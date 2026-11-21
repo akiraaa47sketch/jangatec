@@ -478,7 +478,10 @@ export function animatePill(pill, speed, dt, pose = 'walk', progress = 0) {
     p.armL.rotation.set(-0.5, 0, 0.2);
     p.body.rotation.y = -0.35 * jab; p.body.rotation.x = 0.12 * jab;
   } else if (pose === 'aim') {
-    p.armR.rotation.set(-1.45, 0, -0.15); p.armL.rotation.set(-1.25, 0, 0.35);
+    // braços seguem o ângulo da câmera (aimPitch) e dão tranco no disparo (kick)
+    const ap = pill.userData.aimPitch || 0, kk = pill.userData.kick || 0;
+    p.armR.rotation.set(-1.5 - ap - kk * 0.55, 0.12, -0.12); p.armL.rotation.set(-1.32 - ap - kk * 0.45, -0.25, 0.42);
+    p.body.rotation.set(0.04 - kk * 0.09, -0.12, 0);
   } else if (pose === 'jump') {
     p.armL.rotation.set(-2.4, 0, 0.5); p.armR.rotation.set(-2.4, 0, -0.5);
     p.legL.rotation.set(-0.7, 0, 0); p.legR.rotation.set(0.3, 0, 0);

@@ -27,6 +27,10 @@ export class Player {
     this.swimming = false; this.mantle = null; this.dead = false; this.aboard = false;
     // 1ª pessoa por padrão; [F] alterna. O corpo some só para o próprio jogador.
     this.firstPerson = true; this.fovSens = 1; this.eyeHeight = 1.6;
+    this.zoom = 5.2;          // distância da câmera em 3ª pessoa ([I] aproxima, [O] afasta)
+    this.aimHold = 0;         // depois de um tiro "do quadril", segura a pose de mira um instante
+    this.kick = 0;            // recuo visual dos braços em 3ª pessoa
+    this.flashT = 0;
     this.mesh = makeHumanoid(0xb49b7b, 0xb97251);
     this.proceduralRig = this.mesh.userData.parts.rig;
     this.pillVisual = null;
@@ -73,6 +77,9 @@ export class Player {
     if (this.G.viewmodel) this.G.viewmodel.setGloveColor(this.appearance.pill);
   }
 
+  // Tiro em 3ª pessoa: tranco nos braços, clarão na boca do cano e pose de mira por um instante.
+  onShot() { this.aimHold = 0.8; this.kick = 1; this.flashT = 0.06; }
+
   forward() { return [-Math.sin(this.camYaw), -Math.cos(this.camYaw)]; }
 
   update(dt, t) {
@@ -109,7 +116,7 @@ export class Player {
     b.vel.x += (dx * speed - b.vel.x) * k;
     b.vel.z += (dz * speed - b.vel.z) * k;
     if (this.firstPerson) this.yaw = Math.atan2(fx, fz);
-    else if (aiming) this.yaw = lerpAngle(this.yaw, Math.atan2(fx, fz), Math.min(1, 16 * dt));
+    else if (aiming || this.aimHold > 0) this.yaw = lerpAngle(this.yaw, Math.atan2(fx, fz), Math.min(1, 16 * dt));
     else if (moving) this.yaw = lerpAngle(this.yaw, Math.atan2(dx, dz), Math.min(1, 12 * dt));
 
     if (inp.hit('Space')) {
@@ -208,6 +215,17 @@ export class Player {
       this.mantle ? this.mantle.height : 0);
     if (this.pillVisual) {
       this.proceduralRig.visible = false;
+      // arma de fogo: mira (ou acabou de atirar) = braços apontando para onde a câmera olha
+      const w = G.combat.weapon, gun = w && w.ammo;
+      if (gun && this.aimHold > 0 && pose === 'walk') pose = 'aim';
+      this.aimHold = Math.max(0, this.aimHold - dt);
+      this.kick = Math.max(0, this.kick - dt * 7);
+      const pd = this.pillVisual.children[0].userData;
+      pd.aimPitch = this.firstPerson ? 0 : -this.camPitch * 0.9; pd.kick = this.kick;
+      if (this.flashMesh) {
+        this.flashT -= dt; this.flashMesh.visible = this.flashT > 0;
+        if (this.flashMesh.visible) { this.flashMesh.rotation.z = Math.random() * 6.28; this.flashMesh.scale.setScalar(2.2 + Math.random()); }
+      }
       const pillPose = pose === 'climb' || pose === 'vault' ? 'jump' : pose;
       animatePill(this.pillVisual.children[0], speed, dt, pillPose, progress);
       return;
@@ -240,17 +258,32 @@ export class Player {
   }
 
   updateCamera(dt, t) {
+    // retícula: anel "sobre o ombro" em 3ª pessoa, abre com o recuo e fecha ao mirar
+    const xh = this._xh || (this._xh = document.getElementById('crosshair'));
+    if (xh) {
+      const tp = !this.firstPerson, w = this.G.combat.weapon;
+      xh.classList.toggle('tp', tp);
+      if (tp) xh.classList.remove('ads'); // a classe de mira da 1ª pessoa não pode ficar presa na 3ª
+      xh.classList.toggle('melee', !!(tp && w && w.melee));
+      if (tp) xh.style.setProperty('--s', (1 + (this.G.combat.bloom || 0) * 0.9 - (this.aimBlend || 0) * 0.3).toFixed(3));
+    }
     if (this.firstPerson) { this.updateFirstPersonCamera(dt, t); return; }
     const G = this.G, cam = G.camera, aiming = G.combat.aiming;
     this.mesh.updateWorldMatrix(true, false);
     this.mesh.getWorldPosition(_v); _v.y += 1.6;
     this.camTarget.lerp(_v, 1 - Math.exp(-20 * dt));
-    this.camDist = lerp(this.camDist, aiming ? 2.3 : 5.2, Math.min(1, 10 * dt));
+    // zoom da 3ª pessoa: [I] aproxima, [O] afasta (mira sempre puxa para perto do ombro)
+    if (G.input.hit('KeyI')) this.zoom = clamp(this.zoom - 0.8, 1.8, 10);
+    if (G.input.hit('KeyO')) this.zoom = clamp(this.zoom + 0.8, 1.8, 10);
+    this.aimBlend = lerp(this.aimBlend || 0, aiming ? 1 : 0, Math.min(1, 12 * dt));
+    this.camDist = lerp(this.camDist, aiming ? Math.min(this.zoom, 1.9) : this.zoom, Math.min(1, 10 * dt));
     cam.fov = lerp(cam.fov, aiming ? 48 : 68, Math.min(1, 10 * dt));
     cam.updateProjectionMatrix();
     // Câmera sobre o ombro direito (o personagem não tapa a mira).
     const rx = Math.cos(this.camYaw), rz = -Math.sin(this.camYaw);
-    const origin = _v.copy(this.camTarget); origin.x += rx * 0.6; origin.z += rz * 0.6;
+    // sobre o ombro: mais para a direita e um pouco mais baixo quando mira
+    const sh = 0.6 + this.aimBlend * 0.25;
+    const origin = _v.copy(this.camTarget); origin.x += rx * sh; origin.z += rz * sh; origin.y -= this.aimBlend * 0.15;
     const cp = Math.cos(this.camPitch);
     _d.set(Math.sin(this.camYaw) * cp, Math.sin(this.camPitch), Math.cos(this.camYaw) * cp);
     let dist = this.camDist;

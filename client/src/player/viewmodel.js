@@ -512,7 +512,7 @@ export class ViewModel {
     this.fovTarget = spec && spec.type !== 'melee' ? lerp(baseFov, spec.adsFov, adsEff) : baseFov;
 
     // luneta e mira
-    const scoped = !!spec && spec.scope && adsEff > 0.88;
+    const scoped = !!(spec && spec.scope && adsEff > 0.88);
     this.scoped = scoped;
     this.scopeEl.hidden = !scoped;
     if (scoped) this.weaponRoot.visible = false;
@@ -520,7 +520,8 @@ export class ViewModel {
     else for (const h of this.hands) h.root.visible = true;
     if (scoped) for (const a of this.arms) a.root.visible = false;
     else for (const a of this.arms) a.root.visible = true;
-    if (this.crosshair) this.crosshair.classList.toggle('ads', adsEff > 0.6 || scoped);
+    // !!: com toggle(classe, undefined) o navegador INVERTE a classe a cada quadro (a retícula piscava)
+    if (this.crosshair) this.crosshair.classList.toggle('ads', !!(adsEff > 0.6 || scoped));
   }
 
   updateCycle(dt, spec, parts) {

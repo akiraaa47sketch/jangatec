@@ -306,3 +306,13 @@ body.touch #fps { left: auto; right: calc(14px + env(safe-area-inset-right)); to
   color: #2b1c08; background: linear-gradient(#f6d58c, var(--brass)); border: 1px solid var(--brass-dark); }
 #benchResults button.alt { background: transparent; color: var(--ink); border-color: var(--line); font: 800 14px var(--ui); }
 @media (max-width: 560px) { .bench-grid { grid-template-columns: repeat(2, 1fr); } }
+
+/* retícula de 3ª pessoa (mira sobre o ombro) */
+#crosshair.tp { width: 30px; height: 30px; margin: -15px; border: 2px solid rgba(255, 255, 255, 0.85); background: none;
+  transform: scale(var(--s, 1)); transition: transform 0.05s linear; box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.45), inset 0 0 0 1px rgba(0, 0, 0, 0.35); }
+#crosshair.tp::before { content: ''; position: absolute; inset: -9px; border-radius: 50%;
+  background: linear-gradient(#fff, #fff) 50% 0 / 2px 6px no-repeat, linear-gradient(#fff, #fff) 50% 100% / 2px 6px no-repeat,
+    linear-gradient(#fff, #fff) 0 50% / 6px 2px no-repeat, linear-gradient(#fff, #fff) 100% 50% / 6px 2px no-repeat; opacity: 0.9; }
+#crosshair.tp::after { width: 3px; height: 3px; margin: -1.5px; background: #ff4b3a; box-shadow: 0 0 4px #ff4b3a; }
+#crosshair.tp.melee { width: 10px; height: 10px; margin: -5px; transform: none; }
+#crosshair.tp.melee::before { display: none; }

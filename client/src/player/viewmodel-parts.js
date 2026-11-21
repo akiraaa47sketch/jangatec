@@ -16,6 +16,10 @@ export const MAT = {
   skin: std(0xb97251, 0.86),
   glove: new THREE.MeshPhysicalMaterial({ color: 0xd3202b, roughness: 0.38, clearcoat: 0.6, clearcoatRoughness: 0.35 }),
   tube: new THREE.MeshStandardMaterial({ color: 0x2b2220, roughness: 0.6 }),
+  gloveSeam: new THREE.MeshStandardMaterial({ color: 0x821319, roughness: 0.7 }),
+  rdGlass: new THREE.MeshStandardMaterial({ color: 0x9fd8c8, roughness: 0.05, metalness: 0.3, transparent: true, opacity: 0.16, depthWrite: false, side: THREE.DoubleSide }),
+  rdDot: new THREE.MeshBasicMaterial({ color: 0xff2a1a, toneMapped: false }),
+  rdGlow: new THREE.MeshBasicMaterial({ color: 0xff3a20, transparent: true, opacity: 0.35, blending: THREE.AdditiveBlending, depthWrite: false, toneMapped: false }),
   skinDark: std(0x9c5b3e, 0.9),
   nail: std(0xd8b79c, 0.7),
   strap: std(0x583a28, 0.92),
@@ -88,39 +92,69 @@ const capsuleZ = (r, len, mat) => {
   return new THREE.Mesh(g, mat);
 };
 
-// Mão da pílula = luva de boxe. Mesma API da antiga mão articulada ({ root, setPose }):
-// origem no punho, "dedos" para -Z, palma para -Y, polegar em -X (mão direita).
-// setPose(c, t): c = fechamento (0..1) achata/aperta a luva; t[0] gira o polegar.
+// Mão enluvada da pílula: formato humano, mas gordinha e arredondada (luva de desenho animado),
+// na cor das luvas escolhidas. Mesma articulação da mão antiga: origem no punho, dedos para -Z,
+// palma para -Y, polegar em -X (mão direita); setPose(c, t) dobra dedos e polegar.
+const GLOVE_FINGERS = [
+  { x: -0.03, len: [0.036, 0.026, 0.022], r: 0.0148 },
+  { x: -0.0095, len: [0.04, 0.028, 0.022], r: 0.0152 },
+  { x: 0.011, len: [0.037, 0.026, 0.02], r: 0.0148 },
+  { x: 0.031, len: [0.03, 0.021, 0.018], r: 0.0138 },
+];
+const roundZ = (r, len, mat) => {
+  const g = new THREE.CapsuleGeometry(r, Math.max(0.001, len - r * 2), 6, 14);
+  g.rotateX(Math.PI / 2); g.translate(0, 0, -len / 2);
+  return new THREE.Mesh(g, mat);
+};
 export function buildHand(mirror = false) {
   const root = new THREE.Group();
   const inner = new THREE.Group();
   if (mirror) inner.scale.x = -1;
   root.add(inner);
-  const fist = new THREE.Mesh(new THREE.SphereGeometry(0.062, 24, 18), MAT.glove);
-  fist.scale.set(1.08, 0.92, 1.18); fist.position.set(0, 0.004, -0.07);
-  const knuckle = new THREE.Mesh(new THREE.SphereGeometry(0.045, 18, 12), MAT.glove);
-  knuckle.scale.set(1.35, 0.8, 0.8); knuckle.position.set(0, 0.018, -0.115);
-  const thumbPivot = new THREE.Group(); thumbPivot.position.set(-0.052, -0.006, -0.05);
-  const thumb = new THREE.Mesh(new THREE.CapsuleGeometry(0.02, 0.036, 6, 12), MAT.glove);
-  thumb.rotation.set(Math.PI / 2 - 0.4, 0, 0.35); thumb.position.z = -0.018; thumbPivot.add(thumb);
-  const cuff = new THREE.Mesh(new THREE.CylinderGeometry(0.044, 0.05, 0.05, 20), MAT.glove);
-  cuff.rotation.x = Math.PI / 2; cuff.position.z = -0.005;
-  const lip = new THREE.Mesh(new THREE.TorusGeometry(0.046, 0.009, 8, 22), MAT.glove);
-  lip.position.z = 0.02;
-  const lace = new THREE.Mesh(new THREE.BoxGeometry(0.012, 0.006, 0.05), MAT.white); lace.position.set(0, 0.05, -0.002);
-  add(inner, fist, knuckle, thumbPivot, cuff, lip, lace);
+  // palma = esfera achatada (dorso redondo), base dos dedos e o punho da luva
+  const palm = new THREE.Mesh(new THREE.SphereGeometry(0.05, 24, 16), MAT.glove);
+  palm.scale.set(1.0, 0.52, 1.0); palm.position.set(0, 0.002, -0.05);
+  const knuckles = new THREE.Mesh(new THREE.CapsuleGeometry(0.017, 0.06, 6, 14), MAT.glove);
+  knuckles.rotation.z = Math.PI / 2; knuckles.position.set(0, 0.0, -0.088);
+  const cuff = new THREE.Mesh(new THREE.CylinderGeometry(0.04, 0.046, 0.042, 22), MAT.glove);
+  cuff.rotation.x = Math.PI / 2; cuff.position.z = 0.004;
+  const roll = new THREE.Mesh(new THREE.TorusGeometry(0.044, 0.009, 8, 24), MAT.glove); roll.position.z = 0.026;
+  for (const x of [-0.016, 0, 0.016]) { // costuras no dorso
+    const seam = new THREE.Mesh(new THREE.CapsuleGeometry(0.0022, 0.03, 2, 6), MAT.gloveSeam);
+    seam.rotation.x = Math.PI / 2; seam.position.set(x, 0.026, -0.05); inner.add(seam);
+  }
+  add(inner, palm, knuckles, cuff, roll);
+  const fingers = GLOVE_FINGERS.map((f) => {
+    const base = new THREE.Group(); base.position.set(f.x, -0.002, -0.09);
+    base.add(roundZ(f.r, f.len[0], MAT.glove));
+    const j2 = new THREE.Group(); j2.position.z = -f.len[0]; base.add(j2);
+    j2.add(roundZ(f.r * 0.97, f.len[1], MAT.glove));
+    const j3 = new THREE.Group(); j3.position.z = -f.len[1]; j2.add(j3);
+    j3.add(roundZ(f.r * 0.95, f.len[2], MAT.glove));
+    inner.add(base);
+    return { base, j2, j3 };
+  });
+  const tBase = new THREE.Group(); tBase.position.set(-0.042, -0.006, -0.035);
+  tBase.add(roundZ(0.0165, 0.042, MAT.glove));
+  const tJ = new THREE.Group(); tJ.position.z = -0.042; tBase.add(tJ);
+  tJ.add(roundZ(0.0155, 0.032, MAT.glove));
+  inner.add(tBase);
   const setPose = (c, t) => {
-    const k = (c[0] + c[1] + c[2] + c[3]) / 4;            // mão fechada = luva mais compacta
-    fist.scale.set(1.08, 0.92 - k * 0.08, 1.18 - k * 0.16);
-    knuckle.position.z = -0.115 + k * 0.02;
-    thumbPivot.rotation.set(t[1] * 0.5, t[0] * 0.6, 0);
+    for (let i = 0; i < 4; i++) {
+      const k = c[i], f = fingers[i];
+      f.base.rotation.x = -k * 1.2; f.j2.rotation.x = -k * 1.4; f.j3.rotation.x = -k * 0.9;
+    }
+    tBase.rotation.set(t[1], t[0], 0); tJ.rotation.x = -t[2];
   };
   setPose([0.3, 0.3, 0.3, 0.3], [0.5, -0.2, 0.3]);
   return { root, setPose };
 }
 
 // Cor da luva (vem da personalização da pílula).
-export function setGloveColor(hex) { MAT.glove.color.setHex(hex); }
+export function setGloveColor(hex) {
+  MAT.glove.color.setHex(hex);
+  MAT.gloveSeam.color.setHex(hex).multiplyScalar(0.62); // costura um tom mais escuro
+}
 
 // ---------- braço com IK de dois ossos ----------
 const ARM = { upper: 0.36, fore: 0.33 };
@@ -144,8 +178,8 @@ function place(mesh, from, to) {
 export function buildArm() {
   const root = new THREE.Group();
   // bracinhos de tubo da pílula (finos e escuros); manga e punho somem dentro da luva
-  const upper = limb(0.017, 0.017, MAT.tube, 10);
-  const fore = limb(0.016, 0.017, MAT.tube, 10);
+  const upper = limb(0.019, 0.019, MAT.tube, 12);
+  const fore = limb(0.018, 0.019, MAT.tube, 12);
   const elbow = new THREE.Mesh(new THREE.SphereGeometry(0.018, 10, 8), MAT.tube);
   const cuff = new THREE.Mesh(new THREE.CylinderGeometry(0.001, 0.001, 0.001, 3), MAT.tube); cuff.visible = false;
   const sleeve = limb(0.001, 0.001, MAT.tube, 3); sleeve.visible = false;
@@ -209,6 +243,21 @@ function trigger(g, z = 0.0, y = -0.04) {
   guard.rotation.set(0, Math.PI / 2, Math.PI); guard.position.set(0, y + 0.004, z);
   const tr = box(0.006, 0.022, 0.006, MAT.steel, 0, y + 0.004, z + 0.004); tr.rotation.x = 0.35;
   add(g, guard, tr);
+}
+// Mira red dot: base no trilho, janela com vidro e o ponto vermelho no centro.
+// Retorna a altura do ponto (usada como sightY: na mira o ponto fica no centro da tela).
+function redDot(g, y0, z) {
+  const R = 0.0145, cy = y0 + 0.011 + R;
+  add(g, box(0.026, 0.009, 0.046, MAT.black, 0, y0 + 0.0045, z + 0.004));        // base/trava
+  add(g, box(0.008, 0.006, 0.014, MAT.black, 0.014, y0 + 0.004, z + 0.012));     // parafuso lateral
+  const frame = new THREE.Mesh(new THREE.TorusGeometry(R + 0.0025, 0.0032, 8, 28), MAT.black);
+  frame.position.set(0, cy, z - 0.008); add(g, frame);
+  for (const sd of [-1, 1]) add(g, box(0.004, R * 1.4, 0.026, MAT.black, sd * (R + 0.003), y0 + 0.009 + R * 0.7, z));
+  add(g, box(0.006, 0.006, 0.012, MAT.black, R * 0.9, cy + R * 0.8, z + 0.006));  // botão de brilho
+  const glass = new THREE.Mesh(new THREE.CircleGeometry(R, 24), MAT.rdGlass); glass.position.set(0, cy, z - 0.0085); add(g, glass);
+  const dot = new THREE.Mesh(new THREE.SphereGeometry(0.0011, 8, 6), MAT.rdDot); dot.position.set(0, cy, z - 0.004); add(g, dot);
+  const glow = new THREE.Mesh(new THREE.CircleGeometry(0.0034, 14), MAT.rdGlow); glow.position.set(0, cy, z - 0.0042); add(g, glow);
+  return cy;
 }
 // Fita adesiva enrolada (anéis levemente tortos).
 function tape(g, z, r, n = 3, along = 0.022) {
@@ -325,9 +374,10 @@ SPECS.revolver = () => {
   add(g, box(0.014, 0.014, 0.02, MAT.black, 0, 0.073, 0.052));  // alça
   const hammer = box(0.012, 0.03, 0.02, MAT.iron, 0, 0.075, 0.07); hammer.rotation.x = -0.5;
   add(g, hammer);
+  const rdY = redDot(g, 0.074, 0.005);
   const muzzle = new THREE.Vector3(0, 0.046, -0.255);
   return {
-    group: g, type: 'pistol', reload: 'revolver', muzzle, sightY: 0.074, adsDist: 0.38, adsFov: 62, flash: 1.1,
+    group: g, type: 'pistol', reload: 'revolver', muzzle, sightY: rdY, adsDist: 0.38, adsFov: 62, flash: 1.1,
     hold: { p: [0.17, -0.11, -0.46], r: [0.08, 0.06, 0] },
     gripR: { p: [0, -0.08, 0.085], r: [0, 0, -1.55], c: 0.9, idx: 0.3, th: [-0.35, -0.2, 0.2] },
     gripL: { p: [0, -0.115, 0.085], r: [0, 0, 1.55], c: 0.85, th: [-0.2, 0.0, 0.2] },
@@ -349,6 +399,7 @@ SPECS.pistola = () => {
   add(slide, box(0.01, 0.01, 0.014, MAT.black, 0, 0.063, 0.087));   // alça
   add(slide, box(0.006, 0.012, 0.01, MAT.black, 0, 0.063, -0.092));  // massa
   add(slide, box(0.002, 0.016, 0.05, MAT.brass, 0.017, 0.044, -0.02)); // janela de ejeção
+  const rdY = redDot(slide, 0.058, 0.03); // red dot preso no ferrolho (recua junto)
   g.add(slide);
   for (let i = 0; i < 4; i++) add(g, box(0.034, 0.006, 0.008, MAT.black, 0, -0.016, -0.045 - i * 0.012)); // trilho
   trigger(g, 0.02, -0.04);
@@ -360,7 +411,7 @@ SPECS.pistola = () => {
   g.add(mag);
   const muzzle = new THREE.Vector3(0, 0.04, -0.105);
   return {
-    group: g, type: 'pistol', reload: 'mag', muzzle, sightY: 0.066, adsDist: 0.38, adsFov: 62, flash: 1.0,
+    group: g, type: 'pistol', reload: 'mag', muzzle, sightY: rdY, adsDist: 0.38, adsFov: 62, flash: 1.0,
     eject: new THREE.Vector3(0.02, 0.045, -0.02),
     hold: { p: [0.16, -0.1, -0.46], r: [0.08, 0.05, 0] },
     gripR: { p: [0, -0.065, 0.065], r: [0, 0, -1.55], c: 0.9, idx: 0.3, th: [-0.35, -0.2, 0.2] },
@@ -390,9 +441,10 @@ SPECS.escopeta = () => {
     add(g, cylY(0.0098, 0.012, MAT.brass, 0.03, -0.042, 0.1 + i * 0.024));
   }
   trigger(g, 0.0, -0.04);
+  const rdY = redDot(g, 0.062, -0.05);
   const muzzle = new THREE.Vector3(0, 0.04, -0.7);
   return {
-    group: g, type: 'long', reload: 'shotgun', muzzle, sightY: 0.075, adsDist: 0.42, adsFov: 60, flash: 1.6,
+    group: g, type: 'long', reload: 'shotgun', muzzle, sightY: rdY, adsDist: 0.42, adsFov: 60, flash: 1.6,
     eject: new THREE.Vector3(0.026, 0.03, -0.02),
     hold: { p: [0.15, -0.12, -0.46], r: [0.03, 0.09, 0] },
     gripR: { p: [0, -0.075, 0.07], r: [0, 0, -1.55], c: 0.9, idx: 0.3, th: [-0.35, -0.2, 0.2] },
@@ -413,6 +465,7 @@ SPECS.rifle = () => {
   for (const z of [-0.87, -0.89]) add(g, box(0.026, 0.004, 0.004, MAT.iron, 0, 0.034, z));
   for (let i = 0; i < 5; i++) add(g, box(0.022, 0.006, 0.01, MAT.black, 0, 0.076, -0.12 - i * 0.03)); // trilho superior
   trigger(g, 0.0, -0.04);
+  const rdY = redDot(g, 0.079, -0.17);
   add(g, box(0.008, 0.03, 0.008, MAT.black, 0, 0.066, -0.82));                  // massa
   add(g, box(0.02, 0.016, 0.014, MAT.black, 0, 0.082, 0.07));                   // alça
   add(g, profile([[0.0, 0.05], [-0.1, 0.05], [-0.22, 0.04], [-0.25, -0.05], [-0.2, -0.055], [-0.14, -0.03], [-0.08, -0.04]], 0.045, MAT.woodDark));
@@ -427,7 +480,7 @@ SPECS.rifle = () => {
   g.add(bolt);
   const muzzle = new THREE.Vector3(0, 0.034, -0.9);
   return {
-    group: g, type: 'long', reload: 'mag', muzzle, sightY: 0.09, adsDist: 0.42, adsFov: 54, flash: 1.3,
+    group: g, type: 'long', reload: 'mag', muzzle, sightY: rdY, adsDist: 0.42, adsFov: 54, flash: 1.3,
     eject: new THREE.Vector3(0.03, 0.045, -0.06),
     hold: { p: [0.15, -0.12, -0.46], r: [0.03, 0.09, 0] },
     gripR: { p: [0, -0.07, 0.075], r: [0, 0, -1.55], c: 0.9, idx: 0.3, th: [-0.35, -0.2, 0.2] },

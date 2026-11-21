@@ -82,6 +82,12 @@ vermelhos, sorriso serrilhado e acessórios por tipo — Saqueador (bandana, luv
 (boné e revólver), Brutamontes (capacete com chifres), Corredor (olhos desencontrados) e Pirata
 (tricórnio, tapa-olho e gancho).
 
+Em 3ª pessoa, **[I] aproxima e [O] afasta** a câmera; mirar (botão direito) leva a câmera para
+**sobre o ombro**, com retícula própria que abre com o recuo. A pílula aponta a arma para onde você
+olha, dá tranco no disparo e mostra o clarão na boca do cano. Revólver, pistola, escopeta e rifle
+têm **mira red dot** (o ponto fica no centro da tela ao mirar). As mãos em 1ª pessoa são luvas
+arredondadas com dedos, na cor escolhida para a pílula. Opções gráficas: tecla **G**.
+
 As **armas** usam o mesmo modelo detalhado em 1ª e 3ª pessoa (`client/src/player/viewmodel-parts.js`):
 madeira texturizada, cantos chanfrados, gatilho com guarda-mato e detalhes por arma (fita, pregos
 tortos, estrias do tambor, trilho, cartuchos na coronha, bipé…).
@@ -140,7 +146,7 @@ cinemático da jangada. A água não é simulada como fluido.
 
 ## Gráficos
 
-**Opções gráficas** (botão no menu, tecla `O` no jogo, ⚙ no celular; salvas no navegador) e
+**Opções gráficas** (botão no menu, tecla `G` no jogo, ⚙ no celular; salvas no navegador) e
 **contador de FPS** (`F3`). Predefinições Baixo / Médio / Alto / **Ultra**, ou ajuste fino:
 escala de renderização (50–100%), upscaler, nitidez, sombras (até 4096 com borda suave e área maior),
 MSAA 4x/8x, distância de visão (chunks carregados + neblina), qualidade da água (densidade da malha),

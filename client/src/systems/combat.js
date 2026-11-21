@@ -79,6 +79,7 @@ export class Combat {
     for (const old of mesh.children.slice()) mesh.remove(old);
     const model = buildWeapon(id);
     if (model) { model.flashMesh.visible = false; mesh.add(model.group); }
+    this.G.player.flashMesh = model && model.muzzle ? model.flashMesh : null;
     mesh.visible = !this.buildMode;
     return true;
   }
@@ -166,7 +167,11 @@ export class Combat {
     }
     this.mags[w.id]--;
     if (vm) vm.onFire(w);
-    const origin = vm ? vm.muzzleWorld(_mw) : _m; // 1ª pessoa: o rastro sai da boca da arma na tela
+    else G.player.onShot();
+    this.bloom = Math.min(1, (this.bloom || 0) + 0.45 + w.recoil * 8); // retícula abre com o recuo
+    // 1ª pessoa: o rastro sai da boca da arma na tela; 3ª pessoa: da boca do cano do modelo
+    let origin = vm ? vm.muzzleWorld(_mw) : _m;
+    if (!vm && G.player.flashMesh) origin = G.player.flashMesh.getWorldPosition(_mw);
     const spread = w.spread * (this.aiming ? 0.4 : 1);
     cam.getWorldPosition(_o);
     const targets = G.enemies.hitMeshes.concat(G.solids);
@@ -191,6 +196,7 @@ export class Combat {
     const G = this.G, inp = G.input, w = this.weapon;
     const building = G.build.active, looting = G.interact.lootOpen;
     this.cooldown -= dt;
+    this.bloom = Math.max(0, (this.bloom || 0) - dt * 2.5);
     this.aiming = !!w && !building && !looting && !!w.ammo && inp.mouse.right && !G.player.dead && !G.player.swimming;
     if (this.reloading > 0 && w) {
       this.reloading -= dt;
