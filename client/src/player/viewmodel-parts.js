@@ -4,25 +4,33 @@
 // Convenção dos modelos de arma: origem perto da empunhadura, cano apontando para -Z,
 // +Y para cima, +X para a direita do atirador.
 import * as THREE from '../three.js';
+import { woodTexture, woodBump, metalTexture, repeated } from '../world/textures.js';
 
-const std = (color, roughness = 0.9, metalness = 0) =>
-  new THREE.MeshStandardMaterial({ color, roughness, metalness, flatShading: true });
+const std = (color, roughness = 0.9, metalness = 0, extra = {}) =>
+  new THREE.MeshStandardMaterial({ color, roughness, metalness, ...extra });
+// madeira com veios e relevo; metal com leve desgaste
+const woodMat = (color) => std(color, 0.82, 0, { map: repeated(woodTexture(), 4), bumpMap: repeated(woodBump(), 4), bumpScale: 0.6 });
+const metalMat = (color, roughness, metalness) => std(color, roughness, metalness, { map: repeated(metalTexture(), 3) });
 
 export const MAT = {
   skin: std(0xb97251, 0.86),
+  glove: new THREE.MeshPhysicalMaterial({ color: 0xd3202b, roughness: 0.38, clearcoat: 0.6, clearcoatRoughness: 0.35 }),
+  tube: new THREE.MeshStandardMaterial({ color: 0x2b2220, roughness: 0.6 }),
   skinDark: std(0x9c5b3e, 0.9),
   nail: std(0xd8b79c, 0.7),
   strap: std(0x583a28, 0.92),
   wrap: std(0xd0b99a, 0.97),
   cloth: std(0x8a7a5a, 0.98),
-  wood: std(0x79552f, 0.95),
-  woodDark: std(0x4c3525, 0.95),
-  woodLight: std(0x9a7444, 0.95),
-  steel: std(0xb4b8b6, 0.42, 0.55),
-  iron: std(0x747b7e, 0.55, 0.4),
-  black: std(0x2b2f33, 0.5, 0.35),
-  blued: std(0x3a4046, 0.45, 0.45),
-  rust: std(0x7a5238, 0.95, 0.1),
+  wood: woodMat(0x8a6236),
+  woodDark: woodMat(0x5a3d26),
+  woodLight: woodMat(0xb08a55),
+  steel: std(0xc4c8c6, 0.32, 0.75),
+  iron: metalMat(0x8a9093, 0.5, 0.55),
+  black: std(0x24282c, 0.42, 0.45),
+  blued: std(0x353d47, 0.35, 0.6),
+  rust: metalMat(0x8a5a3a, 0.9, 0.2),
+  tape: std(0x9a9a98, 0.75, 0.05),
+  red2: std(0xc0392b, 0.6),
   brass: std(0xb58d4a, 0.5, 0.5),
   red: std(0xb03a2e, 0.8),
   white: std(0xe8e4da, 0.9),
@@ -37,21 +45,23 @@ const box = (w, h, d, mat, x = 0, y = 0, z = 0) => {
 };
 // Cilindro com eixo em Z. rFront = raio da ponta -Z, rBack = raio da ponta +Z.
 const cylZ = (rFront, rBack, len, mat, x = 0, y = 0, z = 0, seg = 8) => {
-  const g = new THREE.CylinderGeometry(rBack, rFront, len, seg);
+  const g = new THREE.CylinderGeometry(rBack, rFront, len, Math.max(seg, 16));
   g.rotateX(Math.PI / 2);
   const m = new THREE.Mesh(g, mat);
   m.position.set(x, y, z);
   return m;
 };
 const cylY = (r, len, mat, x = 0, y = 0, z = 0, seg = 8) => {
-  const m = new THREE.Mesh(new THREE.CylinderGeometry(r, r, len, seg), mat);
+  const m = new THREE.Mesh(new THREE.CylinderGeometry(r, r, len, Math.max(seg, 12)), mat);
   m.position.set(x, y, z);
   return m;
 };
 // Silhueta lateral extrudada. pontos = [[frente, cima], ...]; espessura em X.
 function profile(points, depth, mat, x = 0, y = 0, z = 0) {
   const shape = new THREE.Shape(points.map(([u, v]) => new THREE.Vector2(u, v)));
-  const geo = new THREE.ExtrudeGeometry(shape, { depth, bevelEnabled: false, steps: 1 });
+  const bev = Math.min(0.003, depth * 0.18); // cantos chanfrados: pegam luz e parecem peças de verdade
+  const geo = new THREE.ExtrudeGeometry(shape, { depth: depth - bev * 2, bevelEnabled: true, bevelThickness: bev, bevelSize: bev, bevelSegments: 2, steps: 1 });
+  geo.translate(0, 0, bev);
   const pos = geo.attributes.position;
   for (let i = 0; i < pos.count; i++) {
     const sx = pos.getX(i), sy = pos.getY(i), sz = pos.getZ(i);
@@ -78,56 +88,39 @@ const capsuleZ = (r, len, mat) => {
   return new THREE.Mesh(g, mat);
 };
 
-// Origem da mão = punho. Dedos apontam para -Z, palma para -Y, polegar em -X (mão direita).
-// A mão esquerda é a mesma malha espelhada em X.
+// Mão da pílula = luva de boxe. Mesma API da antiga mão articulada ({ root, setPose }):
+// origem no punho, "dedos" para -Z, palma para -Y, polegar em -X (mão direita).
+// setPose(c, t): c = fechamento (0..1) achata/aperta a luva; t[0] gira o polegar.
 export function buildHand(mirror = false) {
   const root = new THREE.Group();
   const inner = new THREE.Group();
   if (mirror) inner.scale.x = -1;
   root.add(inner);
-
-  const palm = box(0.088, 0.03, 0.09, MAT.skin, 0, 0, -0.045);
-  inner.add(palm);
-  inner.add(box(0.08, 0.022, 0.03, MAT.skinDark, 0, -0.002, -0.095)); // base dos dedos
-  inner.add(box(0.07, 0.012, 0.05, MAT.skin, 0, 0.018, -0.045));      // dorso levemente elevado
-
-  const fingers = FINGERS.map((f) => {
-    const base = new THREE.Group();
-    base.position.set(f.x, -0.002, -0.09);
-    const s1 = capsuleZ(f.r, f.len[0], MAT.skin);
-    base.add(s1);
-    const j2 = new THREE.Group(); j2.position.z = -f.len[0]; base.add(j2);
-    j2.add(capsuleZ(f.r * 0.96, f.len[1], MAT.skin));
-    const j3 = new THREE.Group(); j3.position.z = -f.len[1]; j2.add(j3);
-    j3.add(capsuleZ(f.r * 0.9, f.len[2], MAT.skin));
-    const tip = box(f.r * 1.2, f.r * 0.5, 0.008, MAT.nail, 0, f.r * 0.5, -f.len[2] + 0.004);
-    j3.add(tip);
-    inner.add(base);
-    return { base, j2, j3 };
-  });
-
-  const tBase = new THREE.Group();
-  tBase.position.set(-0.04, -0.004, -0.03);
-  tBase.add(capsuleZ(0.0125, 0.045, MAT.skin));
-  const tJ = new THREE.Group(); tJ.position.z = -0.045; tBase.add(tJ);
-  tJ.add(capsuleZ(0.011, 0.034, MAT.skin));
-  tJ.add(box(0.014, 0.006, 0.008, MAT.nail, 0, 0.009, -0.03));
-  inner.add(tBase);
-
-  // pose: { c: [ind, med, anel, mindinho] 0..1, t: [giro, inclinação, dobra] }
+  const fist = new THREE.Mesh(new THREE.SphereGeometry(0.062, 24, 18), MAT.glove);
+  fist.scale.set(1.08, 0.92, 1.18); fist.position.set(0, 0.004, -0.07);
+  const knuckle = new THREE.Mesh(new THREE.SphereGeometry(0.045, 18, 12), MAT.glove);
+  knuckle.scale.set(1.35, 0.8, 0.8); knuckle.position.set(0, 0.018, -0.115);
+  const thumbPivot = new THREE.Group(); thumbPivot.position.set(-0.052, -0.006, -0.05);
+  const thumb = new THREE.Mesh(new THREE.CapsuleGeometry(0.02, 0.036, 6, 12), MAT.glove);
+  thumb.rotation.set(Math.PI / 2 - 0.4, 0, 0.35); thumb.position.z = -0.018; thumbPivot.add(thumb);
+  const cuff = new THREE.Mesh(new THREE.CylinderGeometry(0.044, 0.05, 0.05, 20), MAT.glove);
+  cuff.rotation.x = Math.PI / 2; cuff.position.z = -0.005;
+  const lip = new THREE.Mesh(new THREE.TorusGeometry(0.046, 0.009, 8, 22), MAT.glove);
+  lip.position.z = 0.02;
+  const lace = new THREE.Mesh(new THREE.BoxGeometry(0.012, 0.006, 0.05), MAT.white); lace.position.set(0, 0.05, -0.002);
+  add(inner, fist, knuckle, thumbPivot, cuff, lip, lace);
   const setPose = (c, t) => {
-    for (let i = 0; i < 4; i++) {
-      const k = c[i], f = fingers[i];
-      f.base.rotation.x = -k * 1.2;
-      f.j2.rotation.x = -k * 1.45;
-      f.j3.rotation.x = -k * 0.95;
-    }
-    tBase.rotation.set(t[1], t[0], 0);
-    tJ.rotation.x = -t[2];
+    const k = (c[0] + c[1] + c[2] + c[3]) / 4;            // mão fechada = luva mais compacta
+    fist.scale.set(1.08, 0.92 - k * 0.08, 1.18 - k * 0.16);
+    knuckle.position.z = -0.115 + k * 0.02;
+    thumbPivot.rotation.set(t[1] * 0.5, t[0] * 0.6, 0);
   };
   setPose([0.3, 0.3, 0.3, 0.3], [0.5, -0.2, 0.3]);
   return { root, setPose };
 }
+
+// Cor da luva (vem da personalização da pílula).
+export function setGloveColor(hex) { MAT.glove.color.setHex(hex); }
 
 // ---------- braço com IK de dois ossos ----------
 const ARM = { upper: 0.36, fore: 0.33 };
@@ -150,11 +143,12 @@ function place(mesh, from, to) {
 
 export function buildArm() {
   const root = new THREE.Group();
-  const upper = limb(0.040, 0.048, MAT.skin);
-  const fore = limb(0.029, 0.040, MAT.skin);
-  const elbow = new THREE.Mesh(new THREE.SphereGeometry(0.042, 8, 6), MAT.skin);
-  const cuff = new THREE.Mesh(new THREE.CylinderGeometry(0.036, 0.036, 0.05, 8), MAT.strap);
-  const sleeve = limb(0.052, 0.058, MAT.cloth, 8);
+  // bracinhos de tubo da pílula (finos e escuros); manga e punho somem dentro da luva
+  const upper = limb(0.017, 0.017, MAT.tube, 10);
+  const fore = limb(0.016, 0.017, MAT.tube, 10);
+  const elbow = new THREE.Mesh(new THREE.SphereGeometry(0.018, 10, 8), MAT.tube);
+  const cuff = new THREE.Mesh(new THREE.CylinderGeometry(0.001, 0.001, 0.001, 3), MAT.tube); cuff.visible = false;
+  const sleeve = limb(0.001, 0.001, MAT.tube, 3); sleeve.visible = false;
   add(root, upper, fore, elbow, cuff, sleeve);
 
   // S = ombro, W = punho (ambos no espaço do viewmodel), pole = para onde o cotovelo aponta
@@ -209,6 +203,21 @@ function muzzleFlash() {
 
 const SPECS = {};
 
+// Gatilho + guarda-mato (todas as armas de fogo).
+function trigger(g, z = 0.0, y = -0.04) {
+  const guard = new THREE.Mesh(new THREE.TorusGeometry(0.022, 0.004, 6, 16, Math.PI), MAT.black);
+  guard.rotation.set(0, Math.PI / 2, Math.PI); guard.position.set(0, y + 0.004, z);
+  const tr = box(0.006, 0.022, 0.006, MAT.steel, 0, y + 0.004, z + 0.004); tr.rotation.x = 0.35;
+  add(g, guard, tr);
+}
+// Fita adesiva enrolada (anéis levemente tortos).
+function tape(g, z, r, n = 3, along = 0.022) {
+  for (let i = 0; i < n; i++) {
+    const t = cylZ(r, r, along, MAT.tape, 0, 0, z - i * along * 0.9, 16);
+    t.rotation.z = (i % 2 ? 0.08 : -0.06); add(g, t);
+  }
+}
+
 // ----- corpo a corpo -----
 SPECS.tabua_prego = () => {
   const g = new THREE.Group();
@@ -216,10 +225,15 @@ SPECS.tabua_prego = () => {
   add(g, box(0.07, 0.02, 0.1, MAT.wood, 0.012, 0.004, -0.56)); // ponta lascada
   add(g, box(0.095, 0.034, 0.13, MAT.wrap, 0, 0, 0.02));       // pano na empunhadura
   add(g, box(0.097, 0.036, 0.012, MAT.cloth, 0, 0, -0.045));
-  for (const [x, z] of [[-0.022, -0.4], [0.02, -0.42], [-0.01, -0.5], [0.024, -0.52]]) {
-    add(g, cylY(0.006, 0.075, MAT.iron, x, 0.04, z, 5));
-    add(g, cylY(0.012, 0.006, MAT.iron, x, 0.016, z, 6));
+  for (const [x, z, bend] of [[-0.022, -0.4, 0], [0.02, -0.42, 0.3], [-0.01, -0.5, -0.25], [0.024, -0.52, 0.1], [0.0, -0.33, -0.15]]) {
+    const nail = cylY(0.005, 0.075, MAT.iron, x, 0.04, z, 6); nail.rotation.z = bend; add(g, nail);
+    add(g, cylY(0.011, 0.005, MAT.iron, x, 0.016, z, 8));
   }
+  for (const [x, z, r] of [[-0.03, -0.6, 0.3], [0.025, -0.59, -0.2]]) { // lascas na ponta quebrada
+    const sh = new THREE.Mesh(new THREE.ConeGeometry(0.012, 0.06, 4), MAT.woodLight);
+    sh.rotation.set(-Math.PI / 2, 0, r); sh.position.set(x, 0.0, z); add(g, sh);
+  }
+  add(g, box(0.092, 0.03, 0.03, MAT.tape, 0, 0, -0.12)); // remendo de fita
   return {
     group: g, type: 'melee', muzzle: null, swing: ['overhead', 'slashB'],
     hold: { p: [0.22, -0.1, -0.4], r: [0.85, 0.3, -0.12] },
@@ -232,8 +246,10 @@ SPECS.cano = () => {
   add(g, cylZ(0.024, 0.024, 0.66, MAT.iron, 0, 0, -0.25, 9));
   add(g, cylZ(0.04, 0.04, 0.028, MAT.rust, 0, 0, -0.56, 9));
   add(g, cylZ(0.03, 0.03, 0.02, MAT.rust, 0, 0, -0.3, 9));
-  add(g, cylZ(0.028, 0.028, 0.15, MAT.wrap, 0, 0, 0.04, 9));
+  tape(g, 0.1, 0.029, 6, 0.024);
   add(g, cylZ(0.031, 0.031, 0.012, MAT.strap, 0, 0, -0.04, 9));
+  const tee = cylY(0.032, 0.11, MAT.rust, 0, 0, -0.6); add(g, tee);       // conexão em T na ponta
+  for (const yy of [-0.055, 0.055]) add(g, cylY(0.036, 0.016, MAT.iron, 0, yy, -0.6));
   return {
     group: g, type: 'melee', muzzle: null, swing: ['slashA', 'slashB'],
     hold: { p: [0.22, -0.1, -0.4], r: [0.8, 0.25, -0.1] },
@@ -256,8 +272,10 @@ SPECS.faca_manteiga = () => {
 
 SPECS.bastao = () => {
   const g = new THREE.Group();
-  add(g, cylZ(0.026, 0.032, 0.66, MAT.wood, 0, 0, -0.26, 9));
-  add(g, cylZ(0.035, 0.035, 0.17, MAT.strap, 0, 0, 0.04, 9));
+  add(g, cylZ(0.042, 0.024, 0.66, MAT.wood, 0, 0, -0.26, 16)); // taco: grosso na ponta
+  add(g, new THREE.Mesh(new THREE.SphereGeometry(0.042, 16, 10), MAT.wood).translateZ(-0.59));
+  tape(g, 0.12, 0.028, 6, 0.026);
+  for (const [z, a] of [[-0.45, 0.6], [-0.38, 2.4]]) { const sc = box(0.002, 0.03, 0.05, MAT.woodDark, Math.cos(a) * 0.035, Math.sin(a) * 0.035, z); sc.rotation.z = a; add(g, sc); }
   add(g, cylZ(0.034, 0.034, 0.012, MAT.black, 0, 0, 0.13, 9));
   add(g, cylZ(0.029, 0.029, 0.02, MAT.woodDark, 0, 0, -0.57, 9));
   return {
@@ -294,7 +312,13 @@ SPECS.revolver = () => {
   // placas de madeira da empunhadura
   add(g, profile([[-0.07, -0.015], [-0.11, -0.04], [-0.12, -0.05], [-0.112, -0.135], [-0.058, -0.135], [-0.045, -0.07]], 0.036, MAT.wood));
   const drum = cylZ(0.034, 0.034, 0.06, MAT.iron, 0, 0.032, -0.02, 6);
+  for (let i = 0; i < 6; i++) { // estrias do tambor
+    const a = i / 6 * Math.PI * 2 + Math.PI / 6, fl = box(0.008, 0.008, 0.05, MAT.black, Math.cos(a) * 0.031, Math.sin(a) * 0.031, 0);
+    fl.rotation.z = a; drum.add(fl);
+  }
   add(g, drum);
+  add(g, cylZ(0.005, 0.005, 0.13, MAT.steel, 0, 0.018, -0.12, 8)); // vareta do extrator
+  trigger(g, 0.0, -0.045);
   add(g, cylZ(0.015, 0.015, 0.2, MAT.blued, 0, 0.046, -0.15, 8));
   add(g, box(0.014, 0.012, 0.2, MAT.black, 0, 0.066, -0.15));
   add(g, box(0.008, 0.014, 0.01, MAT.black, 0, 0.075, -0.235)); // massa de mira
@@ -326,6 +350,8 @@ SPECS.pistola = () => {
   add(slide, box(0.006, 0.012, 0.01, MAT.black, 0, 0.063, -0.092));  // massa
   add(slide, box(0.002, 0.016, 0.05, MAT.brass, 0.017, 0.044, -0.02)); // janela de ejeção
   g.add(slide);
+  for (let i = 0; i < 4; i++) add(g, box(0.034, 0.006, 0.008, MAT.black, 0, -0.016, -0.045 - i * 0.012)); // trilho
+  trigger(g, 0.02, -0.04);
   // carregador (desce pelo punho)
   const mag = new THREE.Group();
   add(mag, box(0.024, 0.1, 0.05, MAT.iron, 0, -0.085, -0.045));
@@ -359,6 +385,11 @@ SPECS.escopeta = () => {
   g.add(pump);
   add(g, profile([[0.0, 0.05], [-0.1, 0.05], [-0.22, 0.042], [-0.26, -0.06], [-0.2, -0.06], [-0.14, -0.03],
     [-0.1, -0.12], [-0.045, -0.12], [-0.03, -0.03], [0.02, -0.03]], 0.05, MAT.wood));
+  for (let i = 0; i < 4; i++) { // cartuchos presos na coronha
+    const sh = cylY(0.0095, 0.045, MAT.red2, 0.03, -0.015, 0.1 + i * 0.024); add(g, sh);
+    add(g, cylY(0.0098, 0.012, MAT.brass, 0.03, -0.042, 0.1 + i * 0.024));
+  }
+  trigger(g, 0.0, -0.04);
   const muzzle = new THREE.Vector3(0, 0.04, -0.7);
   return {
     group: g, type: 'long', reload: 'shotgun', muzzle, sightY: 0.075, adsDist: 0.42, adsFov: 60, flash: 1.6,
@@ -379,6 +410,9 @@ SPECS.rifle = () => {
   add(g, box(0.058, 0.014, 0.3, MAT.black, 0, 0.044, -0.34));
   add(g, cylZ(0.0115, 0.0115, 0.42, MAT.blued, 0, 0.034, -0.66, 8));             // cano
   add(g, box(0.02, 0.016, 0.04, MAT.black, 0, 0.034, -0.88));                   // quebra-chamas
+  for (const z of [-0.87, -0.89]) add(g, box(0.026, 0.004, 0.004, MAT.iron, 0, 0.034, z));
+  for (let i = 0; i < 5; i++) add(g, box(0.022, 0.006, 0.01, MAT.black, 0, 0.076, -0.12 - i * 0.03)); // trilho superior
+  trigger(g, 0.0, -0.04);
   add(g, box(0.008, 0.03, 0.008, MAT.black, 0, 0.066, -0.82));                  // massa
   add(g, box(0.02, 0.016, 0.014, MAT.black, 0, 0.082, 0.07));                   // alça
   add(g, profile([[0.0, 0.05], [-0.1, 0.05], [-0.22, 0.04], [-0.25, -0.05], [-0.2, -0.055], [-0.14, -0.03], [-0.08, -0.04]], 0.045, MAT.woodDark));
@@ -422,6 +456,11 @@ SPECS.rifle_precisao = () => {
   add(bolt, cylY(0.007, 0.05, MAT.steel, 0.045, 0.012, 0.03, 6).rotateZ(1.2));
   add(bolt, new THREE.Mesh(new THREE.SphereGeometry(0.013, 6, 5), MAT.black).translateX(0.075).translateY(-0.004).translateZ(0.03));
   g.add(bolt);
+  for (const sd of [-1, 1]) { // bipé dobrado
+    const leg = cylZ(0.005, 0.005, 0.2, MAT.black, sd * 0.02, -0.035, -0.5, 8); leg.rotation.y = sd * 0.05; add(g, leg);
+    add(g, new THREE.Mesh(new THREE.SphereGeometry(0.008, 8, 6), MAT.black).translateX(sd * 0.02).translateY(-0.035).translateZ(-0.4));
+  }
+  trigger(g, 0.0, -0.04);
   const mag = new THREE.Group();
   add(mag, box(0.03, 0.05, 0.06, MAT.black, 0, -0.065, -0.06));
   g.add(mag);

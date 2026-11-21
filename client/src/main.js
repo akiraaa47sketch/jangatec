@@ -25,7 +25,7 @@ import { CharacterMenu } from './ui/character.js';
 import { TouchControls, isTouchDevice } from './ui/touch.js';
 import { Graphics } from './core/graphics.js';
 import { GfxMenu } from './ui/gfxmenu.js';
-import { createCastawayVisual } from './player/castaway.js';
+import { Benchmark } from './systems/benchmark.js';
 
 const $ = (id) => document.getElementById(id);
 const canvas = $('c');
@@ -153,15 +153,11 @@ const charMenu = new CharacterMenu((appearance) => G.player.setAppearance(appear
 window.__charMenu = charMenu; // depuração
 const characterAppearance = () => charMenu.appearance;
 G.player.setAppearance(characterAppearance());
-// Prévia do náufrago assim que o modelo dele carregar.
-const waitCastaway = setInterval(() => {
-  if (!G.player.castawayBase) return;
-  clearInterval(waitCastaway);
-  charMenu.setCastawayFactory((a) => createCastawayVisual(G.player.castawayBase, a));
-}, 300);
+
 
 function start(seed, welcome) {
   G.player.setAppearance(characterAppearance());
+  if (G.world && G.world.farSeabed) scene.remove(G.world.farSeabed); // o mundo do menu sai de cena
   G.world = new World(G, seed);
   if (welcome) {
     for (const placed of welcome.placed || []) G.world.placedStates.set(placed.id, placed);
@@ -206,6 +202,10 @@ $('btnMulti').onclick = () => {
     .catch((e) => status(`${e.message}. Confira o endereço do servidor ou jogue solo.`));
 };
 $('help').onclick = () => { $('help').hidden = true; };
+// Benchmark: mundo fixo (seed 4242), câmera roteirizada e relatório de FPS no fim.
+const startBenchmark = () => { start(4242); G.bench = new Benchmark(G); };
+$('btnBench').onclick = startBenchmark;
+try { if (sessionStorage.getItem('mare-alta-bench')) { sessionStorage.removeItem('mare-alta-bench'); setTimeout(startBenchmark, 600); } } catch { /* ok */ }
 
 // ---------- Loop ----------
 let last = performance.now();
@@ -258,6 +258,7 @@ function frame() {
   G.physics.update(dt, t);
   G.enemies.update(dt);
   G.events.update(dt, t);
+  if (G.bench) G.bench.update(dt);
   G.interact.update(dt);
   G.combat.update(dt);
   G.survival.update(dt);

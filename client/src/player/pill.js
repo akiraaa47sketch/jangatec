@@ -109,6 +109,32 @@ const FACE_DRAW = {
     g.beginPath(); g.moveTo(cx + 0.1 * px, top + 0.14 * px); g.lineTo(cx + 0.19 * px, top + 0.09 * px); g.lineTo(cx + 0.28 * px, top + 0.14 * px); g.stroke();
     g.beginPath(); g.arc(cx + 0.02 * px, top + 0.2 * px, 0.08 * px, 0.1 * Math.PI, 0.7 * Math.PI); g.stroke();
   },
+  // ---- rostos dos inimigos ----
+  malvado(g, cx, top, px) {
+    for (const sd of [-1, 1]) {
+      const ex = cx + sd * 0.19 * px;
+      roundEye(g, ex, top + 0.15 * px, 0.11 * px, 0.08 * px, -sd * 0.01, 0.02, 0.45);
+      g.fillStyle = '#d4141f'; g.beginPath(); g.ellipse(ex - sd * 0.02 * px, top + 0.16 * px, 0.045 * px, 0.045 * px, 0, 0, Math.PI * 2); g.fill();
+      g.fillStyle = '#111'; g.beginPath(); // sobrancelha em V
+      g.moveTo(ex - sd * 0.17 * px, top + 0.0 * px); g.lineTo(ex + sd * 0.14 * px, top + 0.12 * px);
+      g.lineTo(ex + sd * 0.14 * px, top + 0.17 * px); g.lineTo(ex - sd * 0.17 * px, top + 0.06 * px); g.fill();
+    }
+    evilGrin(g, cx, top + 0.3 * px, px);
+  },
+  louco(g, cx, top, px) {
+    roundEye(g, cx - 0.19 * px, top + 0.15 * px, 0.13 * px, 0.14 * px, 0.02, -0.02, 0.22);
+    roundEye(g, cx + 0.19 * px, top + 0.15 * px, 0.08 * px, 0.08 * px, -0.01, 0.01, 0.4);
+    for (const e of [[-0.19, 0.022], [0.19, 0.014]]) { g.fillStyle = '#d4141f'; g.beginPath(); g.arc(cx + e[0] * px, top + 0.15 * px, e[1] * px, 0, Math.PI * 2); g.fill(); }
+    evilGrin(g, cx, top + 0.33 * px, px, 0.14);
+  },
+  pirata(g, cx, top, px) {
+    roundEye(g, cx + 0.19 * px, top + 0.15 * px, 0.1 * px, 0.08 * px, -0.01, 0.02, 0.45);
+    g.fillStyle = '#d4141f'; g.beginPath(); g.arc(cx + 0.18 * px, top + 0.16 * px, 0.04 * px, 0, Math.PI * 2); g.fill();
+    g.fillStyle = '#111'; g.beginPath(); g.ellipse(cx - 0.19 * px, top + 0.15 * px, 0.12 * px, 0.1 * px, 0, 0, Math.PI * 2); g.fill(); // tapa-olho
+    g.fillRect(cx - 0.5 * px, top + 0.02 * px, px, 0.025 * px);                                                              // tira
+    g.fillRect(cx + 0.07 * px, top + 0.02 * px, 0.24 * px, 0.035 * px);
+    evilGrin(g, cx, top + 0.3 * px, px, 0.1, true);
+  },
   oculos(g, cx, top, px) {
     g.fillStyle = '#121212';
     for (const s of [-1, 1]) {
@@ -138,6 +164,18 @@ function roundEye(g, ex, ey, ew, eh, lookX, lookY, pupil = 0.5) {
   g.fillStyle = 'rgba(255,255,255,0.9)'; g.beginPath(); g.arc(ex - ew * 0.18, ey - eh * 0.2, ew * 0.14, 0, Math.PI * 2); g.fill();
 }
 const mouthLine = (g, x, y, w) => { g.fillStyle = '#222'; g.fillRect(x - w / 2, y, w, 4); };
+// sorriso malvado com dentes serrilhados (gold = um dente de ouro)
+function evilGrin(g, cx, y, px, w = 0.12, gold = false) {
+  const hw = w * px, h = 0.07 * px;
+  g.fillStyle = '#1a0d0d'; g.beginPath(); g.moveTo(cx - hw, y - h * 0.3); g.quadraticCurveTo(cx, y + h * 1.4, cx + hw, y - h * 0.3);
+  g.quadraticCurveTo(cx, y + h * 0.3, cx - hw, y - h * 0.3); g.fill();
+  const n = 6;
+  for (let i = 0; i < n; i++) {
+    const x0 = cx - hw * 0.8 + (i / n) * hw * 1.6, x1 = x0 + hw * 1.6 / n;
+    g.fillStyle = gold && i === 2 ? '#e0b23a' : '#f3efe3';
+    g.beginPath(); g.moveTo(x0, y - h * 0.05 + (Math.abs(i - 2.5) * h * 0.08)); g.lineTo(x1, y - h * 0.05 + (Math.abs(i - 2.5) * h * 0.08)); g.lineTo((x0 + x1) / 2, y + h * 0.4); g.fill();
+  }
+}
 function blush(g, cx, y, px) {
   for (const s of [-1, 1]) {
     const gr = g.createRadialGradient(cx + s * 0.3 * px, y, 0, cx + s * 0.3 * px, y, 0.07 * px);
@@ -162,7 +200,7 @@ function bodyTexture(color, H, face, seed) {
     gr.addColorStop(0, `rgba(90,75,65,${0.04 + r() * 0.05})`); gr.addColorStop(1, 'rgba(0,0,0,0)');
     g.fillStyle = gr; g.fillRect(x - rad, y - rad, rad * 2, rad * 2);
   }
-  if (face) FACE_DRAW[face](g, W / 2, 2, W / Math.PI);
+  if (face && FACE_DRAW[face]) FACE_DRAW[face](g, W / 2, 2, W / Math.PI);
   const t = new THREE.CanvasTexture(c); t.colorSpace = THREE.SRGBColorSpace; t.anisotropy = 8;
   return t;
 }
@@ -256,6 +294,25 @@ const BOOTS = {
 // ---------- chapéus (origem no topo da cápsula) ----------
 const HATS = {
   nenhum: () => null,
+  bandana(color) {
+    const g = new THREE.Group(), m = matte(typeof color === 'number' && color > 64 ? color : 0x8b1d1d, 0.85);
+    const cap = new THREE.Mesh(new THREE.SphereGeometry(0.49, 28, 14, 0, Math.PI * 2, 0, Math.PI / 2), m); cap.scale.y = 0.62; cap.position.y = -0.24; g.add(cap);
+    const knot = new THREE.Mesh(new THREE.SphereGeometry(0.07, 10, 8), m); knot.position.set(0, -0.14, -0.48); g.add(knot);
+    for (const sd of [-1, 1]) { const tail = new THREE.Mesh(new THREE.BoxGeometry(0.08, 0.32, 0.03), m); tail.position.set(sd * 0.07, -0.3, -0.5); tail.rotation.set(0.3, 0, sd * 0.25); g.add(tail); }
+    return g;
+  },
+  capacete() { // capacete de ferro com chifres
+    const g = new THREE.Group(), iron = new THREE.MeshStandardMaterial({ color: 0x5a5e63, metalness: 0.75, roughness: 0.4 });
+    const dome = new THREE.Mesh(new THREE.SphereGeometry(0.52, 28, 14, 0, Math.PI * 2, 0, Math.PI / 2), iron); dome.position.y = -0.26; g.add(dome);
+    const rim = new THREE.Mesh(new THREE.TorusGeometry(0.52, 0.04, 8, 32), iron); rim.rotation.x = Math.PI / 2; rim.position.y = -0.25; g.add(rim);
+    const horn = matte(0xe8dcc0, 0.6);
+    for (const sd of [-1, 1]) {
+      const h = new THREE.Mesh(new THREE.ConeGeometry(0.09, 0.45, 12), horn);
+      h.position.set(sd * 0.46, 0.02, 0); h.rotation.z = -sd * 0.9; g.add(h);
+    }
+    for (let i = 0; i < 6; i++) { const rv = new THREE.Mesh(new THREE.SphereGeometry(0.03, 8, 6), iron); const a = i / 6 * Math.PI * 2; rv.position.set(Math.sin(a) * 0.53, -0.22, Math.cos(a) * 0.53); g.add(rv); }
+    return g;
+  },
   pirata(color) {
     // Tricórnio: aba com três pontas (uma para a frente) e laterais viradas para cima.
     const g = new THREE.Group(), felt = matte(0x2a1f1a, 0.9);
@@ -341,9 +398,11 @@ export const PILL_HEIGHT = 3.24; // sola no chão (y = 0) até o topo da cápsul
 const R = 0.5, L = 1.55, ARC = Math.PI / 2 * R, TOTAL = 2 * ARC + L, SPLIT = ARC + L * 0.58, BODY_Y = 1.96;
 const SEAM_Y = -L / 2 + (SPLIT - ARC), TOP_Y = L / 2 + R;
 
+// options.npc (inimigos): aceita cores em hex (capHex, baseHex, gloveHex, bootHex), rostos e
+// chapéus extras, luvas com espinhos (spikes) e gancho no lugar da mão esquerda (hook).
 export function makePill(options = {}) {
-  const o = sanitizePill(options);
-  const capHex = PILL_COLORS[o.cap].hex, baseHex = PILL_BASE_COLORS[o.base].hex;
+  const o = options.npc ? { ...PILL_DEFAULT, ...options } : sanitizePill(options);
+  const capHex = o.capHex ?? PILL_COLORS[o.cap].hex, baseHex = o.baseHex ?? PILL_BASE_COLORS[o.base].hex;
   const root = new THREE.Group();
   const body = new THREE.Group(); body.position.y = BODY_Y; root.add(body);
   const pxPerM = 1024 / (Math.PI * 2 * R);
@@ -353,13 +412,27 @@ export function makePill(options = {}) {
   const seam = new THREE.Mesh(new THREE.TorusGeometry(R + 0.004, 0.008, 6, 64), plastic(capHex));
   seam.rotation.x = Math.PI / 2; seam.position.y = SEAM_Y; body.add(seam);
 
-  const limbMat = matte(0x2b2220, 0.6), gloveMat = plastic(PILL_COLORS[o.gloves].hex), bootMat = plastic(PILL_COLORS[o.bootColor].hex);
+  const limbMat = matte(0x2b2220, 0.6), gloveMat = plastic(o.gloveHex ?? PILL_COLORS[o.gloves].hex), bootMat = plastic(o.bootHex ?? PILL_COLORS[o.bootColor].hex);
   const parts = { body };
   for (const side of [-1, 1]) {
     const shoulder = new THREE.Group(); shoulder.position.set(side * (R - 0.03), SEAM_Y - 0.12, 0); body.add(shoulder);
     shoulder.add(limb([new THREE.Vector3(0, 0, 0), new THREE.Vector3(side * 0.12, -0.15, 0), new THREE.Vector3(side * 0.16, -0.42, 0.02), new THREE.Vector3(side * 0.15, -0.62, 0.04)], limbMat));
     const gl = glove(gloveMat); gl.position.set(side * 0.15, -0.84, 0.05); gl.rotation.z = side * 0.1; shoulder.add(gl);
     if (side < 0) gl.scale.x = -1;
+    if (o.spikes) { // luva com cravos
+      const spikeMat = new THREE.MeshStandardMaterial({ color: 0xc9ccd0, metalness: 0.8, roughness: 0.3 });
+      for (let k = 0; k < 4; k++) {
+        const sp = new THREE.Mesh(new THREE.ConeGeometry(0.035, 0.12, 8), spikeMat);
+        sp.position.set(-0.09 + k * 0.06, 0.06, 0.2); sp.rotation.x = Math.PI / 2; gl.add(sp);
+      }
+    }
+    if (o.hook && side > 0) { // gancho de pirata na mão esquerda
+      gl.clear();
+      const steel = new THREE.MeshStandardMaterial({ color: 0xb8bcc0, metalness: 0.9, roughness: 0.25 });
+      const cup = new THREE.Mesh(new THREE.CylinderGeometry(0.1, 0.13, 0.16, 16), matte(0x3a2a1c, 0.8)); cup.position.y = 0.12; gl.add(cup);
+      const hk = new THREE.Mesh(new THREE.TorusGeometry(0.11, 0.025, 8, 20, Math.PI * 1.3), steel); hk.position.set(0, -0.06, 0.05); hk.rotation.set(0, Math.PI / 2, 0.3); gl.add(hk);
+      const shaft = new THREE.Mesh(new THREE.CylinderGeometry(0.025, 0.025, 0.14, 8), steel); shaft.position.y = 0.0; gl.add(shaft);
+    }
     const hip = new THREE.Group(); hip.position.set(side * 0.2, -L / 2 - R * 0.8, 0); body.add(hip);
     hip.add(limb([new THREE.Vector3(0, 0.1, 0), new THREE.Vector3(0, -0.2, 0), new THREE.Vector3(side * 0.01, -0.5, 0)], limbMat, 0.035));
     const shoe = BOOTS[o.boots](bootMat); shoe.position.set(side * 0.03, -0.78, 0); hip.add(shoe);
@@ -370,7 +443,7 @@ export function makePill(options = {}) {
       shoulder.add(hand); parts.hand = hand;
     }
   }
-  const hat = HATS[o.hat](o.hatColor);
+  const hat = (HATS[o.hat] || HATS.nenhum)(o.hatColor);
   if (hat) { hat.scale.setScalar(1.3); hat.position.y = TOP_Y - 0.08; body.add(hat); parts.hat = hat; }
   root.userData.parts = parts; root.userData.phase = 0; root.userData.pill = o;
   root.traverse((m) => { if (m.isMesh) { m.castShadow = true; m.receiveShadow = true; } });
@@ -409,6 +482,15 @@ export function animatePill(pill, speed, dt, pose = 'walk', progress = 0) {
   } else if (pose === 'jump') {
     p.armL.rotation.set(-2.4, 0, 0.5); p.armR.rotation.set(-2.4, 0, -0.5);
     p.legL.rotation.set(-0.7, 0, 0); p.legR.rotation.set(0.3, 0, 0);
+  } else if (pose === 'row') { // sentado na balsa, remando (progress = fase da remada)
+    const st = Math.sin(progress * Math.PI * 2);
+    p.body.position.y = BODY_Y - 0.55; p.body.rotation.set(0.15 + st * 0.12, 0, 0);
+    p.legL.rotation.set(-1.4, 0, 0.1); p.legR.rotation.set(-1.4, 0, -0.1);
+    p.armL.rotation.set(-1.2 - st * 0.6, 0, 0.25); p.armR.rotation.set(-1.2 - st * 0.6, 0, -0.25);
+  } else if (pose === 'leap') { // pendurado na corda do gancho
+    const tuck = Math.sin(Math.min(1, progress) * Math.PI);
+    p.armL.rotation.set(-2.8, 0, 0.3); p.armR.rotation.set(-2.9, 0, -0.3);
+    p.legL.rotation.set(-0.9 * tuck, 0, 0); p.legR.rotation.set(-0.6 * tuck, 0, 0);
   } else if (pose === 'swim') { // deitado na água: braçadas alternadas e pernas batendo
     p.body.position.y = 1.25; p.body.position.z = -0.4;
     p.body.rotation.set(1.25, 0, Math.sin(ph) * 0.12);

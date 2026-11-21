@@ -202,7 +202,7 @@ export class Startup {
     const boost = this.G.events ? this.G.events.stormBoost(t) : 0;
     const storm = this.phase === 'storm'
       ? clamp(this.elapsed / STORM_DURATION, 0, 1)
-      : this.departed ? Math.max(1 - 0.7 * clamp(this.departT / 45, 0, 1), boost)
+      : this.departed ? Math.max(1 - 0.7 * clamp(this.departT / 45, 0, 1), boost, this.G.benchStorm || 0)
         : ['flood', 'board'].includes(this.phase) ? 1 : 0;
     this._updateWeather(storm, t, dt);
   }

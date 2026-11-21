@@ -111,7 +111,9 @@ export function makeSeabedChunk(seed, cx, cz) {
 
 // Chão "infinito" bem embaixo: no horizonte da seca não aparece buraco.
 export function makeFarSeabed() {
-  const m = new THREE.Mesh(new THREE.CircleGeometry(900, 48), new THREE.MeshStandardMaterial({ color: 0xa08e69, roughness: 1 }));
+  // malha subdividida (quadrados de 50 m): um disco com triângulos de 900 m falha no recorte
+  // pelo plano próximo da câmera e cobre a tela
+  const m = new THREE.Mesh(new THREE.PlaneGeometry(1100, 1100, 22, 22), new THREE.MeshStandardMaterial({ color: 0xa08e69, roughness: 1 }));
   m.rotation.x = -Math.PI / 2; m.position.y = SEABED.min - 0.3;
   m.userData.noShadow = true;
   return m;

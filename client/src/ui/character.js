@@ -1,4 +1,4 @@
-// Menu de personalização: escolha do personagem (náufrago ou pílula), opções da pílula,
+// Menu de personalização da pílula (o personagem do jogo): cores, rosto, calçado e chapéu,
 // prévia 3D girando (arraste para girar) e aparência salva no navegador.
 import * as THREE from '../three.js';
 import {
@@ -24,9 +24,7 @@ export class CharacterMenu {
     try { saved = JSON.parse(localStorage.getItem(KEY) || 'null'); } catch { saved = null; }
     const s = saved && typeof saved === 'object' ? saved : {};
     return {
-      character: s.character === 'pilula' ? 'pilula' : 'naufrago',
-      glasses: ['nenhum', 'aviador', 'goggles'].includes(s.glasses) ? s.glasses : 'nenhum',
-      beard: ['nenhuma', 'curta', 'cheia'].includes(s.beard) ? s.beard : 'nenhuma',
+      character: 'pilula', // a pílula é o único personagem
       pill: sanitizePill(s.pill || PILL_DEFAULT),
     };
   }
@@ -54,9 +52,6 @@ export class CharacterMenu {
         return b;
       }));
     }
-    $('charType').onchange = (e) => { this.state.character = e.target.value; this.changed(); };
-    $('glassesStyle').onchange = (e) => { this.state.glasses = e.target.value; this.changed(); };
-    $('beardStyle').onchange = (e) => { this.state.beard = e.target.value; this.changed(); };
     $('pillFace').onchange = (e) => { this.state.pill.face = e.target.value; this.changed(); };
     $('pillBoots').onchange = (e) => { this.state.pill.boots = e.target.value; this.changed(); };
     $('pillHat').onchange = (e) => { this.state.pill.hat = e.target.value; this.changed(); };
@@ -65,11 +60,7 @@ export class CharacterMenu {
 
   syncControls() {
     const s = this.state;
-    $('charType').value = s.character;
-    $('glassesStyle').value = s.glasses; $('beardStyle').value = s.beard;
     $('pillFace').value = s.pill.face; $('pillBoots').value = s.pill.boots; $('pillHat').value = s.pill.hat;
-    $('optsPilula').hidden = s.character !== 'pilula';
-    $('optsNaufrago').hidden = s.character === 'pilula';
     for (const box of document.querySelectorAll('.swatches')) {
       [...box.children].forEach((b, i) => b.classList.toggle('sel', i === s.pill[box.dataset.key]));
     }
@@ -96,9 +87,6 @@ export class CharacterMenu {
     this.rebuildPreview();
   }
 
-  // O náufrago usa o modelo carregado pelo jogador (quando disponível).
-  setCastawayFactory(factory) { this.castawayFactory = factory; this.rebuildPreview(); }
-
   rebuildPreview() {
     if (!this.holder) return;
     for (const c of this.holder.children.slice()) {
@@ -106,14 +94,9 @@ export class CharacterMenu {
       if (c.userData.isPill) disposePill(c.children[0]);
     }
     this.pill = null;
-    if (this.state.character === 'pilula') {
-      const g = new THREE.Group(); g.userData.isPill = true;
-      this.pill = makePill(this.state.pill); g.add(this.pill); g.scale.setScalar(1.75 / PILL_HEIGHT);
-      this.holder.add(g);
-    } else if (this.castawayFactory) {
-      const v = this.castawayFactory(this.state);
-      if (v) this.holder.add(v);
-    }
+    const g = new THREE.Group(); g.userData.isPill = true;
+    this.pill = makePill(this.state.pill); g.add(this.pill); g.scale.setScalar(1.75 / PILL_HEIGHT);
+    this.holder.add(g);
   }
 
   update(dt, visible) {

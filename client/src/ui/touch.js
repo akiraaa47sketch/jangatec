@@ -161,7 +161,7 @@ export class TouchControls {
   // Mostra os botões que fazem sentido agora (construção, vela no mastro, arma de fogo).
   update() {
     const G = this.G, $ = (id) => document.getElementById(id);
-    this.root.hidden = !G.started || G.interact.lootOpen || (G.gfxMenu && G.gfxMenu.open);
+    this.root.hidden = !G.started || G.interact.lootOpen || (G.gfxMenu && G.gfxMenu.open) || !!G.bench;
     if (this.root.hidden) return;
     $('tBuild').classList.toggle('show', !!G.build.active);
     const cur = G.interact.current;

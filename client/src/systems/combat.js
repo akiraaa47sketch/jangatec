@@ -1,4 +1,5 @@
 // Armas com raridade, atributos, munição e durabilidade usados pelo combate.
+import { buildWeapon } from '../player/viewmodel-parts.js';
 import * as THREE from '../three.js';
 
 export const WEAPONS = [
@@ -73,29 +74,11 @@ export class Combat {
     this.weaponId = id;
     this.cooldown = 0;
     this.reloading = 0;
+    // 3ª pessoa: o mesmo modelo detalhado usado na 1ª pessoa
     const mesh = this.G.player.weaponMesh;
-    mesh.scale.set(...(weapon.scale || [1, 1, 1]));
-    const parts = mesh.userData.parts;
-    for (const part of Object.values(parts)) part.visible = false;
-    let mainPart;
-    if (id === 'tabua_prego') {
-      parts.board.visible = parts.grip.visible = parts.nail.visible = true;
-      mainPart = parts.board;
-    } else if (id === 'cano') {
-      parts.pipe.visible = true;
-      mainPart = parts.pipe;
-    } else if (id === 'faca_manteiga' || id === 'facao') {
-      parts.blade.visible = parts.grip.visible = true;
-      mainPart = parts.blade;
-    } else if (id === 'bastao') {
-      parts.baton.visible = true;
-      mainPart = parts.baton;
-    } else {
-      parts.gun.visible = parts.barrel.visible = true;
-      if (id === 'rifle' || id === 'rifle_precisao' || id === 'escopeta') parts.stock.visible = true;
-      mainPart = parts.gun;
-    }
-    mainPart.material.color.setHex(weapon.color);
+    for (const old of mesh.children.slice()) mesh.remove(old);
+    const model = buildWeapon(id);
+    if (model) { model.flashMesh.visible = false; mesh.add(model.group); }
     mesh.visible = !this.buildMode;
     return true;
   }

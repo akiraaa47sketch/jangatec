@@ -5,7 +5,6 @@ import { rot, clamp, lerp, lerpAngle } from '../core/util.js';
 import { CFG } from '../config.js';
 import { waveHeight } from '../world/ocean.js';
 import { makeHumanoid, animateHumanoid } from './model.js';
-import { animateCastaway, createCastawayVisual, loadCastawayModel } from './castaway.js';
 import { makePill, animatePill, disposePill, PILL_DEFAULT, PILL_HEIGHT } from './pill.js';
 
 const PILL_SCALE = 1.75 / PILL_HEIGHT;
@@ -30,50 +29,15 @@ export class Player {
     this.firstPerson = true; this.fovSens = 1; this.eyeHeight = 1.6;
     this.mesh = makeHumanoid(0xb49b7b, 0xb97251);
     this.proceduralRig = this.mesh.userData.parts.rig;
-    this.castawayBase = null;
-    this.castawayVisual = null;
     this.pillVisual = null;
-    this.appearance = { character: 'naufrago', glasses: 'nenhum', beard: 'nenhuma', pill: { ...PILL_DEFAULT } };
+    this.appearance = { character: 'pilula', pill: { ...PILL_DEFAULT } }; // a pílula é o personagem do jogo
     this.mesh.rotation.order = 'YXZ';
+    // Arma em 3ª pessoa: o MESMO modelo detalhado da 1ª pessoa (viewmodel-parts), trocado em combat.equip.
     this.weaponMesh = new THREE.Group();
-    this.weaponMesh.position.set(0, -0.55, 0.1);
-    const wood = new THREE.MeshStandardMaterial({ color: 0x79552f, roughness: 0.95 });
-    const metal = new THREE.MeshStandardMaterial({ color: 0x747b7e, metalness: 0.65, roughness: 0.45 });
-    const addWeaponPart = (geometry, material, position, rotation = [0, 0, 0]) => {
-      const mesh = new THREE.Mesh(geometry, material);
-      mesh.position.set(...position);
-      mesh.rotation.set(...rotation);
-      mesh.visible = false;
-      this.weaponMesh.add(mesh);
-      return mesh;
-    };
-    const parts = {
-      board: addWeaponPart(new THREE.BoxGeometry(0.07, 0.08, 0.5), wood, [0, 0, 0]),
-      grip: addWeaponPart(new THREE.BoxGeometry(0.08, 0.13, 0.12), wood, [0, -0.04, -0.12]),
-      nail: addWeaponPart(new THREE.CylinderGeometry(0.012, 0.012, 0.16, 6), metal, [0, 0.035, 0.25], [Math.PI / 2, 0, 0]),
-      pipe: addWeaponPart(new THREE.CylinderGeometry(0.04, 0.04, 0.56, 8), metal, [0, 0, 0], [Math.PI / 2, 0, 0]),
-      blade: addWeaponPart(new THREE.BoxGeometry(0.09, 0.025, 0.36), metal, [0, 0.025, 0.13]),
-      baton: addWeaponPart(new THREE.CylinderGeometry(0.035, 0.04, 0.58, 8), wood, [0, 0, 0], [Math.PI / 2, 0, 0]),
-      gun: addWeaponPart(new THREE.BoxGeometry(0.11, 0.12, 0.34), metal, [0, 0, 0]),
-      barrel: addWeaponPart(new THREE.CylinderGeometry(0.025, 0.025, 0.28, 8), metal, [0, 0.015, 0.28], [Math.PI / 2, 0, 0]),
-      stock: addWeaponPart(new THREE.BoxGeometry(0.09, 0.1, 0.32), wood, [0, -0.015, -0.28]),
-    };
-    this.weaponMesh.userData.parts = parts;
     this.weaponMesh.visible = false;
-    this.mesh.userData.parts.armR.add(this.weaponMesh);
     G.scene.add(this.mesh);
     this.ray = new THREE.Raycaster();
-    loadCastawayModel()
-      .then((model) => {
-        this.castawayBase = model;
-        this.applyAppearance();
-      })
-      .catch((error) => {
-        console.error('Não foi possível carregar o modelo do personagem:', error);
-        const status = document.getElementById('menuStatus');
-        if (status) status.textContent = 'O modelo personalizado não carregou; usando o personagem provisório.';
-        if (G.started) G.hud.msg('Modelo personalizado indisponível; usando o personagem provisório');
-      });
+    this.applyAppearance();
   }
 
   setFirstPerson(on) {
@@ -93,49 +57,20 @@ export class Player {
     if (this.pillVisual) {
       if (this.weaponMesh.parent) this.weaponMesh.parent.remove(this.weaponMesh);
       this.mesh.remove(this.pillVisual);
-      disposePill(this.pillVisual);
+      disposePill(this.pillVisual.children[0]);
       this.pillVisual = null;
     }
-    if (this.appearance.character === 'pilula') {
-      if (this.castawayVisual) this.castawayVisual.visible = false;
-      const pill = makePill(this.appearance.pill);
-      this.pillVisual = new THREE.Group();
-      this.pillVisual.add(pill);
-      this.pillVisual.scale.setScalar(PILL_SCALE);
-      this.mesh.add(this.pillVisual);
-      this.proceduralRig.visible = false;
-      if (this.weaponMesh.parent) this.weaponMesh.parent.remove(this.weaponMesh);
-      pill.userData.parts.hand.add(this.weaponMesh);
-      this.weaponMesh.position.set(0, 0, 0);
-      this.weaponMesh.rotation.set(0, 0, 0);
-      this.weaponMesh.scale.setScalar(1 / PILL_SCALE);
-      return;
-    }
-    this.weaponMesh.scale.setScalar(1);
-    if (!this.castawayBase) {
-      this.proceduralRig.visible = true;
-      if (!this.weaponMesh.parent) this.mesh.userData.parts.armR.add(this.weaponMesh);
-      this.weaponMesh.position.set(0, -0.55, 0.1);
-      return;
-    }
-    if (this.castawayVisual) {
-      if (this.weaponMesh.parent) this.weaponMesh.parent.remove(this.weaponMesh);
-      this.mesh.remove(this.castawayVisual);
-      this.castawayVisual.traverse((part) => {
-        if (part.geometry) part.geometry.dispose();
-        if (Array.isArray(part.material)) part.material.forEach((material) => material.dispose());
-        else if (part.material) part.material.dispose();
-      });
-    }
-
-    this.castawayVisual = createCastawayVisual(this.castawayBase, this.appearance);
-    this.mesh.add(this.castawayVisual);
+    const pill = makePill(this.appearance.pill);
+    this.pillVisual = new THREE.Group();
+    this.pillVisual.add(pill);
+    this.pillVisual.scale.setScalar(PILL_SCALE);
+    this.mesh.add(this.pillVisual);
     this.proceduralRig.visible = false;
-    this.mesh.userData.parts.armR.remove(this.weaponMesh);
-    const weaponAnchor = this.castawayVisual.userData.weaponAnchor;
-    (weaponAnchor || this.mesh).add(this.weaponMesh);
-    this.weaponMesh.position.set(0, 0.025, 0);
-    this.weaponMesh.rotation.set(0, 0, 0);
+    pill.userData.parts.hand.add(this.weaponMesh);
+    this.weaponMesh.position.set(0, 0, 0);
+    this.weaponMesh.rotation.set(-Math.PI / 2, 0, Math.PI); // cano (-Z) segue o braço; topo para cima ao mirar
+    this.weaponMesh.scale.setScalar(1.5 / PILL_SCALE); // arma "de desenho": um pouco maior
+    if (this.G.viewmodel) this.G.viewmodel.setGloveColor(this.appearance.pill);
   }
 
   forward() { return [-Math.sin(this.camYaw), -Math.cos(this.camYaw)]; }
@@ -273,15 +208,10 @@ export class Player {
       this.mantle ? this.mantle.height : 0);
     if (this.pillVisual) {
       this.proceduralRig.visible = false;
-      if (this.castawayVisual) this.castawayVisual.visible = false;
       const pillPose = pose === 'climb' || pose === 'vault' ? 'jump' : pose;
       animatePill(this.pillVisual.children[0], speed, dt, pillPose, progress);
       return;
     }
-    const useProceduralRig = !this.castawayVisual || this.swimming || !!this.mantle;
-    this.proceduralRig.visible = useProceduralRig;
-    if (this.castawayVisual) this.castawayVisual.visible = !useProceduralRig;
-    animateCastaway(this.castawayVisual, speed, dt, pose);
   }
 
   // Câmera nos olhos. O viewmodel dá o FOV de mira e um pequeno balanço/tranco.

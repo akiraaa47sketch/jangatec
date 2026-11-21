@@ -6,7 +6,7 @@ import { mulberry32, hash2, lerpAngle, rot, clamp, clock } from '../core/util.js
 import { waveHeight } from '../world/ocean.js';
 import { woodTexture, woodBump, repeated, scaleBoxUVs } from '../world/textures.js';
 import { CFG } from '../config.js';
-import { makeHumanoid, animateHumanoid } from '../player/model.js';
+import { makeEnemyPill, animateEnemy } from './evilpills.js';
 
 export const ENEMY_TYPES = {
   melee:    { nome: 'Saqueador', hp: 60,  speed: 3.2, dmg: 10, range: 1.8, cd: 1.0, cor: 0xa83a32, scale: 1 },
@@ -46,7 +46,7 @@ export class Enemies {
   }
   spawn(id, type, isl, x, z) {
     const def = ENEMY_TYPES[type];
-    const mesh = makeHumanoid(def.cor, 0xb98f6a, type);
+    const mesh = makeEnemyPill(type); // pílula malvada (visual por tipo)
     mesh.scale.setScalar(def.scale);
     mesh.rotation.order = 'YXZ';
     const e = {
@@ -210,7 +210,7 @@ export class Enemies {
     }
     e.mesh.position.copy(p);
     e.mesh.rotation.y = e.yaw;
-    animateHumanoid(e.mesh, 0, dt, 'row', (e.rowT % (Math.PI * 2)) / (Math.PI * 2));
+    animateEnemy(e.mesh, 0, dt, 'row', (e.rowT % (Math.PI * 2)) / (Math.PI * 2));
   }
 
   // Reação a dano: tranco para trás + brilho vermelho rápido.
@@ -393,7 +393,7 @@ export class Enemies {
       e.mesh.rotation.y = e.yaw;
       e.mesh.rotation.x = -Math.sin(progress * Math.PI) * 0.35;
       e.mesh.rotation.z = 0;
-      animateHumanoid(e.mesh, 0, dt, 'leap', progress);
+      animateEnemy(e.mesh, 0, dt, 'leap', progress);
       if (progress >= 1) {
         e.mesh.rotation.x = 0;
         p.set(x, targetY, z);
@@ -452,7 +452,7 @@ export class Enemies {
     e.mesh.position.copy(p);
     e.mesh.rotation.y = e.yaw;
     const pose = e.swing > 0 ? 'attack' : 'walk';
-    animateHumanoid(e.mesh, dt > 0 ? moved / dt : 0, dt, pose, e.swing > 0 ? 1 - e.swing / 0.25 : 0);
+    animateEnemy(e.mesh, dt > 0 ? moved / dt : 0, dt, pose, e.swing > 0 ? 1 - e.swing / 0.25 : 0);
     this._animateHit(e, dt);
     if (e.swing > 0) e.swing = Math.max(0, e.swing - dt);
   }
@@ -534,7 +534,7 @@ export class Enemies {
       e.mesh.rotation.y = e.yaw;
       const pose = e.swing > 0 ? 'attack' : e.def.ranged && facePlayer ? 'aim' : 'walk';
       const swingProgress = e.swing > 0 ? 1 - e.swing / 0.25 : 0;
-      animateHumanoid(e.mesh, Math.hypot(mx, mz), dt, pose, swingProgress);
+      animateEnemy(e.mesh, Math.hypot(mx, mz), dt, pose, swingProgress);
       this._animateHit(e, dt);
       if (e.swing > 0) e.swing = Math.max(0, e.swing - dt);
     }
