@@ -13,4 +13,4 @@ services:
     staticPublishPath: dist
     envVars:
       - key: VITE_SERVER_URL
-        value: wss://mare-alta-server.onrender.com
+        value: wss://jangatec.onrender.com

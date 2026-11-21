@@ -24,9 +24,9 @@ por isso o serviço backend usa a raiz do repositório como contexto de deploy.
 
 O plano grátis do backend "dorme": a primeira conexão pode levar até ~1 minuto.
 
-**Frontend na Vercel (alternativa):** New Project > mesmo repositório > Root Directory `client`,
-Framework Preset "Other", Build Command `npm run build`, Output Directory `dist`. Configure
-`VITE_SERVER_URL` como `wss://mare-alta-server.onrender.com` (ou a URL do seu serviço Render).
+**Frontend na Vercel (alternativa):** New Project > mesmo repositório e mantenha Root Directory
+na raiz (`.`). O `vercel.json` configura a instalação e publicação de `client/dist`. Se usar um
+servidor Render com outro endereço, configure `VITE_SERVER_URL` como `wss://SUA-URL.onrender.com`.
 
 ## Controles
 

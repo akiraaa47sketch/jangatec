@@ -1,6 +1,6 @@
 import { WORLD_LOOT_PARAMS } from './systems/loot.js';
 
-const PROD_SERVER = import.meta.env.VITE_SERVER_URL || 'wss://mare-alta-server.onrender.com';
+const PROD_SERVER = import.meta.env.VITE_SERVER_URL || 'wss://jangatec.onrender.com';
 
 const local = ['localhost', '127.0.0.1'].includes(location.hostname);
 export const DEFAULT_SERVER = local ? 'ws://localhost:3001' : PROD_SERVER;
