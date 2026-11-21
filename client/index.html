@@ -1,0 +1,109 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Maré Alta — protótipo</title>
+<link rel="icon" href="data:,">
+<link rel="stylesheet" href="./style.css">
+</head>
+<body>
+<canvas id="c"></canvas>
+
+<div id="hud" hidden>
+  <div id="vignette"></div>
+  <div id="crosshair"></div>
+  <div id="objective"></div>
+  <div id="stats">
+    <div class="bar"><label>Vida</label><i><b id="vida" class="vida"></b></i></div>
+    <pre id="inv"></pre>
+  </div>
+  <div id="boatBox"><span id="arrow">▲</span><pre id="boatInfo"></pre></div>
+  <div id="weapon"></div>
+  <div id="prompt"></div>
+  <div id="hotbar"></div>
+  <div id="msgs"></div>
+  <!-- O estado do objeto carregado é mostrado no prompt e na mira. -->
+  <div id="buildPanel" hidden></div>
+  <div id="hint">H — controles</div>
+</div>
+
+<div id="lootPanel" hidden>
+  <header>
+    <h2 id="lootTitle">Caixa de suprimentos</h2>
+    <button id="lootClose" type="button" aria-label="Fechar caixa">Fechar</button>
+  </header>
+  <p id="lootStatus"></p>
+  <div id="lootItems"></div>
+</div>
+
+<div id="help" hidden>
+  <div>
+    <h2>Controles</h2>
+    <table>
+      <tr><td>W A S D</td><td>andar</td><td>Shift</td><td>correr</td></tr>
+      <tr><td>Espaço</td><td>pular / subir em bordas / sair da água</td><td>Mouse ou setas</td><td>câmera</td></tr>
+      <tr><td>E</td><td>abrir caixote · vela (no mastro)</td><td>Z / C</td><td>soldar no build / girar vela</td></tr>
+      <tr><td>Botão esquerdo</td><td>pegar a peça contornada de verde</td><td>Q</td><td>soltar a peça carregada</td></tr>
+      <tr><td>Mouse + WASD</td><td>mover câmera, peça e personagem</td><td>V</td><td>reposicionar peça em frente à mira</td></tr>
+      <tr><td>R</td><td>liberar cursor e arrastar os anéis do gizmo</td><td>Shift durante o arraste</td><td>encaixar rotação</td></tr>
+      <tr><td>Botão direito no gizmo</td><td>mover a câmera</td><td>Esc / botão direito fora do gizmo</td><td>cancelar e restaurar peça</td></tr>
+      <tr><td>1 2 3 / roda</td><td>trocar arma do inventário</td><td>R (sem construir)</td><td>recarregar</td></tr>
+      <tr><td>F</td><td>alternar 1ª / 3ª pessoa</td><td>Botão direito</td><td>mirar (armas de fogo)</td></tr>
+      <tr><td>4 / 5</td><td>bandagem / kit médico</td><td>H</td><td>ajuda</td></tr>
+    </table>
+    <h3>Construção</h3>
+    <p><b>CONTORNO VERDE → CLIQUE ESQUERDO PEGA → MOUSE/CÂMERA ARRASTA → [Q] SOLTA</b></p>
+    <p>O contorno verde indica a peça visada que está ao alcance de coleta.</p>
+    <p>[R] libera o cursor para arrastar um anel do gizmo; segure o botão direito para mover a câmera sem sair do modo de rotação. Pressione [R] novamente para voltar à mira.</p>
+    <p>A peça real continua visível e física enquanto é carregada: colisões, gravidade e empuxo continuam ativos. Você pode andar e virar a câmera; a peça segue o raycast da mira. No modo de rotação, arraste um dos anéis coloridos; segure o botão direito para mover a câmera sem sair do gizmo. Segure [Shift] para encaixar a rotação.</p>
+    <p>Se a peça ficar presa, pressione [V] para teletransportá-la até o ponto que a mira indica.</p>
+    <p>Com a peça apoiada na jangada, pressione [Z] ainda no build mode para soldar. Use [X] para dessoldar uma peça próxima.</p>
+    <h3>Início e navegação</h3>
+    <p>Todos começam em terra, com uma arma improvisada. Pegue a plataforma de madeira grande e solde-a no único contorno do convés com [Z]. A plataforma central e o ponto do mastro são fixos.<br>
+    Quando o convés estiver pronto, instale a vela com [E] junto ao mastro. Haverá calmaria, mudança gradual do clima e uma inundação jogável; embarque para a jangada partir.<br>
+    Depois da partida, o barco segue uma rota linear pelo oceano. Use a vela [E] para avançar.<br>
+    O ângulo da vela [Z/C] faz pequenos ajustes de curso.<br>
+    <b>O controle 360° é desbloqueado apenas na batalha final.</b></p>
+    <p>Se todos saírem do barco durante a viagem, a vela baixa automaticamente.</p>
+    <p>As armas têm raridade e durabilidade. Explore ilhas mais distantes para encontrar equipamentos melhores.<br>
+    A caixa inicial contém uma pistola e bandagens proporcionais à partida. As caixas guardam itens compartilhados entre os jogadores; o conteúdo é retirado item por item.<br>Clique para fechar</p>
+  </div>
+</div>
+
+<div id="menu">
+  <div class="card">
+    <h1>Maré Alta</h1>
+    <p class="sub">Sobrevivência, exploração e construção em alto-mar · protótipo</p>
+    <section id="characterOptions" aria-label="Personalização do personagem">
+      <h2>Personalize seu náufrago</h2>
+      <label for="glassesStyle">Óculos
+        <select id="glassesStyle">
+          <option value="nenhum">Sem óculos</option>
+          <option value="aviador">Aviador</option>
+          <option value="goggles">Proteção</option>
+        </select>
+      </label>
+      <label for="beardStyle">Barba
+        <select id="beardStyle">
+          <option value="nenhuma">Sem barba</option>
+          <option value="curta">Curta</option>
+          <option value="cheia">Cheia</option>
+        </select>
+      </label>
+    </section>
+    <button id="btnSolo">Jogar solo</button>
+    <label>Seed (opcional) <input id="seed" inputmode="numeric" placeholder="aleatória"></label>
+    <hr>
+    <label>Nome <input id="name" maxlength="16" placeholder="Náufrago"></label>
+    <label>Sala <input id="room" maxlength="24" placeholder="publica"></label>
+    <label>Servidor <input id="server" spellcheck="false"></label>
+    <button id="btnMulti" class="alt">Multiplayer (1–4)</button>
+    <p id="menuStatus"></p>
+    <p class="keys">WASD andar · Espaço pular · E interagir · clique para pegar peças · H controles</p>
+  </div>
+</div>
+
+<script type="module" src="./src/main.js"></script>
+</body>
+</html>

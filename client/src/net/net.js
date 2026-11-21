@@ -1,0 +1,141 @@
+// Cliente multiplayer (WebSocket). Sem servidor o jogo roda igual em modo solo.
+// Host (primeiro da sala) simula o barco; os outros interpolam. Posições a bordo são
+// enviadas em coordenadas locais do barco, então ninguém "escorrega" no convés alheio.
+import * as THREE from '../three.js';
+import { lerpAngle } from '../core/util.js';
+import { makeHumanoid, animateHumanoid } from '../player/model.js';
+
+const COLORS = [0xd1a02f, 0x3fae5a, 0xb84fc9, 0xd1552f];
+
+export class Net {
+  constructor(G) {
+    this.G = G;
+    this.online = false; this.isHost = true; this.id = 'local';
+    this.remotes = new Map(); this.acc = 0; this.physicsAcc = 0; this.n = 0; this.ws = null;
+  }
+  nextId() { return `${this.id}-${Date.now().toString(36)}-${this.n++}`; }
+  send(m) { if (this.online && this.ws.readyState === 1) this.ws.send(JSON.stringify(m)); }
+
+  connect(url, name, room) {
+    return new Promise((resolve, reject) => {
+      let done = false;
+      const fail = (why) => { if (!done) { done = true; reject(new Error(why)); } };
+      let ws;
+      try { ws = new WebSocket(url); } catch { fail('URL inválida ou conexão bloqueada'); return; }
+      this.ws = ws;
+      const timer = setTimeout(() => { fail('Tempo esgotado'); ws.close(); }, 60000);
+      ws.onopen = () => ws.send(JSON.stringify({ t: 'join', name, room }));
+      ws.onerror = () => fail('Não foi possível conectar');
+      ws.onclose = () => {
+        clearTimeout(timer); fail('Conexão fechada');
+        if (this.online) {
+          this.online = false; this.isHost = true;
+          for (const r of this.remotes.values()) r.mesh.parent && r.mesh.parent.remove(r.mesh);
+          this.remotes.clear();
+          this.G.hud.msg('Desconectado do servidor — continuando solo');
+        }
+      };
+      ws.onmessage = (ev) => {
+        let m; try { m = JSON.parse(ev.data); } catch { return; }
+        if (m.t === 'welcome') { clearTimeout(timer); done = true; this.id = m.id; this.isHost = m.host === m.id; this.online = true; resolve(m); }
+        else if (m.t === 'full') fail('Sala cheia (máx. 4)');
+        else if (this.G.started) this.handle(m);
+      };
+    });
+  }
+
+  handle(m) {
+    const G = this.G;
+    switch (m.t) {
+      case 'snap': {
+        const wasHost = this.isHost;
+        this.isHost = m.host === this.id;
+        if (this.isHost && !wasHost) G.hud.msg('Você agora é o host');
+        if (!this.isHost && m.boat) G.boat.netTarget = m.boat;
+        for (const id in m.players) {
+          if (id === this.id) continue;
+          let r = this.remotes.get(id);
+          if (!r) {
+            const mesh = makeHumanoid(COLORS[this.remotes.size % COLORS.length]);
+            r = { mesh, s: m.players[id], yaw: 0, first: true, aboard: false };
+            this.remotes.set(id, r); G.scene.add(mesh);
+          }
+          r.s = m.players[id];
+          r.aboard = !!m.players[id].ab; // sincroniza estado "a bordo"
+        }
+        for (const [id, r] of this.remotes) if (!(id in m.players)) { r.mesh.parent && r.mesh.parent.remove(r.mesh); this.remotes.delete(id); }
+        break;
+      }
+      case 'add': G.boat.addPiece(m.piece); break;
+      case 'remove': G.boat.removePiece(m.id); break;
+      case 'collect': G.world.markCollected(m.id); break;
+      case 'crate:state': G.interact.setCrateState(m.id, m.loot || {}); break;
+      case 'crate:loot': G.interact.receiveLoot(m.loot || {}); break;
+      case 'crate:error':
+        if (G.interact.openCrateId === m.id) {
+          G.hud.msg('Não foi possível acessar essa caixa');
+          G.interact.closeCrate();
+        }
+        break;
+      case 'sail': if (this.isHost) { G.boat.sailUp = m.up; G.boat.sailAngle = m.angle; } break;
+      case 'sail-install': G.startup.installSail(); break;
+      case 'start': G.startup.applyState(m.state); break;
+      case 'msg': G.hud.msg(m.text); break;
+      case 'carry': {
+        G.world.applyCarryState(m.id, m.by, m.state);
+        break;
+      }
+      case 'place': {
+        G.world.applyPlacedState(m.id, m.state);
+        break;
+      }
+      case 'physics': {
+        if (!this.isHost) G.physics.applySnapshot(m.bodies);
+        break;
+      }
+      case 'weld': {
+        G.build.applyRemoteWeld(m);
+        break;
+      }
+      case 'unweld': {
+        G.build.tryRemoveWelded(m.pieceId, false);
+        if (m.state && m.physId) G.world.applyPlacedState(m.physId, m.state);
+        break;
+      }
+    }
+  }
+
+  update(dt) {
+    if (!this.online) return;
+    const G = this.G, pl = G.player, boat = G.boat, b = pl.body;
+    this.acc += dt;
+    this.physicsAcc += dt;
+    if (this.isHost && this.physicsAcc >= 0.1) {
+      this.physicsAcc %= 0.1;
+      this.send({ t: 'physics', bodies: G.physics.snapshot() });
+    }
+    if (this.acc > 0.066) {
+      this.acc = 0;
+      let x = b.pos.x, y = b.pos.y, z = b.pos.z, yaw = pl.yaw;
+      if (pl.aboard) { [x, z] = boat.toLocal(x, z); y -= boat.set.y; yaw -= boat.yaw; }
+      const r2 = (v) => Math.round(v * 100) / 100;
+      this.send({ t: 'state', s: { p: [r2(x), r2(y), r2(z)], yaw: r2(yaw), ab: pl.aboard ? 1 : 0, sw: pl.swimming ? 1 : 0, sp: r2(Math.hypot(b.vel.x, b.vel.z)), dead: pl.dead ? 1 : 0 } });
+      if (this.isHost) this.send({ t: 'boat', b: { x: r2(boat.x), z: r2(boat.z), yaw: Math.round(boat.yaw * 1000) / 1000, speed: r2(boat.speed), up: boat.sailUp, angle: boat.sailAngle } });
+    }
+    // Interpola os aliados.
+    const k = Math.min(1, 12 * dt);
+    for (const r of this.remotes.values()) {
+      const s = r.s, parent = s.ab ? boat.group : G.scene, mesh = r.mesh;
+      if (mesh.parent !== parent) { parent.add(mesh); r.first = true; }
+      if (r.first) { mesh.position.set(s.p[0], s.p[1], s.p[2]); r.yaw = s.yaw; r.first = false; }
+      mesh.position.x += (s.p[0] - mesh.position.x) * k;
+      mesh.position.y += (s.p[1] - mesh.position.y) * k;
+      mesh.position.z += (s.p[2] - mesh.position.z) * k;
+      r.yaw = lerpAngle(r.yaw, s.yaw, k);
+      mesh.rotation.order = 'YXZ';
+      mesh.rotation.y = r.yaw;
+      mesh.rotation.x = s.dead ? -Math.PI / 2 : s.sw ? 0.9 : 0;
+      animateHumanoid(mesh, s.sp, dt, s.sw ? 'swim' : 'walk');
+    }
+  }
+}

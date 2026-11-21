@@ -1,0 +1,16 @@
+services:
+  - type: web
+    name: mare-alta-server
+    runtime: node
+    buildCommand: npm --prefix server ci
+    startCommand: npm --prefix server start
+    plan: free
+  - type: web
+    name: mare-alta-client
+    runtime: static
+    rootDir: client
+    buildCommand: npm ci && npm run build
+    staticPublishPath: dist
+    envVars:
+      - key: VITE_SERVER_URL
+        value: wss://mare-alta-server.onrender.com
