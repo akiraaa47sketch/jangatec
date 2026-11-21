@@ -430,6 +430,12 @@ export class Physics {
   _applyBuoyancy(record, t) {
     const { body, size, volume, obj } = record;
     if (obj.placed && !obj.placedOnWater) return;
+    if (obj.def && obj.def.sinks && !obj.welded) { // metal/pedra: afunda devagar (arrasto da água)
+      if (waveHeight(body.position.x, body.position.z, t) > body.position.y) {
+        body.velocity.scale(0.92, body.velocity); body.angularVelocity.scale(0.9, body.angularVelocity);
+      }
+      return;
+    }
     for (const x of [-size.x / 2, size.x / 2]) {
       for (const [y, layerWeight] of [[-size.y / 2, 0.25], [0, 0.5], [size.y / 2, 0.25]]) {
         for (const z of [-size.z / 2, size.z / 2]) {

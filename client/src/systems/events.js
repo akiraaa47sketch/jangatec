@@ -110,7 +110,8 @@ export class Events {
     this.timer -= dt;
     if (this.timer > 0) return;
     if (G.enemies.list.some((e) => e.pirate && e.state !== 'dead')) { this.timer = 15; return; }
-    if (G.startup.waterLevel < 1.0 || (G.startup.tide.state && G.startup.tide.state.phase.id === 'vazante')) { this.timer = 15; return; }
+    const tide = G.startup.tide.state; // só com o mar cheio e longe da próxima seca
+    if (G.startup.waterLevel < 0.5 || (tide && (tide.phase.id === 'seco' || tide.nextIn < 75))) { this.timer = 15; return; }
     const kind = this.lastKind === 'tsunami' ? (Math.random() < 0.7 ? 'furacao' : 'tsunami')
       : this.lastKind === 'furacao' ? (Math.random() < 0.7 ? 'tsunami' : 'furacao')
         : (Math.random() < 0.5 ? 'tsunami' : 'furacao');

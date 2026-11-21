@@ -22,13 +22,15 @@ import { Events } from './systems/events.js';
 import { Net } from './net/net.js';
 import { Hud } from './ui/hud.js';
 import { CharacterMenu } from './ui/character.js';
+import { TouchControls, isTouchDevice } from './ui/touch.js';
 import { createCastawayVisual } from './player/castaway.js';
 
 const $ = (id) => document.getElementById(id);
 const canvas = $('c');
 
 const renderer = new THREE.WebGLRenderer({ canvas, antialias: true });
-renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
+const MOBILE = isTouchDevice();
+renderer.setPixelRatio(Math.min(devicePixelRatio, MOBILE ? 1.25 : 2)); // celular: menos pixels, mais FPS
 renderer.toneMapping = THREE.NeutralToneMapping; // realces suaves, cores preservadas
 renderer.toneMappingExposure = 1.0;
 const scene = new THREE.Scene();
@@ -81,6 +83,7 @@ G.ocean = ocean;
 G.viewmodel.scene.environment = scene.environment; // metais da 1ª pessoa também refletem o céu
 G.viewmodel.scene.environmentIntensity = scene.environmentIntensity;
 window.G = G; // útil para depurar no console
+if (MOBILE) G.touch = new TouchControls(G);
 
 canvas.addEventListener('mousedown', (e) => {
   if (!G.build.active) {
@@ -256,6 +259,7 @@ function frame() {
   atmo.update(dt, camera);
   ocean.update(t, camera.position.x, camera.position.z);
   G.hud.update(dt);
+  if (G.touch) G.touch.update();
   sunVisual.update(camera, t);
   renderer.render(scene, camera);
   G.viewmodel.render(renderer); // 2º passe: braços e arma por cima do mundo
