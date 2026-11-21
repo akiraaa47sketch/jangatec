@@ -20,6 +20,7 @@ export class Startup {
     this.island = null;
     this.syncTimer = 0;
     this.floodTier = null;
+    this.departT = 0;
     this.clearSky = new THREE.Color(0x9fd3ee);
     this.stormSky = new THREE.Color(0x536273);
     this.clearSun = new THREE.Color(0xfff1d0);
@@ -190,9 +191,13 @@ export class Startup {
 
     sea.level = this.waterLevel;
     this.G.world.updateFloodLevel(this.waterLevel);
+    // Depois da partida o céu abre aos poucos (mar mais calmo = eventos se destacam).
+    if (this.departed) this.departT += dt;
+    const boost = this.G.events ? this.G.events.stormBoost(t) : 0;
     const storm = this.phase === 'storm'
       ? clamp(this.elapsed / STORM_DURATION, 0, 1)
-      : ['flood', 'board', 'depart'].includes(this.phase) ? 1 : 0;
+      : this.departed ? Math.max(1 - 0.7 * clamp(this.departT / 45, 0, 1), boost)
+        : ['flood', 'board'].includes(this.phase) ? 1 : 0;
     this._updateWeather(storm, t, dt);
   }
 

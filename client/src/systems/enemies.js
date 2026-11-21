@@ -2,7 +2,9 @@
 // idle -> patrulha -> (percepção) perseguição -> ataque / recuo -> procura -> morte.
 // Só "pensam" a 5 Hz e apenas quando o jogador está por perto (ativação por distância).
 import * as THREE from '../three.js';
-import { mulberry32, hash2, lerpAngle, rot, clamp } from '../core/util.js';
+import { mulberry32, hash2, lerpAngle, rot, clamp, clock } from '../core/util.js';
+import { waveHeight } from '../world/ocean.js';
+import { woodTexture, woodBump, repeated, scaleBoxUVs } from '../world/textures.js';
 import { CFG } from '../config.js';
 import { makeHumanoid, animateHumanoid } from '../player/model.js';
 
@@ -11,15 +13,22 @@ export const ENEMY_TYPES = {
   atirador: { nome: 'Atirador',  hp: 45,  speed: 2.4, dmg: 7,  range: 22,  cd: 1.7, cor: 0x7a6a2a, scale: 1, ranged: true },
   pesado:   { nome: 'Brutamontes', hp: 160, speed: 1.9, dmg: 22, range: 2.2, cd: 1.6, cor: 0x4a2a5a, scale: 1.3 },
   rapido:   { nome: 'Corredor',  hp: 35,  speed: 5.2, dmg: 6,  range: 1.6, cd: 0.6, cor: 0xc56a1e, scale: 0.85 },
-  pirata:   { nome: 'Pirata', hp: 75, speed: 5.4, dmg: 13, range: 1.8, cd: 1.2, cor: 0x553b2d, scale: 1.05 },
+  pirata:   { nome: 'Pirata', hp: 75, speed: 5.4, dmg: 13, range: 1.8, cd: 1.2, cor: 0x553b2d, scale: 1.05, raftSpeed: 7.2 },
 };
 const BY_DIFF = [['melee'], ['melee', 'rapido'], ['melee', 'rapido', 'atirador'], ['melee', 'atirador', 'pesado', 'rapido'], ['atirador', 'pesado', 'rapido', 'pesado']];
 const SIGHT = 22, LOSE = 36, ACTIVE = 75;
+// Invasões piratas: raras e anunciadas. Intervalo em segundos depois da partida.
+export const PIRATE_BALANCE = {
+  firstWave: [150, 210],   // primeira invasão
+  interval: [210, 330],    // entre invasões (conta só depois que a anterior acabou)
+  spawnDistance: 42,       // as balsas aparecem longe o bastante para serem vistas
+};
+const between = ([a, b]) => a + Math.random() * (b - a);
 
 export class Enemies {
   constructor(G) {
     this.G = G; this.list = []; this.hitMeshes = []; this.tick = 0;
-    this.pirateSpawnTimer = 22; this.pirateWave = 0;
+    this.pirateSpawnTimer = between(PIRATE_BALANCE.firstWave); this.pirateWave = 0;
   }
 
   spawnForIsland(isl, _r) {
@@ -45,7 +54,9 @@ export class Enemies {
       pirate: false,
       body: { pos: new THREE.Vector3(x, isl ? isl.set.y + 1.2 : 1.2, z), vel: new THREE.Vector3(), radius: 0.35, height: 1.7 * def.scale, grounded: false, groundSet: null },
     };
-    mesh.traverse((o) => { if (o.isMesh) { o.userData.enemy = e; this.hitMeshes.push(o); } });
+    e.mats = new Set();
+    mesh.traverse((o) => { if (o.isMesh) { o.userData.enemy = e; this.hitMeshes.push(o); e.mats.add(o.material); } });
+    e.hitT = 0; e.deathT = 0; e.deathSide = Math.random() < 0.5 ? 1 : -1;
     mesh.position.copy(e.body.pos);
     this.G.scene.add(mesh);
     this.list.push(e);
@@ -68,9 +79,10 @@ export class Enemies {
   damage(e, n) {
     if (e.state === 'dead') return;
     e.hp -= n;
+    e.hitT = 0.22;
     if (!e.pirate && e.state !== 'chase' && e.state !== 'attack') e.state = 'chase'; // levou tiro: percebe o jogador
     if (e.hp <= 0) {
-      e.state = 'dead'; e.timer = 5;
+      e.state = 'dead'; e.timer = 5; e.deathT = 0;
       this.G.world.collected.add(e.id);
       const r = Math.random();
       const loot = r < 0.4 ? { municao: 6 } : r < 0.75 ? { bandagem: 1 } : r < 0.85 ? { cartucho: 4 } : null;
@@ -83,23 +95,27 @@ export class Enemies {
     if (!G.startup.departed) return;
     this.pirateSpawnTimer -= dt;
     if (this.pirateSpawnTimer > 0) return;
-    if (this.list.some((e) => e.pirate && e.state !== 'dead')) {
-      this.pirateSpawnTimer = 12;
+    // Nunca junto com uma onda gigante/furacão, nem com outra invasão em andamento.
+    if ((G.events && G.events.active) || this.list.some((e) => e.pirate && e.state !== 'dead')) {
+      this.pirateSpawnTimer = 20;
       return;
     }
-    const wave = this.pirateWave++, count = wave < 2 ? 2 : 3;
+    const wave = this.pirateWave++;
+    const count = wave === 0 ? 1 : wave < 3 ? 2 : 2 + (Math.random() < 0.4 ? 1 : 0);
     const forwardX = Math.sin(G.boat.yaw), forwardZ = Math.cos(G.boat.yaw);
     const sideX = forwardZ, sideZ = -forwardX;
+    const flank = Math.random() < 0.5 ? 1 : -1, D = PIRATE_BALANCE.spawnDistance;
     for (let i = 0; i < count; i++) {
       const id = `pirate-${G.world.seed}-${wave}-${i}`;
       if (G.world.collected.has(id)) continue;
-      const side = (i - (count - 1) / 2) * 3;
+      const side = (i - (count - 1) / 2) * 4;
       this.spawnPirate(id,
-        G.boat.x - forwardX * 22 + sideX * side,
-        G.boat.z - forwardZ * 22 + sideZ * side);
+        G.boat.x - forwardX * D * 0.55 + sideX * (flank * D * 0.8 + side),
+        G.boat.z - forwardZ * D * 0.55 + sideZ * (flank * D * 0.8 + side));
     }
-    G.hud.msg('Piratas se aproximam — prepare-se para o gancho!');
-    this.pirateSpawnTimer = 65;
+    G.hud.msg(count === 1 ? 'Uma balsa pirata se aproxima!' : `${count} balsas piratas se aproximam — prepare-se para o gancho!`);
+    if (G.hud.banner) G.hud.banner('☠ PIRATAS', 'Balsas a ' + (flank > 0 ? 'bombordo' : 'estibordo') + ' — defenda a jangada!', 'pirate', 5);
+    this.pirateSpawnTimer = between(PIRATE_BALANCE.interval);
   }
 
   spawnPirate(id, x, z) {
@@ -115,10 +131,10 @@ export class Enemies {
 
   _makePirateRaft() {
     const raft = new THREE.Group();
-    const wood = new THREE.MeshStandardMaterial({ color: 0x755535, roughness: 0.96 });
-    const float = new THREE.MeshStandardMaterial({ color: 0x493a2d, roughness: 1 });
+    const wood = new THREE.MeshStandardMaterial({ color: 0x6e5034, map: woodTexture(), bumpMap: woodBump(), bumpScale: 1.5, roughness: 0.95 });
+    const float = new THREE.MeshStandardMaterial({ color: 0x4a3828, map: repeated(woodTexture(), 0.5, 2), roughness: 1 });
     for (const x of [-0.58, 0, 0.58]) {
-      const plank = new THREE.Mesh(new THREE.BoxGeometry(0.52, 0.14, 3.5), wood);
+      const plank = new THREE.Mesh(scaleBoxUVs(new THREE.BoxGeometry(0.52, 0.14, 3.5), 0.52, 0.14, 3.5), wood);
       plank.position.set(x, 0.24, 0);
       raft.add(plank);
     }
@@ -128,7 +144,109 @@ export class Enemies {
       log.position.set(x, 0.08, 0);
       raft.add(log);
     }
+    const rope = new THREE.MeshStandardMaterial({ color: 0xa48b5c, roughness: 1 });
+    for (const z of [-1.3, 0, 1.3]) {
+      const lash = new THREE.Mesh(new THREE.BoxGeometry(1.9, 0.05, 0.08), rope);
+      lash.position.set(0, 0.32, z);
+      raft.add(lash);
+    }
+    // Bandeirinha pirata num mastro curto.
+    const pole = new THREE.Mesh(new THREE.CylinderGeometry(0.03, 0.035, 1.6, 6), float);
+    pole.position.set(-0.6, 1.1, -1.4);
+    const flag = new THREE.Mesh(new THREE.PlaneGeometry(0.6, 0.38, 6, 1),
+      new THREE.MeshStandardMaterial({ color: 0x111111, roughness: 1, side: THREE.DoubleSide }));
+    flag.position.set(-0.3, 1.7, -1.4);
+    const skull = new THREE.Mesh(new THREE.CircleGeometry(0.07, 8), new THREE.MeshBasicMaterial({ color: 0xe8e2d0, side: THREE.DoubleSide }));
+    skull.position.set(0, 0, 0.002);
+    flag.add(skull);
+    raft.add(pole, flag);
+    raft.userData.flag = flag;
+    raft.userData.flagBase = flag.geometry.attributes.position.array.slice();
+    // Remo: gira em volta do pirata enquanto ele rema.
+    const oar = new THREE.Group();
+    const shaft = new THREE.Mesh(new THREE.CylinderGeometry(0.03, 0.03, 2.2, 6), wood);
+    shaft.rotation.z = Math.PI / 2;
+    const blade = new THREE.Mesh(new THREE.BoxGeometry(0.42, 0.03, 0.2), wood);
+    blade.position.x = 1.15;
+    oar.add(shaft, blade);
+    oar.position.set(0, 1.0, 0.3);
+    raft.add(oar);
+    raft.userData.oar = oar;
     return raft;
+  }
+
+  // Balsa acompanha as ondas (altura + inclinação) e o pirata rema ajoelhado.
+  _rideRaft(e, dt) {
+    const p = e.body.pos, t = clock();
+    const fx = Math.sin(e.yaw), fz = Math.cos(e.yaw);
+    const h = waveHeight(p.x, p.z, t);
+    const hf = waveHeight(p.x + fx * 1.6, p.z + fz * 1.6, t), hb = waveHeight(p.x - fx * 1.6, p.z - fz * 1.6, t);
+    const hr = waveHeight(p.x + fz * 0.9, p.z - fx * 0.9, t), hl = waveHeight(p.x - fz * 0.9, p.z + fx * 0.9, t);
+    p.y = h + 0.3;
+    if (e.raft) {
+      const raft = e.raft;
+      raft.rotation.order = 'YXZ';
+      raft.position.set(p.x, h - 0.12, p.z);
+      raft.rotation.set(-Math.atan2(hf - hb, 3.2) * 0.9, e.yaw, Math.atan2(hr - hl, 1.8) * 0.9);
+      const oar = raft.userData.oar;
+      e.rowT = (e.rowT || 0) + dt * 3.4;
+      if (oar) {
+        oar.rotation.y = Math.sin(e.rowT) * 0.7;
+        oar.rotation.z = 0.25 + Math.cos(e.rowT) * 0.2;
+      }
+      const flag = raft.userData.flag;
+      if (flag) {
+        const a = flag.geometry.attributes.position, b = raft.userData.flagBase;
+        for (let i = 0; i < a.count; i++) {
+          const x = b[i * 3] + 0.3;
+          a.array[i * 3 + 2] = Math.sin(t * 7 + x * 9) * 0.06 * x;
+        }
+        a.needsUpdate = true;
+      }
+      e.mesh.rotation.order = 'YXZ';
+      e.mesh.rotation.x = raft.rotation.x;
+      e.mesh.rotation.z = raft.rotation.z;
+    }
+    e.mesh.position.copy(p);
+    e.mesh.rotation.y = e.yaw;
+    animateHumanoid(e.mesh, 0, dt, 'row', (e.rowT % (Math.PI * 2)) / (Math.PI * 2));
+  }
+
+  // Reação a dano: tranco para trás + brilho vermelho rápido.
+  _animateHit(e, dt) {
+    if (e.hitT <= 0 && !e.hitGlow) return;
+    e.hitT = Math.max(0, e.hitT - dt);
+    const k = e.hitT / 0.22;
+    for (const m of e.mats) if (m.emissive) { m.emissive.setRGB(0.9 * k, 0.1 * k, 0.05 * k); }
+    e.hitGlow = k > 0;
+    const parts = e.mesh.userData.parts;
+    if (parts) { parts.torso.rotation.x -= Math.sin(k * Math.PI) * 0.45; parts.head.rotation.x -= Math.sin(k * Math.PI) * 0.3; }
+  }
+
+  // Morte: tomba de lado com quique, afunda e some aos poucos.
+  _animateDeath(e, dt) {
+    e.deathT += dt;
+    const t = e.deathT, fall = Math.min(1, t / 0.55);
+    const ease = 1 - Math.pow(1 - fall, 3), bounce = fall >= 1 ? Math.sin(Math.min(1, (t - 0.55) / 0.35) * Math.PI) * 0.12 : 0;
+    e.mesh.rotation.x = (-Math.PI / 2 + bounce) * ease;
+    e.mesh.rotation.z = e.deathSide * 0.25 * ease;
+    const parts = e.mesh.userData.parts;
+    if (parts && t < 0.6) {
+      parts.armL.rotation.x = parts.armR.rotation.x = -2.2 * ease;
+      parts.legL.rotation.x = -0.3 * ease; parts.legR.rotation.x = 0.2 * ease;
+      parts.kneeL.rotation.x = parts.kneeR.rotation.x = 0.4 * ease;
+    }
+    if (t > 3.2) {
+      const fade = Math.max(0, 1 - (t - 3.2) / 1.6);
+      e.mesh.position.y -= dt * 0.35;
+      for (const m of e.mats) { m.transparent = true; m.opacity = fade; }
+    }
+    if (e.raft) {
+      e.raft.position.y -= dt * 0.25;
+      e.raft.rotation.z += dt * 0.15 * e.deathSide;
+    }
+    e.timer -= dt;
+    if (e.timer <= 0) this.remove(e);
   }
 
   _findPirateLanding(p, boat) {
@@ -241,12 +359,7 @@ export class Enemies {
 
   updatePirate(e, dt) {
     const G = this.G, boat = G.boat, b = e.body, p = b.pos, pp = G.player.body.pos;
-    if (e.state === 'dead') {
-      e.timer -= dt;
-      e.mesh.rotation.x = Math.max(-Math.PI / 2, e.mesh.rotation.x - dt * 5);
-      if (e.timer <= 0) this.remove(e);
-      return;
-    }
+    if (e.state === 'dead') { this._animateDeath(e, dt); return; }
     e.cd -= dt;
     if (e.state === 'approach') {
       const dx = boat.x - p.x, dz = boat.z - p.z, centerDistance = Math.hypot(dx, dz) || 1;
@@ -257,17 +370,10 @@ export class Enemies {
         this._startPirateGrapple(e, landing);
         return;
       }
-      const speed = e.def.speed;
+      const speed = e.def.raftSpeed || e.def.speed;
       p.x += dx / centerDistance * speed * dt;
       p.z += dz / centerDistance * speed * dt;
-      p.y = G.startup.waterLevel + 0.55;
-      if (e.raft) {
-        e.raft.position.set(p.x, p.y - 0.38, p.z);
-        e.raft.rotation.y = e.yaw;
-      }
-      e.mesh.position.copy(p);
-      e.mesh.rotation.y = e.yaw;
-      animateHumanoid(e.mesh, speed, dt, 'walk');
+      this._rideRaft(e, dt);
       return;
     }
     if (e.state === 'grapple') {
@@ -284,8 +390,11 @@ export class Enemies {
       this._updateHookVisual(e, progress);
       e.mesh.position.copy(p);
       e.mesh.rotation.y = e.yaw;
-      animateHumanoid(e.mesh, 0, dt, 'attack', progress);
+      e.mesh.rotation.x = -Math.sin(progress * Math.PI) * 0.35;
+      e.mesh.rotation.z = 0;
+      animateHumanoid(e.mesh, 0, dt, 'leap', progress);
       if (progress >= 1) {
+        e.mesh.rotation.x = 0;
         p.set(x, targetY, z);
         e.local = { ...action.local };
         e.body.vel.set(0, 0, 0);
@@ -328,9 +437,8 @@ export class Enemies {
       b.grounded = false;
       b.groundSet = null;
       e.raft = this._makePirateRaft();
-      e.raft.position.set(p.x, p.y - 0.38, p.z);
-      e.raft.rotation.y = e.yaw;
       G.scene.add(e.raft);
+      this._rideRaft(e, 0);
       return;
     }
     const pdx = pp.x - p.x, pdz = pp.z - p.z, playerDistance = Math.hypot(pdx, pdz);
@@ -344,6 +452,7 @@ export class Enemies {
     e.mesh.rotation.y = e.yaw;
     const pose = e.swing > 0 ? 'attack' : 'walk';
     animateHumanoid(e.mesh, dt > 0 ? moved / dt : 0, dt, pose, e.swing > 0 ? 1 - e.swing / 0.25 : 0);
+    this._animateHit(e, dt);
     if (e.swing > 0) e.swing = Math.max(0, e.swing - dt);
   }
 
@@ -383,12 +492,7 @@ export class Enemies {
       const dist = Math.hypot(pdx, pdz) || 1;
       if (dist > ACTIVE) continue; // longe: dormindo
       pdx /= dist; pdz /= dist;
-      if (e.state === 'dead') {
-        e.timer -= dt;
-        e.mesh.rotation.x = Math.max(-Math.PI / 2, e.mesh.rotation.x - dt * 5);
-        if (e.timer <= 0) this.remove(e);
-        continue;
-      }
+      if (e.state === 'dead') { this._animateDeath(e, dt); continue; }
       e.timer -= dt; e.cd -= dt;
       if (thinkNow) this.think(e, dist, pdx, pdz);
 
@@ -430,6 +534,7 @@ export class Enemies {
       const pose = e.swing > 0 ? 'attack' : e.def.ranged && facePlayer ? 'aim' : 'walk';
       const swingProgress = e.swing > 0 ? 1 - e.swing / 0.25 : 0;
       animateHumanoid(e.mesh, Math.hypot(mx, mz), dt, pose, swingProgress);
+      this._animateHit(e, dt);
       if (e.swing > 0) e.swing = Math.max(0, e.swing - dt);
     }
   }

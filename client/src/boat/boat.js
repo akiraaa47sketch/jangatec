@@ -8,6 +8,7 @@ import { rot, clamp, lerpAngle } from '../core/util.js';
 import { CFG } from '../config.js';
 import { sea, waveHeight } from '../world/ocean.js';
 import { PIECES, STARTER_PLATFORM_SIZE, makePieceMesh } from './pieces.js';
+import { woodTexture, woodBump, metalTexture, clothTexture, repeated } from '../world/textures.js';
 import { Navigation, NAV_MODE } from './navigation.js';
 
 export const DECK_BOTTOM = 0.15; // base dos pisos iniciais (local ao barco)
@@ -46,25 +47,64 @@ export class Boat {
     });
     this._makeDeckSlotMarkers();
 
-    // Flutuadores (visuais).
-    const fm = new THREE.MeshStandardMaterial({ color: 0x3c6e8f, roughness: 0.7 });
+    // Flutuadores: barris de madeira com cintas de ferro, presos por cordas.
+    const barrelGeo = new THREE.CylinderGeometry(0.45, 0.45, 1.4, 16, 6);
+    { // barriga do barril
+      const p = barrelGeo.attributes.position;
+      for (let i = 0; i < p.count; i++) {
+        const y = p.getY(i) / 0.7, k = 1 + 0.12 * (1 - y * y);
+        p.setX(i, p.getX(i) * k); p.setZ(i, p.getZ(i) * k);
+      }
+      barrelGeo.computeVertexNormals();
+    }
+    const barrelMat = new THREE.MeshStandardMaterial({ color: 0x8a6239, map: repeated(woodTexture(), 1.2, 0.8), bumpMap: repeated(woodBump(), 1.2, 0.8), bumpScale: 1.5, roughness: 0.9 });
+    const hoopMat = new THREE.MeshStandardMaterial({ color: 0x4a4a50, map: metalTexture(), metalness: 0.65, roughness: 0.5 });
+    const ropeMat = new THREE.MeshStandardMaterial({ color: 0xb59b6a, roughness: 1 });
     for (const [fx, fz] of [[-2.2, -2.2], [2.2, -2.2], [-2.2, 2.2], [2.2, 2.2]]) {
-      const f = new THREE.Mesh(new THREE.CylinderGeometry(0.45, 0.45, 1.4, 10), fm);
-      f.rotation.x = Math.PI / 2; f.position.set(fx, -0.15, fz);
+      const f = new THREE.Group();
+      f.add(new THREE.Mesh(barrelGeo, barrelMat));
+      for (const y of [-0.5, 0, 0.5]) {
+        const hoop = new THREE.Mesh(new THREE.TorusGeometry(0.45 * (1 + 0.12 * (1 - (y / 0.7) ** 2)) + 0.01, 0.025, 6, 20), hoopMat);
+        hoop.rotation.x = Math.PI / 2; hoop.position.y = y; f.add(hoop);
+      }
+      f.rotation.x = Math.PI / 2; f.position.set(fx, -0.4, fz); // logo abaixo do convés
       this.group.add(f);
     }
     // Vela.
     this.sailGroup = new THREE.Group();
     this.sailGroup.position.set(MAST.x, 0, MAST.z);
-    const yard = new THREE.Mesh(new THREE.CylinderGeometry(0.07, 0.07, 3.4, 8), new THREE.MeshStandardMaterial({ color: 0x5d4428 }));
+    const spar = new THREE.MeshStandardMaterial({ color: 0x6d4f2e, map: repeated(woodTexture(), 0.3, 1.5), roughness: 0.85 });
+    const yard = new THREE.Mesh(new THREE.CylinderGeometry(0.06, 0.08, 3.5, 10), spar);
     yard.rotation.z = Math.PI / 2; yard.position.set(0, 5, 0.2);
+    for (const x of [-1.65, 1.65]) { // ponteiras amarradas
+      const tip = new THREE.Mesh(new THREE.TorusGeometry(0.085, 0.022, 5, 10), ropeMat);
+      tip.rotation.y = Math.PI / 2; tip.position.set(x, 5, 0.2); this.sailGroup.add(tip);
+    }
     this.cloth = new THREE.Mesh(
-      new THREE.PlaneGeometry(3.2, 3, 16, 16),
-      new THREE.MeshStandardMaterial({ color: 0xece3cf, side: THREE.DoubleSide, roughness: 1 })
+      new THREE.PlaneGeometry(3.2, 3, 20, 20),
+      new THREE.MeshStandardMaterial({ color: 0xffffff, map: clothTexture(), side: THREE.DoubleSide, roughness: 0.95 })
     );
     this.cloth.position.z = 0.5;
     this.sailBase = this.cloth.geometry.attributes.position.array.slice();
     this.sailGroup.add(yard, this.cloth);
+    // Cordame fixo: estais do topo do mastro até os cantos da plataforma central.
+    const top = new THREE.Vector3(MAST.x, 5.3, MAST.z);
+    for (const [cx, cz] of [[-2.8, -1.8], [2.8, -1.8], [-2.8, 2.8], [2.8, 2.8]]) {
+      const end = new THREE.Vector3(cx, DECK_BOTTOM + 0.35, cz), dir = end.clone().sub(top);
+      const stay = new THREE.Mesh(new THREE.CylinderGeometry(0.018, 0.018, dir.length(), 4), ropeMat);
+      stay.position.copy(top).add(end).multiplyScalar(0.5);
+      stay.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), dir.normalize());
+      this.group.add(stay);
+    }
+    // Bandeira no topo do mastro (tremula com o vento em update).
+    this.flag = new THREE.Mesh(new THREE.PlaneGeometry(0.9, 0.5, 10, 2),
+      new THREE.MeshStandardMaterial({ color: 0xd9452e, side: THREE.DoubleSide, roughness: 0.9 }));
+    this.flag.geometry.translate(0.45, 0, 0);
+    this.flag.position.set(MAST.x, 5.75, MAST.z);
+    this.flagBase = this.flag.geometry.attributes.position.array.slice();
+    const pole = new THREE.Mesh(new THREE.CylinderGeometry(0.02, 0.02, 0.8, 5), spar);
+    pole.position.set(MAST.x, 5.6, MAST.z);
+    this.group.add(this.flag, pole);
     this.group.add(this.sailGroup);
     this.sailGroup.visible = false;
   }
@@ -233,6 +273,16 @@ export class Boat {
         this.z += Math.cos(this.yaw) * this.speed * dt;
       }
 
+      // Eventos: arremesso (onda gigante / cuspido do furacão) e giro descontrolado.
+      if (this.fling) {
+        const f = this.fling, k = f.t / f.T;
+        this.x += f.vx * k * dt; this.z += f.vz * k * dt;
+        f.t -= dt; if (f.t <= 0) this.fling = null;
+      }
+      if (this.spin) {
+        this.yaw += this.spin.rate * dt;
+        this.spin.t -= dt; if (this.spin.t <= 0) this.spin = null;
+      }
       if (startup && startup.departed) this.G.world.pushBoat(this);
     }
 
@@ -250,12 +300,27 @@ export class Boat {
       const x = this.sailBase[i];
       const y = this.sailBase[i + 1];
       const edge = 1 - Math.abs(x) / 1.6;
-      cloth[i + 2] = this.sailBase[i + 2] +
+      // barriga da vela (cheia de vento quando levantada) + tremulação nas bordas
+      const belly = (1 - (x / 1.6) ** 2) * (1 - (y / 1.5) ** 2 * 0.6) * this.sailT * (0.55 + storm * 0.25);
+      cloth[i + 2] = this.sailBase[i + 2] + Math.max(0, belly) +
         Math.sin(t * (1.7 + storm * 0.9) + y * 1.25 + x * 0.55 + this.sailAngle) *
-        0.24 * edge * s * gust;
+        0.24 * edge * s * gust * (1.15 - this.sailT * 0.6) +
+        Math.sin(t * 9 + x * 4 + y * 3) * 0.025 * edge * (0.4 + storm);
     }
     clothPositions.needsUpdate = true;
     this.cloth.geometry.computeVertexNormals();
+    // Bandeira: aponta a favor do vento (oposto à proa) e ondula mais na ponta.
+    {
+      const fp = this.flag.geometry.attributes.position, fa = fp.array, fb = this.flagBase;
+      for (let i = 0; i < fp.count; i++) {
+        const x = fb[i * 3];
+        fa[i * 3 + 2] = Math.sin(t * (6 + storm * 5) - x * 5) * 0.09 * x * (1 + storm);
+        fa[i * 3 + 1] = fb[i * 3 + 1] + Math.sin(t * 4 - x * 3) * 0.03 * x;
+      }
+      fp.needsUpdate = true;
+      this.flag.geometry.computeVertexNormals();
+      this.flag.rotation.y = Math.PI / 2 + Math.sin(t * 0.7) * 0.15;
+    }
     for (const slot of this.deckSlots) {
       const filled = [...this.pieces.values()].some((piece) => piece.startSlotId === slot.id);
       const marker = this.deckSlotMarkers.get(slot.id);
@@ -275,9 +340,10 @@ export class Boat {
       ];
       const he = points.map(([lx, lz]) => sample(lx, lz));
       const avg = he.reduce((sum, value) => sum + value, 0) / he.length;
-      const pitchTarget = clamp(-Math.atan2(sample(0, R) - sample(0, -R), 2 * R), -0.12, 0.12);
-      const rollTarget = clamp(Math.atan2(sample(R, 0) - sample(-R, 0), 2 * R), -0.12, 0.12);
-      const k = Math.min(1, 3 * dt);
+      const tilt = this.G.events ? this.G.events.tiltMax : 0.12;
+      const pitchTarget = clamp(-Math.atan2(sample(0, R) - sample(0, -R), 2 * R) * (tilt > 0.12 ? 1.6 : 1), -tilt, tilt);
+      const rollTarget = clamp(Math.atan2(sample(R, 0) - sample(-R, 0), 2 * R) * (tilt > 0.12 ? 1.6 : 1), -tilt, tilt);
+      const k = Math.min(1, (tilt > 0.12 ? 5 : 3) * dt);
       this.bob += ((avg - sea.level) - this.bob) * k;
       this.pitch += (pitchTarget - this.pitch) * k;
       this.roll += (rollTarget - this.roll) * k;

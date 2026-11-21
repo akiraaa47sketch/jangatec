@@ -81,6 +81,7 @@ export class Net {
       case 'sail-install': G.startup.installSail(); break;
       case 'start': G.startup.applyState(m.state); break;
       case 'msg': G.hud.msg(m.text); break;
+      case 'event': G.events.receive(m.e); break;
       case 'carry': {
         G.world.applyCarryState(m.id, m.by, m.state);
         break;

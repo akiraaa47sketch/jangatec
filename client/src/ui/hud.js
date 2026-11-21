@@ -24,6 +24,30 @@ export class Hud {
     const v = $('vignette');
     v.className = ''; void v.offsetWidth; v.className = kind;
   }
+  // Painel de evento persistente (atualizado pelo sistema de eventos a cada frame).
+  setEvent(ev) { this.event = ev; this.eventUntil = 0; if (!ev) this._renderEvent(); }
+  // Aviso temporário no mesmo painel (ex.: piratas).
+  banner(title, text, kind, seconds = 4) {
+    if (this.event && this.eventUntil === 0) return; // evento climático tem prioridade
+    this.event = { title, text, kind };
+    this.eventUntil = performance.now() + seconds * 1000;
+    this._renderEvent();
+  }
+  _renderEvent() {
+    const ev = this.event, box = $('eventBox');
+    if (!ev) { box.hidden = true; return; }
+    box.hidden = false;
+    box.className = `${ev.kind || ''}${ev.good ? ' good' : ''}`;
+    $('eventTitle').textContent = ev.title;
+    $('eventText').textContent = ev.text || '';
+    $('eventArrow').style.visibility = ev.arrow == null ? 'hidden' : 'visible';
+    if (ev.arrow != null) $('eventArrow').style.transform = `rotate(${ev.arrow}rad)`;
+    $('eventMeter').style.display = ev.meter == null ? 'none' : 'flex';
+    if (ev.meter != null) {
+      $('eventMeterLabel').textContent = ev.meterLabel || 'impacto';
+      $('eventMeterFill').style.width = `${Math.round(ev.meter * 100)}%`;
+    }
+  }
   setBuild(on) {
     // Legacy — não faz nada no novo sistema
   }
@@ -64,7 +88,9 @@ export class Hud {
 
   update(dt) {
     this.acc += dt;
+    if (this.eventUntil && performance.now() > this.eventUntil) { this.event = null; this.eventUntil = 0; this._renderEvent(); }
     if (this.acc < 0.1) return; // 10 Hz basta para o HUD
+    this._renderEvent();
     this.acc = 0;
     const G = this.G, s = G.survival, inv = s.inv, boat = G.boat, c = G.combat, w = c.weapon;
     $('vida').style.width = s.vida + '%';

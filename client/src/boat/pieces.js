@@ -1,7 +1,7 @@
 // Catálogo de peças modulares. Para criar uma peça nova basta adicionar uma entrada aqui.
 // size = [largura X, altura Y, comprimento Z]; col = tipo de colisor.
 import * as THREE from '../three.js';
-import { woodTexture, scaleBoxUVs } from '../world/textures.js';
+import { woodTexture, woodBump, metalTexture, scaleBoxUVs } from '../world/textures.js';
 
 export const STARTER_PLATFORM_SIZE = 6;
 
@@ -36,7 +36,11 @@ export function makePieceMesh(type, ghost = false) {
   const wood = !ghost && !def.metal;
   const mat = ghost
     ? new THREE.MeshBasicMaterial({ color: 0x55ff88, transparent: true, opacity: 0.45, depthWrite: false, side: THREE.DoubleSide })
-    : new THREE.MeshStandardMaterial({ color: def.cor, map: wood ? woodTexture() : null, roughness: def.metal ? 0.5 : 0.9, metalness: def.metal ? 0.6 : 0, side: THREE.DoubleSide });
+    : new THREE.MeshStandardMaterial({
+      color: def.cor, map: wood ? woodTexture() : def.metal ? metalTexture() : null,
+      bumpMap: wood ? woodBump() : null, bumpScale: 1.6,
+      roughness: def.metal ? 0.55 : 0.88, metalness: def.metal ? 0.55 : 0, side: THREE.DoubleSide,
+    });
   const boxGeo = (bw, bh, bl) => { const bg = new THREE.BoxGeometry(bw, bh, bl); return wood ? scaleBoxUVs(bg, bw, bh, bl) : bg; };
   const g = new THREE.Group();
   if (def.stairs) {

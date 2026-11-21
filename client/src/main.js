@@ -18,6 +18,7 @@ import { Startup } from './systems/startup.js';
 import { Combat } from './systems/combat.js';
 import { Enemies } from './systems/enemies.js';
 import { Interact } from './systems/interact.js';
+import { Events } from './systems/events.js';
 import { Net } from './net/net.js';
 import { Hud } from './ui/hud.js';
 
@@ -60,6 +61,7 @@ G.net = new Net(G);
 G.survival = new Survival(G);
 G.combat = new Combat(G);
 G.enemies = new Enemies(G);
+G.events = new Events(G);
 G.physics = new Physics(G);
 G.world = new World(G, 1);
 G.boat = new Boat(G);
@@ -150,6 +152,7 @@ function start(seed, welcome) {
     for (const id of welcome.removed || []) G.boat.removePiece(id);
     for (const p of welcome.added || []) G.boat.addPiece(p);
     for (const id of welcome.collected || []) G.world.collected.add(id);
+    if (welcome.event) G.events.receive(welcome.event);
     if (welcome.boat) { const b = welcome.boat; Object.assign(G.boat, { x: b.x, z: b.z, yaw: b.yaw, speed: b.speed, sailUp: b.up, sailAngle: b.angle }); }
   }
   G.world.ensureStarterIsland();
@@ -228,11 +231,13 @@ function frame() {
   player.update(dt, t);
   G.viewmodel.update(dt, t);
   player.updateCamera(dt, t);
+  G.events.applyShake(camera, dt);
   G.build.update();
   G.world.update(dt, t);
   G.world.updateFloodLevel(G.startup.waterLevel);
   G.physics.update(dt, t);
   G.enemies.update(dt);
+  G.events.update(dt, t);
   G.interact.update(dt);
   G.combat.update(dt);
   G.survival.update(dt);

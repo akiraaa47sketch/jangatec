@@ -23,6 +23,11 @@
   <div id="prompt"></div>
   <div id="hotbar"></div>
   <div id="msgs"></div>
+  <div id="eventBox" hidden>
+    <span id="eventArrow">▲</span>
+    <div><b id="eventTitle"></b><p id="eventText"></p>
+      <div id="eventMeter"><label id="eventMeterLabel"></label><i><b id="eventMeterFill"></b></i></div></div>
+  </div>
   <!-- O estado do objeto carregado é mostrado no prompt e na mira. -->
   <div id="buildPanel" hidden></div>
   <div id="hint">H — controles</div>
@@ -65,6 +70,10 @@
     Depois da partida, o barco segue uma rota linear pelo oceano. Use a vela [E] para avançar.<br>
     O ângulo da vela [Z/C] faz pequenos ajustes de curso.<br>
     <b>O controle 360° é desbloqueado apenas na batalha final.</b></p>
+    <h3>Perigos do mar</h3>
+    <p><b>🌊 Onda gigante:</b> um alerta mostra de onde ela vem e a contagem. Baixe a vela [E] e fique perto do mastro para se segurar. Com a vela cheia a jangada é arremessada e todos a bordo se machucam.<br>
+    <b>🌀 Furacão:</b> o olho passa ao lado da rota e puxa a jangada. Levante a vela e gire-a para o lado <b>oposto</b> ao olho ([Z] ou [C], o alerta indica qual). Se a jangada chegar ao olho, ela é sugada, gira e é cuspida para fora — com dano.<br>
+    <b>☠ Piratas:</b> invasões raras e anunciadas; as balsas aparecem ao longe, remando até a jangada.</p>
     <p>Se todos saírem do barco durante a viagem, a vela baixa automaticamente.</p>
     <p>As armas têm raridade e durabilidade. Explore ilhas mais distantes para encontrar equipamentos melhores.<br>
     A caixa inicial contém uma pistola e bandagens proporcionais à partida. As caixas guardam itens compartilhados entre os jogadores; o conteúdo é retirado item por item.<br>Clique para fechar</p>

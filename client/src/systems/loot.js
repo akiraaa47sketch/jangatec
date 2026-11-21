@@ -1,6 +1,6 @@
 import { hash2, mulberry32 } from '../core/util.js';
 
-export const WORLD_LOOT_PARAMS = { chunkSize: 90, islandChance: 0.14 };
+export const WORLD_LOOT_PARAMS = { chunkSize: 90, islandChance: 0.07 };
 
 export const LOOT_CONFIG = {
   starterCache: {

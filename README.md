@@ -80,6 +80,24 @@ As ilhas exploráveis ficam acima da maré máxima e abrigam fortes improvisados
 guarnições de inimigos. Depois da partida, grupos de piratas podem alcançar a jangada em pequenas
 balsas, lançar ganchos, voar até o convés e atacar quem estiver a bordo.
 
+### Eventos do mar e balanceamento
+
+Depois da partida o céu abre aos poucos e, de tempos em tempos (~2–3 min), o host sorteia um evento
+(`client/src/systems/events.js`, constantes em `EVENT_BALANCE`):
+
+- **Onda gigante**: uma frente de água de ~4,5 m atravessa o mar (entra em `waveHeight` e no shader,
+  então barco, detritos e nadadores sentem a onda). Baixe a vela e fique perto do mastro; com a vela
+  cheia a jangada é arremessada e quem está a bordo leva dano. Quem está longe do mastro é jogado
+  pelo convés.
+- **Furacão**: um funil com nuvem em espiral, spray e destroços passa ao lado da rota e puxa a jangada
+  para o olho (o mar afunda e gira em espiral ali). Levante a vela e gire-a para o lado oposto ao olho;
+  se a jangada chegar ao olho, ela é sugada, gira e é cuspida com dano.
+
+Eventos são anunciados pela rede (`t: 'event'`) e derivados do relógio comum, então todos os
+jogadores veem o mesmo. Piratas ficaram raros (`PIRATE_BALANCE` em `systems/enemies.js`): primeira
+invasão após 2,5–3,5 min, depois a cada 3,5–5,5 min, com 1–3 balsas, nunca durante um evento.
+As ilhas aparecem em 7% dos chunks (`islandChance` em `systems/loot.js`).
+
 A ilha inicial é garantida e tem três caixas, incluindo um cache com pistola e bandagens
 dimensionadas pela quantidade de jogadores. As caixas abrem com animação, mantêm o estoque e
 permitem retirar cada item individualmente. No multiplayer, o servidor gera e controla o estoque
@@ -90,7 +108,7 @@ capacidade de carregador e durabilidade. Armas e raridades superiores dependem d
 O loot é configurado em `client/src/systems/loot.js` por região, tipo de caixa, raridade,
 quantidade e quantidade de jogadores para o cache inicial.
 
-As ilhas aparecem com menor frequência nos chunks para deixar mais espaço aberto no oceano;
+As ilhas aparecem com baixa frequência (7% dos chunks) para deixar mais espaço aberto no oceano;
 a ilha inicial é a exceção garantida. Esta versão não possui crafting nem sede.
 
 Detritos e peças colocadas são corpos rígidos com colisão; objetos flutuantes recebem empuxo

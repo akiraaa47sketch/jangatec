@@ -7,12 +7,27 @@ import { CFG } from '../config.js';
 import { LOOT_CONFIG, generateCrateLoot } from '../systems/loot.js';
 import { makePieceMesh, PIECES } from '../boat/pieces.js';
 import { makePalm, makeRock, makeBush, makeGrassTufts } from './models.js';
+import { woodTexture, woodBump, sandTexture, sandBump, grassTexture, thatchTexture, logWallTexture, metalTexture, repeated, scaleBoxUVs } from './textures.js';
 
 const M = (color, extra = {}) => new THREE.MeshStandardMaterial({ color, roughness: 0.9, ...extra });
 const WOOD = [0x9b7242, 0x86623a, 0xb08a55, 0x6f5231];
 // Areia em gradiente: molhada/escura perto da água, seca/clara no alto (chave = dr do patamar).
 const SAND = { 7.5: 0x9a8d68, 6: 0xab9c72, 4.5: 0xbcab7c, 3: 0xcdb986, 1.5: 0xd8c48e, 0.5: 0xe0cc96, 0: 0xdcc891 };
-const box = (w, h, l, mat) => new THREE.Mesh(new THREE.BoxGeometry(w, h, l), mat);
+// UVs em escala de mundo: texturas mantêm o mesmo tamanho em qualquer caixa.
+const box = (w, h, l, mat) => new THREE.Mesh(scaleBoxUVs(new THREE.BoxGeometry(w, h, l), w, h, l), mat);
+let SHARED = null; // materiais texturizados compartilhados pelas ilhas
+function shared() {
+  if (SHARED) return SHARED;
+  SHARED = {
+    plaster: M(0xc9b89a, { map: sandTexture(), bumpMap: sandBump(), bumpScale: 1.2 }),
+    logs: M(0x8a6a44, { map: repeated(logWallTexture(), 0.4, 0.45), bumpMap: repeated(logWallTexture(), 0.4, 0.45), bumpScale: 2 }),
+    thatch: M(0xc4a874, { map: repeated(thatchTexture(), 0.8), bumpMap: repeated(thatchTexture(), 0.8), bumpScale: 2.5 }),
+    crate: M(0xb08a55, { map: repeated(woodTexture(), 1.2), bumpMap: repeated(woodBump(), 1.2), bumpScale: 1.5 }),
+    crateLid: M(0xc49a60, { map: repeated(woodTexture(), 1.2), bumpMap: repeated(woodBump(), 1.2), bumpScale: 1.5 }),
+    iron: M(0x4a4a52, { map: metalTexture(), metalness: 0.6, roughness: 0.55 }),
+  };
+  return SHARED;
+}
 const STARTER_BUILD_CLEAR_RADIUS = 9.75;
 const STARTER_FLOOR_LOCAL_Z = -9;
 
@@ -83,8 +98,19 @@ export class World {
   update(dt, t) {
     const G = this.G, S = CFG.chunk, R = CFG.loadRadius;
     for (const crate of this.crates) {
-      crate.openT += ((crate.opened ? 1 : 0) - crate.openT) * Math.min(1, dt * 5);
-      crate.lid.rotation.x = -1.25 * crate.openT;
+      // mola amortecida: a tampa abre com um tranco e quica um pouco
+      crate.openV = (crate.openV || 0) + (((crate.opened ? 1 : 0) - crate.openT) * 110 - crate.openV * 11) * dt;
+      crate.openT += crate.openV * dt;
+      crate.lid.rotation.x = -1.25 * Math.max(-0.02, crate.openT);
+    }
+    // Fogueiras dos acampamentos tremulam.
+    for (const isl of this.islands) if (isl.fire) {
+      const f = isl.fire;
+      f.children.forEach((flame, i) => {
+        const s = 0.85 + Math.sin(t * (9 + i * 3.1) + i) * 0.12 + Math.sin(t * 23 + i * 5) * 0.06;
+        flame.scale.set(1 - (s - 1) * 0.5, s, 1 - (s - 1) * 0.5);
+        flame.rotation.y = t * (1.5 + i);
+      });
     }
     // Vento: a copa das palmeiras balança de leve (defasada por palmeira).
     for (const isl of this.islands) for (const p of isl.palms || []) {
@@ -223,8 +249,8 @@ export class World {
       const worldTop = islandElevation + top;
       const radius = R + dr, thickness = 0.35;
       const sand = new THREE.Mesh(
-        new THREE.CylinderGeometry(radius, radius, thickness, 28),
-        M(SAND[dr], { flatShading: true })
+        new THREE.CylinderGeometry(radius, radius, thickness, 40),
+        M(SAND[dr], { map: repeated(sandTexture(), radius * 0.45), bumpMap: repeated(sandBump(), radius * 0.45), bumpScale: 1.4 })
       );
       sand.position.y = top - thickness / 2;
       addSolid(sand);
@@ -235,7 +261,7 @@ export class World {
       set.items.push(collider);
       landLayers.push({ mesh: sand, top: worldTop });
     }
-    const grass = new THREE.Mesh(new THREE.CylinderGeometry(R * 0.7, R * 0.72, 0.06, 20), M(0x6f9d4c));
+    const grass = new THREE.Mesh(new THREE.CylinderGeometry(R * 0.7, R * 0.72, 0.06, 32), M(0x6f9d4c, { map: repeated(grassTexture(), R * 0.35) }));
     grass.position.y = 0.58; group.add(grass);
     const TOP = 0.55;
     landLayers.push({ mesh: grass, top: islandElevation + 0.61 });
@@ -247,7 +273,7 @@ export class World {
     const starterCratePositions = starterIsland
       ? [[-R * 0.78, 0], [R * 0.78, -R * 0.22], [0, R * 0.78]]
       : [];
-    const houses = 1 + ((r() * 2) | 0), wallMat = M(0xc9b89a), crates = [];
+    const houses = 1 + ((r() * 2) | 0), wallMat = shared().plaster, crates = [];
     const houseCenters = [];
     for (let hI = 0; hI < houses; hI++) {
       let hx, hz;
@@ -340,8 +366,9 @@ export class World {
       if (tufts.length) group.add(makeGrassTufts(dec, tufts));
     }
     const siteCenter = houseCenters[0] || [0, 0];
+    let fireRef = null;
     if (!starterIsland) {
-      const siteYaw = r() * 6.28, woodMat = M(0x765633), thatchMat = M(0x8c784d);
+      const siteYaw = r() * 6.28, woodMat = shared().logs, thatchMat = shared().thatch;
       const addSiteBox = (lx, lz, w, h, l, yaw = 0) => {
         const [ox, oz] = rot(lx, lz, siteYaw);
         addBox(siteCenter[0] + ox, siteCenter[1] + oz, w, h, l, siteYaw + yaw, woodMat);
@@ -377,27 +404,52 @@ export class World {
           addSolid(roof);
         }
       }
-      const fire = new THREE.Mesh(new THREE.ConeGeometry(0.22, 0.55, 6), M(0xe47735, { emissive: 0x7d2c10, emissiveIntensity: 0.35 }));
-      fire.position.set(siteCenter[0], TOP + 0.28, siteCenter[1]);
-      addSolid(fire);
+      // Fogueira: pedras em anel, lenha cruzada e chamas em camadas (animadas em update).
+      const campfire = new THREE.Group();
+      campfire.position.set(siteCenter[0], TOP, siteCenter[1]);
+      const stoneMat = M(0x6f6a62, { flatShading: true });
+      for (let i = 0; i < 8; i++) {
+        const st = new THREE.Mesh(new THREE.DodecahedronGeometry(0.12, 0), stoneMat);
+        st.position.set(Math.cos(i / 8 * 6.28) * 0.42, 0.06, Math.sin(i / 8 * 6.28) * 0.42);
+        st.rotation.set(i, i * 2, 0); campfire.add(st);
+      }
+      for (let i = 0; i < 3; i++) {
+        const log = new THREE.Mesh(new THREE.CylinderGeometry(0.05, 0.06, 0.7, 6), M(0x3e2a18));
+        log.rotation.set(Math.PI / 2 - 0.25, i * 2.1, 0); log.position.y = 0.1; campfire.add(log);
+      }
+      const flames = new THREE.Group();
+      [[0xff4d1a, 0.26, 0.62, 0.9], [0xff8a2a, 0.19, 0.5, 0.85], [0xffd36a, 0.11, 0.36, 0.95]].forEach(([c, rr, hh, op]) => {
+        const fl = new THREE.Mesh(new THREE.ConeGeometry(rr, hh, 7, 1, true),
+          new THREE.MeshBasicMaterial({ color: c, transparent: true, opacity: op, depthWrite: false, side: THREE.DoubleSide }));
+        fl.geometry.translate(0, hh / 2, 0); fl.position.y = 0.08; flames.add(fl);
+      });
+      campfire.add(flames);
+      group.add(campfire);
+      fireRef = flames;
     }
     const isl = {
       id, x, z, R, diff, group, set, solids, crates: [], enemies: [], palms: palmList,
       starter: starterIsland, siteType, siteCenter, landLayers, allItems: set.items.slice(),
       maxGround: islandElevation + 0.61, floodTier: null,
+      fire: fireRef,
     };
     crates.forEach(([cx2, cz2], i) => {
       const cid = `${id}c${i}`;
       if (this.collected.has(cid)) return;
       const m = new THREE.Group();
-      const base = box(0.8, 0.46, 0.8, M(0x9b7242));
+      const S = shared();
+      const base = box(0.8, 0.46, 0.8, S.crate);
+      // cantoneiras de ferro
+      for (const [ex, ez] of [[-0.39, -0.39], [0.39, -0.39], [-0.39, 0.39], [0.39, 0.39]]) {
+        const edge = box(0.06, 0.48, 0.06, S.iron); edge.position.set(ex, 0.23, ez); m.add(edge);
+      }
       base.position.y = 0.23;
       const lid = new THREE.Group();
       lid.position.set(0, 0.46, -0.36);
-      const top = box(0.84, 0.14, 0.84, M(0xb5894e));
+      const top = box(0.84, 0.14, 0.84, S.crateLid);
       top.position.set(0, 0.07, 0.36);
       lid.add(top);
-      const strap = box(0.12, 0.12, 0.86, M(0x3d3d44, { metalness: 0.6 }));
+      const strap = box(0.12, 0.12, 0.86, S.iron);
       strap.position.set(0, 0.08, 0.36);
       lid.add(strap);
       m.add(base, lid);

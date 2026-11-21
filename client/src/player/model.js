@@ -281,6 +281,28 @@ export function animateHumanoid(g, speed, dt, pose = 'walk', progress = 0, obsta
     p.armL.rotation.x = -1.08;
     p.elbowR.rotation.x = -0.45;
     p.elbowL.rotation.x = -0.72;
+  } else if (pose === 'row') {
+    // Ajoelhado na balsa, puxando o remo em ciclos (progress = fase da remada 0..1).
+    const stroke = Math.sin(action * Math.PI * 2), pull = Math.cos(action * Math.PI * 2);
+    p.rig.position.y = -0.36;
+    p.torso.rotation.x = 0.28 + stroke * 0.22;
+    p.torso.rotation.z = pull * 0.08;
+    p.legL.rotation.x = -1.45; p.legR.rotation.x = -0.25;
+    p.kneeL.rotation.x = 1.5; p.kneeR.rotation.x = 1.75;
+    p.ankleL.rotation.x = p.ankleR.rotation.x = -0.3;
+    p.armL.rotation.x = -1.1 - stroke * 0.55;
+    p.armR.rotation.x = -1.0 - stroke * 0.6;
+    p.elbowL.rotation.x = -0.5 - Math.max(0, pull) * 0.6;
+    p.elbowR.rotation.x = -0.45 - Math.max(0, pull) * 0.6;
+  } else if (pose === 'leap') {
+    // Balançando na corda do gancho: braços para cima, pernas encolhidas, aterrissagem.
+    const tuck = Math.sin(action * Math.PI), land = phase(0.8, 1);
+    p.torso.rotation.x = -0.15 + tuck * 0.3;
+    p.armL.rotation.x = -2.7 + land * 1.6; p.armR.rotation.x = -2.9 + land * 1.8;
+    p.elbowL.rotation.x = p.elbowR.rotation.x = -0.3;
+    p.legL.rotation.x = -0.9 * tuck - 0.2; p.legR.rotation.x = -0.6 * tuck;
+    p.kneeL.rotation.x = 1.2 * tuck; p.kneeR.rotation.x = 1.0 * tuck + 0.1;
+    p.ankleL.rotation.x = p.ankleR.rotation.x = -0.2 * tuck;
   } else if (pose === 'swim') {
     p.legL.rotation.x = stride;
     p.legR.rotation.x = -stride;
@@ -304,5 +326,18 @@ export function animateHumanoid(g, speed, dt, pose = 'walk', progress = 0, obsta
     p.armR.rotation.x = stride * (0.8 + run * 0.28);
     p.elbowL.rotation.x = -0.12 - swingL * moving * run * 0.32;
     p.elbowR.rotation.x = -0.12 - swingR * moving * run * 0.32;
+    // Parado: respiração e leve troca de apoio para não parecer uma estátua.
+    const idle = 1 - moving;
+    {
+      const breath = Math.sin(p.phase * 1.3), shift = Math.sin(p.phase * 0.35);
+      p.torso.rotation.x += breath * 0.025 * idle;
+      p.head.rotation.x += Math.sin(p.phase * 1.3 + 0.6) * 0.03 * idle;
+      p.head.rotation.y = shift * 0.18 * idle;
+      p.armL.rotation.z = (-0.06 - breath * 0.025) * idle;
+      p.armR.rotation.z = (0.06 + breath * 0.025) * idle;
+      p.pelvis.rotation.z = shift * 0.03 * idle;
+      p.legL.rotation.z = -shift * 0.03 * idle; p.legR.rotation.z = -shift * 0.03 * idle;
+    }
   }
+  if (pose !== 'walk') { p.head.rotation.y = 0; p.armL.rotation.z = p.armR.rotation.z = 0; p.pelvis.rotation.z = 0; p.legL.rotation.z = p.legR.rotation.z = 0; }
 }
