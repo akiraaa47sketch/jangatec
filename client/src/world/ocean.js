@@ -229,6 +229,15 @@ export class Ocean {
     scene.add(this.mesh);
   }
 
+  // Qualidade da água = densidade da malha (mais anéis/setores = ondas mais suaves).
+  setQuality(q) {
+    const [rings, sectors] = { baixa: [60, 100], media: [90, 150], alta: [110, 180], ultra: [170, 280] }[q] || [110, 180];
+    if (this._q === q) return;
+    this._q = q;
+    this.mesh.geometry.dispose();
+    this.mesh.geometry = polarGrid(rings, sectors, 0.4, 420);
+  }
+
   update(t, cx, cz) {
     this.mesh.position.set(cx, 0, cz);
     const u = this.material.uniforms, st = this.atmo.state;

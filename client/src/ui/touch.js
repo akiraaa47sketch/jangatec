@@ -15,6 +15,7 @@ const ICON = {
   swap: '<svg viewBox="0 0 24 24"><path d="M4 8h12l-3-3 1.5-1.5L20 9l-5.5 5.5L13 13l3-3H4zm16 8H8l3 3-1.5 1.5L4 15l5.5-5.5L11 11l-3 3h12z"/></svg>',
   heal: '<svg viewBox="0 0 24 24"><path d="M10 3h4v7h7v4h-7v7h-4v-7H3v-4h7z"/></svg>',
   cam: '<svg viewBox="0 0 24 24"><path d="M12 5C6 5 2 12 2 12s4 7 10 7 10-7 10-7-4-7-10-7zm0 11a4 4 0 1 1 0-8 4 4 0 0 1 0 8z"/></svg>',
+  gear: '<svg viewBox="0 0 24 24"><path d="M19.4 13a7.6 7.6 0 0 0 0-2l2.1-1.6-2-3.5-2.5 1a7.4 7.4 0 0 0-1.7-1L15 3h-4l-.4 2.9a7.4 7.4 0 0 0-1.7 1l-2.5-1-2 3.5L6.5 11a7.6 7.6 0 0 0 0 2l-2.1 1.6 2 3.5 2.5-1a7.4 7.4 0 0 0 1.7 1L11 21h4l.4-2.9a7.4 7.4 0 0 0 1.7-1l2.5 1 2-3.5zM13 15.5A3.5 3.5 0 1 1 13 8.5a3.5 3.5 0 0 1 0 7z"/></svg>',
   full: '<svg viewBox="0 0 24 24"><path d="M4 4h6v2H6v4H4zm10 0h6v6h-2V6h-4zM4 14h2v4h4v2H4zm14 0h2v6h-6v-2h4z"/></svg>',
 };
 
@@ -31,6 +32,7 @@ export class TouchControls {
         <button data-act="heal" title="Bandagem">${ICON.heal}</button>
         <button data-act="cam" title="1ª/3ª pessoa">${ICON.cam}</button>
         <button data-act="full" title="Tela cheia">${ICON.full}</button>
+        <button data-act="gfx" title="Gráficos">${ICON.gear}</button>
       </div>
       <div class="tPad">
         <button class="big" data-act="attack" title="Atacar / pegar">${ICON.attack}</button>
@@ -145,6 +147,7 @@ export class TouchControls {
         key('keydown', code); key('keyup', code);
       });
       else if (act === 'cam') press(el, () => { key('keydown', 'KeyF'); key('keyup', 'KeyF'); });
+      else if (act === 'gfx') press(el, () => G.gfxMenu.toggle(!G.gfxMenu.open));
       else if (act === 'full') press(el, () => {
         const d = document.documentElement;
         if (document.fullscreenElement) document.exitFullscreen?.();
@@ -158,7 +161,7 @@ export class TouchControls {
   // Mostra os botões que fazem sentido agora (construção, vela no mastro, arma de fogo).
   update() {
     const G = this.G, $ = (id) => document.getElementById(id);
-    this.root.hidden = !G.started || G.interact.lootOpen;
+    this.root.hidden = !G.started || G.interact.lootOpen || (G.gfxMenu && G.gfxMenu.open);
     if (this.root.hidden) return;
     $('tBuild').classList.toggle('show', !!G.build.active);
     const cur = G.interact.current;

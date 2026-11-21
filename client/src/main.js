@@ -23,6 +23,8 @@ import { Net } from './net/net.js';
 import { Hud } from './ui/hud.js';
 import { CharacterMenu } from './ui/character.js';
 import { TouchControls, isTouchDevice } from './ui/touch.js';
+import { Graphics } from './core/graphics.js';
+import { GfxMenu } from './ui/gfxmenu.js';
 import { createCastawayVisual } from './player/castaway.js';
 
 const $ = (id) => document.getElementById(id);
@@ -49,6 +51,7 @@ function resize() {
   renderer.setSize(innerWidth, innerHeight, false);
   camera.aspect = innerWidth / innerHeight;
   camera.updateProjectionMatrix();
+  if (window.G && window.G.gfx) window.G.gfx.resize();
 }
 addEventListener('resize', resize);
 resize();
@@ -83,6 +86,8 @@ G.ocean = ocean;
 G.viewmodel.scene.environment = scene.environment; // metais da 1ª pessoa também refletem o céu
 G.viewmodel.scene.environmentIntensity = scene.environmentIntensity;
 window.G = G; // útil para depurar no console
+G.gfx = new Graphics(G, { renderer, scene, camera, sun, mobile: MOBILE }); // pipeline + opções gráficas
+G.gfxMenu = new GfxMenu(G);
 if (MOBILE) G.touch = new TouchControls(G);
 
 canvas.addEventListener('mousedown', (e) => {
@@ -210,7 +215,7 @@ function hotkeys() {
   const inp = G.input;
   if (inp.hit('KeyH')) $('help').hidden = !$('help').hidden;
   if (inp.hit('KeyF')) G.player.setFirstPerson(!G.player.firstPerson);
-  if (G.build.active || G.interact.lootOpen) return;
+  if (G.build.active || G.interact.lootOpen || G.gfxMenu.open) return;
   for (let i = 0; i < 3; i++) if (inp.hit('Digit' + (i + 1))) G.combat.select(i);
   if (inp.mouse.wheel) G.combat.cycle(Math.sign(inp.mouse.wheel));
   if (inp.hit('Digit4')) G.survival.use('bandagem');
@@ -232,8 +237,9 @@ function frame() {
     atmo.update(dt, camera);
     ocean.update(t, 0, 0);
     sunVisual.update(camera, t, true);
-    renderer.render(scene, camera);
+    G.gfx.render(dt);
     charMenu.update(dt, true);
+    G.gfxMenu.update();
     return;
   }
   // Quem está a bordo (mesmo no ar) acompanha o barco antes de se mover.
@@ -261,7 +267,8 @@ function frame() {
   G.hud.update(dt);
   if (G.touch) G.touch.update();
   sunVisual.update(camera, t);
-  renderer.render(scene, camera);
+  G.gfx.render(dt);
+  G.gfxMenu.update();
   G.viewmodel.render(renderer); // 2º passe: braços e arma por cima do mundo
   G.input.endFrame();
 }

@@ -139,6 +139,19 @@ cinemático da jangada. A água não é simulada como fluido.
 
 ## Gráficos
 
+**Opções gráficas** (botão no menu, tecla `O` no jogo, ⚙ no celular; salvas no navegador) e
+**contador de FPS** (`F3`). Predefinições Baixo / Médio / Alto / **Ultra**, ou ajuste fino:
+escala de renderização (50–100%), upscaler, nitidez, sombras (até 4096 com borda suave e área maior),
+MSAA 4x/8x, distância de visão (chunks carregados + neblina), qualidade da água (densidade da malha),
+densidade de pixels, bloom e gradação de cor + vinheta.
+
+Pipeline (`client/src/core/graphics.js`): a cena é desenhada em HDR na escala escolhida
+(com MSAA e bloom opcionais) → **EASU-lite** (upscale bicúbico Catmull-Rom com anti-ringing,
+inspirado no FSR 1 da AMD) + tone mapping Neutral + gradação, na resolução da tela → **RCAS**
+(o afiador adaptativo do FSR 1). Com escala abaixo de 100% o jogo desenha menos pixels e ganha FPS;
+o celular começa no Médio (75%).
+
+
 Água em shader (ondas direcionais, Fresnel, reflexo do céu, espuma, água rasa perto das ilhas), céu em
 gradiente que reage à tempestade, sombras do sol, IBL e tone mapping, palmeiras/rochas/grama procedurais e
 textura de tábuas nas peças. Detalhes e convenções em `PROJECT_MAP.md` (seção 6b).

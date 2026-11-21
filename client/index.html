@@ -50,7 +50,25 @@
   </div>
   <!-- O estado do objeto carregado é mostrado no prompt e na mira. -->
   <div id="buildPanel" hidden></div>
-  <div id="hint"><kbd>H</kbd> controles</div>
+  <div id="hint"><kbd>H</kbd> controles · <kbd>O</kbd> gráficos · <kbd>F3</kbd> FPS</div>
+</div>
+<div id="fps" hidden></div>
+
+<div id="gfxPanel" hidden>
+  <header><h2>Gráficos</h2><button id="gfxClose" type="button">Fechar</button></header>
+  <label>Predefinição <select id="gPreset"></select></label>
+  <label class="slider">Escala de renderização <input id="gScale" type="range" min="50" max="100" step="5"><small id="gScaleVal"></small></label>
+  <label>Upscaler <select id="gUpscaler"></select></label>
+  <label class="slider">Nitidez (RCAS) <input id="gSharp" type="range" min="0" max="100" step="5"><small id="gSharpVal"></small></label>
+  <label>Sombras <select id="gShadows"></select></label>
+  <label>Antisserrilhamento <select id="gMsaa"></select></label>
+  <label>Distância de visão <select id="gView"></select></label>
+  <label>Qualidade da água <select id="gWater"></select></label>
+  <label>Densidade de pixels <select id="gPixel"></select></label>
+  <label class="check"><input id="gBloom" type="checkbox"> Brilho (bloom)</label>
+  <label class="check"><input id="gGrade" type="checkbox"> Gradação de cor + vinheta</label>
+  <label class="check"><input id="gFps" type="checkbox"> Mostrar FPS <kbd>F3</kbd></label>
+  <p class="gfx-tip">Escala abaixo de 100% + FSR = mais FPS: a cena é desenhada menor e reconstruída na resolução da tela com nitidez adaptativa.</p>
 </div>
 
 <div id="lootPanel" hidden>
@@ -150,6 +168,7 @@
       </div>
     </section>
     <button id="btnSolo">Jogar solo</button>
+    <button id="btnGfx" type="button" class="alt">⚙ Opções gráficas</button>
     <label>Seed (opcional) <input id="seed" inputmode="numeric" placeholder="aleatória"></label>
     <hr>
     <label>Nome <input id="name" maxlength="16" placeholder="Náufrago"></label>

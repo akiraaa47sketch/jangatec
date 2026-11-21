@@ -102,7 +102,7 @@ export class World {
   }
 
   update(dt, t) {
-    const G = this.G, S = CFG.chunk, R = CFG.loadRadius;
+    const G = this.G, S = CFG.chunk, R = G.loadRadius || CFG.loadRadius; // distância de visão (opções gráficas)
     for (const crate of this.crates) {
       // mola amortecida: a tampa abre com um tranco e quica um pouco
       crate.openV = (crate.openV || 0) + (((crate.opened ? 1 : 0) - crate.openT) * 110 - crate.openV * 11) * dt;
