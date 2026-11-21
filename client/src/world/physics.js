@@ -546,6 +546,15 @@ export class Physics {
         record.body.aabbNeedsUpdate = true;
         continue;
       }
+      // Fundo do mar: destroços assentam na areia quando a água vai embora.
+      if (record.kind === 'object' && record.obj && !record.holdTarget && this.G.world) {
+        const b = record.body, gh = this.G.world.seabedHeight(b.position.x, b.position.z) + record.size.y * 0.5;
+        if (b.position.y < gh) {
+          b.position.y = gh;
+          if (b.velocity.y < 0) b.velocity.y = 0;
+          b.velocity.x *= 0.85; b.velocity.z *= 0.85; b.angularVelocity.scale(0.85, b.angularVelocity);
+        }
+      }
       this._syncMesh(record);
       if (record.obj && record.kind === 'object') {
         record.obj.x = record.mesh.position.x;

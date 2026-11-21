@@ -95,6 +95,7 @@ export class Enemies {
     if (!G.startup.departed) return;
     this.pirateSpawnTimer -= dt;
     if (this.pirateSpawnTimer > 0) return;
+    if (G.startup.waterLevel < 0.5) { this.pirateSpawnTimer = 20; return; } // oceano seco: sem balsas
     // Nunca junto com uma onda gigante/furacão, nem com outra invasão em andamento.
     if ((G.events && G.events.active) || this.list.some((e) => e.pirate && e.state !== 'dead')) {
       this.pirateSpawnTimer = 20;
@@ -179,7 +180,7 @@ export class Enemies {
   _rideRaft(e, dt) {
     const p = e.body.pos, t = clock();
     const fx = Math.sin(e.yaw), fz = Math.cos(e.yaw);
-    const h = waveHeight(p.x, p.z, t);
+    const h = Math.max(waveHeight(p.x, p.z, t), this.G.world.seabedHeight(p.x, p.z) + 0.15); // no seco a balsa fica na areia
     const hf = waveHeight(p.x + fx * 1.6, p.z + fz * 1.6, t), hb = waveHeight(p.x - fx * 1.6, p.z - fz * 1.6, t);
     const hr = waveHeight(p.x + fz * 0.9, p.z - fx * 0.9, t), hl = waveHeight(p.x - fz * 0.9, p.z + fx * 0.9, t);
     p.y = h + 0.3;

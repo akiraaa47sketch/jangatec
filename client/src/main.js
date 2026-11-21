@@ -4,7 +4,7 @@ import * as THREE from './three.js';
 import { DEFAULT_SERVER } from './config.js';
 import { Input } from './core/input.js';
 import { Colliders } from './world/colliders.js';
-import { Ocean } from './world/ocean.js';
+import { Ocean, sea } from './world/ocean.js';
 import { Atmosphere } from './world/atmosphere.js';
 import { SunVisual } from './world/sun.js';
 import { World } from './world/world.js';
@@ -63,6 +63,10 @@ G.enemies = new Enemies(G);
 G.events = new Events(G);
 G.physics = new Physics(G);
 G.world = new World(G, 1);
+G.colliders.groundFn = (x, z) => { // fundo do mar só vira chão com pouca água por cima
+  const gh = G.world.seabedHeight(x, z);
+  return sea.level > gh + 1.2 ? -Infinity : gh;
+};
 G.boat = new Boat(G);
 G.player = new Player(G);
 G.viewmodel = new ViewModel(G, { sun, hemisphere }); // braços/arma em 1ª pessoa (só o jogador local vê)
@@ -71,7 +75,7 @@ G.build = new Build(G);     // Sistema unificado de posicionamento físico
 G.interact = new Interact(G);
 const atmo = new Atmosphere(renderer, scene, { sun, hemisphere }); // céu, IBL e sombras
 const ocean = new Ocean(scene, atmo);
-ocean.islandSource = () => G.world.islands.concat(G.world.sandbars); // água rasa também sobre os bancos
+ocean.islandSource = () => G.world.islands;
 G.atmosphere = atmo;
 G.ocean = ocean;
 G.viewmodel.scene.environment = scene.environment; // metais da 1ª pessoa também refletem o céu

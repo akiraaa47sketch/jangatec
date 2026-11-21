@@ -4,10 +4,11 @@
 import * as THREE from '../three.js';
 import { mulberry32, hash2, rot } from '../core/util.js';
 import { CFG } from '../config.js';
-import { LOOT_CONFIG, generateCrateLoot, sandbarFor } from '../systems/loot.js';
+import { LOOT_CONFIG, generateCrateLoot, wreckFor } from '../systems/loot.js';
+import { seabedHeight, makeSeabedChunk, makeFarSeabed } from './seabed.js';
 import { makePieceMesh, PIECES } from '../boat/pieces.js';
 import { makePalm, makeRock, makeBush, makeGrassTufts } from './models.js';
-import { woodTexture, woodBump, sandTexture, sandBump, grassTexture, thatchTexture, logWallTexture, metalTexture, repeated, scaleBoxUVs } from './textures.js';
+import { woodTexture, woodBump, sandTexture, sandBump, grassTexture, thatchTexture, logWallTexture, metalTexture, clothTexture as clothTex, repeated, scaleBoxUVs } from './textures.js';
 
 const M = (color, extra = {}) => new THREE.MeshStandardMaterial({ color, roughness: 0.9, ...extra });
 const WOOD = [0x9b7242, 0x86623a, 0xb08a55, 0x6f5231];
@@ -65,7 +66,8 @@ export class World {
     this.G = G; this.seed = seed;
     this.chunks = new Map();
     this.collected = new Set(); // ids de detritos coletados / caixotes abertos / inimigos mortos
-    this.debris = []; this.islands = []; this.crates = []; this.sandbars = [];
+    this.debris = []; this.islands = []; this.crates = []; this.wrecks = [];
+    this.farSeabed = makeFarSeabed(); G.scene.add(this.farSeabed);
     this.crateStates = new Map();
     // Objetos físicos e posições de peças colocadas, inclusive em chunks já descarregados.
     this.physObjects = [];
@@ -75,16 +77,8 @@ export class World {
   }
 
   updateFloodLevel(level) {
-    // Bancos de areia: continuam visíveis sob a água, mas só têm chão quando expostos.
-    for (const bar of this.sandbars) {
-      const tier = bar.allItems.filter((item) => item.floodTop == null || item.floodTop > level - 0.15);
-      bar.exposed = level < bar.top - 0.05;
-      for (const c of bar.crates) c.submerged = level > c.y + 0.25;
-      if (bar.floodTier === tier.length) continue;
-      this.G.physics.removeStaticSet(bar.set);
-      bar.set.items = tier; bar.floodTier = tier.length;
-      this.G.physics.addStaticSet(bar.set);
-    }
+    // Baús dos naufrágios só abrem fora d'água.
+    for (const w of this.wrecks) for (const c of w.crates) c.submerged = level > c.y + 0.3;
     for (const island of this.islands) {
       for (const layer of island.landLayers) layer.mesh.visible = level < layer.top;
       const tier = island.allItems.filter((item) => item.floodTop == null || item.floodTop > level);
@@ -97,6 +91,7 @@ export class World {
       this.G.physics.addStaticSet(island.set);
     }
   }
+  seabedHeight(x, z) { return seabedHeight(this.seed, x, z); }
   difficulty(x, z) { return Math.min(4, Math.floor(Math.hypot(x, z) / 320)); }
 
   ensureStarterIsland() {
@@ -128,14 +123,18 @@ export class World {
       u.crown.rotation.z = Math.sin(t * 0.9 + u.phase) * 0.035 + Math.sin(t * 2.3 + u.phase * 1.7) * 0.012;
       u.crown.rotation.x = Math.cos(t * 0.8 + u.phase) * 0.03;
     }
-    const ccx = Math.round(G.boat.x / S), ccz = Math.round(G.boat.z / S);
-    for (let i = -R; i <= R; i++) for (let j = -R; j <= R; j++) {
+    // Carrega em volta da jangada E do jogador (no fundo seco dá para se afastar a pé).
+    const pp = G.player ? G.player.body.pos : G.boat;
+    const centers = [[Math.round(G.boat.x / S), Math.round(G.boat.z / S)], [Math.round(pp.x / S), Math.round(pp.z / S)]];
+    for (const [ccx, ccz] of centers) for (let i = -R; i <= R; i++) for (let j = -R; j <= R; j++) {
       const key = `${ccx + i},${ccz + j}`;
       if (!this.chunks.has(key)) this.chunks.set(key, this.makeChunk(ccx + i, ccz + j));
     }
+    this.farSeabed.position.set(pp.x, this.farSeabed.position.y, pp.z);
     for (const [key, ch] of this.chunks) {
       const carryingDebris = ch.debris.some((obj) => obj.carriedBy);
-      if (!carryingDebris && (Math.abs(ch.cx - ccx) > R + 1 || Math.abs(ch.cz - ccz) > R + 1)) {
+      const far = centers.every(([ccx, ccz]) => Math.abs(ch.cx - ccx) > R + 1 || Math.abs(ch.cz - ccz) > R + 1);
+      if (!carryingDebris && far) {
         this.dropChunk(ch);
         this.chunks.delete(key);
       }
@@ -157,8 +156,10 @@ export class World {
       }
     }
     const n = 4 + ((r() * 4) | 0);
-    const bar = sandbarFor(this.seed, cx, cz);
-    if (bar) ch.sandbar = this.makeSandbar(bar);
+    ch.seabed = makeSeabedChunk(this.seed, cx, cz);
+    G.scene.add(ch.seabed);
+    const wreck = wreckFor(this.seed, cx, cz);
+    if (wreck) ch.wreck = this.makeWreck(ch, wreck);
     for (let i = 0; i < n; i++) {
       // Sempre consome o RNG na mesma ordem para manter o determinismo.
       const x = ox + (r() - 0.5) * S, z = oz + (r() - 0.5) * S;
@@ -166,16 +167,24 @@ export class World {
       for (const d of DEBRIS) { pick -= d.w; if (pick <= 0) { def = d; break; } }
       const lr = mulberry32(hash2(this.seed, cx * 131 + i, cz * 17 + 7));
       const id = `d${cx},${cz},${i}`;
-      if (this.collected.has(id)) continue;
       if (ch.island && Math.hypot(x - ch.island.x, z - ch.island.z) < ch.island.R + 9) continue;
-      if (ch.sandbar && Math.hypot(x - ch.sandbar.x, z - ch.sandbar.z) < ch.sandbar.R + 4) continue;
+      this.spawnDebris(ch, id, def, x, z, lr);
+    }
+    return ch;
+  }
+
+  // Detrito físico (pode ser pego, carregado e soldado). y = altura inicial (0 = flutuando).
+  spawnDebris(ch, id, def, x, z, lr, y = 0) {
+    const G = this.G;
+    {
+      if (this.collected.has(id)) return;
       const existing = this.physObjects.find((item) => item.id === id);
-      if (existing) { ch.debris.push(existing); continue; }
+      if (existing) { ch.debris.push(existing); return; }
       const welded = this.weldedStates.get(id);
-      if (welded && G.boat.pieces.has(welded.id)) continue;
+      if (welded && G.boat.pieces.has(welded.id)) return;
       const mesh = def.make(lr);
       mesh.scale.setScalar(1.4);
-      mesh.position.set(x, 0, z); mesh.rotation.y = lr() * 6.28;
+      mesh.position.set(x, y, z); mesh.rotation.y = lr() * 6.28;
       G.scene.add(mesh);
       const tilt = (lr() - 0.5) * 0.25;
       const loot = def.loot(lr);
@@ -185,7 +194,7 @@ export class World {
       G.physics.addFloatingObject(obj);
       if (welded) {
         G.build.applyRemoteWeld({ physId: id, piece: welded });
-        continue;
+        return;
       }
       const placed = this.placedStates.get(id);
       if (placed) this.applyPlacedState(id, placed);
@@ -195,7 +204,6 @@ export class World {
         G.physics.suspendObject(obj);
       }
     }
-    return ch;
   }
 
   applyPlacedState(id, state) {
@@ -519,96 +527,97 @@ export class World {
     });
   }
 
-  // Banco de areia: aparece na maré seca, com naufrágio meio enterrado e um baú (id b<cx>,<cz>c0).
-  makeSandbar(b) {
-    const G = this.G, r = b.rng, S = shared();
-    const group = new THREE.Group(); group.position.set(b.x, 0, b.z); group.rotation.y = b.yaw;
-    const set = { x: b.x, z: b.z, yaw: 0, y: 0, radius: b.R + 4, items: [] };
-    const TOP = 0.45; // topo do banco (mundo): exposto quando o mar fica abaixo disso
-    for (const [dr, top] of [[3.2, -0.9], [1.6, -0.25], [0, TOP]]) {
-      const radius = b.R + dr, th = 0.4;
-      const geo = new THREE.CylinderGeometry(radius * 0.92, radius, th, 36);
-      geo.scale(1, 1, 0.68); // banco alongado
-      const m = new THREE.Mesh(geo, M(dr ? 0xb9a77a : 0xd6c391, {
-        map: repeated(sandTexture(), radius * 0.45), bumpMap: repeated(sandBump(), radius * 0.45), bumpScale: 1.4,
-      }));
-      m.position.y = top - th / 2; group.add(m);
-      set.items.push({ type: 'cyl', x: 0, y: top - th / 2, z: 0, hx: radius * 0.75, hy: th / 2, hz: radius * 0.75, floodTop: top });
+  // Naufrágio no fundo do mar: casco tombado e meio enterrado, com 1–2 baús dentro
+  // (ids b<cx>,<cz>c<n>, validados pelo servidor) e destroços para montar a jangada em volta.
+  makeWreck(ch, w) {
+    const G = this.G, r = w.rng, S = shared();
+    const gy = this.seabedHeight(w.x, w.z);
+    const group = new THREE.Group(); group.position.set(w.x, gy, w.z); group.rotation.y = w.yaw;
+    const set = { x: w.x, z: w.z, yaw: w.yaw, y: gy, radius: 9, items: [] };
+    const hullMat = M(0x5e4630, { map: woodTexture(), bumpMap: woodBump(), bumpScale: 1.6 });
+    const darkMat = M(0x3b2c1f, { map: woodTexture() });
+    const L = 9, W = 3.2, Hh = 2.2, tilt = 0.32;
+    const hull = new THREE.Group(); hull.rotation.z = tilt; hull.position.y = -0.35; group.add(hull);
+    // Costado esquerdo (mais alto, por causa da inclinação) e direito quebrado, popa inteira.
+    for (const side of [-1, 1]) {
+      for (let k = 0; k < 5; k++) {
+        const len = side > 0 && k > 2 ? L * (0.45 + r() * 0.2) : L * (0.92 - k * 0.04);
+        const plank = box(0.12, 0.42, len, hullMat);
+        plank.position.set(side * (W / 2 - k * 0.12 * (1 - k * 0.1)), 0.25 + k * 0.42, (L - len) / 2 * (side > 0 ? 1 : 0));
+        plank.rotation.z = -side * (0.18 + k * 0.05);
+        hull.add(plank);
+      }
     }
-    const add = (mesh, x, y, z) => { mesh.position.set(x, y, z); group.add(mesh); return mesh; };
-    // Naufrágio: costelas e tábuas do casco saindo da areia.
-    const hullX = (r() - 0.5) * b.R * 0.5, hullZ = (r() - 0.5) * b.R * 0.3;
-    const plankMat = M(0x6e5437, { map: woodTexture(), bumpMap: woodBump(), bumpScale: 1.5 });
-    for (let i = 0; i < 6; i++) {
-      const rib = new THREE.Mesh(new THREE.TorusGeometry(1.1, 0.07, 6, 14, Math.PI * (0.6 + r() * 0.35)), plankMat);
-      rib.rotation.set(0, Math.PI / 2, Math.PI * 0.05 + (r() - 0.5) * 0.2);
-      add(rib, hullX + (i - 2.5) * 0.55, TOP - 0.35, hullZ);
+    const keel = box(W * 0.6, 0.18, L * 0.95, darkMat); keel.position.y = 0.05; hull.add(keel);
+    const stern = box(W, Hh, 0.18, hullMat); stern.position.set(0, Hh / 2, -L / 2); hull.add(stern);
+    for (let i = 0; i < 6; i++) { // cavernas (costelas) aparecendo
+      const rib = new THREE.Mesh(new THREE.TorusGeometry(W / 2, 0.08, 6, 14, Math.PI), darkMat);
+      rib.rotation.set(0, 0, Math.PI); rib.position.set(0, Hh * 0.9, -L / 2 + 1 + i * 1.4); rib.scale.y = 1.2; hull.add(rib);
     }
-    for (let i = 0; i < 3; i++) {
-      const plank = box(3.4 - i * 0.6, 0.08, 0.3, plankMat);
-      plank.rotation.set(0.5 + i * 0.25, 0, (r() - 0.5) * 0.15);
-      add(plank, hullX + (r() - 0.5) * 0.5, TOP + 0.1 + i * 0.12, hullZ + 0.55 + i * 0.12);
-    }
-    const mast = new THREE.Mesh(new THREE.CylinderGeometry(0.09, 0.12, 2.2, 8), plankMat);
-    mast.rotation.z = 0.55; add(mast, hullX - 1.3, TOP + 0.6, hullZ - 0.3);
-    // Pedras, estrelas-do-mar e algas.
-    for (let i = 0; i < 5; i++) {
-      const a = r() * 6.28, d = b.R * (0.45 + r() * 0.4);
-      const rock = makeRock(r, 0.25 + r() * 0.35); add(rock, Math.cos(a) * d, TOP - 0.05, Math.sin(a) * d * 0.68);
-    }
-    const starShape = new THREE.Shape();
-    for (let i = 0; i < 10; i++) { const a = i / 10 * Math.PI * 2, rr = i % 2 ? 0.07 : 0.17; starShape[i ? 'lineTo' : 'moveTo'](Math.sin(a) * rr, Math.cos(a) * rr); }
-    const starGeo = new THREE.ExtrudeGeometry(starShape, { depth: 0.03, bevelEnabled: false });
-    for (let i = 0; i < 4; i++) {
-      const st = new THREE.Mesh(starGeo, M([0xe0643c, 0xd94f6a, 0xf0a13c][i % 3], { roughness: 0.7 }));
-      st.rotation.x = -Math.PI / 2; st.rotation.z = r() * 6;
-      const a = r() * 6.28, d = b.R * r() * 0.8; add(st, Math.cos(a) * d, TOP + 0.01, Math.sin(a) * d * 0.68);
-    }
-    const weed = M(0x3f6b33, { side: THREE.DoubleSide, roughness: 0.9 });
-    for (let i = 0; i < 7; i++) {
-      const w = new THREE.Mesh(new THREE.PlaneGeometry(0.18, 0.5 + r() * 0.4), weed);
-      const a = r() * 6.28, d = b.R * (0.7 + r() * 0.25);
-      w.rotation.set(0, r() * 3, (r() - 0.5) * 0.6); add(w, Math.cos(a) * d, TOP + 0.2, Math.sin(a) * d * 0.68);
-    }
-    // Baú enterrado (tampa arredondada; abre com a mesma mola das caixas).
-    const id = `b${b.cx},${b.cz}c0`, crates = [];
-    if (!this.collected.has(id)) {
+    const deck = box(W * 0.8, 0.1, L * 0.35, hullMat); deck.position.set(0, Hh * 0.75, L / 2 - L * 0.2); // convés só na proa: baús à vista na popa deck.rotation.x = 0.05; hull.add(deck);
+    const mast = new THREE.Mesh(new THREE.CylinderGeometry(0.14, 0.18, 6, 10), darkMat);
+    mast.position.set(-1.6, 1.6, 0.8); mast.rotation.set(0.2, 0, 1.25); group.add(mast);
+    const sail = new THREE.Mesh(new THREE.PlaneGeometry(2.6, 2.2, 6, 4), M(0xcfc3a5, { side: THREE.DoubleSide, map: clothTex() }));
+    sail.position.set(-3.6, 0.35, 1.2); sail.rotation.set(-Math.PI / 2 + 0.15, 0, 0.6); group.add(sail);
+    // Colisão: paredes do casco (entra-se pela proa quebrada) e a popa.
+    const wallY = 1.0;
+    set.items.push({ type: 'box', x: -W / 2 + 0.1, y: wallY, z: 0, hx: 0.25, hy: 1.1, hz: L * 0.46, yaw: 0 });
+    set.items.push({ type: 'box', x: W / 2 - 0.1, y: wallY * 0.6, z: -L * 0.2, hx: 0.25, hy: 0.7, hz: L * 0.25, yaw: 0 });
+    set.items.push({ type: 'box', x: 0, y: wallY, z: -L / 2, hx: W / 2, hy: 1.1, hz: 0.2, yaw: 0 });
+    // Baús dentro do casco.
+    const crates = [];
+    for (let n = 0; n < w.crates; n++) {
+      const id = `b${w.cx},${w.cz}c${n}`;
+      const lx = (n ? 0.5 : -0.4), lz = -L / 2 + 1.4 + n * 2.6;
+      if (this.collected.has(id)) continue;
       const chest = new THREE.Group();
-      const base = box(0.9, 0.5, 0.6, S.crate); base.position.y = 0.05; chest.add(base);
-      for (const x of [-0.42, 0.42]) { const band = box(0.06, 0.52, 0.62, S.iron); band.position.set(x, 0.05, 0); chest.add(band); }
-      const lid = new THREE.Group(); lid.position.set(0, 0.3, -0.3);
+      const base = box(0.9, 0.5, 0.6, S.crate); base.position.y = 0.25; chest.add(base);
+      for (const x of [-0.42, 0.42]) { const band = box(0.06, 0.52, 0.62, S.iron); band.position.set(x, 0.25, 0); chest.add(band); }
+      const lid = new THREE.Group(); lid.position.set(0, 0.5, -0.3);
       const dome = new THREE.Mesh(new THREE.CylinderGeometry(0.3, 0.3, 0.9, 16, 1, false, 0, Math.PI), S.crateLid);
       dome.rotation.z = Math.PI / 2; dome.position.set(0, 0, 0.3); lid.add(dome);
       const lock = box(0.1, 0.14, 0.05, M(0xd8b04a, { metalness: 0.8, roughness: 0.3 })); lock.position.set(0, 0, 0.6); lid.add(lock);
       chest.add(lid);
-      const cxl = -hullX * 0.6 + 1.2, czl = -hullZ * 0.6 - 0.8;
-      chest.position.set(cxl, TOP - 0.12, czl); chest.rotation.set(0.08, r() * 6, -0.06);
+      chest.position.set(lx, 0, lz); chest.rotation.set(0, (r() - 0.5) * 0.6, 0.05);
       group.add(chest);
-      const [wx, wz] = rot(cxl, czl, b.yaw);
+      const [wx, wz] = rot(lx, lz, w.yaw);
       const saved = this.crateStates.get(id);
       const c = {
-        id, mesh: chest, lid, x: b.x + wx, z: b.z + wz, y: TOP, diff: this.difficulty(b.x, b.z), starter: false,
+        id, mesh: chest, lid, x: w.x + wx, z: w.z + wz, y: gy, diff: this.difficulty(w.x, w.z), starter: false,
         opened: !!(saved && saved.opened), openT: saved && saved.opened ? 1 : 0, submerged: false,
       };
       lid.rotation.x = -1.25 * c.openT;
       crates.push(c); this.crates.push(c);
     }
-    group.traverse((o) => { if (o.isMesh) o.receiveShadow = true; });
+    group.traverse((o) => { if (o.isMesh) { o.receiveShadow = true; o.castShadow = true; } });
     G.scene.add(group);
     G.colliders.addSet(set);
     G.physics.addStaticSet(set);
-    const bar = { x: b.x, z: b.z, R: b.R + 1.6, top: TOP, group, set, crates, allItems: set.items.slice(), floodTier: null, exposed: false, sandbar: true };
-    this.sandbars.push(bar);
-    return bar;
+    // Destroços para construir espalhados em volta (ficam no chão na seca, flutuam na cheia).
+    for (let i = 0; i < w.debris; i++) {
+      const a = r() * Math.PI * 2, d = 5 + r() * 9;
+      const x = w.x + Math.cos(a) * d, z = w.z + Math.sin(a) * d;
+      let pick = r() * DEBRIS_W, def = DEBRIS[0];
+      for (const dd of DEBRIS) { pick -= dd.w; if (pick <= 0) { def = dd; break; } }
+      this.spawnDebris(ch, `w${w.cx},${w.cz},${i}`, def, x, z, mulberry32(hash2(this.seed ^ 0x77, w.cx * 31 + i, w.cz)), this.seabedHeight(x, z) + 0.4);
+    }
+    const wreck = { x: w.x, z: w.z, group, set, crates };
+    this.wrecks.push(wreck);
+    return wreck;
   }
 
   dropChunk(ch) {
     const G = this.G;
-    if (ch.sandbar) {
-      const bar = ch.sandbar;
-      G.physics.removeStaticSet(bar.set); G.colliders.removeSet(bar.set); G.scene.remove(bar.group);
-      for (const c of bar.crates) { const i = this.crates.indexOf(c); if (i >= 0) this.crates.splice(i, 1); }
-      this.sandbars.splice(this.sandbars.indexOf(bar), 1);
+    if (ch.seabed) {
+      G.scene.remove(ch.seabed);
+      ch.seabed.traverse((o) => { if (o.isMesh && !o.userData.sharedGeo) o.geometry.dispose(); });
+      ch.seabed.children[0].material.dispose();
+    }
+    if (ch.wreck) {
+      const w = ch.wreck;
+      G.physics.removeStaticSet(w.set); G.colliders.removeSet(w.set); G.scene.remove(w.group);
+      for (const c of w.crates) { const i = this.crates.indexOf(c); if (i >= 0) this.crates.splice(i, 1); }
+      this.wrecks.splice(this.wrecks.indexOf(w), 1);
     }
     for (const d of ch.debris) {
       if (d.placed) continue;
@@ -672,18 +681,6 @@ export class World {
   // O barco encalha na parte rasa em vez de atravessar a ilha.
   pushBoat(boat) {
     const level = this.G.startup.waterLevel, boatR = Math.min(boat.set.radius, 7) * 0.75;
-    // Encalha nos bancos de areia expostos (ou quase: a jangada raspa no fundo).
-    for (const bar of this.sandbars) {
-      if (level > bar.top + 0.25) continue;
-      const dx = boat.x - bar.x, dz = boat.z - bar.z, d = Math.hypot(dx, dz) || 1, min = bar.R + boatR;
-      if (d < min) {
-        boat.x = bar.x + (dx / d) * min; boat.z = bar.z + (dz / d) * min; boat.speed *= 0.9;
-        if (!this._groundMsg || performance.now() - this._groundMsg > 8000) {
-          this._groundMsg = performance.now();
-          this.G.hud.msg('A jangada raspou num banco de areia!');
-        }
-      }
-    }
     for (const isl of this.islands) {
       if (isl.flooded) continue;
       const dx = boat.x - isl.x, dz = boat.z - isl.z, d = Math.hypot(dx, dz) || 1;

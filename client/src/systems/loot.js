@@ -1,6 +1,6 @@
 import { hash2, mulberry32 } from '../core/util.js';
 
-export const WORLD_LOOT_PARAMS = { chunkSize: 90, islandChance: 0.07, sandbarChance: 0.22 };
+export const WORLD_LOOT_PARAMS = { chunkSize: 90, islandChance: 0.07, wreckChance: 0.3 };
 
 // Ilha no chunk? (mesma regra/ordem de RNG que World.makeChunk)
 export function chunkHasIsland(seed, cx, cz) {
@@ -9,13 +9,17 @@ export function chunkHasIsland(seed, cx, cz) {
   return mulberry32(hash2(seed, cx, cz))() < WORLD_LOOT_PARAMS.islandChance;
 }
 
-// Banco de areia (aparece na maré seca) com um baú enterrado. RNG próprio: não altera o mundo antigo.
-export function sandbarFor(seed, cx, cz) {
+// Naufrágio no fundo do mar (explorável quando o oceano seca) com 1–2 baús e destroços.
+// RNG próprio: não altera a geração antiga do mundo.
+export function wreckFor(seed, cx, cz) {
   if (Math.abs(cx) + Math.abs(cz) <= 1 || chunkHasIsland(seed, cx, cz)) return null;
   const r = mulberry32(hash2(seed ^ 0x5a17c3, cx, cz));
-  if (r() >= WORLD_LOOT_PARAMS.sandbarChance) return null;
+  if (r() >= WORLD_LOOT_PARAMS.wreckChance) return null;
   const S = WORLD_LOOT_PARAMS.chunkSize;
-  return { cx, cz, x: cx * S + (r() - 0.5) * 40, z: cz * S + (r() - 0.5) * 40, R: 5 + r() * 4, yaw: r() * Math.PI * 2, rng: r };
+  return {
+    cx, cz, x: cx * S + (r() - 0.5) * 50, z: cz * S + (r() - 0.5) * 50, yaw: r() * Math.PI * 2,
+    crates: r() < 0.5 ? 2 : 1, debris: 3 + ((r() * 3) | 0), rng: r,
+  };
 }
 
 export const LOOT_CONFIG = {
@@ -151,8 +155,8 @@ export function difficultyForCrateId(id) {
 }
 
 export function isGeneratedCrate(seed, id) {
-  const sand = /^b(-?\d+),(-?\d+)c0$/.exec(id);
-  if (sand) return !!sandbarFor(seed, Number(sand[1]), Number(sand[2]));
+  const wreck = /^b(-?\d+),(-?\d+)c(\d+)$/.exec(id);
+  if (wreck) { const w = wreckFor(seed, Number(wreck[1]), Number(wreck[2])); return !!w && Number(wreck[3]) < w.crates; }
   const match = /^i(-?\d+),(-?\d+)c(\d+)$/.exec(id);
   if (!match) return false;
   const cx = Number(match[1]), cz = Number(match[2]), crateIndex = Number(match[3]);

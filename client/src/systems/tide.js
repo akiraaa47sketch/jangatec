@@ -1,19 +1,19 @@
 // Ciclo de maré depois da partida: SECA → ENCHENTE → CHEIA → VAZANTE.
 // Deriva só do relógio comum, então todos os jogadores veem a mesma maré sem tráfego de rede.
-// O nível alimenta sea.level (via Startup): as faixas baixas das ilhas afundam na cheia e os
-// bancos de areia (com naufrágios e baús) aparecem na seca.
+// O nível alimenta sea.level (via Startup). Na seca o oceano esvazia de verdade: a água desce
+// abaixo do fundo do mar (world/seabed.js) e dá para andar por ele até a água voltar.
 import { clamp } from '../core/util.js';
 
 export const TIDE = {
-  period: 330,          // segundos por ciclo completo
-  low: -0.35,           // nível do mar na seca
+  period: 360,          // segundos por ciclo completo
+  low: -7.2,            // nível na seca: abaixo de todo o fundo do mar (mín. -6,4) = oceano seco
   high: 2.35,           // nível na cheia (as 4 faixas externas das ilhas ficam submersas)
   // frações do ciclo: seca, enchente, cheia, vazante
   phases: [
-    { id: 'seca', nome: 'Maré seca', dur: 0.27 },
-    { id: 'enchente', nome: 'Maré enchendo', dur: 0.2 },
-    { id: 'cheia', nome: 'Maré cheia', dur: 0.27 },
-    { id: 'vazante', nome: 'Maré baixando', dur: 0.26 },
+    { id: 'seca', nome: 'Oceano seco', dur: 0.3 },
+    { id: 'enchente', nome: 'Água voltando', dur: 0.2 },
+    { id: 'cheia', nome: 'Maré cheia', dur: 0.28 },
+    { id: 'vazante', nome: 'Água baixando', dur: 0.22 },
   ],
   blendIn: 25,          // s para sair do nível da inundação inicial e entrar no ciclo
 };
@@ -40,10 +40,10 @@ export function tideAt(t) {
 }
 
 const MESSAGES = {
-  seca: 'Maré seca! Bancos de areia, naufrágios e baús estão expostos.',
-  enchente: 'A maré está subindo — quem estiver nos bancos de areia, volte para a jangada!',
-  cheia: 'Maré cheia: as praias estão submersas e a jangada chega mais perto das ilhas.',
-  vazante: 'A maré está baixando — bancos de areia vão começar a aparecer.',
+  seca: 'O OCEANO SECOU! Explore o fundo do mar: destroços e naufrágios com loot. A água vai voltar…',
+  enchente: 'A água está voltando — corra de volta para a jangada!',
+  cheia: 'Maré cheia: as praias estão submersas e a jangada flutua de novo.',
+  vazante: 'A água está baixando… o fundo do mar vai aparecer. A jangada vai encalhar na areia.',
 };
 
 export class Tide {

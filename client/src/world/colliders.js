@@ -8,7 +8,7 @@ import { rot, clamp } from '../core/util.js';
 import { CFG } from '../config.js';
 
 export class Colliders {
-  constructor() { this.sets = []; }
+  constructor() { this.sets = []; this.groundFn = null; } // groundFn(x, z): chão do fundo do mar (ou -Infinity)
   addSet(set) { this.sets.push(set); return set; }
   removeSet(set) { const i = this.sets.indexOf(set); if (i >= 0) this.sets.splice(i, 1); }
 
@@ -69,6 +69,11 @@ export class Colliders {
         const [wx, wz] = rot(ux, uz, set.yaw);
         p.x += wx; p.z += wz;
       }
+    }
+    // Fundo do mar (terreno contínuo): pisável quando a água está rasa ou seca.
+    if (this.groundFn) {
+      const gh = this.groundFn(p.x, p.z);
+      if (gh > ground && p.y < gh + (body.grounded ? 0.3 : 0.02) && Math.max(p.y, prevY) >= gh - 1.2) { ground = gh; gset = null; }
     }
     if (ground > -Infinity && body.vel.y <= 0) {
       body.landVel = body.grounded ? 0 : body.vel.y;

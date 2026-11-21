@@ -12,6 +12,7 @@ import { woodTexture, woodBump, metalTexture, clothTexture, repeated } from '../
 import { Navigation, NAV_MODE } from './navigation.js';
 
 export const DECK_BOTTOM = 0.15; // base dos pisos iniciais (local ao barco)
+const KEEL = 0.9; // distância do fundo dos barris até a linha d'água do convés
 const MAST = { x: 0, z: 1 };
 const STARTER_DECK_OVERLAP = 0.25;
 const STARTER_SLOT_POSITIONS = [
@@ -254,11 +255,20 @@ export class Boat {
         : 0;
       const acceleration = this.sailUp ? 0.45 : 0.6;
       this.speed += (target - this.speed) * Math.min(1, acceleration * dt);
+      // Oceano seco: a jangada encalha na areia até a água voltar.
+      const wasStranded = this.stranded;
+      this.stranded = !!(startup && startup.departed) && this.G.world.seabedHeight(this.x, this.z) + KEEL > sea.level + 0.1;
+      if (this.stranded) {
+        this.speed = 0;
+        if (!wasStranded) this.G.hud && this.G.hud.msg('A jangada encalhou na areia — explore o fundo do mar até a água voltar.');
+      } else if (wasStranded) this.G.hud && this.G.hud.msg('A água voltou: a jangada está flutuando de novo!');
 
       // Atualiza o segmento da rota de acordo com a posição Z do barco
       this.nav.updateSegment(this.z);
 
-      if (this.nav.isLinear) {
+      if (this.stranded) {
+        // parada na areia (só eventos ainda podem arrastá-la)
+      } else if (this.nav.isLinear) {
         // Modo LINEAR: yaw segue a rota; sailAngle só adiciona pequeno desvio lateral
         const targetYaw = this.nav.getTargetYaw(dt, this.sailAngle);
         // Suaviza o yaw em direção à rota (retorno ao curso)
@@ -329,7 +339,11 @@ export class Boat {
 
     // Flutuação: amostras mais densas para um mar mais estável e menos "deformado".
     const R = Math.min(this.set.radius, 6) * 0.7;
-    const sample = (lx, lz) => { const [wx, wz] = this.toWorld(lx, lz); return waveHeight(wx, wz, t); };
+    // Flutua nas ondas; sem água, apoia os barris no fundo do mar (inclina com o terreno).
+    const sample = (lx, lz) => {
+      const [wx, wz] = this.toWorld(lx, lz);
+      return Math.max(waveHeight(wx, wz, t), this.G.world.seabedHeight(wx, wz) + KEEL);
+    };
     if (anchored && sea.level <= 0.55) {
       this.bob = this.pitch = this.roll = 0;
     } else {

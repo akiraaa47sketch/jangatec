@@ -103,11 +103,13 @@ Depois da partida o céu abre aos poucos e, de tempos em tempos (~2–3 min), o 
   para o olho (o mar afunda e gira em espiral ali). Levante a vela e gire-a para o lado oposto ao olho;
   se a jangada chegar ao olho, ela é sugada, gira e é cuspida com dano.
 
-- **Maré** (`client/src/systems/tide.js`, constantes em `TIDE`): ciclo de ~5,5 min — seca, enchente,
-  cheia e vazante — calculado do relógio comum (todos veem a mesma maré, sem tráfego de rede). Na cheia
-  as faixas externas das ilhas afundam e a jangada chega mais perto; na seca surgem **bancos de areia**
-  (22% dos chunks sem ilha) com naufrágio e um baú enterrado (`b<cx>,<cz>c0`, validado também pelo
-  servidor). A jangada encalha em bancos expostos e o baú fica inacessível quando submerso.
+- **Oceano que seca** (`client/src/systems/tide.js`, constantes em `TIDE`): ciclo de ~6 min — seco,
+  água voltando, cheia e água baixando — calculado do relógio comum (todos veem o mesmo, sem tráfego de
+  rede). Na seca a água desce abaixo do **fundo do mar** (`client/src/world/seabed.js`: dunas, valas e
+  encostas que sobem até as ilhas) e dá para andar livremente por ele. A jangada encalha na areia até a
+  água voltar; destroços assentam no fundo e podem ser carregados para a jangada; **naufrágios** (30% dos
+  chunks sem ilha) têm 1–2 baús (`b<cx>,<cz>c<n>`, validados pelo servidor) e destroços em volta.
+  Baús só abrem fora d'água. Piratas e eventos não acontecem com o mar seco.
 
 Eventos são anunciados pela rede (`t: 'event'`) e derivados do relógio comum, então todos os
 jogadores veem o mesmo. Piratas ficaram raros (`PIRATE_BALANCE` em `systems/enemies.js`): primeira
