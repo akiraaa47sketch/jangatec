@@ -112,9 +112,11 @@ export class Player {
     if (moving) { dx /= len; dz /= len; }
     let speed = this.swimming ? CFG.swim : inp.down('ShiftLeft') ? CFG.run : CFG.walk;
     if (aiming) speed = Math.min(speed, 3);
+    speed *= this.speedMul || 1; // bloqueando/carregando golpe anda devagar
     const k = Math.min(1, (b.grounded ? 14 : this.swimming ? 6 : 3.5) * dt);
     b.vel.x += (dx * speed - b.vel.x) * k;
     b.vel.z += (dz * speed - b.vel.z) * k;
+    if (this.dash) { b.vel.x = this.dash.vx; b.vel.z = this.dash.vz; } // esquiva [Q]
     if (this.firstPerson) this.yaw = Math.atan2(fx, fz);
     else if (aiming || this.aimHold > 0) this.yaw = lerpAngle(this.yaw, Math.atan2(fx, fz), Math.min(1, 16 * dt));
     else if (moving) this.yaw = lerpAngle(this.yaw, Math.atan2(dx, dz), Math.min(1, 12 * dt));
@@ -216,7 +218,14 @@ export class Player {
     if (this.pillVisual) {
       this.proceduralRig.visible = false;
       // arma de fogo: mira (ou acabou de atirar) = braços apontando para onde a câmera olha
-      const w = G.combat.weapon, gun = w && w.ammo;
+      const w = G.combat.weapon, gun = w && w.ammo, m = G.melee;
+      if (m) { // corpo a corpo: esquiva, guarda, carga do pesado e pancada pesada
+        if (m.dodge) { pose = 'dodge'; progress = m.dodge.t / 0.24; }
+        else if (m.stunT > 0) pose = 'stagger';
+        else if (m.blocking) pose = 'guard';
+        else if (m.charging) { pose = 'windup'; progress = Math.min(1, m.holdT / 0.6); }
+        else if (m.swingPose && m.swingPose.heavy) { pose = 'slam'; progress = m.swingPose.t / m.swingPose.dur; }
+      }
       if (gun && this.aimHold > 0 && pose === 'walk') pose = 'aim';
       this.aimHold = Math.max(0, this.aimHold - dt);
       this.kick = Math.max(0, this.kick - dt * 7);

@@ -26,6 +26,7 @@ import { TouchControls, isTouchDevice } from './ui/touch.js';
 import { Graphics } from './core/graphics.js';
 import { GfxMenu } from './ui/gfxmenu.js';
 import { Benchmark } from './systems/benchmark.js';
+import { Melee } from './systems/melee.js';
 
 const $ = (id) => document.getElementById(id);
 const canvas = $('c');
@@ -66,6 +67,7 @@ G.survival = new Survival(G);
 G.combat = new Combat(G);
 G.enemies = new Enemies(G);
 G.events = new Events(G);
+G.melee = new Melee(G); // corpo a corpo: combos, pesado, bloqueio, parry, esquiva
 G.physics = new Physics(G);
 G.world = new World(G, 1);
 G.colliders.groundFn = (x, z) => { // fundo do mar só vira chão com pouca água por cima
@@ -224,7 +226,10 @@ function hotkeys() {
 
 function frame() {
   requestAnimationFrame(frame);
-  const ms = performance.now(), dt = Math.min((ms - last) / 1000, 1 / 30), t = now();
+  const ms = performance.now(), t = now();
+  let dt = Math.min((ms - last) / 1000, 1 / 30);
+  // hit-stop: o mundo quase congela por um instante quando um golpe conecta
+  if (G.hitStop > 0) { G.hitStop -= dt; dt *= 0.08; }
   last = ms;
   const { boat, player } = G;
   if (G.started) G.startup.update(dt, t);
@@ -261,6 +266,7 @@ function frame() {
   if (G.bench) G.bench.update(dt);
   G.interact.update(dt);
   G.combat.update(dt);
+  G.melee.update(dt);
   G.survival.update(dt);
   G.net.update(dt);
   atmo.update(dt, camera);

@@ -226,6 +226,7 @@ h2 { margin: 0 0 10px; }
 .tPad [data-act="use"] { right: 2px; bottom: 98px; }
 .tPad [data-act="aim"] { right: 84px; bottom: 74px; }
 .tPad [data-act="reload"] { right: 152px; bottom: 66px; width: 48px; height: 48px; }
+.tPad [data-act="dodge"] { right: 160px; bottom: 6px; width: 50px; height: 50px; }
 .tPad button.on, .tTop button.on, .tCtx button.on { background: rgba(224, 172, 76, 0.55); transform: scale(0.94); }
 .tPad button.lock { background: rgba(224, 172, 76, 0.45); }
 .tPad button.pulse { animation: tpulse 1s infinite; border-color: var(--brass-2); }
@@ -316,3 +317,12 @@ body.touch #fps { left: auto; right: calc(14px + env(safe-area-inset-right)); to
 #crosshair.tp::after { width: 3px; height: 3px; margin: -1.5px; background: #ff4b3a; box-shadow: 0 0 4px #ff4b3a; }
 #crosshair.tp.melee { width: 10px; height: 10px; margin: -5px; transform: none; }
 #crosshair.tp.melee::before { display: none; }
+
+/* estamina e números de dano do corpo a corpo */
+.bar.stam { margin-top: 4px; } .bar.stam i { height: 4px; }
+#stamina { background: linear-gradient(90deg, #d9a441, #ffe08a); transition: width 0.1s; }
+#stamina.low { background: #ff7b4a; animation: beat 0.6s infinite; }
+#dmgNums { position: absolute; inset: 0; pointer-events: none; overflow: hidden; }
+.dmg { position: absolute; left: 0; top: 0; font: 800 18px var(--ui); white-space: nowrap; will-change: transform;
+  text-shadow: 0 2px 0 #1a0a05, 0 0 6px rgba(0, 0, 0, 0.7); }
+.dmg.big { font: 400 26px var(--display); letter-spacing: 0.04em; }

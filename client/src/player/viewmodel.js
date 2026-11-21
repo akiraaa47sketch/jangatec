@@ -164,10 +164,10 @@ export class ViewModel {
   // ---------- ganchos chamados pelos outros sistemas ----------
   strikeFraction() { return 0.42; }
 
-  onSwing(w) {
+  onSwing(w, style = null, dur = null) {
     const styles = (this.spec && this.spec.swing) || ['slashA', 'slashB'];
-    this.swingStyle = styles[this.combo++ % styles.length];
-    this.swingDur = clamp(w.rate * 0.88, 0.3, 0.55);
+    this.swingStyle = style || styles[this.combo++ % styles.length];
+    this.swingDur = dur || clamp(w.rate * 0.88, 0.3, 0.55);
     this.swingT = 0;
     return this.swingDur;
   }
@@ -409,6 +409,16 @@ export class ViewModel {
       for (let i = 0; i < 6; i++) { if (i < 3) P[i] += swingOff[i]; else R[i - 3] += swingOff[i]; }
     }
 
+    // corpo a corpo: guarda (arma atravessada na frente) e carga do golpe pesado (puxa para trás)
+    const mel = this.G.melee;
+    this.blockW = approach(this.blockW || 0, mel && mel.blocking ? 1 : 0, dt * 12);
+    this.chargeW = approach(this.chargeW || 0, mel && mel.charging ? Math.min(1, mel.holdT / 0.6) : 0, dt * 8);
+    if (spec && spec.type === 'melee') {
+      const bw = this.blockW, cw = this.chargeW;
+      P[0] += -0.16 * bw; P[1] += 0.12 * bw; P[2] += 0.05 * bw; R[0] += 0.25 * bw; R[1] += 0.85 * bw; R[2] += 1.3 * bw;
+      P[0] += 0.04 * cw; P[1] += 0.08 * cw; P[2] += 0.14 * cw; R[0] += 0.75 * cw; R[2] -= 0.35 * cw;
+      if (cw > 0.95) { P[0] += (Math.random() - 0.5) * 0.004; P[1] += (Math.random() - 0.5) * 0.004; } // tremor de força
+    }
     this.weaponRoot.position.set(P[0], P[1], P[2]);
     this.weaponRoot.rotation.set(R[0], R[1], R[2]);
 

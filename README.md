@@ -88,6 +88,15 @@ olha, dá tranco no disparo e mostra o clarão na boca do cano. Revólver, pisto
 têm **mira red dot** (o ponto fica no centro da tela ao mirar). As mãos em 1ª pessoa são luvas
 arredondadas com dedos, na cor escolhida para a pílula. Opções gráficas: tecla **G**.
 
+**Corpo a corpo** (`client/src/systems/melee.js`, constantes em `MELEE`): com arma branca, clique =
+golpe leve (combo de 3, o último empurra longe), segurar o clique = golpe pesado carregado (quebra a
+guarda e interrompe ataques), botão direito = bloquear (no instante do golpe vira **parry**: o inimigo
+fica atordoado e o próximo golpe é crítico), **[Q] = esquiva** com invencibilidade. Golpes, bloqueios e
+esquivas gastam **estamina** (barra dourada sob a vida); sem estamina a guarda quebra. Os inimigos
+avisam antes de bater (luva brilhando + "!" vermelho = leve, "!!" amarelo = pesado), têm golpes por
+tipo (jab, combo duplo, pancada em área), às vezes defendem, ficam atordoados com estrelas, rodeiam o
+jogador e no máximo 2 atacam ao mesmo tempo. Impactos têm hit-stop, empurrão e números de dano.
+
 As **armas** usam o mesmo modelo detalhado em 1ª e 3ª pessoa (`client/src/player/viewmodel-parts.js`):
 madeira texturizada, cantos chanfrados, gatilho com guarda-mato e detalhes por arma (fita, pregos
 tortos, estrias do tambor, trilho, cartuchos na coronha, bipé…).

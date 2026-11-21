@@ -38,7 +38,8 @@ export class TouchControls {
         <button class="big" data-act="attack" title="Atacar / pegar">${ICON.attack}</button>
         <button data-act="jump" title="Pular">${ICON.jump}</button>
         <button data-act="use" title="Interagir [E]">${ICON.use}</button>
-        <button data-act="aim" title="Mirar">${ICON.aim}</button>
+        <button data-act="aim" title="Mirar / bloquear">${ICON.aim}</button>
+        <button data-act="dodge" title="Esquivar [Q]">${ICON.jump.replace('M12 4l7 8h-4v8H9v-8H5z', 'M4 12l7-7v4h9v6h-9v4z')}</button>
         <button data-act="reload" title="Recarregar">${ICON.reload}</button>
       </div>
       <div class="tCtx" id="tBuild">
@@ -138,6 +139,7 @@ export class TouchControls {
         inp.mouse.right = !inp.mouse.right; if (inp.mouse.right) inp.mouse.rightPressed = true;
         el.classList.toggle('lock', inp.mouse.right);
       });
+      else if (act === 'dodge') press(el, () => key('keydown', 'KeyQ'), () => key('keyup', 'KeyQ'));
       else if (act === 'jump') press(el, () => key('keydown', 'Space'), () => key('keyup', 'Space'));
       else if (act === 'use') press(el, () => key('keydown', 'KeyE'), () => key('keyup', 'KeyE'));
       else if (act === 'reload') press(el, () => key('keydown', 'KeyR'), () => key('keyup', 'KeyR'));
@@ -167,7 +169,7 @@ export class TouchControls {
     const cur = G.interact.current;
     $('tSail').classList.toggle('show', !G.build.active && !!(cur && cur.mast && G.startup.departed));
     const w = G.combat.weapon;
-    this.root.querySelector('[data-act="aim"]').style.display = w && w.ammo ? '' : 'none';
+    this.root.querySelector('[data-act="aim"]').style.display = w ? '' : 'none'; // arma branca: bloquear
     this.root.querySelector('[data-act="reload"]').style.display = w && w.ammo ? '' : 'none';
     this.root.querySelector('[data-act="use"]').classList.toggle('pulse', !!cur);
   }

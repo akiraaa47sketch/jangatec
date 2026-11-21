@@ -96,6 +96,7 @@ export class Hud {
     // Vida: boia salva-vidas + barra
     const vida = Math.max(0, Math.round(s.vida));
     $('vida').style.width = vida + '%';
+    if (G.melee) { const st = G.melee.stamina; $('stamina').style.width = st + '%'; $('stamina').classList.toggle('low', st < 25); }
     $('vidaNum').textContent = vida;
     $('lifeArc').style.strokeDashoffset = String(157 * (1 - vida / 100));
     $('lifeRing').classList.toggle('low', vida <= 30);

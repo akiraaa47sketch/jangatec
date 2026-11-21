@@ -413,7 +413,7 @@ export function makePill(options = {}) {
   seam.rotation.x = Math.PI / 2; seam.position.y = SEAM_Y; body.add(seam);
 
   const limbMat = matte(0x2b2220, 0.6), gloveMat = plastic(o.gloveHex ?? PILL_COLORS[o.gloves].hex), bootMat = plastic(o.bootHex ?? PILL_COLORS[o.bootColor].hex);
-  const parts = { body };
+  const parts = { body, gloveMat }; // gloveMat: usado no brilho de aviso dos inimigos
   for (const side of [-1, 1]) {
     const shoulder = new THREE.Group(); shoulder.position.set(side * (R - 0.03), SEAM_Y - 0.12, 0); body.add(shoulder);
     shoulder.add(limb([new THREE.Vector3(0, 0, 0), new THREE.Vector3(side * 0.12, -0.15, 0), new THREE.Vector3(side * 0.16, -0.42, 0.02), new THREE.Vector3(side * 0.15, -0.62, 0.04)], limbMat));
@@ -459,7 +459,8 @@ export function disposePill(pill) {
   });
 }
 
-// pose: walk | attack | aim | swim | jump (progress 0..1 para o ataque)
+// poses: walk | attack | aim | swim | jump | row | leap | windup | heavyWindup | slam | guard | stagger | dodge
+const smooth01 = (x) => { x = Math.max(0, Math.min(1, x)); return x * x * (3 - 2 * x); };
 export function animatePill(pill, speed, dt, pose = 'walk', progress = 0) {
   const p = pill.userData.parts, k = Math.min(1, speed / 4);
   pill.userData.phase += dt * (pose === 'swim' ? 5 : 2 + speed * 2.2);
@@ -482,6 +483,32 @@ export function animatePill(pill, speed, dt, pose = 'walk', progress = 0) {
     const ap = pill.userData.aimPitch || 0, kk = pill.userData.kick || 0;
     p.armR.rotation.set(-1.5 - ap - kk * 0.55, 0.12, -0.12); p.armL.rotation.set(-1.32 - ap - kk * 0.45, -0.25, 0.42);
     p.body.rotation.set(0.04 - kk * 0.09, -0.12, 0);
+  } else if (pose === 'windup') { // puxa o braço para trás (aviso do golpe / carga do pesado)
+    const k = smooth01(progress);
+    p.armR.rotation.set(0.9 * k, 0, -0.35 - 0.4 * k); p.armL.rotation.set(-0.9 * k, 0, 0.35);
+    p.body.rotation.set(-0.1 * k, 0.45 * k, 0.04 * k);
+    p.legL.rotation.set(-0.35 * k, 0, 0); p.legR.rotation.set(0.25 * k, 0, 0);
+  } else if (pose === 'heavyWindup') { // os dois braços para o alto
+    const k = smooth01(progress);
+    p.armR.rotation.set(-2.9 * k, 0, -0.25 * k); p.armL.rotation.set(-2.9 * k, 0, 0.25 * k);
+    p.body.rotation.set(-0.22 * k, 0, 0); p.body.position.y = BODY_Y + 0.12 * k;
+  } else if (pose === 'slam') { // pancada de cima para baixo
+    const k = Math.sin(Math.min(1, progress) * Math.PI * 0.5);
+    p.armR.rotation.set(-2.9 + 2.2 * k, 0, -0.25); p.armL.rotation.set(-2.9 + 2.2 * k, 0, 0.25);
+    p.body.rotation.set(-0.22 + 0.5 * k, 0, 0); p.body.position.y = BODY_Y - 0.1 * k;
+  } else if (pose === 'guard') { // guarda: luvas na frente do rosto
+    p.armR.rotation.set(-1.9, 0.5, -0.9); p.armL.rotation.set(-1.9, -0.5, 0.9);
+    p.body.rotation.set(0.12, 0, 0); p.body.position.y = BODY_Y - 0.06;
+    p.legL.rotation.set(-0.25, 0, 0.08); p.legR.rotation.set(0.2, 0, -0.08);
+  } else if (pose === 'stagger') { // atordoado: cambaleia
+    const ph2 = pill.userData.phase * 2.2;
+    p.body.rotation.set(-0.18 + Math.sin(ph2) * 0.12, Math.sin(ph2 * 0.7) * 0.3, Math.sin(ph2) * 0.22);
+    p.armR.rotation.set(0.3, 0, -0.9 + Math.sin(ph2) * 0.3); p.armL.rotation.set(0.3, 0, 0.9 + Math.cos(ph2) * 0.3);
+  } else if (pose === 'dodge') { // esquiva: abaixa e inclina
+    const k = Math.sin(Math.min(1, progress) * Math.PI);
+    p.body.position.y = BODY_Y - 0.5 * k; p.body.rotation.set(0.5 * k, 0, 0);
+    p.armR.rotation.set(-0.6 * k, 0, -0.6 * k); p.armL.rotation.set(-0.6 * k, 0, 0.6 * k);
+    p.legL.rotation.set(-1.0 * k, 0, 0); p.legR.rotation.set(0.6 * k, 0, 0);
   } else if (pose === 'jump') {
     p.armL.rotation.set(-2.4, 0, 0.5); p.armR.rotation.set(-2.4, 0, -0.5);
     p.legL.rotation.set(-0.7, 0, 0); p.legR.rotation.set(0.3, 0, 0);

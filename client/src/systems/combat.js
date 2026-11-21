@@ -209,7 +209,8 @@ export class Combat {
       if (inp.hit('KeyR')) this.startReload();
       const trigger = inp.mouse.leftPressed || (w.automatic && inp.mouse.left);
       const drawing = G.player.firstPerson && G.viewmodel && G.viewmodel.lowerEquip > 0.35; // arma ainda sendo sacada
-      if (trigger && this.cooldown <= 0 && this.reloading <= 0 && !G.player.swimming && !drawing) this.fire();
+      // corpo a corpo (leve/pesado/bloqueio/esquiva) fica no sistema Melee
+      if (trigger && !w.melee && this.cooldown <= 0 && this.reloading <= 0 && !G.player.swimming && !drawing) this.fire();
     }
     if (this.pendingStrike) {
       const s = this.pendingStrike;
