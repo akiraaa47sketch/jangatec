@@ -1,6 +1,7 @@
 import * as THREE from '../three.js';
 import { clamp } from '../core/util.js';
 import { sea } from '../world/ocean.js';
+import { Tide } from './tide.js';
 
 const PHASES = new Set(['build', 'install', 'calm', 'storm', 'flood', 'board', 'depart']);
 const CALM_DURATION = 7;
@@ -21,6 +22,7 @@ export class Startup {
     this.syncTimer = 0;
     this.floodTier = null;
     this.departT = 0;
+    this.tide = new Tide(G);
     this.clearSky = new THREE.Color(0x9fd3ee);
     this.stormSky = new THREE.Color(0x536273);
     this.clearSun = new THREE.Color(0xfff1d0);
@@ -120,7 +122,9 @@ export class Startup {
     if (!state || !PHASES.has(state.phase)) return;
     this.phase = state.phase;
     this.elapsed = Number.isFinite(state.elapsed) ? Math.max(0, state.elapsed) : 0;
-    this.waterLevel = Number.isFinite(state.waterLevel) ? clamp(state.waterLevel, 0, FLOOD_LEVEL) : 0;
+    if (state.phase !== 'depart' || this.phase !== 'depart') {
+      this.waterLevel = Number.isFinite(state.waterLevel) ? clamp(state.waterLevel, 0, FLOOD_LEVEL) : 0;
+    }
     if (Array.isArray(state.anchor) && state.anchor.length === 2 &&
         state.anchor.every(Number.isFinite)) {
       this.anchor = { x: state.anchor[0], z: state.anchor[1] };
@@ -189,6 +193,8 @@ export class Startup {
       this._sync();
     }
 
+    // Depois da partida a maré segue o ciclo (calculado localmente pelo relógio comum).
+    if (this.departed) this.waterLevel = this.tide.level(t, dt, FLOOD_LEVEL);
     sea.level = this.waterLevel;
     this.G.world.updateFloodLevel(this.waterLevel);
     // Depois da partida o céu abre aos poucos (mar mais calmo = eventos se destacam).

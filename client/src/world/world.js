@@ -4,7 +4,7 @@
 import * as THREE from '../three.js';
 import { mulberry32, hash2, rot } from '../core/util.js';
 import { CFG } from '../config.js';
-import { LOOT_CONFIG, generateCrateLoot } from '../systems/loot.js';
+import { LOOT_CONFIG, generateCrateLoot, sandbarFor } from '../systems/loot.js';
 import { makePieceMesh, PIECES } from '../boat/pieces.js';
 import { makePalm, makeRock, makeBush, makeGrassTufts } from './models.js';
 import { woodTexture, woodBump, sandTexture, sandBump, grassTexture, thatchTexture, logWallTexture, metalTexture, repeated, scaleBoxUVs } from './textures.js';
@@ -65,7 +65,7 @@ export class World {
     this.G = G; this.seed = seed;
     this.chunks = new Map();
     this.collected = new Set(); // ids de detritos coletados / caixotes abertos / inimigos mortos
-    this.debris = []; this.islands = []; this.crates = [];
+    this.debris = []; this.islands = []; this.crates = []; this.sandbars = [];
     this.crateStates = new Map();
     // Objetos físicos e posições de peças colocadas, inclusive em chunks já descarregados.
     this.physObjects = [];
@@ -75,6 +75,16 @@ export class World {
   }
 
   updateFloodLevel(level) {
+    // Bancos de areia: continuam visíveis sob a água, mas só têm chão quando expostos.
+    for (const bar of this.sandbars) {
+      const tier = bar.allItems.filter((item) => item.floodTop == null || item.floodTop > level - 0.15);
+      bar.exposed = level < bar.top - 0.05;
+      for (const c of bar.crates) c.submerged = level > c.y + 0.25;
+      if (bar.floodTier === tier.length) continue;
+      this.G.physics.removeStaticSet(bar.set);
+      bar.set.items = tier; bar.floodTier = tier.length;
+      this.G.physics.addStaticSet(bar.set);
+    }
     for (const island of this.islands) {
       for (const layer of island.landLayers) layer.mesh.visible = level < layer.top;
       const tier = island.allItems.filter((item) => item.floodTop == null || item.floodTop > level);
@@ -147,6 +157,8 @@ export class World {
       }
     }
     const n = 4 + ((r() * 4) | 0);
+    const bar = sandbarFor(this.seed, cx, cz);
+    if (bar) ch.sandbar = this.makeSandbar(bar);
     for (let i = 0; i < n; i++) {
       // Sempre consome o RNG na mesma ordem para manter o determinismo.
       const x = ox + (r() - 0.5) * S, z = oz + (r() - 0.5) * S;
@@ -156,6 +168,7 @@ export class World {
       const id = `d${cx},${cz},${i}`;
       if (this.collected.has(id)) continue;
       if (ch.island && Math.hypot(x - ch.island.x, z - ch.island.z) < ch.island.R + 9) continue;
+      if (ch.sandbar && Math.hypot(x - ch.sandbar.x, z - ch.sandbar.z) < ch.sandbar.R + 4) continue;
       const existing = this.physObjects.find((item) => item.id === id);
       if (existing) { ch.debris.push(existing); continue; }
       const welded = this.weldedStates.get(id);
@@ -259,7 +272,7 @@ export class World {
         hx: radius, hy: thickness / 2, hz: radius, floodTop: worldTop,
       };
       set.items.push(collider);
-      landLayers.push({ mesh: sand, top: worldTop });
+      landLayers.push({ mesh: sand, top: worldTop, dr });
     }
     const grass = new THREE.Mesh(new THREE.CylinderGeometry(R * 0.7, R * 0.72, 0.06, 32), M(0x6f9d4c, { map: repeated(grassTexture(), R * 0.35) }));
     grass.position.y = 0.58; group.add(grass);
@@ -506,8 +519,97 @@ export class World {
     });
   }
 
+  // Banco de areia: aparece na maré seca, com naufrágio meio enterrado e um baú (id b<cx>,<cz>c0).
+  makeSandbar(b) {
+    const G = this.G, r = b.rng, S = shared();
+    const group = new THREE.Group(); group.position.set(b.x, 0, b.z); group.rotation.y = b.yaw;
+    const set = { x: b.x, z: b.z, yaw: 0, y: 0, radius: b.R + 4, items: [] };
+    const TOP = 0.45; // topo do banco (mundo): exposto quando o mar fica abaixo disso
+    for (const [dr, top] of [[3.2, -0.9], [1.6, -0.25], [0, TOP]]) {
+      const radius = b.R + dr, th = 0.4;
+      const geo = new THREE.CylinderGeometry(radius * 0.92, radius, th, 36);
+      geo.scale(1, 1, 0.68); // banco alongado
+      const m = new THREE.Mesh(geo, M(dr ? 0xb9a77a : 0xd6c391, {
+        map: repeated(sandTexture(), radius * 0.45), bumpMap: repeated(sandBump(), radius * 0.45), bumpScale: 1.4,
+      }));
+      m.position.y = top - th / 2; group.add(m);
+      set.items.push({ type: 'cyl', x: 0, y: top - th / 2, z: 0, hx: radius * 0.75, hy: th / 2, hz: radius * 0.75, floodTop: top });
+    }
+    const add = (mesh, x, y, z) => { mesh.position.set(x, y, z); group.add(mesh); return mesh; };
+    // Naufrágio: costelas e tábuas do casco saindo da areia.
+    const hullX = (r() - 0.5) * b.R * 0.5, hullZ = (r() - 0.5) * b.R * 0.3;
+    const plankMat = M(0x6e5437, { map: woodTexture(), bumpMap: woodBump(), bumpScale: 1.5 });
+    for (let i = 0; i < 6; i++) {
+      const rib = new THREE.Mesh(new THREE.TorusGeometry(1.1, 0.07, 6, 14, Math.PI * (0.6 + r() * 0.35)), plankMat);
+      rib.rotation.set(0, Math.PI / 2, Math.PI * 0.05 + (r() - 0.5) * 0.2);
+      add(rib, hullX + (i - 2.5) * 0.55, TOP - 0.35, hullZ);
+    }
+    for (let i = 0; i < 3; i++) {
+      const plank = box(3.4 - i * 0.6, 0.08, 0.3, plankMat);
+      plank.rotation.set(0.5 + i * 0.25, 0, (r() - 0.5) * 0.15);
+      add(plank, hullX + (r() - 0.5) * 0.5, TOP + 0.1 + i * 0.12, hullZ + 0.55 + i * 0.12);
+    }
+    const mast = new THREE.Mesh(new THREE.CylinderGeometry(0.09, 0.12, 2.2, 8), plankMat);
+    mast.rotation.z = 0.55; add(mast, hullX - 1.3, TOP + 0.6, hullZ - 0.3);
+    // Pedras, estrelas-do-mar e algas.
+    for (let i = 0; i < 5; i++) {
+      const a = r() * 6.28, d = b.R * (0.45 + r() * 0.4);
+      const rock = makeRock(r, 0.25 + r() * 0.35); add(rock, Math.cos(a) * d, TOP - 0.05, Math.sin(a) * d * 0.68);
+    }
+    const starShape = new THREE.Shape();
+    for (let i = 0; i < 10; i++) { const a = i / 10 * Math.PI * 2, rr = i % 2 ? 0.07 : 0.17; starShape[i ? 'lineTo' : 'moveTo'](Math.sin(a) * rr, Math.cos(a) * rr); }
+    const starGeo = new THREE.ExtrudeGeometry(starShape, { depth: 0.03, bevelEnabled: false });
+    for (let i = 0; i < 4; i++) {
+      const st = new THREE.Mesh(starGeo, M([0xe0643c, 0xd94f6a, 0xf0a13c][i % 3], { roughness: 0.7 }));
+      st.rotation.x = -Math.PI / 2; st.rotation.z = r() * 6;
+      const a = r() * 6.28, d = b.R * r() * 0.8; add(st, Math.cos(a) * d, TOP + 0.01, Math.sin(a) * d * 0.68);
+    }
+    const weed = M(0x3f6b33, { side: THREE.DoubleSide, roughness: 0.9 });
+    for (let i = 0; i < 7; i++) {
+      const w = new THREE.Mesh(new THREE.PlaneGeometry(0.18, 0.5 + r() * 0.4), weed);
+      const a = r() * 6.28, d = b.R * (0.7 + r() * 0.25);
+      w.rotation.set(0, r() * 3, (r() - 0.5) * 0.6); add(w, Math.cos(a) * d, TOP + 0.2, Math.sin(a) * d * 0.68);
+    }
+    // Baú enterrado (tampa arredondada; abre com a mesma mola das caixas).
+    const id = `b${b.cx},${b.cz}c0`, crates = [];
+    if (!this.collected.has(id)) {
+      const chest = new THREE.Group();
+      const base = box(0.9, 0.5, 0.6, S.crate); base.position.y = 0.05; chest.add(base);
+      for (const x of [-0.42, 0.42]) { const band = box(0.06, 0.52, 0.62, S.iron); band.position.set(x, 0.05, 0); chest.add(band); }
+      const lid = new THREE.Group(); lid.position.set(0, 0.3, -0.3);
+      const dome = new THREE.Mesh(new THREE.CylinderGeometry(0.3, 0.3, 0.9, 16, 1, false, 0, Math.PI), S.crateLid);
+      dome.rotation.z = Math.PI / 2; dome.position.set(0, 0, 0.3); lid.add(dome);
+      const lock = box(0.1, 0.14, 0.05, M(0xd8b04a, { metalness: 0.8, roughness: 0.3 })); lock.position.set(0, 0, 0.6); lid.add(lock);
+      chest.add(lid);
+      const cxl = -hullX * 0.6 + 1.2, czl = -hullZ * 0.6 - 0.8;
+      chest.position.set(cxl, TOP - 0.12, czl); chest.rotation.set(0.08, r() * 6, -0.06);
+      group.add(chest);
+      const [wx, wz] = rot(cxl, czl, b.yaw);
+      const saved = this.crateStates.get(id);
+      const c = {
+        id, mesh: chest, lid, x: b.x + wx, z: b.z + wz, y: TOP, diff: this.difficulty(b.x, b.z), starter: false,
+        opened: !!(saved && saved.opened), openT: saved && saved.opened ? 1 : 0, submerged: false,
+      };
+      lid.rotation.x = -1.25 * c.openT;
+      crates.push(c); this.crates.push(c);
+    }
+    group.traverse((o) => { if (o.isMesh) o.receiveShadow = true; });
+    G.scene.add(group);
+    G.colliders.addSet(set);
+    G.physics.addStaticSet(set);
+    const bar = { x: b.x, z: b.z, R: b.R + 1.6, top: TOP, group, set, crates, allItems: set.items.slice(), floodTier: null, exposed: false, sandbar: true };
+    this.sandbars.push(bar);
+    return bar;
+  }
+
   dropChunk(ch) {
     const G = this.G;
+    if (ch.sandbar) {
+      const bar = ch.sandbar;
+      G.physics.removeStaticSet(bar.set); G.colliders.removeSet(bar.set); G.scene.remove(bar.group);
+      for (const c of bar.crates) { const i = this.crates.indexOf(c); if (i >= 0) this.crates.splice(i, 1); }
+      this.sandbars.splice(this.sandbars.indexOf(bar), 1);
+    }
     for (const d of ch.debris) {
       if (d.placed) continue;
       G.physics.removeObject(d);
@@ -569,10 +671,26 @@ export class World {
 
   // O barco encalha na parte rasa em vez de atravessar a ilha.
   pushBoat(boat) {
+    const level = this.G.startup.waterLevel, boatR = Math.min(boat.set.radius, 7) * 0.75;
+    // Encalha nos bancos de areia expostos (ou quase: a jangada raspa no fundo).
+    for (const bar of this.sandbars) {
+      if (level > bar.top + 0.25) continue;
+      const dx = boat.x - bar.x, dz = boat.z - bar.z, d = Math.hypot(dx, dz) || 1, min = bar.R + boatR;
+      if (d < min) {
+        boat.x = bar.x + (dx / d) * min; boat.z = bar.z + (dz / d) * min; boat.speed *= 0.9;
+        if (!this._groundMsg || performance.now() - this._groundMsg > 8000) {
+          this._groundMsg = performance.now();
+          this.G.hud.msg('A jangada raspou num banco de areia!');
+        }
+      }
+    }
     for (const isl of this.islands) {
       if (isl.flooded) continue;
       const dx = boat.x - isl.x, dz = boat.z - isl.z, d = Math.hypot(dx, dz) || 1;
-      const min = isl.R + 2.5 + Math.min(boat.set.radius, 7) * 0.75;
+      // Faixas ainda fora d'água definem até onde a jangada chega (maré cheia = chega mais perto).
+      let reach = 0;
+      for (const [i, layer] of isl.landLayers.entries()) if (layer.top > level && layer.dr != null) reach = Math.max(reach, layer.dr);
+      const min = isl.R + Math.min(2.5, reach * 0.45 + 0.5) + boatR;
       if (d < min) { boat.x = isl.x + (dx / d) * min; boat.z = isl.z + (dz / d) * min; boat.speed *= 0.9; }
     }
   }

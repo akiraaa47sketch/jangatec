@@ -53,7 +53,7 @@ function canReachMast(room, ws) {
 }
 
 function validCrateId(id, seed, message) {
-  const match = typeof id === 'string' && /^i(-?\d+),(-?\d+)c(\d+)$/.exec(id);
+  const match = typeof id === 'string' && /^[ib](-?\d+),(-?\d+)c(\d+)$/.exec(id);
   if (!match || Number(match[3]) > 2 || !isGeneratedCrate(seed, id)) return false;
   const cx = Number(match[1]), cz = Number(match[2]);
   return Number.isFinite(message.x) && Number.isFinite(message.z) &&

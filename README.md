@@ -103,6 +103,12 @@ Depois da partida o céu abre aos poucos e, de tempos em tempos (~2–3 min), o 
   para o olho (o mar afunda e gira em espiral ali). Levante a vela e gire-a para o lado oposto ao olho;
   se a jangada chegar ao olho, ela é sugada, gira e é cuspida com dano.
 
+- **Maré** (`client/src/systems/tide.js`, constantes em `TIDE`): ciclo de ~5,5 min — seca, enchente,
+  cheia e vazante — calculado do relógio comum (todos veem a mesma maré, sem tráfego de rede). Na cheia
+  as faixas externas das ilhas afundam e a jangada chega mais perto; na seca surgem **bancos de areia**
+  (22% dos chunks sem ilha) com naufrágio e um baú enterrado (`b<cx>,<cz>c0`, validado também pelo
+  servidor). A jangada encalha em bancos expostos e o baú fica inacessível quando submerso.
+
 Eventos são anunciados pela rede (`t: 'event'`) e derivados do relógio comum, então todos os
 jogadores veem o mesmo. Piratas ficaram raros (`PIRATE_BALANCE` em `systems/enemies.js`): primeira
 invasão após 2,5–3,5 min, depois a cada 3,5–5,5 min, com 1–3 balsas, nunca durante um evento.

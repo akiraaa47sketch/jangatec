@@ -71,7 +71,7 @@ G.build = new Build(G);     // Sistema unificado de posicionamento físico
 G.interact = new Interact(G);
 const atmo = new Atmosphere(renderer, scene, { sun, hemisphere }); // céu, IBL e sombras
 const ocean = new Ocean(scene, atmo);
-ocean.islandSource = () => G.world.islands;
+ocean.islandSource = () => G.world.islands.concat(G.world.sandbars); // água rasa também sobre os bancos
 G.atmosphere = atmo;
 G.ocean = ocean;
 G.viewmodel.scene.environment = scene.environment; // metais da 1ª pessoa também refletem o céu

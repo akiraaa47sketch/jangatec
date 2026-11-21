@@ -117,6 +117,18 @@ export class Hud {
       hotbar.append(slot);
     }
 
+    // Maré (só depois da partida)
+    const tide = G.startup.departed && G.startup.tide.state;
+    $('tideBox').hidden = !tide;
+    if (tide) {
+      const icon = { seca: '🏝', enchente: '⬆', cheia: '🌊', vazante: '⬇' }[tide.phase.id];
+      const secs = Math.ceil(tide.nextIn), mm = Math.floor(secs / 60), ss = String(secs % 60).padStart(2, '0');
+      $('tideBox').className = tide.phase.id;
+      $('tideName').textContent = `${icon} ${tide.phase.nome}`;
+      $('tideNext').textContent = `${tide.next.nome} em ${mm}:${ss}`;
+      $('tideFill').style.height = `${Math.round(12 + tide.norm * 88)}%`;
+    }
+
     // Info de navegação
     const nav = boat.nav;
     const navMode = nav.isFree ? '🔥 CONTROLE LIVRE — Batalha Final!' : `Rota — fase: ${nav.phase}`;
