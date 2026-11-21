@@ -68,8 +68,9 @@ pistola. A jangada inicial tem uma plataforma central indestrutível e um encaix
 plataforma de madeira; ambas medem 6×6 m. Pegue a plataforma de madeira e fixe-a à jangada com `[Z]`; depois,
 instale a vela no mastro com `[E]`.
 Antes de iniciar, escolha óculos e barba para personalizar o náufrago; o cabelo original do modelo é preservado.
-O personagem usa um modelo Meshy com rig Mixamo (`client/assets/castaway-survivor.glb`): textura de cor
-gerada da arte de referência (`tools/texture-bake/`) e animações de caminhada, corrida e ataque.
+O personagem (`client/assets/castaway-survivor.glb`) usa a malha e a textura de um modelo Tripo, com o
+esqueleto Mixamo e os pesos transferidos do modelo Meshy (`tools/texture-bake/`), e animações de caminhada,
+corrida e ataque.
 Natação e parkour usam o rig procedural para evitar deformações causadas por clipes incompatíveis com o esqueleto.
 O espaço de construção ao redor da jangada e da peça inicial fica livre; árvores, caixas e ruínas
 ficam mais afastadas, na borda da ilha.

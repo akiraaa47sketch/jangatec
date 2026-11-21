@@ -1,7 +1,7 @@
 import * as THREE from '../three.js';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import { clone as cloneSkeleton } from 'three/addons/utils/SkeletonUtils.js';
-// Náufrago: modelo Meshy com rig Mixamo; textura de cor gerada a partir da arte de referência.
+// Náufrago: malha/textura Tripo com esqueleto Mixamo e pesos transferidos do modelo Meshy.
 import modelUrl from '../../assets/castaway-survivor.glb?url';
 
 const skinColor = new THREE.Color(0xb97251);
