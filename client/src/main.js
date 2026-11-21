@@ -21,13 +21,12 @@ import { Interact } from './systems/interact.js';
 import { Events } from './systems/events.js';
 import { Net } from './net/net.js';
 import { Hud } from './ui/hud.js';
+import { CharacterMenu } from './ui/character.js';
+import { createCastawayVisual } from './player/castaway.js';
 
 const $ = (id) => document.getElementById(id);
 const canvas = $('c');
-const characterAppearance = () => ({
-  glasses: $('glassesStyle').value,
-  beard: $('beardStyle').value,
-});
+
 const renderer = new THREE.WebGLRenderer({ canvas, antialias: true });
 renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
 renderer.toneMapping = THREE.NeutralToneMapping; // realces suaves, cores preservadas
@@ -138,9 +137,16 @@ addEventListener('keydown', (e) => {
 // ---------- Menu ----------
 $('server').value = DEFAULT_SERVER;
 const status = (s) => { $('menuStatus').textContent = s; };
-for (const id of ['glassesStyle', 'beardStyle']) {
-  $(id).addEventListener('change', () => G.player.setAppearance(characterAppearance()));
-}
+const charMenu = new CharacterMenu((appearance) => G.player.setAppearance(appearance));
+window.__charMenu = charMenu; // depuração
+const characterAppearance = () => charMenu.appearance;
+G.player.setAppearance(characterAppearance());
+// Prévia do náufrago assim que o modelo dele carregar.
+const waitCastaway = setInterval(() => {
+  if (!G.player.castawayBase) return;
+  clearInterval(waitCastaway);
+  charMenu.setCastawayFactory((a) => createCastawayVisual(G.player.castawayBase, a));
+}, 300);
 
 function start(seed, welcome) {
   G.player.setAppearance(characterAppearance());
@@ -220,6 +226,7 @@ function frame() {
     ocean.update(t, 0, 0);
     sunVisual.update(camera, t, true);
     renderer.render(scene, camera);
+    charMenu.update(dt, true);
     return;
   }
   // Quem está a bordo (mesmo no ar) acompanha o barco antes de se mover.

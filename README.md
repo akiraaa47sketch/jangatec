@@ -67,7 +67,15 @@ Todos os jogadores começam em terra firme, com uma arma improvisada sorteada; n
 pistola. A jangada inicial tem uma plataforma central indestrutível e um encaixe para uma única
 plataforma de madeira; ambas medem 6×6 m. Pegue a plataforma de madeira e fixe-a à jangada com `[Z]`; depois,
 instale a vela no mastro com `[E]`.
-Antes de iniciar, escolha óculos e barba para personalizar o náufrago; o cabelo original do modelo é preservado.
+Antes de iniciar, escolha o personagem no menu, com prévia 3D (arraste para girar):
+- **Náufrago**: óculos e barba.
+- **Pílula** (`client/src/player/pill.js`, modelo procedural): cor da cápsula, da base e das luvas,
+  7 rostos, 5 calçados (tênis, botas, galochas, nadadeiras, chinelo) com cor, e 8 chapéus (pirata,
+  palha, boné, cartola, capitão, coroa, gorro) com cor; botão "Aleatório". Tem animações próprias
+  (andar gingado, soco, mira, pulo, nado).
+
+A escolha fica salva no navegador e, no multiplayer, os outros jogadores veem a sua pílula
+(código curto `ap` no estado do jogador).
 O personagem (`client/assets/castaway-survivor.glb`) usa a malha e a textura de um modelo Tripo, com o
 esqueleto Mixamo e os pesos transferidos do modelo Meshy (`tools/texture-bake/`), e animações de caminhada,
 corrida e ataque.

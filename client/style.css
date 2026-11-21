@@ -88,6 +88,7 @@ pre { margin: 0; font: inherit; white-space: pre-wrap; }
 #menu, #help { position: fixed; inset: 0; display: flex; align-items: center; justify-content: center; }
 #menu { overflow-y: auto; align-items: flex-start; padding: 16px; background: linear-gradient(rgba(12, 30, 44, 0.15), rgba(12, 30, 44, 0.6)); }
 .card, #help > div { background: rgba(12, 30, 44, 0.88); border: 1px solid var(--line); border-radius: 10px; padding: 26px 30px; width: min(400px, 92vw); }
+.card { width: min(600px, 94vw); }
 #help { background: rgba(0, 0, 0, 0.45); cursor: pointer; }
 #help > div { width: min(680px, 94vw); }
 #help td { padding: 3px 10px 3px 0; vertical-align: top; }
@@ -107,3 +108,19 @@ h2 { margin: 0 0 10px; }
 .card button:hover { filter: brightness(1.1); }
 .card hr { border: 0; border-top: 1px solid var(--line); margin: 14px 0; }
 #menuStatus { min-height: 1.4em; color: #ffcf8a; font-size: 13px; margin: 6px 0 0; }
+
+.char-layout { display: flex; gap: 12px; align-items: flex-start; }
+#charPreview { flex: 0 0 auto; width: 170px; height: 210px; border-radius: 8px; background: radial-gradient(circle at 50% 35%, #2f4a5c, #142633); cursor: grab; }
+.char-fields { flex: 1; min-width: 0; }
+.char-fields label { margin: 6px 0; }
+.char-fields select { flex: 0 0 58%; }
+.swatch-row { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin: 6px 0; font-size: 13px; }
+.swatches { display: flex; flex-wrap: wrap; gap: 4px; flex: 0 0 58%; }
+.card .swatches button { width: 20px; height: 20px; min-width: 0; padding: 0; margin: 0; border-radius: 50%;
+  border: 2px solid rgba(255, 255, 255, 0.25); cursor: pointer; }
+.card .swatches button.sel { border-color: #fff; box-shadow: 0 0 0 2px var(--accent); }
+.card #pillRandom { margin-top: 8px; padding: 7px; font-size: 14px; }
+@media (max-width: 520px) {
+  .char-layout { flex-direction: column; align-items: center; }
+  .char-fields { width: 100%; }
+}
