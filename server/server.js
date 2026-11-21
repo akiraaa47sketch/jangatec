@@ -236,6 +236,12 @@ function handle(ws, m) {
       broadcast(room, m, ws);
       break;
     }
+    case 'revive': {
+      // um jogador reanimou um aliado caído: avisa a sala (o alvo se levanta)
+      if (typeof m.id !== 'string' || m.id.length > 20 || !room.players.has(m.id) || m.id === ws.id) break;
+      broadcast(room, { t: 'revive', id: m.id, by: ws.name });
+      break;
+    }
     case 'event': {
       // Onda gigante / furacão sorteados pelo host: valida e repassa a todos.
       const e = m.e;

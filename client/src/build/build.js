@@ -64,7 +64,7 @@ export class Build {
   }
 
   updatePickupTarget() {
-    if (this.active || this.G.player.dead || !this.G.started) {
+    if (this.active || this.G.player.dead || this.G.player.downed || !this.G.started) {
       this._setPickupTarget(null);
       return null;
     }

@@ -88,13 +88,21 @@ olha, dá tranco no disparo e mostra o clarão na boca do cano. Revólver, pisto
 têm **mira red dot** (o ponto fica no centro da tela ao mirar). As mãos em 1ª pessoa são luvas
 arredondadas com dedos, na cor escolhida para a pílula. Opções gráficas: tecla **G**.
 
+**Caído no multiplayer**: com aliados na sala, ao zerar a vida o jogador fica **caído** — não ataca
+nem se cura, se arrasta devagar e sangra por 45 s (golpes encurtam o tempo). Um aliado reanima
+**segurando E perto dele por 2,5 s** (volta com 35 de vida). Sem ajuda, ou se todos caírem, ele morre e
+renasce no barco. Jogando solo, morrer continua levando direto ao barco.
+
 **Corpo a corpo** (`client/src/systems/melee.js`, constantes em `MELEE`): com arma branca, clique =
-golpe leve (combo de 3, o último empurra longe), segurar o clique = golpe pesado carregado (quebra a
+golpe leve rápido (combo de 3 com animações variadas: corte, revés e um final aleatório — estocada,
+uppercut ou giro de 360°), segurar o clique = golpe pesado carregado (pancada ou giro; quebra a
 guarda e interrompe ataques), botão direito = bloquear (no instante do golpe vira **parry**: o inimigo
 fica atordoado e o próximo golpe é crítico), **[Q] = esquiva** com invencibilidade. Golpes, bloqueios e
-esquivas gastam **estamina** (barra dourada sob a vida); sem estamina a guarda quebra. Os inimigos
+esquivas gastam **estamina** (barra dourada sob a vida); sem estamina a guarda quebra. A esquiva é
+cambalhota (frente/trás) ou passo lateral, e o parry tem animação própria com faíscas. Os inimigos
 avisam antes de bater (luva brilhando + "!" vermelho = leve, "!!" amarelo = pesado), têm golpes por
-tipo (jab, combo duplo, pancada em área), às vezes defendem, ficam atordoados com estrelas, rodeiam o
+tipo (golpes variados, combos de 2–3, pancada em área), avançam no golpe, às vezes **desviam** ou
+defendem, ficam atordoados com estrelas, rodeiam o
 jogador e no máximo 2 atacam ao mesmo tempo. Impactos têm hit-stop, empurrão e números de dano.
 
 As **armas** usam o mesmo modelo detalhado em 1ª e 3ª pessoa (`client/src/player/viewmodel-parts.js`):

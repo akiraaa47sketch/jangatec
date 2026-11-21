@@ -85,6 +85,7 @@ export class Net {
       case 'start': G.startup.applyState(m.state); break;
       case 'msg': G.hud.msg(m.text); break;
       case 'event': G.events.receive(m.e); break;
+      case 'revive': if (m.id === this.id) G.survival.revive(m.by); break;
       case 'carry': {
         G.world.applyCarryState(m.id, m.by, m.state);
         break;
@@ -141,7 +142,7 @@ export class Net {
       let x = b.pos.x, y = b.pos.y, z = b.pos.z, yaw = pl.yaw;
       if (pl.aboard) { [x, z] = boat.toLocal(x, z); y -= boat.set.y; yaw -= boat.yaw; }
       const r2 = (v) => Math.round(v * 100) / 100;
-      this.send({ t: 'state', s: { p: [r2(x), r2(y), r2(z)], yaw: r2(yaw), ab: pl.aboard ? 1 : 0, sw: pl.swimming ? 1 : 0, sp: r2(Math.hypot(b.vel.x, b.vel.z)), dead: pl.dead ? 1 : 0, ap: this.localLook() } });
+      this.send({ t: 'state', s: { p: [r2(x), r2(y), r2(z)], yaw: r2(yaw), ab: pl.aboard ? 1 : 0, sw: pl.swimming ? 1 : 0, sp: r2(Math.hypot(b.vel.x, b.vel.z)), dead: pl.dead ? 1 : 0, dn: pl.downed ? 1 : 0, ap: this.localLook() } });
       if (this.isHost) this.send({ t: 'boat', b: { x: r2(boat.x), z: r2(boat.z), yaw: Math.round(boat.yaw * 1000) / 1000, speed: r2(boat.speed), up: boat.sailUp, angle: boat.sailAngle } });
     }
     // Interpola os aliados.
@@ -159,7 +160,7 @@ export class Net {
       mesh.rotation.x = s.dead ? -Math.PI / 2 : s.sw ? 0.9 : 0;
       if (r.pill) {
         mesh.rotation.x = s.dead ? -Math.PI / 2 : 0;
-        animatePill(r.pill.children[0], s.sp, dt, s.sw ? 'swim' : 'walk');
+        animatePill(r.pill.children[0], s.sp, dt, s.sw ? 'swim' : s.dn ? 'crawl' : 'walk'); // caído: se arrastando
       } else animateHumanoid(mesh, s.sp, dt, s.sw ? 'swim' : 'walk');
     }
   }

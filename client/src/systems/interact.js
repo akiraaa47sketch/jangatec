@@ -1,4 +1,5 @@
-// Interação com [E]: caixas de loot e mastro; [X]: peças soldadas.
+// Interação com [E]: caixas de loot, mastro e reanimar aliados caídos; [X]: peças soldadas.
+const REVIVE_TIME = 2.5;
 export class Interact {
   constructor(G) {
     this.G = G;
@@ -12,6 +13,14 @@ export class Interact {
     if (G.build.active) return null;
     let best = null, bd = Infinity;
     const consider = (d, o) => { if (d < bd) { bd = d; best = o; } };
+
+    // Aliado caído por perto: segurar E reanima
+    for (const [id, r] of G.net.remotes) {
+      if (!r.s || !r.s.dn) continue;
+      const wp = r.mesh.getWorldPosition(this._v || (this._v = p.clone()));
+      const d = Math.hypot(wp.x - p.x, wp.z - p.z);
+      if (d < 2.4 && Math.abs(wp.y - p.y) < 2) consider(d - 1, { revive: id, name: r.s.n || 'aliado', label: `Reanimar ${r.s.n || 'aliado'} (segure)` });
+    }
 
     // Caixas de loot
     for (const c of G.world.crates) {
@@ -118,9 +127,22 @@ export class Interact {
       this.current = null;
       return;
     }
-    this.current = G.player.dead ? null : this.find();
+    this.current = G.player.dead || G.player.downed ? null : this.find();
     const c = this.current;
+    if (!c || !c.revive) this.reviveT = 0;
     if (!c) return;
+    if (c.revive) { // segurar E por REVIVE_TIME segundos
+      if (inp.down('KeyE')) {
+        this.reviveT = (this.reviveT || 0) + dt;
+        c.label = `Reanimando ${c.name}… ${Math.min(100, Math.round(this.reviveT / REVIVE_TIME * 100))}%`;
+        if (this.reviveT >= REVIVE_TIME) {
+          this.reviveT = 0;
+          G.net.send({ t: 'revive', id: c.revive });
+          G.hud.msg(`Você reanimou ${c.name}!`);
+        }
+      } else this.reviveT = 0;
+      return;
+    }
     if (c.remove && inp.hit('KeyX')) G.build.tryRemoveWelded(c.remove);
     else if (inp.hit('KeyE') && c.run) { c.run(); if (G.viewmodel) G.viewmodel.onInteract(); }
     if (c.mast && !c.installSail) {

@@ -96,6 +96,14 @@ export class Hud {
     // Vida: boia salva-vidas + barra
     const vida = Math.max(0, Math.round(s.vida));
     $('vida').style.width = vida + '%';
+    const down = !!G.player.downed;
+    document.body.classList.toggle('downed', down);
+    $('downed').hidden = !down;
+    if (down) {
+      const left = Math.max(0, G.survival.bleed);
+      $('bleedFill').style.width = `${(left / 45) * 100}%`;
+      $('downedText').textContent = `Arraste-se até um aliado — ele te reanima segurando E (${Math.ceil(left)} s)`;
+    }
     if (G.melee) { const st = G.melee.stamina; $('stamina').style.width = st + '%'; $('stamina').classList.toggle('low', st < 25); }
     $('vidaNum').textContent = vida;
     $('lifeArc').style.strokeDashoffset = String(157 * (1 - vida / 100));

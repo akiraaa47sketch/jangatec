@@ -38,6 +38,12 @@ class Spring {
 
 // Keyframes [tempo, [px, py, pz, rx, ry, rz]] relativos à pose de empunhadura.
 const SWINGS = {
+  parry: [ // tapa a arma para fora, desviando o golpe
+    [0, [0, 0, 0, 0, 0, 0]],
+    [0.25, [-0.18, 0.14, 0.04, 0.5, 0.9, 1.2]],
+    [0.55, [0.12, 0.1, -0.06, 0.3, -0.5, -0.4]],
+    [1, [0, 0, 0, 0, 0, 0]],
+  ],
   slashA: [ // do alto-direita para baixo-esquerda
     [0, [0, 0, 0, 0, 0, 0]],
     [0.26, [0.1, 0.1, 0.06, 0.4, -0.3, -0.6]],
@@ -280,7 +286,7 @@ export class ViewModel {
   update(dt, t) {
     const G = this.G, pl = G.player, cb = G.combat, inp = G.input, b = pl.body;
     this.active = !!(pl.firstPerson && G.started);
-    this.group.visible = this.active && !pl.dead;
+    this.group.visible = this.active && !pl.dead && !pl.downed;
     if (!this.active) { this.scopeEl.hidden = true; this.fovTarget = 68; return; }
     this.time += dt;
     const S = this.springs;

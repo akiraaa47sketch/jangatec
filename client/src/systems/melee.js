@@ -8,22 +8,25 @@ import { clamp } from '../core/util.js';
 
 export const MELEE = {
   stamina: { max: 100, regen: 30, delay: 0.7 },
-  light: { cost: 9, windup: 0.13, combo: [1, 1.15, 1.6], window: 0.8, knock: [2.4, 2.8, 6] },
-  heavy: { cost: 24, minHold: 0.26, maxCharge: 0.9, windup: 0.2, mult: [1.7, 2.6], knock: 8 },
-  block: { mult: 0.2, heavyMult: 0.5, cost: 14, parry: 0.22, arc: 0.3 },
-  dodge: { cost: 22, speed: 15, dur: 0.24, iframes: 0.32, cd: 0.5 },
+  light: { cost: 8, combo: [1, 1.15, 1.6], window: 0.7, knock: [2.4, 2.8, 6] },
+  heavy: { cost: 22, minHold: 0.24, maxCharge: 0.7, mult: [1.7, 2.6], knock: 8 },
+  block: { mult: 0.2, heavyMult: 0.5, cost: 14, parry: 0.18, arc: 0.3 },
+  dodge: { cost: 20, speed: 11.5, dur: 0.34, iframes: 0.3, cd: 0.45 },
+  enemy: { recover: 0.32, heavyRecover: 0.6, lunge: 3.6, evade: 0.16 }, // ritmo dos inimigos
   crit: 2.2,
   tokens: 2,                                  // quantos inimigos podem atacar ao mesmo tempo
 };
 
 // Repertório por tipo: wind = aviso (s), hits = golpes seguidos, heavy = pancada pesada.
 const MOVES = {
-  melee: [{ wind: 0.5, mult: 1, w: 3 }, { wind: 0.9, mult: 1.9, heavy: true, w: 1 }],
-  rapido: [{ wind: 0.32, mult: 0.8, hits: 2, w: 3 }, { wind: 0.55, mult: 1.3, w: 1 }],
-  pesado: [{ wind: 1.05, mult: 1.6, heavy: true, aoe: 3.0, w: 2 }, { wind: 0.6, mult: 0.9, w: 1 }],
-  pirata: [{ wind: 0.45, mult: 1, hits: 2, w: 2 }, { wind: 0.85, mult: 1.8, heavy: true, w: 1 }],
+  melee: [{ wind: 0.36, mult: 1, w: 3 }, { wind: 0.3, mult: 0.85, hits: 2, w: 2 }, { wind: 0.62, mult: 1.9, heavy: true, w: 1 }],
+  rapido: [{ wind: 0.24, mult: 0.8, hits: 3, w: 3 }, { wind: 0.36, mult: 1.3, w: 1 }],
+  pesado: [{ wind: 0.75, mult: 1.6, heavy: true, aoe: 3.0, w: 2 }, { wind: 0.42, mult: 0.9, w: 1 }],
+  pirata: [{ wind: 0.32, mult: 1, hits: 2, w: 2 }, { wind: 0.6, mult: 1.8, heavy: true, w: 1 }],
 };
+const LIGHT_POSES = ['slashR', 'slashL', 'thrust', 'uppercut'];
 const GUARD_CHANCE = { melee: 0.3, pesado: 0.45, pirata: 0.25, rapido: 0.1 };
+const EVADE_CHANCE = { melee: 0.12, pesado: 0, pirata: 0.18, rapido: 0.3 }; // desviam do seu golpe
 
 let bangTex = {}, starTex = null;
 function bang(text, color) {
@@ -77,7 +80,7 @@ export class Melee {
     if (this.dodge) { this.dodge.t += dt; if (this.dodge.t >= MELEE.dodge.dur) this.dodge = null; }
     this.updateNums(dt);
 
-    const free = !G.build.active && !G.interact.lootOpen && !pl.dead && !pl.mantle && !pl.swimming && !(G.gfxMenu && G.gfxMenu.open) && !G.bench;
+    const free = !G.build.active && !G.interact.lootOpen && !pl.dead && !pl.downed && !pl.mantle && !pl.swimming && !(G.gfxMenu && G.gfxMenu.open) && !G.bench;
     // esquiva [Q] (com qualquer arma)
     if (free && inp.hit('KeyQ') && !this.dodge && this.dodgeCd <= 0 && this.stunT <= 0 && this.stamina >= MELEE.dodge.cost * 0.5) {
       this.spend(MELEE.dodge.cost);
@@ -86,7 +89,10 @@ export class Melee {
       let dx = fx * f + rx * sd, dz = fz * f + rz * sd;
       if (!dx && !dz) { dx = -fx; dz = -fz; } // parado: pula para trás
       const l = Math.hypot(dx, dz); dx /= l; dz /= l;
-      this.dodge = { vx: dx * MELEE.dodge.speed, vz: dz * MELEE.dodge.speed, t: 0 };
+      // cambalhota para frente/trás, passo lateral para os lados
+      const along = dx * fx + dz * fz, side = dx * rx + dz * rz;
+      const anim = Math.abs(along) >= Math.abs(side) ? 'roll' : 'sidestep';
+      this.dodge = { vx: dx * MELEE.dodge.speed, vz: dz * MELEE.dodge.speed, t: 0, anim, dir: anim === 'roll' ? Math.sign(along) || -1 : -Math.sign(side) || 1, side };
       this.iframes = MELEE.dodge.iframes; this.dodgeCd = MELEE.dodge.cd;
       this.cancelCharge();
       if (G.viewmodel && pl.firstPerson) G.viewmodel.springs.kickRx.kick(1.5);
@@ -99,6 +105,7 @@ export class Melee {
       if (this.pending.t <= 0) { const p = this.pending; this.pending = null; this.strike(p); }
     }
     if (this.swingPose) { this.swingPose.t += dt; if (this.swingPose.t >= this.swingPose.dur) this.swingPose = null; }
+    this.updateSparks(dt);
 
     if (!w || !free || this.stunT > 0) { this.blocking = false; this.cancelCharge(); pl.speedMul = this.stunT > 0 ? 0.3 : 1; return; }
     // bloqueio (segurar o botão direito)
@@ -134,14 +141,18 @@ export class Melee {
     const mult = heavy ? MELEE.heavy.mult[0] + (MELEE.heavy.mult[1] - MELEE.heavy.mult[0]) * charge : MELEE.light.combo[step];
     const finisher = !heavy && step === 2;
     this.combo = heavy ? 0 : (step + 1) % 3; this.comboT = MELEE.light.window;
-    const dur = heavy ? clamp(w.rate * 1.25, 0.45, 0.7) : clamp(w.rate * (finisher ? 0.95 : 0.8), 0.28, 0.5);
-    G.combat.cooldown = dur * (heavy ? 1.05 : 0.9);
+    // golpes rápidos; o combo alterna corte direita/revés e fecha com um final variado
+    const dur = heavy ? clamp(w.rate * 0.95, 0.38, 0.55) : clamp(w.rate * (finisher ? 0.7 : 0.58), 0.2, 0.38);
+    G.combat.cooldown = dur * (heavy ? 1.0 : 0.82);
     G.combat.swing = G.combat.swingDuration = dur;
     const [fx, fz] = pl.forward(); pl.yaw = Math.atan2(fx, fz);
-    const style = heavy ? 'overhead' : finisher ? 'stab' : null;
-    let impact = dur * (heavy ? 0.5 : 0.42);
+    const pick = (l) => l[(Math.random() * l.length) | 0];
+    const pose = heavy ? pick(['slam', 'spin']) : finisher ? pick(['thrust', 'uppercut', 'spin']) : step === 0 ? 'slashR' : 'slashL';
+    const style = heavy ? (pose === 'spin' ? 'slashA' : 'overhead') : finisher ? (pose === 'thrust' ? 'stab' : 'overhead') : step === 0 ? 'slashA' : 'slashB';
+    let impact = dur * (pose === 'spin' ? 0.55 : 0.4);
     if (pl.firstPerson && G.viewmodel) impact = G.viewmodel.onSwing(w, style, dur) * G.viewmodel.strikeFraction(w);
-    this.swingPose = { heavy, t: 0, dur };
+    this.swingPose = { heavy, pose, t: 0, dur };
+    if (!heavy) { const [lx, lz] = pl.forward(); pl.body.vel.x += lx * 2.2; pl.body.vel.z += lz * 2.2; } // passinho à frente no golpe
     this.pending = { w, heavy, mult, finisher, t: impact, knock: heavy ? MELEE.heavy.knock : MELEE.light.knock[step] };
     G.combat._useDurability(w);
   }
@@ -150,15 +161,17 @@ export class Melee {
   strike({ w, heavy, mult, finisher, knock }) {
     const G = this.G, pl = G.player, p = pl.body.pos;
     const [fx, fz] = pl.forward();
-    const range = w.range * (heavy ? 1.2 : finisher ? 1.1 : 1), arc = heavy ? -0.1 : 0.25;
+    const spin = this.swingPose && this.swingPose.pose === 'spin';
+    const range = w.range * (heavy ? 1.2 : finisher ? 1.1 : 1), arc = spin ? -1.01 : heavy ? -0.1 : 0.25;
     let hits = 0;
     for (const e of G.enemies.list) {
       if (e.state === 'dead') continue;
       const dx = e.body.pos.x - p.x, dz = e.body.pos.z - p.z, d = Math.hypot(dx, dz) || 1;
       if (d > range + 0.3 || Math.abs(e.body.pos.y - p.y) > 2 || (d > 0.8 && (dx * fx + dz * fz) / d < arc)) continue;
+      const ms = e.m || (e.m = { state: 'idle', t: 0 });
+      if (ms.state === 'evade') { this.say(e.body.pos, 'DESVIOU', '#c8d2da'); continue; }
       hits++;
       let dmg = w.dmg * mult, label = null, color = '#ffffff';
-      const ms = e.m || (e.m = { state: 'idle', t: 0 });
       const front = ((p.x - e.body.pos.x) * Math.sin(e.yaw) + (p.z - e.body.pos.z) * Math.cos(e.yaw)) / d > 0.3;
       if (ms.state === 'stagger') { dmg *= MELEE.crit; label = 'CRÍTICO'; color = '#ffb347'; }
       else if (ms.state === 'guard' && front) {
@@ -206,21 +219,31 @@ export class Melee {
       case 'windup': {
         const p = 1 - ms.t / ms.move.wind;
         this.setTell(e, ms.move, p);
-        if (ms.t <= 0) { ms.state = 'strike'; ms.t = 0.18; ms.hit = ms.move.hits || 1; this.enemyHit(e, ms.move, dist); }
+        if (ms.t <= 0) {
+          ms.state = 'strike'; ms.t = 0.16; ms.hit = ms.hit || ms.move.hits || 1;
+          ms.anim = ms.move.heavy ? 'slam' : LIGHT_POSES[(Math.random() * LIGHT_POSES.length) | 0];
+          // investida: o golpe avança em direção ao jogador (recuar um passo não basta)
+          const pp = G.player.body.pos, dx = pp.x - e.body.pos.x, dz = pp.z - e.body.pos.z, l = Math.hypot(dx, dz) || 1;
+          if (l > 1.1) e.knock = { x: dx / l * MELEE.enemy.lunge, z: dz / l * MELEE.enemy.lunge };
+          this.enemyHit(e, ms.move, dist);
+        }
         return { pose: ms.move.heavy ? 'heavyWindup' : 'windup', progress: p, hold: true };
       }
       case 'strike': {
-        const p = 1 - ms.t / 0.18;
+        const p = 1 - ms.t / 0.16;
         if (ms.t <= 0) {
           ms.hit--;
-          if (ms.hit > 0) { ms.state = 'windup'; ms.t = 0.22; ms.move = { ...ms.move, wind: 0.22, hits: ms.hit }; }
-          else { ms.state = 'recover'; ms.t = ms.move.heavy ? 0.85 : 0.5; this.setTell(e, null); }
+          if (ms.hit > 0) { ms.state = 'windup'; ms.t = 0.16; ms.move = { ...ms.move, wind: 0.16 }; } // combo: próximo golpe quase sem aviso
+          else { ms.state = 'recover'; ms.hit = 0; ms.t = ms.move.heavy ? MELEE.enemy.heavyRecover : MELEE.enemy.recover; this.setTell(e, null); }
         }
-        return { pose: ms.move.heavy ? 'slam' : 'attack', progress: p, hold: true };
+        return { pose: ms.anim || 'slashR', progress: p, hold: true };
       }
+      case 'evade':
+        if (ms.t <= 0) ms.state = 'idle';
+        return { pose: 'sidestep', progress: 1 - ms.t / 0.3, hold: true };
       case 'recover':
         if (ms.t <= 0) {
-          ms.state = 'idle'; e.cd = def.cd * (0.7 + Math.random() * 0.6);
+          ms.state = 'idle'; e.cd = def.cd * (0.45 + Math.random() * 0.45);
           if (ms.token) { this.tokens.delete(e); ms.token = false; }
         }
         return { pose: 'walk', hold: true };
@@ -233,12 +256,24 @@ export class Melee {
       if (Math.random() < (GUARD_CHANCE[e.type] || 0)) { ms.state = 'guard'; ms.t = 0.8 + Math.random() * 0.5; return { pose: 'guard', hold: true }; }
     }
     if (!this.pending && !this.charging) ms.guardTried = false;
+    // desvia do seu golpe que está vindo (pulo lateral)
+    if (this.pending && dist < 2.8 && !ms.evadeTried) {
+      ms.evadeTried = true;
+      if (Math.random() < (EVADE_CHANCE[e.type] || 0)) {
+        const pp = pl.body.pos, dx = pp.x - e.body.pos.x, dz = pp.z - e.body.pos.z, l = Math.hypot(dx, dz) || 1, sd = Math.random() < 0.5 ? 1 : -1;
+        e.knock = { x: -dz / l * 7 * sd - dx / l * 2, z: dx / l * 7 * sd - dz / l * 2 };
+        e.mesh.userData.pill && (e.mesh.userData.pill.userData.rollDir = sd);
+        ms.state = 'evade'; ms.t = 0.3;
+        return { pose: 'sidestep', progress: 0, hold: true };
+      }
+    }
+    if (!this.pending) ms.evadeTried = false;
     // começa um ataque se estiver perto, sem recarga e com "vaga" (no máximo N atacando juntos)
-    if (!pl.dead && dist < def.range + 0.4 && e.cd <= 0 && (this.tokens.size < MELEE.tokens || ms.token)) {
+    if (!pl.dead && !pl.downed && dist < def.range + 0.4 && e.cd <= 0 && (this.tokens.size < MELEE.tokens || ms.token)) {
       const moves = MOVES[e.type] || MOVES.melee, total = moves.reduce((s, m) => s + m.w, 0);
       let r = Math.random() * total, move = moves[0];
       for (const m of moves) { r -= m.w; if (r <= 0) { move = m; break; } }
-      ms.state = 'windup'; ms.t = move.wind; ms.move = move; ms.token = true; this.tokens.add(e);
+      ms.state = 'windup'; ms.t = move.wind; ms.move = move; ms.hit = 0; ms.token = true; this.tokens.add(e);
       return { pose: move.heavy ? 'heavyWindup' : 'windup', progress: 0, hold: true };
     }
     return null; // segue a IA normal (perseguir/rodear)
@@ -248,7 +283,7 @@ export class Melee {
     const G = this.G, pl = G.player, pp = pl.body.pos, p = e.body.pos;
     const d = Math.hypot(pp.x - p.x, pp.z - p.z);
     const reach = move.aoe || e.def.range + 0.5;
-    if (pl.dead || d > reach || Math.abs(pp.y - p.y) > 1.8) { this.say(e.body.pos, 'ERROU', '#c8d2da'); return; }
+    if (pl.dead || pl.downed || d > reach || Math.abs(pp.y - p.y) > 1.8) { this.say(e.body.pos, 'ERROU', '#c8d2da'); return; }
     // golpe direcional: só acerta quem está na frente (exceto a pancada em área)
     if (!move.aoe && d > 0.6 && ((pp.x - p.x) * Math.sin(e.yaw) + (pp.z - p.z) * Math.cos(e.yaw)) / d < 0.25) { this.say(e.body.pos, 'ERROU', '#c8d2da'); return; }
     this.incoming(e.def.dmg * move.mult, e.def.nome, e, !!move.heavy);
@@ -267,7 +302,9 @@ export class Melee {
           this.stamina = Math.min(MELEE.stamina.max, this.stamina + 15);
           this.say(attacker.body.pos, 'PARRY!', '#ffe14d', true);
           G.hitStop = 0.16;
-          if (G.viewmodel && pl.firstPerson) G.viewmodel.onMeleeHit();
+          this.parryAnim = { t: 0, dur: 0.3 };
+          this.sparks(new THREE.Vector3((pp.x + attacker.body.pos.x) / 2, pp.y + 1.3, (pp.z + attacker.body.pos.z) / 2), 26);
+          if (G.viewmodel && pl.firstPerson && this.weapon) G.viewmodel.onSwing(this.weapon, 'parry', 0.28);
           return;
         }
         this.spend(MELEE.block.cost * (heavy ? 2 : 1));
@@ -278,6 +315,7 @@ export class Melee {
           return;
         }
         this.say(pp, 'BLOQUEOU', '#8fd3ff');
+        this.sparks(new THREE.Vector3(pp.x + ax / l * 0.6, pp.y + 1.3, pp.z + az / l * 0.6), 10);
         G.survival.damage(dmg * (heavy ? MELEE.block.heavyMult : MELEE.block.mult), source);
         G.hitStop = 0.05;
         return;
@@ -295,13 +333,13 @@ export class Melee {
     const pill = e.mesh.userData.pill;
     if (!e.tell) {
       e.tell = new THREE.Sprite(new THREE.SpriteMaterial({ map: bang('!', '#ff3b2b'), depthTest: false, transparent: true }));
-      e.tell.scale.setScalar(0.7); e.tell.position.y = 2.35; e.tell.renderOrder = 10; e.mesh.add(e.tell);
+      e.tell.scale.setScalar(0.3); e.tell.position.y = 2.2; e.tell.renderOrder = 10; e.mesh.add(e.tell);
       e.gloveMats = pill && pill.userData.parts.gloveMat ? [pill.userData.parts.gloveMat] : [];
     }
     if (!move) { e.tell.visible = false; for (const m of e.gloveMats) m.emissive && m.emissive.setRGB(0, 0, 0); return; }
     e.tell.visible = true;
     e.tell.material.map = bang(move.heavy ? '!!' : '!', move.heavy ? '#ffd23f' : '#ff3b2b');
-    e.tell.scale.setScalar(0.6 + p * 0.3 + Math.sin(p * 30) * 0.05);
+    e.tell.scale.setScalar(0.26 + p * 0.1 + Math.sin(p * 30) * 0.02); // ícone discreto
     const k = 0.3 + p * 0.9;
     for (const m of e.gloveMats) if (m.emissive) m.emissive.setRGB(k, move.heavy ? k * 0.75 : k * 0.08, 0);
   }
@@ -320,6 +358,32 @@ export class Melee {
     if (!on) return;
     e.starA = (e.starA || 0) + dt * 5;
     e.stars.children.forEach((s, i) => { const a = e.starA + i * 2.094; s.position.set(Math.cos(a) * 0.45, Math.sin(a * 2) * 0.05, Math.sin(a) * 0.45); });
+  }
+
+  // ---------- faíscas (parry/bloqueio) ----------
+  sparks(pos, n) {
+    if (!this.sparkPts) {
+      const N = 64, g = new THREE.BufferGeometry();
+      g.setAttribute('position', new THREE.BufferAttribute(new Float32Array(N * 3), 3));
+      this.sparkPts = new THREE.Points(g, new THREE.PointsMaterial({ color: 0xffd27a, size: 0.09, transparent: true, blending: THREE.AdditiveBlending, depthWrite: false }));
+      this.sparkPts.frustumCulled = false; this.G.scene.add(this.sparkPts);
+      this.sparkData = Array.from({ length: N }, () => ({ p: new THREE.Vector3(0, -999, 0), v: new THREE.Vector3(), life: 0 }));
+      this.sparkI = 0;
+    }
+    for (let i = 0; i < n; i++) {
+      const s = this.sparkData[this.sparkI++ % this.sparkData.length];
+      s.p.copy(pos); s.v.set((Math.random() - 0.5) * 9, Math.random() * 6, (Math.random() - 0.5) * 9); s.life = 0.25 + Math.random() * 0.2;
+    }
+  }
+  updateSparks(dt) {
+    if (this.parryAnim) { this.parryAnim.t += dt; if (this.parryAnim.t >= this.parryAnim.dur) this.parryAnim = null; }
+    if (!this.sparkPts) return;
+    const a = this.sparkPts.geometry.attributes.position.array;
+    this.sparkData.forEach((s, i) => {
+      if (s.life > 0) { s.life -= dt; s.v.y -= 18 * dt; s.p.addScaledVector(s.v, dt); if (s.life <= 0) s.p.y = -999; }
+      a[i * 3] = s.p.x; a[i * 3 + 1] = s.p.y; a[i * 3 + 2] = s.p.z;
+    });
+    this.sparkPts.geometry.attributes.position.needsUpdate = true;
   }
 
   // ---------- números de dano / avisos ----------

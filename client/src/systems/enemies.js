@@ -416,7 +416,7 @@ export class Enemies {
     let moved = 0;
     const mres = G.melee ? G.melee.enemyTick(e, dt, Math.hypot(pp.x - p.x, pp.z - p.z)) : null; // aviso/golpe/guarda
     if (e.knock) [e.local.x, e.local.z] = boat.toLocal(p.x, p.z);
-    if (!G.player.dead && distance > e.def.range * 0.7 && !(mres && mres.hold)) {
+    if (!G.player.dead && !G.player.downed && distance > e.def.range * 0.7 && !(mres && mres.hold)) {
       moved = Math.min(distance - e.def.range * 0.7, e.def.speed * dt);
       e.local.x += dx / distance * moved;
       e.local.z += dz / distance * moved;
@@ -457,7 +457,7 @@ export class Enemies {
   }
 
   think(e, dist, pdx, pdz) {
-    const def = e.def, alive = !this.G.player.dead;
+    const def = e.def, alive = !this.G.player.dead && !this.G.player.downed; // caído: inimigos perdem o interesse
     switch (e.state) {
       case 'idle': case 'patrol': case 'search':
         if (alive && dist < SIGHT) { e.state = 'chase'; break; }

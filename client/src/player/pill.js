@@ -460,8 +460,33 @@ export function disposePill(pill) {
 }
 
 // poses: walk | attack | aim | swim | jump | row | leap | windup | heavyWindup | slam | guard | stagger | dodge
+//        | slashR | slashL | thrust | uppercut | spin | parry | roll | sidestep | crawl
 const smooth01 = (x) => { x = Math.max(0, Math.min(1, x)); return x * x * (3 - 2 * x); };
+// Partes animadas: a pose calcula o ALVO e animatePill mistura suavemente do quadro anterior para
+// ele (sem "estalos" ao trocar de pose). Ângulos misturados pelo caminho mais curto (giros de 360°).
+const BLEND_PARTS = ['body', 'armL', 'armR', 'legL', 'legR'];
+const _snap = new Float32Array(BLEND_PARTS.length * 3 + 2);
+const wrapPi = (a) => { a = (a + Math.PI) % (Math.PI * 2); return (a < 0 ? a + Math.PI * 2 : a) - Math.PI; };
 export function animatePill(pill, speed, dt, pose = 'walk', progress = 0) {
+  const p = pill.userData.parts;
+  const first = !pill.userData.blended; pill.userData.blended = true;
+  BLEND_PARTS.forEach((n, i) => { const r = p[n].rotation; _snap[i * 3] = r.x; _snap[i * 3 + 1] = r.y; _snap[i * 3 + 2] = r.z; });
+  _snap[15] = p.body.position.y; _snap[16] = p.body.position.z;
+  poseTargets(pill, speed, dt, pose, progress);
+  if (first) return;
+  // poses de ação (golpes/esquiva) respondem mais rápido que andar/parar
+  const rate = ['walk', 'swim', 'row', 'aim'].includes(pose) ? 16 : 30, k = 1 - Math.exp(-rate * dt);
+  BLEND_PARTS.forEach((n, i) => {
+    const r = p[n].rotation;
+    r.x = _snap[i * 3] + wrapPi(r.x - _snap[i * 3]) * k;
+    r.y = _snap[i * 3 + 1] + wrapPi(r.y - _snap[i * 3 + 1]) * k;
+    r.z = _snap[i * 3 + 2] + wrapPi(r.z - _snap[i * 3 + 2]) * k;
+  });
+  p.body.position.y = _snap[15] + (p.body.position.y - _snap[15]) * k;
+  p.body.position.z = _snap[16] + (p.body.position.z - _snap[16]) * k;
+}
+
+function poseTargets(pill, speed, dt, pose, progress) {
   const p = pill.userData.parts, k = Math.min(1, speed / 4);
   pill.userData.phase += dt * (pose === 'swim' ? 5 : 2 + speed * 2.2);
   const ph = pill.userData.phase, c = Math.sin(ph);
@@ -509,6 +534,47 @@ export function animatePill(pill, speed, dt, pose = 'walk', progress = 0) {
     p.body.position.y = BODY_Y - 0.5 * k; p.body.rotation.set(0.5 * k, 0, 0);
     p.armR.rotation.set(-0.6 * k, 0, -0.6 * k); p.armL.rotation.set(-0.6 * k, 0, 0.6 * k);
     p.legL.rotation.set(-1.0 * k, 0, 0); p.legR.rotation.set(0.6 * k, 0, 0);
+  } else if (pose === 'slashR') { // corte horizontal da direita para a esquerda
+    const a = smooth01(progress), sw = Math.sin(Math.min(1, progress) * Math.PI);
+    p.armR.rotation.set(-1.45, -1.3 + 2.4 * a, -0.4 + 0.3 * sw); p.armL.rotation.set(-0.6, 0, 0.5);
+    p.body.rotation.set(0.08, 0.55 - 1.2 * a, 0); p.legL.rotation.set(-0.35, 0, 0); p.legR.rotation.set(0.3, 0, 0);
+  } else if (pose === 'slashL') { // revés da esquerda para a direita
+    const a = smooth01(progress);
+    p.armR.rotation.set(-1.35, 1.1 - 2.3 * a, -0.2); p.armL.rotation.set(-0.4, 0, 0.45);
+    p.body.rotation.set(0.08, -0.6 + 1.2 * a, 0); p.legL.rotation.set(0.3, 0, 0); p.legR.rotation.set(-0.35, 0, 0);
+  } else if (pose === 'thrust') { // estocada com avanço
+    const a = Math.sin(Math.min(1, progress) * Math.PI);
+    p.armR.rotation.set(-1.6, 0, -0.1); p.armL.rotation.set(0.5 * a, 0, 0.3);
+    p.body.position.z = 0.35 * a; p.body.rotation.set(0.35 * a, -0.25 * a, 0);
+    p.legL.rotation.set(-0.7 * a, 0, 0); p.legR.rotation.set(0.5 * a, 0, 0);
+  } else if (pose === 'uppercut') { // golpe de baixo para cima
+    const a = smooth01(progress);
+    p.armR.rotation.set(0.6 - 3.0 * a, 0, -0.25); p.armL.rotation.set(-0.5, 0, 0.4);
+    p.body.position.y = BODY_Y - 0.15 + 0.3 * a; p.body.rotation.set(0.3 - 0.5 * a, -0.2, 0);
+  } else if (pose === 'spin') { // giro de 360° (golpe final)
+    const a = smooth01(progress);
+    p.armR.rotation.set(-1.5, 0, -1.2); p.armL.rotation.set(-1.5, 0, 1.2);
+    p.body.rotation.set(0.1, -a * Math.PI * 2, 0); p.body.position.y = BODY_Y + Math.sin(a * Math.PI) * 0.15;
+  } else if (pose === 'parry') { // desvia o golpe com um tapa da arma para fora
+    const a = Math.sin(Math.min(1, progress) * Math.PI);
+    p.armR.rotation.set(-2.0, -0.9 * a, -0.4 - 0.8 * a); p.armL.rotation.set(-1.0, 0.4, 0.6);
+    p.body.rotation.set(-0.15 * a, 0.5 * a, 0.08 * a); p.body.position.z = -0.2 * a;
+  } else if (pose === 'roll') { // cambalhota (esquiva para frente/trás)
+    const a = smooth01(progress), dir = pill.userData.rollDir || 1;
+    p.body.rotation.set(dir * a * Math.PI * 2, 0, 0);
+    p.body.position.y = BODY_Y - 0.75 * Math.sin(a * Math.PI);
+    p.armR.rotation.set(-2.2, 0, -0.5); p.armL.rotation.set(-2.2, 0, 0.5);
+    p.legL.rotation.set(-1.4, 0, 0); p.legR.rotation.set(-1.4, 0, 0);
+  } else if (pose === 'sidestep') { // esquiva lateral: inclina e abre as pernas
+    const a = Math.sin(Math.min(1, progress) * Math.PI), sd = pill.userData.rollDir || 1;
+    p.body.rotation.set(0.15 * a, 0, -0.55 * a * sd); p.body.position.y = BODY_Y - 0.35 * a;
+    p.legL.rotation.set(0, 0, 0.5 * a); p.legR.rotation.set(0, 0, -0.5 * a);
+    p.armR.rotation.set(-0.8, 0, -1.0 * a); p.armL.rotation.set(-0.8, 0, 1.0 * a);
+  } else if (pose === 'crawl') { // caído: deitado de bruços, se arrastando
+    const cw = Math.sin(pill.userData.phase * 1.6), mv = Math.min(1, speed / 0.8);
+    p.body.rotation.set(1.45, 0, cw * 0.08 * mv); p.body.position.y = 0.55; p.body.position.z = -0.6;
+    p.armR.rotation.set(-2.6 + cw * 0.6 * mv, 0, -0.5); p.armL.rotation.set(-2.6 - cw * 0.6 * mv, 0, 0.5);
+    p.legL.rotation.set(0.2 + cw * 0.3 * mv, 0, 0.15); p.legR.rotation.set(0.2 - cw * 0.3 * mv, 0, -0.15);
   } else if (pose === 'jump') {
     p.armL.rotation.set(-2.4, 0, 0.5); p.armR.rotation.set(-2.4, 0, -0.5);
     p.legL.rotation.set(-0.7, 0, 0); p.legR.rotation.set(0.3, 0, 0);

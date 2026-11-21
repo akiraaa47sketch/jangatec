@@ -25,6 +25,7 @@ export class Player {
     this.yaw = 0; this.camYaw = Math.PI; this.camPitch = 0.3; this.camDist = 5.2;
     this.camTarget = new THREE.Vector3(0, 2, 0);
     this.swimming = false; this.mantle = null; this.dead = false; this.aboard = false;
+    this.downed = false; // multiplayer: caído, se arrastando até ser reanimado
     // 1ª pessoa por padrão; [F] alterna. O corpo some só para o próprio jogador.
     this.firstPerson = true; this.fovSens = 1; this.eyeHeight = 1.6;
     this.zoom = 5.2;          // distância da câmera em 3ª pessoa ([I] aproxima, [O] afasta)
@@ -111,6 +112,7 @@ export class Player {
     const len = Math.hypot(dx, dz), moving = len > 0;
     if (moving) { dx /= len; dz /= len; }
     let speed = this.swimming ? CFG.swim : inp.down('ShiftLeft') ? CFG.run : CFG.walk;
+    if (this.downed) speed = this.swimming ? CFG.swim * 0.6 : 0.9; // caído: só se arrasta
     if (aiming) speed = Math.min(speed, 3);
     speed *= this.speedMul || 1; // bloqueando/carregando golpe anda devagar
     const k = Math.min(1, (b.grounded ? 14 : this.swimming ? 6 : 3.5) * dt);
@@ -121,7 +123,7 @@ export class Player {
     else if (aiming || this.aimHold > 0) this.yaw = lerpAngle(this.yaw, Math.atan2(fx, fz), Math.min(1, 16 * dt));
     else if (moving) this.yaw = lerpAngle(this.yaw, Math.atan2(dx, dz), Math.min(1, 12 * dt));
 
-    if (inp.hit('Space')) {
+    if (inp.hit('Space') && !this.downed) {
       const dir = moving ? [dx, dz] : [Math.sin(this.yaw), Math.cos(this.yaw)];
       if (!this.tryMantle(dir[0], dir[1]) && b.grounded) { b.vel.y = CFG.jumpSpeed; b.grounded = false; }
     }
@@ -220,11 +222,13 @@ export class Player {
       // arma de fogo: mira (ou acabou de atirar) = braços apontando para onde a câmera olha
       const w = G.combat.weapon, gun = w && w.ammo, m = G.melee;
       if (m) { // corpo a corpo: esquiva, guarda, carga do pesado e pancada pesada
-        if (m.dodge) { pose = 'dodge'; progress = m.dodge.t / 0.24; }
+        if (this.downed && !this.swimming) pose = 'crawl';
+        else if (m.dodge) { pose = m.dodge.anim; progress = m.dodge.t / 0.34; this.pillVisual.children[0].userData.rollDir = m.dodge.dir; }
+        else if (m.parryAnim) { pose = 'parry'; progress = m.parryAnim.t / m.parryAnim.dur; }
         else if (m.stunT > 0) pose = 'stagger';
         else if (m.blocking) pose = 'guard';
-        else if (m.charging) { pose = 'windup'; progress = Math.min(1, m.holdT / 0.6); }
-        else if (m.swingPose && m.swingPose.heavy) { pose = 'slam'; progress = m.swingPose.t / m.swingPose.dur; }
+        else if (m.charging) { pose = 'windup'; progress = Math.min(1, m.holdT / 0.5); }
+        else if (m.swingPose) { pose = m.swingPose.pose; progress = m.swingPose.t / m.swingPose.dur; }
       }
       if (gun && this.aimHold > 0 && pose === 'walk') pose = 'aim';
       this.aimHold = Math.max(0, this.aimHold - dt);
@@ -246,7 +250,7 @@ export class Player {
     const G = this.G, cam = G.camera, vm = G.viewmodel;
     this.mesh.updateWorldMatrix(true, false);
     this.mesh.getWorldPosition(_v);
-    this.eyeHeight += ((this.dead ? 0.35 : 1.6) - this.eyeHeight) * Math.min(1, 6 * dt);
+    this.eyeHeight += ((this.dead ? 0.35 : this.downed ? 0.5 : 1.6) - this.eyeHeight) * Math.min(1, 6 * dt);
     _v.y += this.eyeHeight + (vm ? vm.camOff.y : 0);
     this.camTarget.copy(_v);
     this.camDist = 0;
@@ -262,7 +266,15 @@ export class Player {
     _d.set(-Math.sin(this.camYaw) * cp, -Math.sin(pitch), -Math.cos(this.camYaw) * cp);
     cam.up.set(0, 1, 0);
     cam.lookAt(_v.copy(cam.position).add(_d));
-    const roll = (vm ? vm.camOff.roll : 0) + (this.dead ? (1.6 - this.eyeHeight) * 0.6 : 0);
+    // esquiva em 1ª pessoa: a câmera abaixa e inclina para o lado do movimento
+    const dg = G.melee && G.melee.dodge;
+    let dodgeRoll = 0;
+    if (dg) {
+      const k = Math.sin(Math.min(1, dg.t / 0.34) * Math.PI);
+      cam.position.y -= (dg.anim === 'roll' ? 0.55 : 0.3) * k;
+      dodgeRoll = dg.anim === 'sidestep' ? -Math.sign(dg.side || 1) * 0.18 * k : 0;
+    }
+    const roll = (vm ? vm.camOff.roll : 0) + dodgeRoll + (this.dead ? (1.6 - this.eyeHeight) * 0.6 : 0);
     if (roll) cam.rotateZ(roll);
   }
 
@@ -279,7 +291,7 @@ export class Player {
     if (this.firstPerson) { this.updateFirstPersonCamera(dt, t); return; }
     const G = this.G, cam = G.camera, aiming = G.combat.aiming;
     this.mesh.updateWorldMatrix(true, false);
-    this.mesh.getWorldPosition(_v); _v.y += 1.6;
+    this.mesh.getWorldPosition(_v); _v.y += this.downed ? 0.7 : 1.6;
     this.camTarget.lerp(_v, 1 - Math.exp(-20 * dt));
     // zoom da 3ª pessoa: [I] aproxima, [O] afasta (mira sempre puxa para perto do ombro)
     if (G.input.hit('KeyI')) this.zoom = clamp(this.zoom - 0.8, 1.8, 10);
@@ -311,6 +323,6 @@ export class Player {
     b.pos.set(spawn.x, spawn.y, spawn.z); b.vel.set(0, 0, 0);
     b.carrier = spawn.groundSet; b.groundSet = spawn.groundSet; b.grounded = !!spawn.groundSet;
     this.camTarget.set(b.pos.x, b.pos.y + 1.6, b.pos.z);
-    this.swimming = false; this.mantle = null; this.dead = false;
+    this.swimming = false; this.mantle = null; this.dead = false; this.downed = false;
   }
 }

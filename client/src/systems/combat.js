@@ -197,7 +197,7 @@ export class Combat {
     const building = G.build.active, looting = G.interact.lootOpen;
     this.cooldown -= dt;
     this.bloom = Math.max(0, (this.bloom || 0) - dt * 2.5);
-    this.aiming = !!w && !building && !looting && !!w.ammo && inp.mouse.right && !G.player.dead && !G.player.swimming;
+    this.aiming = !!w && !building && !looting && !!w.ammo && inp.mouse.right && !G.player.dead && !G.player.downed && !G.player.swimming;
     if (this.reloading > 0 && w) {
       this.reloading -= dt;
       if (this.reloading <= 0) {
@@ -205,7 +205,7 @@ export class Combat {
         this.mags[w.id] += count; inv[w.ammo] -= count;
       }
     }
-    if (!building && !looting && !G.player.dead && !G.player.mantle && !this.buildMode && w) {
+    if (!building && !looting && !G.player.dead && !G.player.downed && !G.player.mantle && !this.buildMode && w) {
       if (inp.hit('KeyR')) this.startReload();
       const trigger = inp.mouse.leftPressed || (w.automatic && inp.mouse.left);
       const drawing = G.player.firstPerson && G.viewmodel && G.viewmodel.lowerEquip > 0.35; // arma ainda sendo sacada
