@@ -5,7 +5,6 @@ import { rot, clamp, lerp, lerpAngle } from '../core/util.js';
 import { CFG } from '../config.js';
 import { waveHeight } from '../world/ocean.js';
 import { makeHumanoid, animateHumanoid } from './model.js';
-import { animateCastaway, createCastawayVisual, loadCastawayModel } from './castaway.js';
 import { makePill, animatePill, disposePill, PILL_DEFAULT, PILL_HEIGHT } from './pill.js';
 
 const PILL_SCALE = 1.75 / PILL_HEIGHT;
@@ -28,52 +27,21 @@ export class Player {
     this.swimming = false; this.mantle = null; this.dead = false; this.aboard = false;
     // 1ª pessoa por padrão; [F] alterna. O corpo some só para o próprio jogador.
     this.firstPerson = true; this.fovSens = 1; this.eyeHeight = 1.6;
+    this.zoom = 5.2;          // distância da câmera em 3ª pessoa ([I] aproxima, [O] afasta)
+    this.aimHold = 0;         // depois de um tiro "do quadril", segura a pose de mira um instante
+    this.kick = 0;            // recuo visual dos braços em 3ª pessoa
+    this.flashT = 0;
     this.mesh = makeHumanoid(0xb49b7b, 0xb97251);
     this.proceduralRig = this.mesh.userData.parts.rig;
-    this.castawayBase = null;
-    this.castawayVisual = null;
     this.pillVisual = null;
-    this.appearance = { character: 'naufrago', glasses: 'nenhum', beard: 'nenhuma', pill: { ...PILL_DEFAULT } };
+    this.appearance = { character: 'pilula', pill: { ...PILL_DEFAULT } }; // a pílula é o personagem do jogo
     this.mesh.rotation.order = 'YXZ';
+    // Arma em 3ª pessoa: o MESMO modelo detalhado da 1ª pessoa (viewmodel-parts), trocado em combat.equip.
     this.weaponMesh = new THREE.Group();
-    this.weaponMesh.position.set(0, -0.55, 0.1);
-    const wood = new THREE.MeshStandardMaterial({ color: 0x79552f, roughness: 0.95 });
-    const metal = new THREE.MeshStandardMaterial({ color: 0x747b7e, metalness: 0.65, roughness: 0.45 });
-    const addWeaponPart = (geometry, material, position, rotation = [0, 0, 0]) => {
-      const mesh = new THREE.Mesh(geometry, material);
-      mesh.position.set(...position);
-      mesh.rotation.set(...rotation);
-      mesh.visible = false;
-      this.weaponMesh.add(mesh);
-      return mesh;
-    };
-    const parts = {
-      board: addWeaponPart(new THREE.BoxGeometry(0.07, 0.08, 0.5), wood, [0, 0, 0]),
-      grip: addWeaponPart(new THREE.BoxGeometry(0.08, 0.13, 0.12), wood, [0, -0.04, -0.12]),
-      nail: addWeaponPart(new THREE.CylinderGeometry(0.012, 0.012, 0.16, 6), metal, [0, 0.035, 0.25], [Math.PI / 2, 0, 0]),
-      pipe: addWeaponPart(new THREE.CylinderGeometry(0.04, 0.04, 0.56, 8), metal, [0, 0, 0], [Math.PI / 2, 0, 0]),
-      blade: addWeaponPart(new THREE.BoxGeometry(0.09, 0.025, 0.36), metal, [0, 0.025, 0.13]),
-      baton: addWeaponPart(new THREE.CylinderGeometry(0.035, 0.04, 0.58, 8), wood, [0, 0, 0], [Math.PI / 2, 0, 0]),
-      gun: addWeaponPart(new THREE.BoxGeometry(0.11, 0.12, 0.34), metal, [0, 0, 0]),
-      barrel: addWeaponPart(new THREE.CylinderGeometry(0.025, 0.025, 0.28, 8), metal, [0, 0.015, 0.28], [Math.PI / 2, 0, 0]),
-      stock: addWeaponPart(new THREE.BoxGeometry(0.09, 0.1, 0.32), wood, [0, -0.015, -0.28]),
-    };
-    this.weaponMesh.userData.parts = parts;
     this.weaponMesh.visible = false;
-    this.mesh.userData.parts.armR.add(this.weaponMesh);
     G.scene.add(this.mesh);
     this.ray = new THREE.Raycaster();
-    loadCastawayModel()
-      .then((model) => {
-        this.castawayBase = model;
-        this.applyAppearance();
-      })
-      .catch((error) => {
-        console.error('Não foi possível carregar o modelo do personagem:', error);
-        const status = document.getElementById('menuStatus');
-        if (status) status.textContent = 'O modelo personalizado não carregou; usando o personagem provisório.';
-        if (G.started) G.hud.msg('Modelo personalizado indisponível; usando o personagem provisório');
-      });
+    this.applyAppearance();
   }
 
   setFirstPerson(on) {
@@ -93,50 +61,24 @@ export class Player {
     if (this.pillVisual) {
       if (this.weaponMesh.parent) this.weaponMesh.parent.remove(this.weaponMesh);
       this.mesh.remove(this.pillVisual);
-      disposePill(this.pillVisual);
+      disposePill(this.pillVisual.children[0]);
       this.pillVisual = null;
     }
-    if (this.appearance.character === 'pilula') {
-      if (this.castawayVisual) this.castawayVisual.visible = false;
-      const pill = makePill(this.appearance.pill);
-      this.pillVisual = new THREE.Group();
-      this.pillVisual.add(pill);
-      this.pillVisual.scale.setScalar(PILL_SCALE);
-      this.mesh.add(this.pillVisual);
-      this.proceduralRig.visible = false;
-      if (this.weaponMesh.parent) this.weaponMesh.parent.remove(this.weaponMesh);
-      pill.userData.parts.hand.add(this.weaponMesh);
-      this.weaponMesh.position.set(0, 0, 0);
-      this.weaponMesh.rotation.set(0, 0, 0);
-      this.weaponMesh.scale.setScalar(1 / PILL_SCALE);
-      return;
-    }
-    this.weaponMesh.scale.setScalar(1);
-    if (!this.castawayBase) {
-      this.proceduralRig.visible = true;
-      if (!this.weaponMesh.parent) this.mesh.userData.parts.armR.add(this.weaponMesh);
-      this.weaponMesh.position.set(0, -0.55, 0.1);
-      return;
-    }
-    if (this.castawayVisual) {
-      if (this.weaponMesh.parent) this.weaponMesh.parent.remove(this.weaponMesh);
-      this.mesh.remove(this.castawayVisual);
-      this.castawayVisual.traverse((part) => {
-        if (part.geometry) part.geometry.dispose();
-        if (Array.isArray(part.material)) part.material.forEach((material) => material.dispose());
-        else if (part.material) part.material.dispose();
-      });
-    }
-
-    this.castawayVisual = createCastawayVisual(this.castawayBase, this.appearance);
-    this.mesh.add(this.castawayVisual);
+    const pill = makePill(this.appearance.pill);
+    this.pillVisual = new THREE.Group();
+    this.pillVisual.add(pill);
+    this.pillVisual.scale.setScalar(PILL_SCALE);
+    this.mesh.add(this.pillVisual);
     this.proceduralRig.visible = false;
-    this.mesh.userData.parts.armR.remove(this.weaponMesh);
-    const weaponAnchor = this.castawayVisual.userData.weaponAnchor;
-    (weaponAnchor || this.mesh).add(this.weaponMesh);
-    this.weaponMesh.position.set(0, 0.025, 0);
-    this.weaponMesh.rotation.set(0, 0, 0);
+    pill.userData.parts.hand.add(this.weaponMesh);
+    this.weaponMesh.position.set(0, 0, 0);
+    this.weaponMesh.rotation.set(-Math.PI / 2, 0, Math.PI); // cano (-Z) segue o braço; topo para cima ao mirar
+    this.weaponMesh.scale.setScalar(1.5 / PILL_SCALE); // arma "de desenho": um pouco maior
+    if (this.G.viewmodel) this.G.viewmodel.setGloveColor(this.appearance.pill);
   }
+
+  // Tiro em 3ª pessoa: tranco nos braços, clarão na boca do cano e pose de mira por um instante.
+  onShot() { this.aimHold = 0.8; this.kick = 1; this.flashT = 0.06; }
 
   forward() { return [-Math.sin(this.camYaw), -Math.cos(this.camYaw)]; }
 
@@ -153,7 +95,7 @@ export class Player {
     }
 
     if (this.dead) { this.syncMesh(0, dt); return; }
-    if (G.interact && G.interact.lootOpen) {
+    if ((G.interact && G.interact.lootOpen) || (G.gfxMenu && G.gfxMenu.open)) {
       b.vel.x = b.vel.z = 0;
       this.syncMesh(0, dt);
       return;
@@ -174,7 +116,7 @@ export class Player {
     b.vel.x += (dx * speed - b.vel.x) * k;
     b.vel.z += (dz * speed - b.vel.z) * k;
     if (this.firstPerson) this.yaw = Math.atan2(fx, fz);
-    else if (aiming) this.yaw = lerpAngle(this.yaw, Math.atan2(fx, fz), Math.min(1, 16 * dt));
+    else if (aiming || this.aimHold > 0) this.yaw = lerpAngle(this.yaw, Math.atan2(fx, fz), Math.min(1, 16 * dt));
     else if (moving) this.yaw = lerpAngle(this.yaw, Math.atan2(dx, dz), Math.min(1, 12 * dt));
 
     if (inp.hit('Space')) {
@@ -273,15 +215,21 @@ export class Player {
       this.mantle ? this.mantle.height : 0);
     if (this.pillVisual) {
       this.proceduralRig.visible = false;
-      if (this.castawayVisual) this.castawayVisual.visible = false;
+      // arma de fogo: mira (ou acabou de atirar) = braços apontando para onde a câmera olha
+      const w = G.combat.weapon, gun = w && w.ammo;
+      if (gun && this.aimHold > 0 && pose === 'walk') pose = 'aim';
+      this.aimHold = Math.max(0, this.aimHold - dt);
+      this.kick = Math.max(0, this.kick - dt * 7);
+      const pd = this.pillVisual.children[0].userData;
+      pd.aimPitch = this.firstPerson ? 0 : -this.camPitch * 0.9; pd.kick = this.kick;
+      if (this.flashMesh) {
+        this.flashT -= dt; this.flashMesh.visible = this.flashT > 0;
+        if (this.flashMesh.visible) { this.flashMesh.rotation.z = Math.random() * 6.28; this.flashMesh.scale.setScalar(2.2 + Math.random()); }
+      }
       const pillPose = pose === 'climb' || pose === 'vault' ? 'jump' : pose;
       animatePill(this.pillVisual.children[0], speed, dt, pillPose, progress);
       return;
     }
-    const useProceduralRig = !this.castawayVisual || this.swimming || !!this.mantle;
-    this.proceduralRig.visible = useProceduralRig;
-    if (this.castawayVisual) this.castawayVisual.visible = !useProceduralRig;
-    animateCastaway(this.castawayVisual, speed, dt, pose);
   }
 
   // Câmera nos olhos. O viewmodel dá o FOV de mira e um pequeno balanço/tranco.
@@ -310,17 +258,32 @@ export class Player {
   }
 
   updateCamera(dt, t) {
+    // retícula: anel "sobre o ombro" em 3ª pessoa, abre com o recuo e fecha ao mirar
+    const xh = this._xh || (this._xh = document.getElementById('crosshair'));
+    if (xh) {
+      const tp = !this.firstPerson, w = this.G.combat.weapon;
+      xh.classList.toggle('tp', tp);
+      if (tp) xh.classList.remove('ads'); // a classe de mira da 1ª pessoa não pode ficar presa na 3ª
+      xh.classList.toggle('melee', !!(tp && w && w.melee));
+      if (tp) xh.style.setProperty('--s', (1 + (this.G.combat.bloom || 0) * 0.9 - (this.aimBlend || 0) * 0.3).toFixed(3));
+    }
     if (this.firstPerson) { this.updateFirstPersonCamera(dt, t); return; }
     const G = this.G, cam = G.camera, aiming = G.combat.aiming;
     this.mesh.updateWorldMatrix(true, false);
     this.mesh.getWorldPosition(_v); _v.y += 1.6;
     this.camTarget.lerp(_v, 1 - Math.exp(-20 * dt));
-    this.camDist = lerp(this.camDist, aiming ? 2.3 : 5.2, Math.min(1, 10 * dt));
+    // zoom da 3ª pessoa: [I] aproxima, [O] afasta (mira sempre puxa para perto do ombro)
+    if (G.input.hit('KeyI')) this.zoom = clamp(this.zoom - 0.8, 1.8, 10);
+    if (G.input.hit('KeyO')) this.zoom = clamp(this.zoom + 0.8, 1.8, 10);
+    this.aimBlend = lerp(this.aimBlend || 0, aiming ? 1 : 0, Math.min(1, 12 * dt));
+    this.camDist = lerp(this.camDist, aiming ? Math.min(this.zoom, 1.9) : this.zoom, Math.min(1, 10 * dt));
     cam.fov = lerp(cam.fov, aiming ? 48 : 68, Math.min(1, 10 * dt));
     cam.updateProjectionMatrix();
     // Câmera sobre o ombro direito (o personagem não tapa a mira).
     const rx = Math.cos(this.camYaw), rz = -Math.sin(this.camYaw);
-    const origin = _v.copy(this.camTarget); origin.x += rx * 0.6; origin.z += rz * 0.6;
+    // sobre o ombro: mais para a direita e um pouco mais baixo quando mira
+    const sh = 0.6 + this.aimBlend * 0.25;
+    const origin = _v.copy(this.camTarget); origin.x += rx * sh; origin.z += rz * sh; origin.y -= this.aimBlend * 0.15;
     const cp = Math.cos(this.camPitch);
     _d.set(Math.sin(this.camYaw) * cp, Math.sin(this.camPitch), Math.cos(this.camYaw) * cp);
     let dist = this.camDist;

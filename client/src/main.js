@@ -23,7 +23,9 @@ import { Net } from './net/net.js';
 import { Hud } from './ui/hud.js';
 import { CharacterMenu } from './ui/character.js';
 import { TouchControls, isTouchDevice } from './ui/touch.js';
-import { createCastawayVisual } from './player/castaway.js';
+import { Graphics } from './core/graphics.js';
+import { GfxMenu } from './ui/gfxmenu.js';
+import { Benchmark } from './systems/benchmark.js';
 
 const $ = (id) => document.getElementById(id);
 const canvas = $('c');
@@ -49,6 +51,7 @@ function resize() {
   renderer.setSize(innerWidth, innerHeight, false);
   camera.aspect = innerWidth / innerHeight;
   camera.updateProjectionMatrix();
+  if (window.G && window.G.gfx) window.G.gfx.resize();
 }
 addEventListener('resize', resize);
 resize();
@@ -83,6 +86,8 @@ G.ocean = ocean;
 G.viewmodel.scene.environment = scene.environment; // metais da 1ª pessoa também refletem o céu
 G.viewmodel.scene.environmentIntensity = scene.environmentIntensity;
 window.G = G; // útil para depurar no console
+G.gfx = new Graphics(G, { renderer, scene, camera, sun, mobile: MOBILE }); // pipeline + opções gráficas
+G.gfxMenu = new GfxMenu(G);
 if (MOBILE) G.touch = new TouchControls(G);
 
 canvas.addEventListener('mousedown', (e) => {
@@ -148,15 +153,11 @@ const charMenu = new CharacterMenu((appearance) => G.player.setAppearance(appear
 window.__charMenu = charMenu; // depuração
 const characterAppearance = () => charMenu.appearance;
 G.player.setAppearance(characterAppearance());
-// Prévia do náufrago assim que o modelo dele carregar.
-const waitCastaway = setInterval(() => {
-  if (!G.player.castawayBase) return;
-  clearInterval(waitCastaway);
-  charMenu.setCastawayFactory((a) => createCastawayVisual(G.player.castawayBase, a));
-}, 300);
+
 
 function start(seed, welcome) {
   G.player.setAppearance(characterAppearance());
+  if (G.world && G.world.farSeabed) scene.remove(G.world.farSeabed); // o mundo do menu sai de cena
   G.world = new World(G, seed);
   if (welcome) {
     for (const placed of welcome.placed || []) G.world.placedStates.set(placed.id, placed);
@@ -201,6 +202,10 @@ $('btnMulti').onclick = () => {
     .catch((e) => status(`${e.message}. Confira o endereço do servidor ou jogue solo.`));
 };
 $('help').onclick = () => { $('help').hidden = true; };
+// Benchmark: mundo fixo (seed 4242), câmera roteirizada e relatório de FPS no fim.
+const startBenchmark = () => { start(4242); G.bench = new Benchmark(G); };
+$('btnBench').onclick = startBenchmark;
+try { if (sessionStorage.getItem('mare-alta-bench')) { sessionStorage.removeItem('mare-alta-bench'); setTimeout(startBenchmark, 600); } } catch { /* ok */ }
 
 // ---------- Loop ----------
 let last = performance.now();
@@ -210,7 +215,7 @@ function hotkeys() {
   const inp = G.input;
   if (inp.hit('KeyH')) $('help').hidden = !$('help').hidden;
   if (inp.hit('KeyF')) G.player.setFirstPerson(!G.player.firstPerson);
-  if (G.build.active || G.interact.lootOpen) return;
+  if (G.build.active || G.interact.lootOpen || G.gfxMenu.open) return;
   for (let i = 0; i < 3; i++) if (inp.hit('Digit' + (i + 1))) G.combat.select(i);
   if (inp.mouse.wheel) G.combat.cycle(Math.sign(inp.mouse.wheel));
   if (inp.hit('Digit4')) G.survival.use('bandagem');
@@ -232,8 +237,9 @@ function frame() {
     atmo.update(dt, camera);
     ocean.update(t, 0, 0);
     sunVisual.update(camera, t, true);
-    renderer.render(scene, camera);
+    G.gfx.render(dt);
     charMenu.update(dt, true);
+    G.gfxMenu.update();
     return;
   }
   // Quem está a bordo (mesmo no ar) acompanha o barco antes de se mover.
@@ -252,6 +258,7 @@ function frame() {
   G.physics.update(dt, t);
   G.enemies.update(dt);
   G.events.update(dt, t);
+  if (G.bench) G.bench.update(dt);
   G.interact.update(dt);
   G.combat.update(dt);
   G.survival.update(dt);
@@ -261,7 +268,8 @@ function frame() {
   G.hud.update(dt);
   if (G.touch) G.touch.update();
   sunVisual.update(camera, t);
-  renderer.render(scene, camera);
+  G.gfx.render(dt);
+  G.gfxMenu.update();
   G.viewmodel.render(renderer); // 2º passe: braços e arma por cima do mundo
   G.input.endFrame();
 }

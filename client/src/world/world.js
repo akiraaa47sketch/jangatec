@@ -102,7 +102,7 @@ export class World {
   }
 
   update(dt, t) {
-    const G = this.G, S = CFG.chunk, R = CFG.loadRadius;
+    const G = this.G, S = CFG.chunk, R = G.loadRadius || CFG.loadRadius; // distância de visão (opções gráficas)
     for (const crate of this.crates) {
       // mola amortecida: a tampa abre com um tranco e quica um pouco
       crate.openV = (crate.openV || 0) + (((crate.opened ? 1 : 0) - crate.openT) * 110 - crate.openV * 11) * dt;
@@ -132,6 +132,7 @@ export class World {
       if (!this.chunks.has(key)) this.chunks.set(key, this.makeChunk(ccx + i, ccz + j));
     }
     this.farSeabed.position.set(pp.x, this.farSeabed.position.y, pp.z);
+    this.farSeabed.visible = (G.startup ? G.startup.waterLevel : 1) < -3; // só faz falta com o mar seco
     for (const [key, ch] of this.chunks) {
       const carryingDebris = ch.debris.some((obj) => obj.carriedBy);
       const far = centers.every(([ccx, ccz]) => Math.abs(ch.cx - ccx) > R + 1 || Math.abs(ch.cz - ccz) > R + 1);

@@ -50,7 +50,33 @@
   </div>
   <!-- O estado do objeto carregado é mostrado no prompt e na mira. -->
   <div id="buildPanel" hidden></div>
-  <div id="hint"><kbd>H</kbd> controles</div>
+  <div id="hint"><kbd>H</kbd> controles · <kbd>G</kbd> gráficos · <kbd>F3</kbd> FPS · <kbd>I</kbd>/<kbd>O</kbd> zoom (3ª pessoa)</div>
+</div>
+<div id="fps" hidden></div>
+
+<div id="benchOverlay" hidden>
+  <div class="bench-title">BENCHMARK</div>
+  <div id="benchStage"></div>
+  <div class="bench-bar"><b id="benchFill"></b></div>
+  <div id="benchFps"></div>
+</div>
+<div id="benchResults" hidden></div>
+
+<div id="gfxPanel" hidden>
+  <header><h2>Gráficos</h2><button id="gfxClose" type="button">Fechar</button></header>
+  <label>Predefinição <select id="gPreset"></select></label>
+  <label class="slider">Escala de renderização <input id="gScale" type="range" min="50" max="100" step="5"><small id="gScaleVal"></small></label>
+  <label>Upscaler <select id="gUpscaler"></select></label>
+  <label class="slider">Nitidez (RCAS) <input id="gSharp" type="range" min="0" max="100" step="5"><small id="gSharpVal"></small></label>
+  <label>Sombras <select id="gShadows"></select></label>
+  <label>Antisserrilhamento <select id="gMsaa"></select></label>
+  <label>Distância de visão <select id="gView"></select></label>
+  <label>Qualidade da água <select id="gWater"></select></label>
+  <label>Densidade de pixels <select id="gPixel"></select></label>
+  <label class="check"><input id="gBloom" type="checkbox"> Brilho (bloom)</label>
+  <label class="check"><input id="gGrade" type="checkbox"> Gradação de cor + vinheta</label>
+  <label class="check"><input id="gFps" type="checkbox"> Mostrar FPS <kbd>F3</kbd></label>
+  <p class="gfx-tip">Escala abaixo de 100% + FSR = mais FPS: a cena é desenhada menor e reconstruída na resolução da tela com nitidez adaptativa.</p>
 </div>
 
 <div id="lootPanel" hidden>
@@ -75,6 +101,7 @@
       <tr><td>Botão direito no gizmo</td><td>mover a câmera</td><td>Esc / botão direito fora do gizmo</td><td>cancelar e restaurar peça</td></tr>
       <tr><td>1 2 3 / roda</td><td>trocar arma do inventário</td><td>R (sem construir)</td><td>recarregar</td></tr>
       <tr><td>F</td><td>alternar 1ª / 3ª pessoa</td><td>Botão direito</td><td>mirar (armas de fogo)</td></tr>
+      <tr><td>I / O</td><td>zoom da câmera em 3ª pessoa (perto / longe)</td><td>G · F3</td><td>opções gráficas · contador de FPS</td></tr>
       <tr><td>4 / 5</td><td>bandagem / kit médico</td><td>H</td><td>ajuda</td></tr>
     </table>
     <h3>Construção</h3>
@@ -109,33 +136,11 @@
     </div>
     <p class="sub">Sobreviva, construa sua jangada e explore um oceano que seca e enche.</p>
     <section id="characterOptions" aria-label="Personalização do personagem">
-      <h2>Personalize seu personagem</h2>
+      <h2>Personalize sua pílula</h2>
       <div class="char-layout">
         <canvas id="charPreview" width="220" height="270" aria-label="Prévia do personagem"></canvas>
         <div class="char-fields">
-          <label for="charType">Personagem
-            <select id="charType">
-              <option value="naufrago">Náufrago</option>
-              <option value="pilula">Pílula</option>
-            </select>
-          </label>
-          <div id="optsNaufrago">
-            <label for="glassesStyle">Óculos
-              <select id="glassesStyle">
-                <option value="nenhum">Sem óculos</option>
-                <option value="aviador">Aviador</option>
-                <option value="goggles">Proteção</option>
-              </select>
-            </label>
-            <label for="beardStyle">Barba
-              <select id="beardStyle">
-                <option value="nenhuma">Sem barba</option>
-                <option value="curta">Curta</option>
-                <option value="cheia">Cheia</option>
-              </select>
-            </label>
-          </div>
-          <div id="optsPilula" hidden>
+          <div id="optsPilula">
             <div class="swatch-row"><span>Cápsula</span><div class="swatches" data-key="cap"></div></div>
             <div class="swatch-row"><span>Base</span><div class="swatches" data-key="base"></div></div>
             <div class="swatch-row"><span>Luvas</span><div class="swatches" data-key="gloves"></div></div>
@@ -150,6 +155,10 @@
       </div>
     </section>
     <button id="btnSolo">Jogar solo</button>
+    <div class="menu-row">
+      <button id="btnGfx" type="button" class="alt">⚙ Opções gráficas</button>
+      <button id="btnBench" type="button" class="alt">📊 Benchmark</button>
+    </div>
     <label>Seed (opcional) <input id="seed" inputmode="numeric" placeholder="aleatória"></label>
     <hr>
     <label>Nome <input id="name" maxlength="16" placeholder="Náufrago"></label>

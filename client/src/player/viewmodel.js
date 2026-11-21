@@ -5,11 +5,12 @@
 // - Nada daqui é enviado pela rede nem entra em G.scene: os outros jogadores só enxergam o
 //   modelo de 3ª pessoa. As animações de mão existem apenas para quem joga em 1ª pessoa.
 // - Tudo é procedural (molas + keyframes), sem depender de clipes de animação.
+import { PILL_COLORS, sanitizePill } from './pill.js';
 import * as THREE from '../three.js';
 import { clamp, lerp } from '../core/util.js';
 import { CFG } from '../config.js';
 import {
-  MAT, buildHand, buildArm, buildWeapon, buildBandage, buildMedkit, buildShell, buildCartridgeCase,
+  MAT, buildHand, buildArm, buildWeapon, buildBandage, buildMedkit, buildShell, buildCartridgeCase, setGloveColor,
 } from './viewmodel-parts.js';
 
 const V = (x = 0, y = 0, z = 0) => new THREE.Vector3(x, y, z);
@@ -110,6 +111,7 @@ export class ViewModel {
     this.group.add(this.weaponRoot);
 
     this.hands = [buildHand(false), buildHand(true)]; // 0 = direita, 1 = esquerda
+    if (G.player) this.setGloveColor(G.player.appearance.pill);
     this.arms = [buildArm(), buildArm()];
     for (let i = 0; i < 2; i++) this.group.add(this.hands[i].root, this.arms[i].root);
 
@@ -510,7 +512,7 @@ export class ViewModel {
     this.fovTarget = spec && spec.type !== 'melee' ? lerp(baseFov, spec.adsFov, adsEff) : baseFov;
 
     // luneta e mira
-    const scoped = !!spec && spec.scope && adsEff > 0.88;
+    const scoped = !!(spec && spec.scope && adsEff > 0.88);
     this.scoped = scoped;
     this.scopeEl.hidden = !scoped;
     if (scoped) this.weaponRoot.visible = false;
@@ -518,7 +520,8 @@ export class ViewModel {
     else for (const h of this.hands) h.root.visible = true;
     if (scoped) for (const a of this.arms) a.root.visible = false;
     else for (const a of this.arms) a.root.visible = true;
-    if (this.crosshair) this.crosshair.classList.toggle('ads', adsEff > 0.6 || scoped);
+    // !!: com toggle(classe, undefined) o navegador INVERTE a classe a cada quadro (a retícula piscava)
+    if (this.crosshair) this.crosshair.classList.toggle('ads', !!(adsEff > 0.6 || scoped));
   }
 
   updateCycle(dt, spec, parts) {
@@ -719,6 +722,11 @@ export class ViewModel {
       const k = wt.reach;
       mix(hands[0], V(0.1, -0.1, -0.5), eulerQ([0.1, 0.1, -0.1]), [0.1, 0.1, 0.1, 0.1], k);
     }
+  }
+
+  // Luvas da 1ª pessoa com a cor escolhida para a pílula.
+  setGloveColor(pill) {
+    setGloveColor(PILL_COLORS[sanitizePill(pill).gloves].hex);
   }
 
   // ---------- desenho ----------

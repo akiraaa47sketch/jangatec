@@ -202,7 +202,7 @@ export class Startup {
     const boost = this.G.events ? this.G.events.stormBoost(t) : 0;
     const storm = this.phase === 'storm'
       ? clamp(this.elapsed / STORM_DURATION, 0, 1)
-      : this.departed ? Math.max(1 - 0.7 * clamp(this.departT / 45, 0, 1), boost)
+      : this.departed ? Math.max(1 - 0.7 * clamp(this.departT / 45, 0, 1), boost, this.G.benchStorm || 0)
         : ['flood', 'board'].includes(this.phase) ? 1 : 0;
     this._updateWeather(storm, t, dt);
   }
@@ -213,8 +213,9 @@ export class Startup {
     if (G.scene.background && G.scene.background.isColor) G.scene.background.copy(sky);
     if (G.scene.fog) {
       G.scene.fog.color.copy(sky);
-      G.scene.fog.near = 120 - storm * 65;
-      G.scene.fog.far = 330 - storm * 180;
+      const view = G.viewScale || 1; // distância de visão (opções gráficas)
+      G.scene.fog.near = (120 - storm * 65) * view;
+      G.scene.fog.far = (330 - storm * 180) * view;
     }
     this.sun.color.copy(this.clearSun).lerp(this.stormSun, storm);
     this.sun.intensity = 1.7 - storm * 0.95;

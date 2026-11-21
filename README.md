@@ -72,19 +72,26 @@ Todos os jogadores começam em terra firme, com uma arma improvisada sorteada; n
 pistola. A jangada inicial tem uma plataforma central indestrutível e um encaixe para uma única
 plataforma de madeira; ambas medem 6×6 m. Pegue a plataforma de madeira e fixe-a à jangada com `[Z]`; depois,
 instale a vela no mastro com `[E]`.
-Antes de iniciar, escolha o personagem no menu, com prévia 3D (arraste para girar):
-- **Náufrago**: óculos e barba.
-- **Pílula** (`client/src/player/pill.js`, modelo procedural): cor da cápsula, da base e das luvas,
-  7 rostos, 5 calçados (tênis, botas, galochas, nadadeiras, chinelo) com cor, e 8 chapéus (pirata,
-  palha, boné, cartola, capitão, coroa, gorro) com cor; botão "Aleatório". Tem animações próprias
-  (andar gingado, soco, mira, pulo, nado).
+O personagem do jogo é a **Pílula** (`client/src/player/pill.js`, modelo procedural), personalizada no
+menu com prévia 3D (arraste para girar): cor da cápsula, da base e das luvas, 7 rostos, 5 calçados com
+cor e 8 chapéus com cor; botão "Aleatório". A escolha fica salva no navegador e os outros jogadores a
+veem no multiplayer. Em 1ª pessoa aparecem os bracinhos de tubo com as luvas de boxe da sua pílula.
 
-A escolha fica salva no navegador e, no multiplayer, os outros jogadores veem a sua pílula
-(código curto `ap` no estado do jogador).
-O personagem (`client/assets/castaway-survivor.glb`) usa a malha e a textura de um modelo Tripo, com o
-esqueleto Mixamo e os pesos transferidos do modelo Meshy (`tools/texture-bake/`), e animações de caminhada,
-corrida e ataque.
-Natação e parkour usam o rig procedural para evitar deformações causadas por clipes incompatíveis com o esqueleto.
+Os **inimigos também são pílulas**, com visual malvado (`client/src/systems/evilpills.js`): olhos
+vermelhos, sorriso serrilhado e acessórios por tipo — Saqueador (bandana, luvas com cravos), Atirador
+(boné e revólver), Brutamontes (capacete com chifres), Corredor (olhos desencontrados) e Pirata
+(tricórnio, tapa-olho e gancho).
+
+Em 3ª pessoa, **[I] aproxima e [O] afasta** a câmera; mirar (botão direito) leva a câmera para
+**sobre o ombro**, com retícula própria que abre com o recuo. A pílula aponta a arma para onde você
+olha, dá tranco no disparo e mostra o clarão na boca do cano. Revólver, pistola, escopeta e rifle
+têm **mira red dot** (o ponto fica no centro da tela ao mirar). As mãos em 1ª pessoa são luvas
+arredondadas com dedos, na cor escolhida para a pílula. Opções gráficas: tecla **G**.
+
+As **armas** usam o mesmo modelo detalhado em 1ª e 3ª pessoa (`client/src/player/viewmodel-parts.js`):
+madeira texturizada, cantos chanfrados, gatilho com guarda-mato e detalhes por arma (fita, pregos
+tortos, estrias do tambor, trilho, cartuchos na coronha, bipé…).
+
 O espaço de construção ao redor da jangada e da peça inicial fica livre; árvores, caixas e ruínas
 ficam mais afastadas, na borda da ilha.
 
@@ -138,6 +145,24 @@ aproximado amostrado nas extremidades. Peças fixadas à jangada usam juntas rí
 cinemático da jangada. A água não é simulada como fluido.
 
 ## Gráficos
+
+**Opções gráficas** (botão no menu, tecla `G` no jogo, ⚙ no celular; salvas no navegador) e
+**contador de FPS** (`F3`). Predefinições Baixo / Médio / Alto / **Ultra**, ou ajuste fino:
+escala de renderização (50–100%), upscaler, nitidez, sombras (até 4096 com borda suave e área maior),
+MSAA 4x/8x, distância de visão (chunks carregados + neblina), qualidade da água (densidade da malha),
+densidade de pixels, bloom e gradação de cor + vinheta.
+
+**Benchmark** (botão no menu): percurso de câmera de ~55 s pelas cenas mais pesadas — oceano e ondas,
+tempestade com chuva, onda gigante, furacão, explosões (`client/src/world/explosions.js`) e o mar
+secando — e no fim um relatório com FPS médio, 1% mínimo, pior quadro, engasgos, nota e uma dica de
+configuração (`client/src/systems/benchmark.js`).
+
+Pipeline (`client/src/core/graphics.js`): a cena é desenhada em HDR na escala escolhida
+(com MSAA e bloom opcionais) → **EASU-lite** (upscale bicúbico Catmull-Rom com anti-ringing,
+inspirado no FSR 1 da AMD) + tone mapping Neutral + gradação, na resolução da tela → **RCAS**
+(o afiador adaptativo do FSR 1). Com escala abaixo de 100% o jogo desenha menos pixels e ganha FPS;
+o celular começa no Médio (75%).
+
 
 Água em shader (ondas direcionais, Fresnel, reflexo do céu, espuma, água rasa perto das ilhas), céu em
 gradiente que reage à tempestade, sombras do sol, IBL e tone mapping, palmeiras/rochas/grama procedurais e
