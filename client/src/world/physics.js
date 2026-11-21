@@ -430,6 +430,12 @@ export class Physics {
   _applyBuoyancy(record, t) {
     const { body, size, volume, obj } = record;
     if (obj.placed && !obj.placedOnWater) return;
+    if (obj.def && obj.def.sinks && !obj.welded) { // metal/pedra: afunda devagar (arrasto da água)
+      if (waveHeight(body.position.x, body.position.z, t) > body.position.y) {
+        body.velocity.scale(0.92, body.velocity); body.angularVelocity.scale(0.9, body.angularVelocity);
+      }
+      return;
+    }
     for (const x of [-size.x / 2, size.x / 2]) {
       for (const [y, layerWeight] of [[-size.y / 2, 0.25], [0, 0.5], [size.y / 2, 0.25]]) {
         for (const z of [-size.z / 2, size.z / 2]) {
@@ -545,6 +551,15 @@ export class Physics {
         record.body.quaternion.set(quaternion.x, quaternion.y, quaternion.z, quaternion.w);
         record.body.aabbNeedsUpdate = true;
         continue;
+      }
+      // Fundo do mar: destroços assentam na areia quando a água vai embora.
+      if (record.kind === 'object' && record.obj && !record.holdTarget && this.G.world) {
+        const b = record.body, gh = this.G.world.seabedHeight(b.position.x, b.position.z) + record.size.y * 0.5;
+        if (b.position.y < gh) {
+          b.position.y = gh;
+          if (b.velocity.y < 0) b.velocity.y = 0;
+          b.velocity.x *= 0.85; b.velocity.z *= 0.85; b.angularVelocity.scale(0.85, b.angularVelocity);
+        }
       }
       this._syncMesh(record);
       if (record.obj && record.kind === 'object') {

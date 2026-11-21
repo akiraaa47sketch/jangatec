@@ -30,6 +30,11 @@ servidor Render com outro endereço, configure `VITE_SERVER_URL` como `wss://SUA
 
 ## Controles
 
+No celular/tablet os controles de toque aparecem sozinhos (`client/src/ui/touch.js`): joystick à
+esquerda (empurre até o fim para correr), arraste a metade direita para girar a câmera, botões de
+atacar/pegar, pular, interagir (E), mirar e recarregar, e no topo trocar arma, curar, câmera e tela cheia.
+Durante a construção aparecem Soltar/Soldar/Mover/Cancelar e, no mastro, ◀ Vela ▶.
+
 | Tecla | Ação |
 |---|---|
 | W A S D / Shift | andar / correr |
@@ -67,8 +72,18 @@ Todos os jogadores começam em terra firme, com uma arma improvisada sorteada; n
 pistola. A jangada inicial tem uma plataforma central indestrutível e um encaixe para uma única
 plataforma de madeira; ambas medem 6×6 m. Pegue a plataforma de madeira e fixe-a à jangada com `[Z]`; depois,
 instale a vela no mastro com `[E]`.
-Antes de iniciar, escolha óculos e barba para personalizar o náufrago; o cabelo original do modelo é preservado.
-O personagem usa o modelo Mixamo com animações nativas de caminhada, corrida e ataque.
+Antes de iniciar, escolha o personagem no menu, com prévia 3D (arraste para girar):
+- **Náufrago**: óculos e barba.
+- **Pílula** (`client/src/player/pill.js`, modelo procedural): cor da cápsula, da base e das luvas,
+  7 rostos, 5 calçados (tênis, botas, galochas, nadadeiras, chinelo) com cor, e 8 chapéus (pirata,
+  palha, boné, cartola, capitão, coroa, gorro) com cor; botão "Aleatório". Tem animações próprias
+  (andar gingado, soco, mira, pulo, nado).
+
+A escolha fica salva no navegador e, no multiplayer, os outros jogadores veem a sua pílula
+(código curto `ap` no estado do jogador).
+O personagem (`client/assets/castaway-survivor.glb`) usa a malha e a textura de um modelo Tripo, com o
+esqueleto Mixamo e os pesos transferidos do modelo Meshy (`tools/texture-bake/`), e animações de caminhada,
+corrida e ataque.
 Natação e parkour usam o rig procedural para evitar deformações causadas por clipes incompatíveis com o esqueleto.
 O espaço de construção ao redor da jangada e da peça inicial fica livre; árvores, caixas e ruínas
 ficam mais afastadas, na borda da ilha.
@@ -80,6 +95,31 @@ As ilhas exploráveis ficam acima da maré máxima e abrigam fortes improvisados
 guarnições de inimigos. Depois da partida, grupos de piratas podem alcançar a jangada em pequenas
 balsas, lançar ganchos, voar até o convés e atacar quem estiver a bordo.
 
+### Eventos do mar e balanceamento
+
+Depois da partida o céu abre aos poucos e, de tempos em tempos (~2–3 min), o host sorteia um evento
+(`client/src/systems/events.js`, constantes em `EVENT_BALANCE`):
+
+- **Onda gigante**: uma frente de água de ~4,5 m atravessa o mar (entra em `waveHeight` e no shader,
+  então barco, detritos e nadadores sentem a onda). Baixe a vela e fique perto do mastro; com a vela
+  cheia a jangada é arremessada e quem está a bordo leva dano. Quem está longe do mastro é jogado
+  pelo convés.
+- **Furacão**: um funil com nuvem em espiral, spray e destroços passa ao lado da rota e puxa a jangada
+  para o olho (o mar afunda e gira em espiral ali). Levante a vela e gire-a para o lado oposto ao olho;
+  se a jangada chegar ao olho, ela é sugada, gira e é cuspida com dano.
+
+- **Oceano que seca** (`client/src/systems/tide.js`, constantes em `TIDE`): só dois estados — **mar cheio**
+  e **mar seco** — num ciclo de 6 min (seco ≈ 2 min 24 s), com uma transição rápida (16 s) entre eles,
+  calculado do relógio comum. Seco, a água desce abaixo do **fundo do mar** (`client/src/world/seabed.js`)
+  e dá para andar livremente por ele. A jangada encalha até a água voltar. **Itens pesados afundam**
+  (placa metálica, calha, sucata e pedaço de casa, `sinks: true` em `DEBRIS`): ficam no fundo e só são
+  alcançáveis com o mar seco. **Naufrágios** (30% dos chunks sem ilha) têm 1–2 baús e destroços em volta.
+
+Eventos são anunciados pela rede (`t: 'event'`) e derivados do relógio comum, então todos os
+jogadores veem o mesmo. Piratas ficaram raros (`PIRATE_BALANCE` em `systems/enemies.js`): primeira
+invasão após 2,5–3,5 min, depois a cada 3,5–5,5 min, com 1–3 balsas, nunca durante um evento.
+As ilhas aparecem em 7% dos chunks (`islandChance` em `systems/loot.js`).
+
 A ilha inicial é garantida e tem três caixas, incluindo um cache com pistola e bandagens
 dimensionadas pela quantidade de jogadores. As caixas abrem com animação, mantêm o estoque e
 permitem retirar cada item individualmente. No multiplayer, o servidor gera e controla o estoque
@@ -90,7 +130,7 @@ capacidade de carregador e durabilidade. Armas e raridades superiores dependem d
 O loot é configurado em `client/src/systems/loot.js` por região, tipo de caixa, raridade,
 quantidade e quantidade de jogadores para o cache inicial.
 
-As ilhas aparecem com menor frequência nos chunks para deixar mais espaço aberto no oceano;
+As ilhas aparecem com baixa frequência (7% dos chunks) para deixar mais espaço aberto no oceano;
 a ilha inicial é a exceção garantida. Esta versão não possui crafting nem sede.
 
 Detritos e peças colocadas são corpos rígidos com colisão; objetos flutuantes recebem empuxo

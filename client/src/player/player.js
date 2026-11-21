@@ -6,6 +6,9 @@ import { CFG } from '../config.js';
 import { waveHeight } from '../world/ocean.js';
 import { makeHumanoid, animateHumanoid } from './model.js';
 import { animateCastaway, createCastawayVisual, loadCastawayModel } from './castaway.js';
+import { makePill, animatePill, disposePill, PILL_DEFAULT, PILL_HEIGHT } from './pill.js';
+
+const PILL_SCALE = 1.75 / PILL_HEIGHT;
 
 const _v = new THREE.Vector3(), _d = new THREE.Vector3();
 const smoothstep = (value) => {
@@ -29,7 +32,8 @@ export class Player {
     this.proceduralRig = this.mesh.userData.parts.rig;
     this.castawayBase = null;
     this.castawayVisual = null;
-    this.appearance = { glasses: 'nenhum', beard: 'nenhuma' };
+    this.pillVisual = null;
+    this.appearance = { character: 'naufrago', glasses: 'nenhum', beard: 'nenhuma', pill: { ...PILL_DEFAULT } };
     this.mesh.rotation.order = 'YXZ';
     this.weaponMesh = new THREE.Group();
     this.weaponMesh.position.set(0, -0.55, 0.1);
@@ -86,7 +90,34 @@ export class Player {
   }
 
   applyAppearance() {
-    if (!this.castawayBase) return;
+    if (this.pillVisual) {
+      if (this.weaponMesh.parent) this.weaponMesh.parent.remove(this.weaponMesh);
+      this.mesh.remove(this.pillVisual);
+      disposePill(this.pillVisual);
+      this.pillVisual = null;
+    }
+    if (this.appearance.character === 'pilula') {
+      if (this.castawayVisual) this.castawayVisual.visible = false;
+      const pill = makePill(this.appearance.pill);
+      this.pillVisual = new THREE.Group();
+      this.pillVisual.add(pill);
+      this.pillVisual.scale.setScalar(PILL_SCALE);
+      this.mesh.add(this.pillVisual);
+      this.proceduralRig.visible = false;
+      if (this.weaponMesh.parent) this.weaponMesh.parent.remove(this.weaponMesh);
+      pill.userData.parts.hand.add(this.weaponMesh);
+      this.weaponMesh.position.set(0, 0, 0);
+      this.weaponMesh.rotation.set(0, 0, 0);
+      this.weaponMesh.scale.setScalar(1 / PILL_SCALE);
+      return;
+    }
+    this.weaponMesh.scale.setScalar(1);
+    if (!this.castawayBase) {
+      this.proceduralRig.visible = true;
+      if (!this.weaponMesh.parent) this.mesh.userData.parts.armR.add(this.weaponMesh);
+      this.weaponMesh.position.set(0, -0.55, 0.1);
+      return;
+    }
     if (this.castawayVisual) {
       if (this.weaponMesh.parent) this.weaponMesh.parent.remove(this.weaponMesh);
       this.mesh.remove(this.castawayVisual);
@@ -240,6 +271,13 @@ export class Player {
     }
     animateHumanoid(this.mesh, this.swimming ? speed + 1.5 : speed, dt, pose, progress,
       this.mantle ? this.mantle.height : 0);
+    if (this.pillVisual) {
+      this.proceduralRig.visible = false;
+      if (this.castawayVisual) this.castawayVisual.visible = false;
+      const pillPose = pose === 'climb' || pose === 'vault' ? 'jump' : pose;
+      animatePill(this.pillVisual.children[0], speed, dt, pillPose, progress);
+      return;
+    }
     const useProceduralRig = !this.castawayVisual || this.swimming || !!this.mantle;
     this.proceduralRig.visible = useProceduralRig;
     if (this.castawayVisual) this.castawayVisual.visible = !useProceduralRig;

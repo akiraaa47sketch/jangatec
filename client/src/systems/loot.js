@@ -1,6 +1,26 @@
 import { hash2, mulberry32 } from '../core/util.js';
 
-export const WORLD_LOOT_PARAMS = { chunkSize: 90, islandChance: 0.14 };
+export const WORLD_LOOT_PARAMS = { chunkSize: 90, islandChance: 0.07, wreckChance: 0.3 };
+
+// Ilha no chunk? (mesma regra/ordem de RNG que World.makeChunk)
+export function chunkHasIsland(seed, cx, cz) {
+  if (cx === 0 && cz === 0) return false;
+  if (cx === 0 && cz === 1) return true;
+  return mulberry32(hash2(seed, cx, cz))() < WORLD_LOOT_PARAMS.islandChance;
+}
+
+// Naufrágio no fundo do mar (explorável quando o oceano seca) com 1–2 baús e destroços.
+// RNG próprio: não altera a geração antiga do mundo.
+export function wreckFor(seed, cx, cz) {
+  if (Math.abs(cx) + Math.abs(cz) <= 1 || chunkHasIsland(seed, cx, cz)) return null;
+  const r = mulberry32(hash2(seed ^ 0x5a17c3, cx, cz));
+  if (r() >= WORLD_LOOT_PARAMS.wreckChance) return null;
+  const S = WORLD_LOOT_PARAMS.chunkSize;
+  return {
+    cx, cz, x: cx * S + (r() - 0.5) * 50, z: cz * S + (r() - 0.5) * 50, yaw: r() * Math.PI * 2,
+    crates: r() < 0.5 ? 2 : 1, debris: 3 + ((r() * 3) | 0), rng: r,
+  };
+}
 
 export const LOOT_CONFIG = {
   starterCache: {
@@ -127,7 +147,7 @@ export function generateCrateLoot(seed, id, difficulty, playerCount = 1) {
 }
 
 export function difficultyForCrateId(id) {
-  const match = /^i(-?\d+),(-?\d+)c\d+$/.exec(id);
+  const match = /^[ib](-?\d+),(-?\d+)c\d+$/.exec(id);
   if (!match) return 0;
   const x = Number(match[1]) * WORLD_LOOT_PARAMS.chunkSize;
   const z = Number(match[2]) * WORLD_LOOT_PARAMS.chunkSize;
@@ -135,6 +155,8 @@ export function difficultyForCrateId(id) {
 }
 
 export function isGeneratedCrate(seed, id) {
+  const wreck = /^b(-?\d+),(-?\d+)c(\d+)$/.exec(id);
+  if (wreck) { const w = wreckFor(seed, Number(wreck[1]), Number(wreck[2])); return !!w && Number(wreck[3]) < w.crates; }
   const match = /^i(-?\d+),(-?\d+)c(\d+)$/.exec(id);
   if (!match) return false;
   const cx = Number(match[1]), cz = Number(match[2]), crateIndex = Number(match[3]);

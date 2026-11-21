@@ -1,7 +1,8 @@
 import * as THREE from '../three.js';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import { clone as cloneSkeleton } from 'three/addons/utils/SkeletonUtils.js';
-import modelUrl from '../../assets/castaway-scout-animated.glb?url';
+// Náufrago: malha/textura Tripo com esqueleto Mixamo e pesos transferidos do modelo Meshy.
+import modelUrl from '../../assets/castaway-survivor.glb?url';
 
 const skinColor = new THREE.Color(0xb97251);
 const shirtColor = new THREE.Color(0xb49b7b);
@@ -16,6 +17,15 @@ export async function loadCastawayModel() {
 function colorModel(model) {
   model.traverse((part) => {
     if (!part.isMesh) return;
+    // Modelo já texturizado: só ajusta o material e liga as sombras.
+    if (part.material && part.material.map) {
+      part.material = part.material.clone();
+      part.material.roughness = 0.9;
+      part.material.metalness = 0;
+      part.castShadow = true;
+      part.receiveShadow = true;
+      return;
+    }
 
     const geometry = part.geometry.clone();
     const positions = geometry.attributes.position;

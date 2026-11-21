@@ -28,7 +28,14 @@ Cole este bloco no início de uma nova conversa para continuar o projeto.
 - Combate: facão, pistola, escopeta (achada em caixotes); hitscan, dispersão, recuo, recarga.
 - Inimigos: FSM idle/patrulha/perseguição/ataque/recuo/procura/morte; 4 tipos; ativação por
   distância; pensam a 5 Hz. Vivem nas ilhas.
-- Mundo procedural por seed em chunks de 90 m; ilhas em 14% dos chunks (reduzido), dificuldade 1–5 pela distância da origem.
+- Mundo procedural por seed em chunks de 90 m; ilhas em 7% dos chunks, dificuldade 1–5 pela distância da origem.
+- Eventos do mar (`systems/events.js`): onda gigante e furacão sorteados pelo host após a partida,
+  sincronizados por `t: 'event'`; `sea.surge` / `sea.vortex` entram em `waveHeight` e no shader.
+  Barco ganhou `fling`/`spin` (arremesso/giro) e inclinação maior durante eventos.
+- Piratas raros (`PIRATE_BALANCE`): balsas remando nas ondas, bandeira, salto no gancho; inimigos com
+  reação a dano, morte animada (tomba, afunda, some) e respiração parada.
+- Texturas procedurais em `world/textures.js`: madeira com relevo (bumpMap), areia, grama, lona da
+  vela, palha, paliçada e metal; jangada com barris, cordame e bandeira; fogueiras animadas.
 - Multiplayer base: seed, posições, barco (host simula), vela, peças, estados e snapshots de corpos físicos;
   entrada tardia e migração de host.
 
@@ -37,7 +44,7 @@ Cole este bloco no início de uma nova conversa para continuar o projeto.
   13 maré e tempestades (`sea.level` e `sea.amp` já existem em `world/ocean.js`),
   14 mais estruturas (vilas, faróis, fortalezas), 15 progressão em fases, 16 chefes, 17 Kraken.
 - Multiplayer: inimigos, dano e inventário ainda são locais de cada cliente; sem revive de aliados.
-- Sem salvamento de partida. Sem som. Modelos são placeholders.
+- Sem salvamento de partida. Sem som. Modelos ainda procedurais (sem arquivos de arte).
 
 ## Arquivos importantes
 `client/src/main.js`, `world/colliders.js`, `boat/boat.js`, `boat/pieces.js`, `player/player.js`,

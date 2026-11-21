@@ -15,6 +15,7 @@ export class Interact {
 
     // Caixas de loot
     for (const c of G.world.crates) {
+      if (c.submerged) continue; // baú do banco de areia debaixo d'água
       const dist = Math.hypot(c.x - p.x, c.z - p.z);
       if (dist < 2.4 && Math.abs(p.y - c.y) < 2) {
         consider(dist, { label: c.opened ? 'Ver caixa' : 'Abrir caixa', run: () => this.openCrate(c) });

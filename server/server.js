@@ -53,7 +53,7 @@ function canReachMast(room, ws) {
 }
 
 function validCrateId(id, seed, message) {
-  const match = typeof id === 'string' && /^i(-?\d+),(-?\d+)c(\d+)$/.exec(id);
+  const match = typeof id === 'string' && /^[ib](-?\d+),(-?\d+)c(\d+)$/.exec(id);
   if (!match || Number(match[3]) > 2 || !isGeneratedCrate(seed, id)) return false;
   const cx = Number(match[1]), cz = Number(match[2]);
   return Number.isFinite(message.x) && Number.isFinite(message.z) &&
@@ -100,7 +100,7 @@ function handle(ws, m) {
       t: 'welcome', id: ws.id, seed: room.seed, host: room.hostId,
       added: room.added, removed: room.removed, collected: room.collected,
       placed: [...room.placed.values()], welded: [...room.welded.values()],
-      crates: [...room.crates.values()], boat: room.boat, start: room.start,
+      crates: [...room.crates.values()], boat: room.boat, start: room.start, event: room.event || null,
     });
     broadcast(room, { t: 'msg', text: `${ws.name} entrou` }, ws);
     return;
@@ -234,6 +234,23 @@ function handle(ws, m) {
       room.welded.delete(m.pieceId);
       if (state) room.placed.set(state.id, state);
       broadcast(room, m, ws);
+      break;
+    }
+    case 'event': {
+      // Onda gigante / furacão sorteados pelo host: valida e repassa a todos.
+      const e = m.e;
+      if (room.hostId !== ws.id || !e || !['tsunami', 'furacao'].includes(e.kind) ||
+          typeof e.id !== 'string' || e.id.length > 40) break;
+      const keys = ['t0', 'dur', 'ox', 'oz', 'dx', 'dz', 'speed', 'A', 'sigma', 'cx', 'cz', 'fx', 'fz', 'lat', 'latV', 'ahead'];
+      const clean = { id: e.id, kind: e.kind, end: !!e.end };
+      for (const key of keys) {
+        if (e[key] === undefined) continue;
+        if (!Number.isFinite(e[key])) return;
+        clean[key] = e[key];
+      }
+      if (!Number.isFinite(clean.t0) || !Number.isFinite(clean.dur) || clean.dur > 120) break;
+      room.event = clean.end ? null : clean;
+      broadcast(room, { t: 'event', e: clean }, ws);
       break;
     }
     case 'physics': {

@@ -4,7 +4,7 @@ import * as THREE from './three.js';
 import { DEFAULT_SERVER } from './config.js';
 import { Input } from './core/input.js';
 import { Colliders } from './world/colliders.js';
-import { Ocean } from './world/ocean.js';
+import { Ocean, sea } from './world/ocean.js';
 import { Atmosphere } from './world/atmosphere.js';
 import { SunVisual } from './world/sun.js';
 import { World } from './world/world.js';
@@ -18,17 +18,19 @@ import { Startup } from './systems/startup.js';
 import { Combat } from './systems/combat.js';
 import { Enemies } from './systems/enemies.js';
 import { Interact } from './systems/interact.js';
+import { Events } from './systems/events.js';
 import { Net } from './net/net.js';
 import { Hud } from './ui/hud.js';
+import { CharacterMenu } from './ui/character.js';
+import { TouchControls, isTouchDevice } from './ui/touch.js';
+import { createCastawayVisual } from './player/castaway.js';
 
 const $ = (id) => document.getElementById(id);
 const canvas = $('c');
-const characterAppearance = () => ({
-  glasses: $('glassesStyle').value,
-  beard: $('beardStyle').value,
-});
+
 const renderer = new THREE.WebGLRenderer({ canvas, antialias: true });
-renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
+const MOBILE = isTouchDevice();
+renderer.setPixelRatio(Math.min(devicePixelRatio, MOBILE ? 1.25 : 2)); // celular: menos pixels, mais FPS
 renderer.toneMapping = THREE.NeutralToneMapping; // realces suaves, cores preservadas
 renderer.toneMappingExposure = 1.0;
 const scene = new THREE.Scene();
@@ -60,8 +62,13 @@ G.net = new Net(G);
 G.survival = new Survival(G);
 G.combat = new Combat(G);
 G.enemies = new Enemies(G);
+G.events = new Events(G);
 G.physics = new Physics(G);
 G.world = new World(G, 1);
+G.colliders.groundFn = (x, z) => { // fundo do mar só vira chão com pouca água por cima
+  const gh = G.world.seabedHeight(x, z);
+  return sea.level > gh + 1.2 ? -Infinity : gh;
+};
 G.boat = new Boat(G);
 G.player = new Player(G);
 G.viewmodel = new ViewModel(G, { sun, hemisphere }); // braços/arma em 1ª pessoa (só o jogador local vê)
@@ -76,6 +83,7 @@ G.ocean = ocean;
 G.viewmodel.scene.environment = scene.environment; // metais da 1ª pessoa também refletem o céu
 G.viewmodel.scene.environmentIntensity = scene.environmentIntensity;
 window.G = G; // útil para depurar no console
+if (MOBILE) G.touch = new TouchControls(G);
 
 canvas.addEventListener('mousedown', (e) => {
   if (!G.build.active) {
@@ -136,9 +144,16 @@ addEventListener('keydown', (e) => {
 // ---------- Menu ----------
 $('server').value = DEFAULT_SERVER;
 const status = (s) => { $('menuStatus').textContent = s; };
-for (const id of ['glassesStyle', 'beardStyle']) {
-  $(id).addEventListener('change', () => G.player.setAppearance(characterAppearance()));
-}
+const charMenu = new CharacterMenu((appearance) => G.player.setAppearance(appearance));
+window.__charMenu = charMenu; // depuração
+const characterAppearance = () => charMenu.appearance;
+G.player.setAppearance(characterAppearance());
+// Prévia do náufrago assim que o modelo dele carregar.
+const waitCastaway = setInterval(() => {
+  if (!G.player.castawayBase) return;
+  clearInterval(waitCastaway);
+  charMenu.setCastawayFactory((a) => createCastawayVisual(G.player.castawayBase, a));
+}, 300);
 
 function start(seed, welcome) {
   G.player.setAppearance(characterAppearance());
@@ -150,6 +165,7 @@ function start(seed, welcome) {
     for (const id of welcome.removed || []) G.boat.removePiece(id);
     for (const p of welcome.added || []) G.boat.addPiece(p);
     for (const id of welcome.collected || []) G.world.collected.add(id);
+    if (welcome.event) G.events.receive(welcome.event);
     if (welcome.boat) { const b = welcome.boat; Object.assign(G.boat, { x: b.x, z: b.z, yaw: b.yaw, speed: b.speed, sailUp: b.up, sailAngle: b.angle }); }
   }
   G.world.ensureStarterIsland();
@@ -217,6 +233,7 @@ function frame() {
     ocean.update(t, 0, 0);
     sunVisual.update(camera, t, true);
     renderer.render(scene, camera);
+    charMenu.update(dt, true);
     return;
   }
   // Quem está a bordo (mesmo no ar) acompanha o barco antes de se mover.
@@ -228,11 +245,13 @@ function frame() {
   player.update(dt, t);
   G.viewmodel.update(dt, t);
   player.updateCamera(dt, t);
+  G.events.applyShake(camera, dt);
   G.build.update();
   G.world.update(dt, t);
   G.world.updateFloodLevel(G.startup.waterLevel);
   G.physics.update(dt, t);
   G.enemies.update(dt);
+  G.events.update(dt, t);
   G.interact.update(dt);
   G.combat.update(dt);
   G.survival.update(dt);
@@ -240,6 +259,7 @@ function frame() {
   atmo.update(dt, camera);
   ocean.update(t, camera.position.x, camera.position.z);
   G.hud.update(dt);
+  if (G.touch) G.touch.update();
   sunVisual.update(camera, t);
   renderer.render(scene, camera);
   G.viewmodel.render(renderer); // 2º passe: braços e arma por cima do mundo

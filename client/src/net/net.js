@@ -4,6 +4,7 @@
 import * as THREE from '../three.js';
 import { lerpAngle } from '../core/util.js';
 import { makeHumanoid, animateHumanoid } from '../player/model.js';
+import { makePill, animatePill, disposePill, decodePill, encodePill, PILL_HEIGHT } from '../player/pill.js';
 
 const COLORS = [0xd1a02f, 0x3fae5a, 0xb84fc9, 0xd1552f];
 
@@ -62,6 +63,8 @@ export class Net {
           }
           r.s = m.players[id];
           r.aboard = !!m.players[id].ab; // sincroniza estado "a bordo"
+          const ap = typeof r.s.ap === 'string' ? r.s.ap.slice(0, 40) : '';
+          if (ap !== (r.ap || '')) this.setRemoteLook(r, ap);
         }
         for (const [id, r] of this.remotes) if (!(id in m.players)) { r.mesh.parent && r.mesh.parent.remove(r.mesh); this.remotes.delete(id); }
         break;
@@ -81,6 +84,7 @@ export class Net {
       case 'sail-install': G.startup.installSail(); break;
       case 'start': G.startup.applyState(m.state); break;
       case 'msg': G.hud.msg(m.text); break;
+      case 'event': G.events.receive(m.e); break;
       case 'carry': {
         G.world.applyCarryState(m.id, m.by, m.state);
         break;
@@ -105,6 +109,24 @@ export class Net {
     }
   }
 
+  // Aparência dos aliados: "p:<código>" = pílula personalizada; vazio = náufrago padrão.
+  setRemoteLook(r, ap) {
+    r.ap = ap;
+    if (r.pill) { r.mesh.remove(r.pill); disposePill(r.pill.children[0]); r.pill = null; }
+    const rig = r.mesh.userData.parts.rig;
+    if (ap.startsWith('p:')) {
+      const pill = makePill(decodePill(ap.slice(2))), holder = new THREE.Group();
+      holder.add(pill); holder.scale.setScalar(1.75 / PILL_HEIGHT);
+      r.mesh.add(holder); r.pill = holder; rig.visible = false;
+    } else rig.visible = true;
+  }
+
+  // Código de aparência enviado junto com o estado do jogador local.
+  localLook() {
+    const a = this.G.player.appearance;
+    return a.character === 'pilula' ? 'p:' + encodePill(a.pill) : '';
+  }
+
   update(dt) {
     if (!this.online) return;
     const G = this.G, pl = G.player, boat = G.boat, b = pl.body;
@@ -119,7 +141,7 @@ export class Net {
       let x = b.pos.x, y = b.pos.y, z = b.pos.z, yaw = pl.yaw;
       if (pl.aboard) { [x, z] = boat.toLocal(x, z); y -= boat.set.y; yaw -= boat.yaw; }
       const r2 = (v) => Math.round(v * 100) / 100;
-      this.send({ t: 'state', s: { p: [r2(x), r2(y), r2(z)], yaw: r2(yaw), ab: pl.aboard ? 1 : 0, sw: pl.swimming ? 1 : 0, sp: r2(Math.hypot(b.vel.x, b.vel.z)), dead: pl.dead ? 1 : 0 } });
+      this.send({ t: 'state', s: { p: [r2(x), r2(y), r2(z)], yaw: r2(yaw), ab: pl.aboard ? 1 : 0, sw: pl.swimming ? 1 : 0, sp: r2(Math.hypot(b.vel.x, b.vel.z)), dead: pl.dead ? 1 : 0, ap: this.localLook() } });
       if (this.isHost) this.send({ t: 'boat', b: { x: r2(boat.x), z: r2(boat.z), yaw: Math.round(boat.yaw * 1000) / 1000, speed: r2(boat.speed), up: boat.sailUp, angle: boat.sailAngle } });
     }
     // Interpola os aliados.
@@ -135,7 +157,10 @@ export class Net {
       mesh.rotation.order = 'YXZ';
       mesh.rotation.y = r.yaw;
       mesh.rotation.x = s.dead ? -Math.PI / 2 : s.sw ? 0.9 : 0;
-      animateHumanoid(mesh, s.sp, dt, s.sw ? 'swim' : 'walk');
+      if (r.pill) {
+        mesh.rotation.x = s.dead ? -Math.PI / 2 : 0;
+        animatePill(r.pill.children[0], s.sp, dt, s.sw ? 'swim' : 'walk');
+      } else animateHumanoid(mesh, s.sp, dt, s.sw ? 'swim' : 'walk');
     }
   }
 }

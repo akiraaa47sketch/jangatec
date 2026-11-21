@@ -2,7 +2,32 @@ import * as THREE from '../three.js';
 import { SKY_GLSL, skyUniformDefs } from './atmosphere.js';
 
 // Estado do mar. "level" = maré/enchente, "amp" = tempestade (escala a altura das ondas).
-export const sea = { level: 0, amp: 1 };
+// surge = onda gigante (frente plana que viaja), vortex = olho do furacão (depressão + espiral).
+// Ambos entram em waveHeight E no shader: o barco sente exatamente o que se vê.
+export const sea = {
+  level: 0, amp: 1,
+  surge: { A: 0, ox: 0, oz: 0, dx: 1, dz: 0, front: 0, sigma: 10 },
+  vortex: { k: 0, x: 0, z: 0, R: 30, depth: 2.2 },
+};
+
+// Altura extra dos eventos. Mesma fórmula em EVENTS_GLSL logo abaixo.
+export function eventHeight(x, z, t) {
+  let h = 0;
+  const s = sea.surge;
+  if (s.A > 0) {
+    const d = (x - s.ox) * s.dx + (z - s.oz) * s.dz - s.front;
+    const a = d / s.sigma, b = (d + s.sigma * 2.2) / (s.sigma * 1.6);
+    // crista íngreme na frente, cava atrás (a água "puxada" pela onda)
+    h += s.A * (Math.exp(-a * a) * 1 - 0.32 * Math.exp(-b * b));
+  }
+  const v = sea.vortex;
+  if (v.k > 0) {
+    const dx = x - v.x, dz = z - v.z, r = Math.hypot(dx, dz), q = r / v.R;
+    const spiral = Math.sin(r * 0.32 - Math.atan2(dz, dx) * 3 + t * 2.6) * 0.55 * Math.exp(-r / 70);
+    h += v.k * (-v.depth * Math.exp(-q * q) + spiral);
+  }
+  return h;
+}
 
 // ---- Ondas ----
 // UMA tabela alimenta a física (JS) e o shader (GLSL): o que você vê é o que o barco sente.
@@ -27,7 +52,7 @@ export function waveHeight(x, z, t) {
     const u = 0.5 + 0.5 * Math.sin(w.kx * x + w.kz * z - w.w * t + w.ph);
     h += w.A * (2 * u * u - 0.75);
   }
-  return sea.level + sea.amp * h;
+  return sea.level + sea.amp * h + eventHeight(x, z, t);
 }
 
 const f = (v) => v.toFixed(6);
@@ -48,17 +73,45 @@ vec3 waves(vec2 p, float t) {
   return vec3(h, g);
 }`;
 
+const EVENTS_GLSL = `
+uniform vec4 uSurge;  // ox, oz, dx, dz
+uniform vec3 uSurge2; // A, sigma, front
+uniform vec4 uVortex; // x, z, R, depth
+uniform float uVortexK;
+float eventH(vec2 p, float t) {
+  float h = 0.0;
+  if (uSurge2.x > 0.0) {
+    float d = dot(p - uSurge.xy, uSurge.zw) - uSurge2.z;
+    float a = d / uSurge2.y, b = (d + uSurge2.y * 2.2) / (uSurge2.y * 1.6);
+    h += uSurge2.x * (exp(-a * a) - 0.32 * exp(-b * b));
+  }
+  if (uVortexK > 0.0) {
+    vec2 dv = p - uVortex.xy; float r = length(dv), q = r / uVortex.z;
+    float spiral = sin(r * 0.32 - atan(dv.y, dv.x) * 3.0 + t * 2.6) * 0.55 * exp(-r / 70.0);
+    h += uVortexK * (-uVortex.w * exp(-q * q) + spiral);
+  }
+  return h;
+}`;
+
 const VERT = /* glsl */`
 uniform float uTime; uniform float uAmp; uniform float uLevel;
-varying vec3 vWorld; varying vec3 vN; varying float vHn;
+varying vec3 vWorld; varying vec3 vN; varying float vHn; varying float vEv;
 #include <fog_pars_vertex>
 ${WAVES_GLSL}
+${EVENTS_GLSL}
 void main() {
   vec4 wp = modelMatrix * vec4(position, 1.0);
   vec3 w = waves(wp.xz, uTime);
-  wp.y = uLevel + uAmp * w.x;
+  float e = eventH(wp.xz, uTime);
+  vec2 eg = vec2(0.0);
+  if (uSurge2.x > 0.0 || uVortexK > 0.0) {
+    eg = vec2(eventH(wp.xz + vec2(0.6, 0.0), uTime) - e, eventH(wp.xz + vec2(0.0, 0.6), uTime) - e) / 0.6;
+  }
+  wp.y = uLevel + uAmp * w.x + e;
   vHn = w.x;
-  vN = normalize(vec3(-uAmp * w.y, 1.0, -uAmp * w.z));
+  // espuma do evento: crista da onda gigante e bordas da espiral do furacão
+  vEv = clamp(length(eg) * 0.9 + max(e, 0.0) * 0.12, 0.0, 1.0);
+  vN = normalize(vec3(-uAmp * w.y - eg.x, 1.0, -uAmp * w.z - eg.y));
   vWorld = wp.xyz;
   vec4 mvPosition = viewMatrix * wp;
   gl_Position = projectionMatrix * mvPosition;
@@ -69,7 +122,7 @@ const FRAG = /* glsl */`
 uniform float uTime; uniform float uLight;
 uniform vec3 uDeep; uniform vec3 uShallow;
 uniform vec3 uIsl[6];
-varying vec3 vWorld; varying vec3 vN; varying float vHn;
+varying vec3 vWorld; varying vec3 vN; varying float vHn; varying float vEv;
 #include <fog_pars_fragment>
 ${SKY_GLSL}
 float hash(vec2 p) { vec3 p3 = fract(vec3(p.xyx) * 0.1031); p3 += dot(p3, p3.yzx + 33.33); return fract((p3.x + p3.y) * p3.z); }
@@ -124,6 +177,7 @@ void main() {
   float crest = smoothstep(0.30 - uStorm * 0.09, 0.50, hn + (n1 - 0.5) * 0.16);
   float foam = crest * (0.5 + 0.5 * n2) * (1.0 - smoothstep(150.0, 300.0, dist));
   foam = max(foam * 0.9, shore * (0.6 + 0.4 * n2));
+  foam = max(foam, smoothstep(0.25, 0.85, vEv + (n2 - 0.5) * 0.35));
   col = mix(col, vec3(0.92, 0.97, 1.0) * (0.45 + 0.55 * uLight), clamp(foam, 0.0, 1.0));
 
   gl_FragColor = vec4(col, max(mix(0.94, 0.55, shallow), foam));
@@ -164,6 +218,8 @@ export class Ocean {
       uTime: { value: 0 }, uAmp: { value: 1 }, uLevel: { value: 0 }, uLight: { value: 1 },
       uDeep: { value: new THREE.Color() }, uShallow: { value: new THREE.Color() },
       uIsl: { value: Array.from({ length: 6 }, () => new THREE.Vector3(0, 0, -1e4)) },
+      uSurge: { value: new THREE.Vector4(0, 0, 1, 0) }, uSurge2: { value: new THREE.Vector3(0, 10, 0) },
+      uVortex: { value: new THREE.Vector4(0, 0, 30, 2) }, uVortexK: { value: 0 },
     });
     this.material = new THREE.ShaderMaterial({
       uniforms, vertexShader: VERT, fragmentShader: FRAG, transparent: true, depthWrite: true, fog: true,
@@ -177,6 +233,9 @@ export class Ocean {
     this.mesh.position.set(cx, 0, cz);
     const u = this.material.uniforms, st = this.atmo.state;
     u.uTime.value = t; u.uAmp.value = sea.amp; u.uLevel.value = sea.level; u.uLight.value = st.light;
+    const sg = sea.surge, vx = sea.vortex;
+    u.uSurge.value.set(sg.ox, sg.oz, sg.dx, sg.dz); u.uSurge2.value.set(sg.A, sg.sigma, sg.front);
+    u.uVortex.value.set(vx.x, vx.z, vx.R, vx.depth); u.uVortexK.value = vx.k;
     u.uDeep.value.copy(DEEP[0]).lerp(DEEP[1], st.storm);
     u.uShallow.value.copy(SHALLOW[0]).lerp(SHALLOW[1], st.storm);
     this.atmo.applySky(u);

@@ -27,3 +27,6 @@ export function hash2(seed, x, y) {
   h = Math.imul(h ^ (h >>> 13), 1274126177);
   return (h ^ (h >>> 16)) >>> 0;
 }
+
+// Relógio comum a todos os clientes (mesmo usado pelas ondas em main.js).
+export const clock = () => (Date.now() / 1000) % 100000;
