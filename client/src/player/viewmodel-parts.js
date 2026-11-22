@@ -158,8 +158,11 @@ export function buildHand(mirror = false) {
 }
 
 // Cor da luva (vem da personalização da pílula).
+// luva "realista" (formato da mão 3D): mesma cor, couro com relevo do modelo
+MAT.gloveReal = new THREE.MeshPhysicalMaterial({ color: 0xd3202b, roughness: 0.55, clearcoat: 0.35, clearcoatRoughness: 0.45, sheen: 0.4, sheenRoughness: 0.6 });
 export function setGloveColor(hex) {
   MAT.glove.color.setHex(hex);
+  MAT.gloveReal.color.setHex(hex);
   MAT.gloveSeam.color.setHex(hex).multiplyScalar(0.62); // costura um tom mais escuro
 }
 

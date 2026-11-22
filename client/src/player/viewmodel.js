@@ -268,10 +268,12 @@ export class ViewModel {
   // Pose de uma mão presa à arma: posição no espaço do viewmodel + rotação + dedos.
   // grip.p é um ponto NO EIXO do cabo; a origem da mão (punho) fica deslocada pela geometria
   // dos dedos: palma ~3 cm acima do eixo e punho ~7 cm atrás do ponto de curvatura.
-  gripHand(grip, extra) {
+  gripHand(grip, extra, hand = 0) {
     const q = eulerQ(grip.r, grip.order || 'XYZ');
     const wq = this.weaponRoot.quaternion;
-    const p = V(...(grip.off || [0, 0.03, 0.07])).applyQuaternion(q).add(V(...grip.p));
+    // cada modelo de mão tem o seu ponto de pegada (a mão 3D mede o buraco do punho fechado)
+    const h = this.hands[hand], ho = h && h.gripOff ? (hand === 1 ? [-h.gripOff[0], h.gripOff[1], h.gripOff[2]] : h.gripOff) : null;
+    const p = V(...(grip.off || ho || [0, 0.03, 0.07])).applyQuaternion(q).add(V(...grip.p));
     if (extra) p.add(extra);
     p.applyMatrix4(this.weaponRoot.matrixWorld);
     return { p, q: wq.clone().multiply(q) };
@@ -466,7 +468,7 @@ export class ViewModel {
     if (spec && spec.gripL) {
       let extra = null;
       if (parts.pump) extra = V(0, 0, parts.pump.position.z);
-      const g = this.gripHand(spec.gripL, extra);
+      const g = this.gripHand(spec.gripL, extra, 1);
       hands[1].p = g.p; hands[1].q = g.q;
       const gl = spec.gripL;
       hands[1].c = [gl.c, gl.c, gl.c, gl.c];
@@ -598,7 +600,7 @@ export class ViewModel {
     const belt = BELT.clone();
     const mk = (pos, q = qOpen, c = open) => ({ p: pos, q, c });
     const mixH = (a, b, u) => ({ p: a.p.clone().lerp(b.p, u), q: a.q.clone().slerp(b.q, u), c: lerpArr(a.c, b.c, u) });
-    const grip = this.gripHand(spec.gripL);
+    const grip = this.gripHand(spec.gripL, null, 1);
     const gripPose = { p: grip.p, q: grip.q, c: [spec.gripL.c, spec.gripL.c, spec.gripL.c, spec.gripL.c] };
 
     if (spec.reload === 'mag') {
@@ -745,7 +747,7 @@ export class ViewModel {
   // Troca as mãos de luva pelas mãos 3D realistas (quando o GLB termina de carregar).
   upgradeHands(build) {
     for (let i = 0; i < 2; i++) {
-      const old = this.hands[i], nh = build(i === 1);
+      const old = this.hands[i], nh = build(i === 1, MAT.gloveReal);
       if (!nh) return;
       for (const item of this.heldItems) if (item.parent === old.root) nh.root.add(item);
       nh.root.position.copy(old.root.position); nh.root.quaternion.copy(old.root.quaternion);

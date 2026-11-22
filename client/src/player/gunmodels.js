@@ -59,26 +59,50 @@ export function preloadHand(url) {
     .catch((e) => { console.warn('Mãos 3D não carregaram:', e); return false; });
 }
 const _q = new THREE.Quaternion(), _e = new THREE.Euler(), X = new THREE.Vector3(1, 0, 0);
-export function buildRealHand(mirror = false) {
+export function buildRealHand(mirror = false, gloveMat = null) {
   if (!handScene) return null;
   const root = new THREE.Group(), inner = cloneSkinned(handScene);
-  if (mirror) inner.scale.x = -1;
+  inner.scale.setScalar(1.2); // luva "gordinha", na proporção das armas
+  if (mirror) inner.scale.x = -1.2;
   root.add(inner);
   const bones = {};
+  let skin = null, cuffR = 0.03;
   inner.traverse((o) => {
-    if (o.isBone) { bones[o.name] = o; o.userData.q0 = o.quaternion.clone(); }
-    if (o.isMesh) { o.frustumCulled = false; o.castShadow = false; }
+    if (o.isBone) { bones[o.name] = o; o.userData.q0 = o.quaternion.clone(); o.userData.rest = o.userData.bend || 0; }
+    if (o.isMesh) { o.frustumCulled = false; o.castShadow = false; skin = o; if (o.userData.cuffR) cuffR = o.userData.cuffR; }
   });
+  // luva: o mesmo formato da mão, na cor das luvas da pílula, com o relevo (rugas) do modelo
+  if (skin && gloveMat) {
+    if (!gloveMat.normalMap && skin.material.normalMap) { gloveMat.normalMap = skin.material.normalMap; gloveMat.normalScale.set(0.9, 0.9); gloveMat.needsUpdate = true; }
+    skin.material = gloveMat;
+    const r = Math.max(0.026, cuffR * 1.3);
+    const cuff = new THREE.Mesh(new THREE.CylinderGeometry(r, r * 1.08, 0.04, 24, 1, true), gloveMat);
+    cuff.rotation.x = Math.PI / 2; cuff.position.z = 0.03;
+    const roll = new THREE.Mesh(new THREE.TorusGeometry(r * 1.08, 0.008, 8, 28), gloveMat); roll.position.z = 0.05;
+    inner.add(cuff, roll);
+  }
   const fingers = [0, 1, 2, 3].map((f) => [0, 1, 2].map((j) => bones[`d${f}_${j}`]));
   const BEND = [1.2, 1.4, 0.9];
+  // pose ABSOLUTA: dobra 0 = dedo reto (desfaz a dobra que o modelo já tinha), como a luva antiga
   const setPose = (c, t) => {
     fingers.forEach((chain, f) => chain.forEach((b, j) => {
-      if (b) b.quaternion.copy(b.userData.q0).multiply(_q.setFromAxisAngle(X, -c[f] * BEND[j]));
+      if (b) b.quaternion.copy(b.userData.q0).multiply(_q.setFromAxisAngle(X, -b.userData.rest - c[f] * BEND[j]));
     }));
     const t0 = bones.pol_0, t1 = bones.pol_1;
     if (t0) t0.quaternion.copy(t0.userData.q0).multiply(_q.setFromEuler(_e.set(t[1] * 0.8, t[0] * 0.8, 0)));
     if (t1) t1.quaternion.copy(t1.userData.q0).multiply(_q.setFromAxisAngle(X, -t[2]));
   };
+  // ponto de pegada: o "buraco" do punho fechado (entre a palma sob o nó do dedo médio e a ponta
+  // do dedo médio dobrado). As armas encaixam o cabo aqui, como faziam com a luva de desenho.
+  setPose([0.95, 0.95, 0.95, 0.95], [0.5, -0.2, 0.3]);
+  root.updateMatrixWorld(true);
+  const inv = new THREE.Matrix4().copy(root.matrixWorld).invert(), wp = (o) => o.getWorldPosition(new THREE.Vector3()).applyMatrix4(inv);
+  let gripOff = [0, 0.03, 0.07];
+  if (bones.d1_0 && bones.d1_2) {
+    const knuckle = wp(bones.d1_0), tip = wp(bones.d1_2), palm = knuckle.clone(); palm.y -= 0.018;
+    const hole = palm.lerp(tip, 0.5);
+    gripOff = [-hole.x, -hole.y, -hole.z];
+  }
   setPose([0.3, 0.3, 0.3, 0.3], [0.5, -0.2, 0.3]);
-  return { root, setPose, real: true };
+  return { root, setPose, real: true, gripOff };
 }
