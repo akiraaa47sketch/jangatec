@@ -1,6 +1,7 @@
 // Personagem "Pílula": modelo procedural personalizável (cápsula, rostos, luvas, calçados e
 // chapéus) + animação própria. Altura do modelo ≈ 3,24 unidades; o jogo escala para ~1,75 m.
 import * as THREE from '../three.js';
+import { attachRealHands, animateRealHands } from './pillhands.js';
 
 // ---------- opções de personalização ----------
 const C = (nome, hex) => ({ nome, hex });
@@ -474,6 +475,8 @@ export function makePill(options = {}) {
     const shoulder = new THREE.Group(); shoulder.position.set(side * (R - 0.03), SEAM_Y - 0.12, 0); body.add(shoulder);
     shoulder.add(limb([new THREE.Vector3(0, 0, 0), new THREE.Vector3(side * 0.12, -0.15, 0), new THREE.Vector3(side * 0.16, -0.42, 0.02), new THREE.Vector3(side * 0.15, -0.62, 0.04)], limbMat));
     const gl = glove(gloveMat); gl.position.set(side * 0.15, -0.84, 0.05); gl.rotation.z = side * 0.1; shoulder.add(gl);
+    gl.userData.wrist = new THREE.Vector3(side * 0.15, -0.6, 0.04); // fim do braço: onde entra o pulso da mão 3D
+    (parts.gloves || (parts.gloves = {}))[side < 0 ? 'R' : 'L'] = gl;
     if (side < 0) gl.scale.x = -1;
     if (o.spikes) { // luva com cravos
       const spikeMat = new THREE.MeshStandardMaterial({ color: 0xc9ccd0, metalness: 0.8, roughness: 0.3 });
@@ -483,7 +486,7 @@ export function makePill(options = {}) {
       }
     }
     if (o.hook && side > 0) { // gancho de pirata na mão esquerda
-      gl.clear();
+      gl.clear(); gl.userData.hook = true;
       const steel = new THREE.MeshStandardMaterial({ color: 0xb8bcc0, metalness: 0.9, roughness: 0.25 });
       const cup = new THREE.Mesh(new THREE.CylinderGeometry(0.1, 0.13, 0.16, 16), matte(0x3a2a1c, 0.8)); cup.position.y = 0.12; gl.add(cup);
       const hk = new THREE.Mesh(new THREE.TorusGeometry(0.11, 0.025, 8, 20, Math.PI * 1.3), steel); hk.position.set(0, -0.06, 0.05); hk.rotation.set(0, Math.PI / 2, 0.3); gl.add(hk);
@@ -504,13 +507,14 @@ export function makePill(options = {}) {
   root.userData.parts = parts; root.userData.phase = 0; root.userData.pill = o; root.userData.face = face;
   root.userData.blinkT = 1 + Math.random() * 3;
   root.traverse((m) => { if (m.isMesh) { m.castShadow = true; m.receiveShadow = true; } });
+  if (!options.npc) attachRealHands(root, 1 / PILL_SCALE); // jogadores: mãos 3D (iguais às da 1ª pessoa)
   return root;
 }
 
 export function disposePill(pill) {
   const face = pill.userData.face && pill.userData.face.mesh;
   pill.traverse((m) => {
-    if (!m.isMesh) return;
+    if (!m.isMesh || m.userData.sharedGeo) return; // mão 3D: geometria compartilhada com as outras
     m.geometry.dispose();
     if (m === face) { m.material.dispose(); return; } // quadros do rosto são compartilhados
     if (m.material.map) m.material.map.dispose();
@@ -521,6 +525,7 @@ export function disposePill(pill) {
 // poses: walk | attack | aim | reload | use | throw | strum | hammer | climb | vault | swim | jump | row | leap
 //        | windup | heavyWindup | slam | guard | stagger | dodge | slashR | slashL | thrust | uppercut | spin
 //        | parry | roll | sidestep | crawl | kick | clash
+const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
 const smooth01 = (x) => { x = Math.max(0, Math.min(1, x)); return x * x * (3 - 2 * x); };
 // Partes animadas: a pose calcula o ALVO e animatePill mistura suavemente do quadro anterior para
 // ele (sem "estalos" ao trocar de pose). Ângulos misturados pelo caminho mais curto (giros de 360°).
@@ -545,6 +550,8 @@ export function animatePill(pill, speed, dt, pose = 'walk', progress = 0) {
   p.body.position.y = _snap[15] + (p.body.position.y - _snap[15]) * k;
   p.body.position.z = _snap[16] + (p.body.position.z - _snap[16]) * k;
   animateFace(pill.userData, dt);
+  pill.userData.pose = pose;
+  animateRealHands(pill, dt);
 }
 
 // Pisca de vez em quando; a boca abre conforme o volume da voz (userData.talk 0..1, chat de voz).
@@ -576,7 +583,10 @@ function poseTargets(pill, speed, dt, pose, progress) {
   const look = ud.idleT > 3 ? Math.sin(ud.idleT * 0.7) * 0.25 * Math.min(1, (ud.idleT - 3) * 0.5) : 0;
   p.body.position.y = BODY_Y + Math.abs(Math.cos(ph)) * (0.06 + run * 0.08) * k + breathe * 0.015;
   p.body.position.z = 0;
-  p.body.rotation.set((0.05 + run * 0.2) * k - back * 0.12, look + c * 0.04 * k, c * (0.06 + run * 0.03) * k + side * 0.12 * k);
+  // inclina para dentro da curva e para a frente/trás ao acelerar/frear (ud.turn, ud.accel vêm do jogador);
+  // parado, troca o peso de um pé para o outro devagar
+  const turn = clamp(ud.turn || 0, -3, 3), acc = clamp(ud.accel || 0, -8, 8), sway = Math.sin((ud.idleT || 0) * 0.8) * 0.035 * (1 - k);
+  p.body.rotation.set((0.05 + run * 0.2) * k - back * 0.12 + acc * 0.012, look + c * (0.07 + run * 0.03) * k, c * (0.06 + run * 0.03) * k + side * 0.12 * k - turn * 0.045 * k + sway);
   const stride = (0.55 + run * 0.35) * k * (back ? 0.8 : 1);
   if (side) { // passo lateral: pernas abrem e fecham
     p.legL.rotation.set(0, 0, Math.max(0, c) * 0.45 * k); p.legR.rotation.set(0, 0, -Math.max(0, -c) * 0.45 * k);

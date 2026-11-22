@@ -85,6 +85,8 @@ export class Combat {
     const model = buildWeapon(id);
     if (model) { model.flashMesh.visible = false; (id === 'banjo' && chest ? chest : mesh).add(model.group); }
     this.G.player.flashMesh = model && model.muzzle ? model.flashMesh : null;
+    this.G.player.weaponSpec = id === 'banjo' ? null : model; // pegada da 3ª pessoa = pegada da 1ª
+    this.G.player.fitWeapon3P();
     mesh.visible = !this.buildMode;
     return true;
   }

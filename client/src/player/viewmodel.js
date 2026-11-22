@@ -36,6 +36,21 @@ class Spring {
   }
 }
 
+// Nado de peito (mão direita; a esquerda é espelhada): deslize com as mãos juntas à frente →
+// abre para os lados com as palmas para fora → puxa para baixo/trás → recolhe sob o queixo →
+// estica de novo. [tempo, [x, y, z, rx, ry, rz]] no espaço do viewmodel.
+const SWIM_STROKE = [
+  [0, [0.07, -0.13, -0.56, 0.05, 0, 0.15]],
+  [0.18, [0.09, -0.13, -0.57, 0.05, 0, 0.3]],     // deslize (segura um pouco)
+  [0.4, [0.34, -0.17, -0.47, 0.0, 0, 1.1]],       // abre, palma para fora
+  [0.6, [0.25, -0.34, -0.27, -1.1, 0, 0.6]],      // puxa: palma para trás, dedos para baixo
+  [0.78, [0.07, -0.25, -0.3, 0.25, 0, -1.25]],    // recolhe sob o queixo, palmas juntas
+  [0.9, [0.06, -0.17, -0.47, 0.1, 0, -0.5]],      // estica para a frente
+  [1, [0.07, -0.13, -0.56, 0.05, 0, 0.15]],
+];
+// dedos: esticados no deslize, um pouco fechados na puxada
+const sampleCurl = (u) => (u > 0.4 && u < 0.78 ? 0.08 + 0.12 * Math.sin((u - 0.4) / 0.38 * Math.PI) : 0.05);
+
 // Keyframes [tempo, [px, py, pz, rx, ry, rz]] relativos à pose de empunhadura.
 const SWINGS = {
   parry: [ // tapa a arma para fora, desviando o golpe
@@ -320,6 +335,7 @@ export class ViewModel {
 
     // ---- estado do jogador ----
     const speed = Math.hypot(b.vel.x, b.vel.z);
+    this.speedNow = speed;
     const grounded = b.grounded && !pl.swimming;
     const w = cb.weapon;
     const shownIsCurrent = this.shownId === cb.weaponId;
@@ -553,6 +569,7 @@ export class ViewModel {
     this.camOff.y = (-Math.abs(Math.cos(bp)) * 0.025 * this.bobAmp * (1 - adsEff * 0.8) + land * 0.06) * bobK;
     this.camOff.roll = Math.sin(bp) * 0.006 * this.bobAmp * (1 - adsEff * 0.8) * bobK + shakeR * 0.03 * shk;
     this.camOff.pitch = shake * 0.02 * shk + land * 0.02 * bobK;
+    if (this.swimCam) { this.camOff.y += this.swimCam.y; this.camOff.pitch += this.swimCam.pitch; this.camOff.roll += this.swimCam.roll; }
     const baseFov = this.sprint > 0.01 ? 75 + 5 * this.sprint : 75;
     this.fovTarget = spec && spec.type !== 'melee' ? lerp(baseFov, spec.adsFov, adsEff) : baseFov;
 
@@ -727,17 +744,34 @@ export class ViewModel {
       mix(hands[0], V(0.2 + bob + sway, -0.13, -0.4), eulerQ([-0.15, 0.25, -0.5]), [0.65, 0.65, 0.65, 0.65], wt.carry);
       mix(hands[1], V(-0.2 + bob + sway, -0.13, -0.4), eulerQ(mirrorEuler([-0.15, 0.25, -0.5])), [0.65, 0.65, 0.65, 0.65], wt.carry);
     }
-    // nadando: braçadas alternadas
+    // nadando: nado de peito andando, "pedalando a água" parado (mistura pela velocidade)
     if (wt.swim > 0.001) {
-      this.swimPhase += dt * 3.2;
+      const sp = clamp((this.speedNow || 0) / CFG.swim, 0, 1);
+      this.swimMove = approach(this.swimMove || 0, sp > 0.25 ? 1 : 0, dt * 2.5);
+      const m = this.swimMove;
+      this.swimPhase = (this.swimPhase + dt * (0.45 + 0.4 * sp) * (m > 0.05 ? 1 : 0)) % 1;   // ciclos por segundo
+      this.treadT = (this.treadT || 0) + dt;
+      const u = this.swimPhase, tt = this.treadT;
       for (let i = 0; i < 2; i++) {
-        const ph = this.swimPhase + i * Math.PI, sd = i === 0 ? 1 : -1;
-        const reach = Math.sin(ph), lift = Math.max(0, Math.cos(ph));
-        const p = V(sd * (0.12 + 0.02 * reach), -0.08 + 0.05 * lift, -0.38 - 0.06 * reach);
-        const rr = [-0.6 - 0.35 * lift, sd * -0.1, -sd * 0.15 - 0.2 * sd];
-        mix(hands[i], p, eulerQ(i === 0 ? rr : mirrorEuler(rr)), [0.12, 0.12, 0.12, 0.12], wt.swim);
+        const sd = i === 0 ? 1 : -1;
+        // braçada (mão direita): [x, y, z, rx, ry, rz]; a esquerda é espelhada
+        const st = sampleKeys(SWIM_STROKE, (u + i * 0.02) % 1);
+        // pedalando: mãos baixas na frente, abanando de leve com as palmas para baixo
+        const sc = Math.sin(tt * 2.4 + i * 0.6);
+        const tr = [0.2 + 0.05 * sc, -0.26 + 0.015 * Math.cos(tt * 4.8), -0.46, -0.2, 0, 0.45 * sc];
+        const f = lerpArr(tr, st, m);
+        const rr = [f[3], f[4], f[5]];
+        const curl = lerp(0.12, sampleCurl(u), m);
+        mix(hands[i], V(sd * f[0], f[1], f[2]), eulerQ(i === 0 ? rr : mirrorEuler(rr)), [curl, curl, curl, curl], wt.swim);
       }
-    }
+      // cabeça sobe na puxada e afunda um pouco no deslize; boia de leve quando parado
+      const pull = Math.sin(clamp((u - 0.28) / 0.5, 0, 1) * Math.PI);
+      this.swimCam = {
+        y: lerp(0.018 * Math.sin(tt * 2.1), 0.07 * pull - 0.03, m) * wt.swim,
+        pitch: lerp(0.01 * Math.sin(tt * 2.1 + 1), -0.05 * pull + 0.025, m) * wt.swim,
+        roll: lerp(0.012 * Math.sin(tt * 1.3), 0.008 * Math.sin(u * Math.PI * 2), m) * wt.swim,
+      };
+    } else this.swimCam = null;
     // escalando / pulando uma borda
     if (wt.mantle > 0.001) {
       const u = this.mantleU;

@@ -52,14 +52,17 @@ export function gunModel(id) {
 // ---------- mãos realistas (GLB com esqueleto) ----------
 // Mesma API das mãos procedurais: { root, setPose(c[4] = dobra de cada dedo, t[3] = polegar) }.
 // Origem no punho, dedos para -Z, palma para -Y, polegar em -X; a esquerda é a direita espelhada.
-let handScene = null;
-export function preloadHand(url) {
+// Duas versões: 'fp' (detalhada, 1ª pessoa) e '3p' (leve, para as pílulas em 3ª pessoa).
+const handScenes = {};
+export const handReady = (lod = 'fp') => !!handScenes[lod];
+export function preloadHand(url, lod = 'fp') {
   const loader = new GLTFLoader(); loader.setMeshoptDecoder(MeshoptDecoder);
-  return loader.loadAsync(url).then((gltf) => { handScene = gltf.scene; return true; })
+  return loader.loadAsync(url).then((gltf) => { handScenes[lod] = gltf.scene; return true; })
     .catch((e) => { console.warn('Mãos 3D não carregaram:', e); return false; });
 }
 const _q = new THREE.Quaternion(), _e = new THREE.Euler(), X = new THREE.Vector3(1, 0, 0);
-export function buildRealHand(mirror = false, gloveMat = null) {
+export function buildRealHand(mirror = false, gloveMat = null, lod = 'fp') {
+  const handScene = handScenes[lod];
   if (!handScene) return null;
   const root = new THREE.Group(), inner = cloneSkinned(handScene);
   inner.scale.setScalar(1.06); // luva no formato natural da mão
