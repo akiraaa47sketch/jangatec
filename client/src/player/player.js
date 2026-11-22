@@ -1,6 +1,7 @@
 // Personagem em terceira pessoa: andar/correr/pular, nado, parkour (vault + agarrar/subir
 // bordas com a mesma mecânica de "mantle") e câmera com colisão.
 import * as THREE from '../three.js';
+import { fitWeaponToHand } from './pillhands.js';
 import { rot, clamp, lerp, lerpAngle } from '../core/util.js';
 import { CFG } from '../config.js';
 import { waveHeight } from '../world/ocean.js';
@@ -80,10 +81,21 @@ export class Player {
     this.chestMount.position.set(0.05, -0.45, 0.62);
     this.chestMount.rotation.set(0.15, Math.PI, 0);
     this.chestMount.scale.setScalar(1.15 / PILL_SCALE);
+    pill.userData.onHands = () => this.fitWeapon3P(); // as mãos 3D chegaram depois: reencaixa a arma
+    this.fitWeapon3P();
+    if (this.G.viewmodel) this.G.viewmodel.setGloveColor(this.appearance.pill);
+  }
+
+  // Arma em 3ª pessoa: com a mão 3D, usa a mesma pegada da 1ª pessoa; sem ela, o encaixe antigo na luva.
+  fitWeapon3P() {
+    const pill = this.pillVisual && this.pillVisual.children[0];
+    if (!pill) return;
+    const parts = pill.userData.parts;
+    if (this.weaponMesh.parent !== parts.hand) parts.hand.add(this.weaponMesh);
+    if (fitWeaponToHand(pill, this.weaponMesh, this.weaponSpec)) return;
     this.weaponMesh.position.set(0, 0, 0);
     this.weaponMesh.rotation.set(-Math.PI / 2, 0, Math.PI); // cano (-Z) segue o braço; topo para cima ao mirar
     this.weaponMesh.scale.setScalar(1.5 / PILL_SCALE); // arma "de desenho": um pouco maior
-    if (this.G.viewmodel) this.G.viewmodel.setGloveColor(this.appearance.pill);
   }
 
   // Tiro em 3ª pessoa: tranco nos braços, clarão na boca do cano e pose de mira por um instante.
@@ -292,6 +304,10 @@ export class Player {
       if (sp > 0.5) { pd.mf = (vx * Math.sin(this.yaw) + vz * Math.cos(this.yaw)) / sp; pd.ms = (vx * Math.cos(this.yaw) - vz * Math.sin(this.yaw)) / sp; }
       else { pd.mf = 1; pd.ms = 0; }
       pd.vy = b.vel.y;
+      // curva e aceleração (suavizadas) para a inclinação do corpo
+      let dyaw = this.yaw - (this._prevYaw ?? this.yaw); dyaw = Math.atan2(Math.sin(dyaw), Math.cos(dyaw)); this._prevYaw = this.yaw;
+      pd.turn = (pd.turn || 0) + ((dt > 0 ? dyaw / dt : 0) - (pd.turn || 0)) * Math.min(1, 6 * dt);
+      pd.accel = (pd.accel || 0) + ((dt > 0 ? (sp - (this._prevSp ?? sp)) / dt : 0) - (pd.accel || 0)) * Math.min(1, 5 * dt); this._prevSp = sp;
       pd.armed = !w ? 'none' : w.tool && w.tool !== 'martelo' ? 'tool' : w.melee ? 'melee' : GUN_TYPE[w.id] || 'pistol';
       pd.gunType = GUN_TYPE[w && w.id] || 'pistol';
       pd.reloadKind = w && w.id === 'escopeta' ? 'shotgun' : w && w.id === 'revolver' ? 'revolver' : 'mag';

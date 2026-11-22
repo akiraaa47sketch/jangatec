@@ -3,7 +3,7 @@
 import * as THREE from '../three.js';
 import {
   makePill, animatePill, disposePill, sanitizePill, randomPill,
-  PILL_COLORS, PILL_BASE_COLORS, PILL_FACES, PILL_BOOTS, PILL_HATS, PILL_DEFAULT, PILL_SCALE,
+  PILL_COLORS, PILL_BASE_COLORS, PILL_FACES, PILL_BOOTS, PILL_HATS, PILL_DEFAULT, PILL_SCALE, PILL_OUTFITS, PILL_BACKS,
 } from '../player/pill.js';
 
 const KEY = 'mare-alta-aparencia';
@@ -41,7 +41,7 @@ export class CharacterMenu {
 
   buildControls() {
     const fill = (id, list) => { $(id).replaceChildren(...list.map((o) => new Option(o.nome, o.id))); };
-    fill('pillFace', PILL_FACES); fill('pillBoots', PILL_BOOTS); fill('pillHat', PILL_HATS);
+    fill('pillFace', PILL_FACES); fill('pillBoots', PILL_BOOTS); fill('pillHat', PILL_HATS); fill('pillOutfit', PILL_OUTFITS); fill('pillBack', PILL_BACKS);
     for (const box of document.querySelectorAll('.swatches')) {
       const key = box.dataset.key, list = key === 'base' ? PILL_BASE_COLORS : PILL_COLORS;
       box.replaceChildren(...list.map((c, i) => {
@@ -55,12 +55,15 @@ export class CharacterMenu {
     $('pillFace').onchange = (e) => { this.state.pill.face = e.target.value; this.changed(); };
     $('pillBoots').onchange = (e) => { this.state.pill.boots = e.target.value; this.changed(); };
     $('pillHat').onchange = (e) => { this.state.pill.hat = e.target.value; this.changed(); };
+    $('pillOutfit').onchange = (e) => { this.state.pill.outfit = e.target.value; this.changed(); };
+    $('pillBack').onchange = (e) => { this.state.pill.back = e.target.value; this.changed(); };
     $('pillRandom').onclick = () => { this.state.pill = randomPill(); this.changed(); };
   }
 
   syncControls() {
     const s = this.state;
     $('pillFace').value = s.pill.face; $('pillBoots').value = s.pill.boots; $('pillHat').value = s.pill.hat;
+    $('pillOutfit').value = s.pill.outfit; $('pillBack').value = s.pill.back;
     for (const box of document.querySelectorAll('.swatches')) {
       [...box.children].forEach((b, i) => b.classList.toggle('sel', i === s.pill[box.dataset.key]));
     }

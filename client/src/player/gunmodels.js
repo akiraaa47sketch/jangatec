@@ -52,14 +52,17 @@ export function gunModel(id) {
 // ---------- mãos realistas (GLB com esqueleto) ----------
 // Mesma API das mãos procedurais: { root, setPose(c[4] = dobra de cada dedo, t[3] = polegar) }.
 // Origem no punho, dedos para -Z, palma para -Y, polegar em -X; a esquerda é a direita espelhada.
-let handScene = null;
-export function preloadHand(url) {
+// Duas versões: 'fp' (detalhada, 1ª pessoa) e '3p' (leve, para as pílulas em 3ª pessoa).
+const handScenes = {};
+export const handReady = (lod = 'fp') => !!handScenes[lod];
+export function preloadHand(url, lod = 'fp') {
   const loader = new GLTFLoader(); loader.setMeshoptDecoder(MeshoptDecoder);
-  return loader.loadAsync(url).then((gltf) => { handScene = gltf.scene; return true; })
+  return loader.loadAsync(url).then((gltf) => { handScenes[lod] = gltf.scene; return true; })
     .catch((e) => { console.warn('Mãos 3D não carregaram:', e); return false; });
 }
 const _q = new THREE.Quaternion(), _e = new THREE.Euler(), X = new THREE.Vector3(1, 0, 0);
-export function buildRealHand(mirror = false, gloveMat = null) {
+export function buildRealHand(mirror = false, gloveMat = null, lod = 'fp') {
+  const handScene = handScenes[lod];
   if (!handScene) return null;
   const root = new THREE.Group(), inner = cloneSkinned(handScene);
   inner.scale.setScalar(1.06); // luva no formato natural da mão
@@ -79,9 +82,11 @@ export function buildRealHand(mirror = false, gloveMat = null) {
   const fingers = [0, 1, 2, 3].map((f) => [0, 1, 2].map((j) => bones[`d${f}_${j}`]));
   const BEND = [1.2, 1.4, 0.9];
   // pose ABSOLUTA: dobra 0 = dedo reto (desfaz a dobra que o modelo já tinha), como a luva antiga
-  const setPose = (c, t) => {
+  // jm (opcional): multiplica a dobra de cada junta [base, meio, ponta] — cabos grossos pedem a base
+  // menos dobrada e as pontas mais, para os dedos contornarem o cabo em vez de entrarem nele
+  const setPose = (c, t, jm = null) => {
     fingers.forEach((chain, f) => chain.forEach((b, j) => {
-      if (b) b.quaternion.copy(b.userData.q0).multiply(_q.setFromAxisAngle(X, -b.userData.rest - c[f] * BEND[j]));
+      if (b) b.quaternion.copy(b.userData.q0).multiply(_q.setFromAxisAngle(X, -b.userData.rest - c[f] * BEND[j] * (jm ? jm[j] : 1)));
     }));
     const t0 = bones.pol_0, t1 = bones.pol_1;
     if (t0) t0.quaternion.copy(t0.userData.q0).multiply(_q.setFromEuler(_e.set(t[1] * 0.8, t[0] * 0.8, 0)));
