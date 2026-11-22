@@ -225,6 +225,9 @@ function hotkeys() {
   if (inp.mouse.wheel) G.combat.cycle(Math.sign(inp.mouse.wheel));
   if (inp.act('bandage')) G.survival.use('bandagem');
   if (inp.act('medkit')) G.survival.use('kit');
+  if (inp.act('food1')) G.survival.use('barra_proteina');
+  if (inp.act('food2')) G.survival.use('energetico');
+  if (inp.act('food3')) G.survival.use('chocolate');
 }
 
 function frame() {

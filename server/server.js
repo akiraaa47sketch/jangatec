@@ -72,8 +72,8 @@ function canReachMast(room, ws) {
 }
 
 function validCrateId(id, seed, message) {
-  const match = typeof id === 'string' && /^[ib](-?\d+),(-?\d+)c(\d+)$/.exec(id);
-  if (!match || Number(match[3]) > 2 || !isGeneratedCrate(seed, id)) return false;
+  const match = typeof id === 'string' && /^[ibs](-?\d+),(-?\d+)c(\d+)$/.exec(id);
+  if (!match || Number(match[3]) > 6 || !isGeneratedCrate(seed, id)) return false;
   const cx = Number(match[1]), cz = Number(match[2]);
   return Number.isFinite(message.x) && Number.isFinite(message.z) &&
     Math.abs(message.x - cx * WORLD_LOOT_PARAMS.chunkSize) <= 32 &&
@@ -203,7 +203,7 @@ function handle(ws, m) {
       const crate = room.crates.get(m.id);
       if (!validCrateId(m.id, room.seed, m) || !ws.openedCrates.has(m.id) || !crate ||
           !canReachCrate(room, ws, m) || typeof m.item !== 'string' ||
-          !/^(madeira|metal|pano|bandagem|kit|municao|cartucho|canhao|bala_canhao|arma_[a-z0-9_]+)$/.test(m.item)) {
+          !/^(metal|bandagem|kit|municao|cartucho|canhao|gancho|bala_canhao|barra_proteina|energetico|chocolate|arma_[a-z0-9_]+)$/.test(m.item)) {
         send(ws, { t: 'crate:error', id: m.id });
         break;
       }
@@ -220,6 +220,13 @@ function handle(ws, m) {
         room.collected.push(m.id);
       }
       broadcast(room, { t: 'crate:state', id: crate.id, loot: crate.loot });
+      break;
+    }
+    case 'drag': { // peça sendo arrastada: posição/rotação para os outros (não guarda estado)
+      if (typeof m.id !== 'string' || m.id.length > 80 || !Array.isArray(m.p) || m.p.length !== 3 ||
+          !Array.isArray(m.q) || m.q.length !== 4 || ![...m.p, ...m.q].every(Number.isFinite)) break;
+      const now = Date.now(); if (now - (ws.lastDrag || 0) < 40) break; ws.lastDrag = now; // anti-spam
+      broadcast(room, { t: 'drag', id: m.id, p: m.p, q: m.q, from: ws.id }, ws);
       break;
     }
     case 'carry': {

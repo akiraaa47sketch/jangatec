@@ -74,7 +74,7 @@ export class Melee {
   }
 
   get weapon() { const w = this.G.combat.weapon; return w && w.melee ? w : null; }
-  spend(n) { this.stamina = Math.max(0, this.stamina - n); this.stamDelay = MELEE.stamina.delay; }
+  spend(n) { this.stamina = Math.max(0, this.stamina - n * (this.G.survival ? this.G.survival.staminaMul : 1)); this.stamDelay = MELEE.stamina.delay; }
 
   // ---------- jogador ----------
   update(dt) {
@@ -163,7 +163,8 @@ export class Melee {
     const finisher = !heavy && step === 2;
     this.combo = heavy ? 0 : (step + 1) % 3; this.comboT = MELEE.light.window;
     // golpes rápidos; o combo alterna corte direita/revés e fecha com um final variado
-    const dur = heavy ? clamp(w.rate * 0.95, 0.38, 0.55) : clamp(w.rate * (finisher ? 0.68 : 0.55), 0.2, 0.36);
+    // golpe com um leve atraso (peso da arma): o leve leva ~0,3 s e o impacto vem perto da metade
+    const dur = heavy ? clamp(w.rate * 1.05, 0.42, 0.6) : clamp(w.rate * (finisher ? 0.82 : 0.68), 0.27, 0.44);
     const pick = (l) => l[(Math.random() * l.length) | 0];
     let pose = heavy ? pick(['slam', 'spin']) : finisher ? pick(['thrust', 'uppercut', 'spin']) : step === 0 ? 'slashR' : 'slashL';
     if (w.tool === 'martelo') pose = heavy ? 'slam' : 'hammer'; // martelo: marteladas de cima para baixo
@@ -242,7 +243,7 @@ export class Melee {
         this.clashEnemy(e, dx / d, dz / d);
         continue;
       }
-      let dmg = w.dmg * mult, label = null, color = '#ffffff', sound = 'hit';
+      let dmg = w.dmg * mult * G.survival.dmgMul, label = null, color = '#ffffff', sound = 'hit';
       if (ms.state === 'stagger') { dmg *= MELEE.crit; label = 'CRÍTICO'; color = '#ffb347'; }
       else if (ms.state === 'clashed') { dmg *= 1.4; label = 'ABERTO'; color = '#ffe9a8'; }
       else if (ms.state === 'guard' && front) {

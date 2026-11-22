@@ -31,7 +31,7 @@ export const NAVAL = {
   maxDuration: 330,           // depois disso os navios restantes fogem
 };
 export const HOOK_TURRET = { speed: 34, range: 34 };
-export const PIECE_HP = { piso: 240, plataforma: 240, tabua: 70, bloco: 130, rampa: 110, escada: 100, parede: 120, suporte: 60, chapa: 230, canhao: 160, gancho: 140 };
+export const PIECE_HP = { piso: 240, plataforma: 240, tabua: 70, bloco: 130, rampa: 110, escada: 100, parede: 120, suporte: 60, chapa: 230, canhao: 160, gancho: 140, parede_plastico: 35, parede_ferro: 330 };
 const between = ([a, b]) => a + Math.random() * (b - a);
 const CHAR = new THREE.Color(0x2a1d14);
 const _v = new THREE.Vector3(), _w = new THREE.Vector3(), _q = new THREE.Quaternion();
@@ -111,7 +111,8 @@ export class Naval {
     if (piece.type === 'canhao') return PIECE_HP.canhao;
     const size = piece.physSize || (PIECES[piece.type] && PIECES[piece.type].size) || [1, 1, 1];
     const base = PIECE_HP[piece.type] || 90;
-    return Math.round(base * clamp(Math.sqrt(size[0] * size[2]) / 1.6, 0.6, 1.6)); // peça maior aguenta mais
+    const wall = String(piece.type).startsWith('parede') || piece.type === 'escada'; // paredes: conta a face (largura × altura)
+    return Math.round(base * clamp(Math.sqrt(size[0] * (wall ? size[1] : size[2])) / 1.6, 0.6, 1.6)); // peça maior aguenta mais
   }
   hpOf(piece) { return this.pieceHp.has(piece.id) ? this.pieceHp.get(piece.id) : this.maxHp(piece); }
   destructible(piece) { return !(piece.indestructible || piece.id === 'starter-platform' || piece.id === 'mastro' || piece.type === 'mastro'); }
@@ -402,6 +403,7 @@ export class Naval {
       hp: st.hp, max: st.max, sinkT: st.sink || 0, side: st.side || 1, R: st.R || 48, phase: Math.random() * 6,
       speed: 0, fireCd: between(NAVAL.ship.fireCd) + 3, roll: 0, pitch: 0, fires: [], scorch: 0,
       net: { x: st.x, z: st.z, yaw: st.yaw }, diff: st.diff || 0, retreat: false,
+      boarder: !!st.b, boardT: 0,
     };
     drawShipHp(s.data, s.hp / s.max);
     this.ships.set(s.id, s);
@@ -463,12 +465,32 @@ export class Naval {
     this._sendShips();
   }
 
+  // Invasão por abordagem: navio(s) surgem longe, vêm atirando, encostam e os piratas pulam a bordo.
+  // Não precisa ter canhão (é a ameaça que obriga a defender o convés).
+  startBoarding() {
+    const G = this.G, boat = G.boat, diff = G.world.difficulty(boat.x, boat.z);
+    const count = diff >= 3 && Math.random() < 0.5 ? 2 : 1;
+    const fx = Math.sin(boat.yaw), fz = Math.cos(boat.yaw), rx = fz, rz = -fx, flank = Math.random() < 0.5 ? 1 : -1;
+    for (let i = 0; i < count; i++) {
+      const side = i === 0 ? flank : -flank, ahead = 60 + Math.random() * 60, lat = side * (110 + Math.random() * 30);
+      const hp = NAVAL.ship.hp[Math.min(4, diff)] * 0.75;
+      this._spawnShip({
+        id: `board-${Date.now().toString(36)}-${i}`, x: boat.x + fx * ahead + rx * lat, z: boat.z + fz * ahead + rz * lat,
+        yaw: Math.atan2(-rx * side, -rz * side), hp, max: hp, side, R: 9, diff, b: 1,
+      });
+    }
+    this.active = true; this.battleT = 0;
+    G.hud.msg(count === 1 ? '☠ Navio de abordagem! Vai atirar e encostar na jangada' : '☠ Dois navios de abordagem cercando a jangada!');
+    if (G.hud.banner) G.hud.banner('☠ ABORDAGEM', 'Um navio pirata vem bombardeando e vai invadir o convés!', 'pirate', 6);
+    this._sendShips();
+  }
+
   _sendShips() {
     if (!this.G.net.online || !this._isHost()) return;
     const r = (x) => Math.round(x * 10) / 10;
     this.G.net.send({
       t: 'naval', k: 'ships', on: this.active ? 1 : 0,
-      s: [...this.ships.values()].map((s) => ({ id: s.id, x: r(s.x), z: r(s.z), yaw: Math.round(s.yaw * 100) / 100, hp: Math.round(s.hp), max: Math.round(s.max), sink: r(s.sinkT), side: s.side, R: r(s.R), diff: s.diff })),
+      s: [...this.ships.values()].map((s) => ({ id: s.id, x: r(s.x), z: r(s.z), yaw: Math.round(s.yaw * 100) / 100, hp: Math.round(s.hp), max: Math.round(s.max), sink: r(s.sinkT), side: s.side, R: r(s.R), diff: s.diff, b: s.boarder ? 1 : 0 })),
     });
   }
 
@@ -479,24 +501,30 @@ export class Naval {
     let tx, tz;
     if (s.retreat) { tx = s.x + Math.sin(s.yaw) * 100; tz = s.z + Math.cos(s.yaw) * 100; }
     else {
-      const along = Math.sin(this.t * 0.045 + s.phase) * 18;
+      const along = s.boarder ? 0 : Math.sin(this.t * 0.045 + s.phase) * 18; // abordagem: vem direto para o costado
       tx = boat.x + rx * s.side * s.R + fx * along; tz = boat.z + rz * s.side * s.R + fz * along;
     }
     const dx = tx - s.x, dz = tz - s.z, d = Math.hypot(dx, dz);
     // perto do ponto: navega paralelo à jangada (bordada virada para ela); longe: vai até lá
     const desired = d > 14 ? Math.atan2(dx, dz) : lerpAngle(boat.yaw, Math.atan2(dx, dz), d / 14);
+    if (s.boarder && !s.retreat) { // abordagem: encosta e acompanha a jangada; foge quando a tripulação morre
+      s.boardT += dt;
+      const crew = G.enemies.list.filter((e) => e.ship === s && e.state !== 'dead').length;
+      if (s.spawned && crew === 0 && s.boardT > 6) { s.retreat = true; G.hud.msg('O navio de abordagem está fugindo!'); }
+    }
     s.yaw = lerpAngle(s.yaw, desired, Math.min(1, 0.32 * dt));
-    const want = s.retreat ? 7 : clamp(boat.speed + d * 0.09, 1.2, boat.speed + 5);
+    const want = s.retreat ? 7 : clamp(boat.speed + d * (s.boarder ? 0.14 : 0.09), 1.2, boat.speed + (s.boarder ? 7 : 5));
     s.speed += (want - s.speed) * Math.min(1, 0.4 * dt);
     s.x += Math.sin(s.yaw) * s.speed * dt; s.z += Math.cos(s.yaw) * s.speed * dt;
     // não encostar na jangada
     const bx = s.x - boat.x, bz = s.z - boat.z, bd = Math.hypot(bx, bz);
-    if (bd < 22) { s.x += (bx / bd) * (22 - bd) * 0.5 * dt * 4; s.z += (bz / bd) * (22 - bd) * 0.5 * dt * 4; }
+    const minD = s.boarder && !s.retreat ? 8.5 : 22;
+    if (bd < minD) { s.x += (bx / bd) * (minD - bd) * 0.5 * dt * 4; s.z += (bz / bd) * (minD - bd) * 0.5 * dt * 4; }
     // tiro
     s.fireCd -= dt;
-    if (!s.retreat && s.fireCd <= 0 && bd < NAVAL.ship.range && G.startup.departed) {
+    if (!s.retreat && s.fireCd <= 0 && bd < NAVAL.ship.range && G.startup.departed && !(s.boarder && bd < 26)) { // abordagem: para de atirar ao encostar
       const n = [...this.ships.values()].filter((x) => x.sinkT <= 0).length;
-      s.fireCd = between(NAVAL.ship.fireCd) * (n > 1 ? 1.35 : 1);
+      s.fireCd = between(NAVAL.ship.fireCd) * (n > 1 ? 1.35 : 1) * (s.boarder ? 0.85 : 1);
       const [lx] = rot(boat.x - s.x, boat.z - s.z, -s.yaw);
       const ports = lx > 0 ? s.data.ports.left : s.data.ports.right;
       const salvo = 1 + (Math.random() < 0.35 + s.diff * 0.1 ? 1 : 0);
@@ -593,7 +621,7 @@ export class Naval {
       const a = Math.random() * 6.28, d = 3 + Math.random() * 5;
       const loot = i === 0
         ? { metal: 2 + ((Math.random() * 3) | 0), municao: 8 + diff * 2, bandagem: 1 }
-        : Math.random() < 0.5 ? { madeira: 3 + ((Math.random() * 3) | 0), pano: 2, cartucho: 4 } : { kit: 1, municao: 6, metal: 2 };
+        : Math.random() < 0.5 ? { cartucho: 4, barra_proteina: 1, chocolate: 1 } : { kit: 1, municao: 6, energetico: 1 };
       this._spawnCrate({ id: `crate-${s.id}-${i}`, x: s.x + Math.cos(a) * d, z: s.z + Math.sin(a) * d, vx: Math.cos(a) * 1.5, vz: Math.sin(a) * 1.5, loot });
     }
     this._sendCrates();
@@ -744,7 +772,12 @@ export class Naval {
       this.sendAcc += dt;
       if (this.sendAcc > 0.2) { this.sendAcc = 0; this._sendShips(); }
     }
-    for (const s of this.ships.values()) this._shipVisual(s, dt, t);
+    for (const s of this.ships.values()) {
+      this._shipVisual(s, dt, t);
+      if (s.boarder && !s.spawned && s.sinkT <= 0 && !s.retreat && Math.hypot(s.x - G.boat.x, s.z - G.boat.z) < 14) {
+        s.spawned = true; G.enemies.spawnBoarders(s);
+      }
+    }
     this.updateBalls(dt);
     this._updateCrates(dt, t);
     this.reload = Math.max(0, this.reload - dt);

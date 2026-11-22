@@ -22,6 +22,16 @@ export function wreckFor(seed, cx, cz) {
   };
 }
 
+// Caixotes de suprimento espalhados no fundo do mar (só dá para abrir com o mar seco).
+// ids s<cx>,<cz>c<n>; RNG próprio (não mexe no resto do mundo).
+export function seabedCratesFor(seed, cx, cz) {
+  if (Math.abs(cx) + Math.abs(cz) <= 1 || chunkHasIsland(seed, cx, cz)) return [];
+  const r = mulberry32(hash2(seed ^ 0x3c6ef372, cx, cz)), S = WORLD_LOOT_PARAMS.chunkSize, out = [];
+  const n = r() < 0.45 ? (r() < 0.35 ? 2 : 1) : 0;
+  for (let i = 0; i < n; i++) out.push({ x: cx * S + (r() - 0.5) * (S - 34), z: cz * S + (r() - 0.5) * (S - 34), yaw: r() * 6.28 }); // dentro do alcance que o servidor aceita (±32 m do centro)
+  return out;
+}
+
 export const LOOT_CONFIG = {
   starterCache: {
     id: 'i0,1c0',
@@ -37,31 +47,31 @@ export const LOOT_CONFIG = {
     {
       rarity: [0.76, 0.24, 0, 0, 0],
       resources: [
-        ['madeira', 2, 5, 5], ['pano', 1, 2, 2], ['bandagem', 1, 2, 1],
+        ['municao', 4, 8, 3], ['bandagem', 1, 2, 3], ['barra_proteina', 1, 1, 1], ['chocolate', 1, 1, 1], ['energetico', 1, 1, 1],
       ],
     },
     {
       rarity: [0.45, 0.43, 0.12, 0, 0],
       resources: [
-        ['madeira', 2, 5, 3], ['metal', 1, 3, 3], ['pano', 1, 3, 2], ['bandagem', 1, 2, 2],
+        ['municao', 5, 10, 3], ['cartucho', 2, 4, 1], ['bandagem', 1, 2, 3], ['barra_proteina', 1, 1, 1], ['chocolate', 1, 2, 1], ['energetico', 1, 1, 1],
       ],
     },
     {
       rarity: [0.2, 0.43, 0.3, 0.065, 0.005],
       resources: [
-        ['metal', 2, 5, 4], ['pano', 1, 3, 2], ['bandagem', 1, 3, 2], ['kit', 1, 1, 1],
+        ['municao', 6, 12, 3], ['cartucho', 3, 6, 2], ['bandagem', 1, 3, 2], ['kit', 1, 1, 1], ['barra_proteina', 1, 2, 1], ['chocolate', 1, 2, 1], ['energetico', 1, 2, 1],
       ],
     },
     {
       rarity: [0.07, 0.27, 0.42, 0.21, 0.03],
       resources: [
-        ['metal', 3, 7, 4], ['pano', 2, 5, 2], ['bandagem', 2, 4, 2], ['kit', 1, 2, 1],
+        ['municao', 8, 15, 3], ['cartucho', 4, 8, 2], ['bandagem', 2, 4, 2], ['kit', 1, 2, 1], ['barra_proteina', 1, 2, 1], ['chocolate', 1, 2, 1], ['energetico', 1, 2, 1],
       ],
     },
     {
       rarity: [0.01, 0.1, 0.31, 0.43, 0.15],
       resources: [
-        ['metal', 4, 9, 4], ['pano', 3, 6, 2], ['bandagem', 2, 5, 2], ['kit', 1, 2, 2],
+        ['municao', 10, 20, 3], ['cartucho', 5, 10, 2], ['bandagem', 2, 5, 2], ['kit', 1, 2, 2], ['barra_proteina', 1, 3, 1], ['chocolate', 1, 3, 1], ['energetico', 1, 3, 1],
       ],
     },
   ],
@@ -110,6 +120,17 @@ export function generateCrateLoot(seed, id, difficulty, playerCount = 1) {
   }
 
   const regionIndex = Math.max(0, Math.min(4, Math.floor(difficulty)));
+  if (id.startsWith('s')) { // caixote da seca: só o básico (curativo, munição, comida)
+    const random = seededRandom(seed, id), loot = {}, add = (k, n) => { loot[k] = (loot[k] || 0) + n; };
+    add('bandagem', 1 + (random() < 0.4 ? 1 : 0));
+    add('municao', 6 + Math.floor(random() * 8) + regionIndex * 2);
+    if (random() < 0.45) add('cartucho', 3 + Math.floor(random() * 4));
+    const foods = ['barra_proteina', 'energetico', 'chocolate'];
+    add(foods[Math.floor(random() * 3)], 1);
+    if (random() < 0.3) add(foods[Math.floor(random() * 3)], 1);
+    if (regionIndex >= 2 && random() < 0.2) add('kit', 1);
+    return loot;
+  }
   const region = LOOT_CONFIG.regions[regionIndex];
   const type = LOOT_CONFIG.crateTypes[regionIndex >= 3 ? 'danger' : 'supply'];
   const random = seededRandom(seed, id);
@@ -157,7 +178,7 @@ export function generateCrateLoot(seed, id, difficulty, playerCount = 1) {
 }
 
 export function difficultyForCrateId(id) {
-  const match = /^[ib](-?\d+),(-?\d+)c\d+$/.exec(id);
+  const match = /^[ibs](-?\d+),(-?\d+)c\d+$/.exec(id);
   if (!match) return 0;
   const x = Number(match[1]) * WORLD_LOOT_PARAMS.chunkSize;
   const z = Number(match[2]) * WORLD_LOOT_PARAMS.chunkSize;
@@ -167,34 +188,13 @@ export function difficultyForCrateId(id) {
 export function isGeneratedCrate(seed, id) {
   const wreck = /^b(-?\d+),(-?\d+)c(\d+)$/.exec(id);
   if (wreck) { const w = wreckFor(seed, Number(wreck[1]), Number(wreck[2])); return !!w && Number(wreck[3]) < w.crates; }
+  const sea = /^s(-?\d+),(-?\d+)c(\d+)$/.exec(id);
+  if (sea) return Number(sea[3]) < seabedCratesFor(seed, Number(sea[1]), Number(sea[2])).length;
   const match = /^i(-?\d+),(-?\d+)c(\d+)$/.exec(id);
   if (!match) return false;
   const cx = Number(match[1]), cz = Number(match[2]), crateIndex = Number(match[3]);
   if (cx === 0 && cz === 0) return false;
-  const starterIsland = cx === 0 && cz === 1;
-  const random = mulberry32(hash2(seed, cx, cz));
-  if (!starterIsland && random() >= WORLD_LOOT_PARAMS.islandChance) return false;
-  if (starterIsland) return crateIndex < 3;
-
-  random(); // Island X offset.
-  random(); // Island Z offset.
-  random(); // Island radius.
-  const houses = 1 + ((random() * 2) | 0);
-  let crateCount = 0;
-  for (let i = 0; i < houses; i++) {
-    random(); // House angle.
-    random(); // House distance.
-    random(); // House rotation.
-    random(); // First wall.
-    if (random() > 0.25) random(); // Optional wall height.
-    random(); // Third wall.
-    random(); // Door-wall height.
-    crateCount++;
-  }
-  if (random() < 0.6) {
-    random();
-    random();
-    crateCount++;
-  }
-  return crateIndex < crateCount;
+  if (cx === 0 && cz === 1) return crateIndex < 3; // ilha inicial
+  // ilha existe neste chunk; os caixotes dela (ruínas + acampamento) são no máximo 6
+  return chunkHasIsland(seed, cx, cz) && crateIndex < 6;
 }

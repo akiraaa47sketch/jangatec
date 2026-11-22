@@ -388,6 +388,15 @@ const HATS = {
     }
     return g;
   },
+  militar() { // capacete militar verde-oliva com tela e jugular
+    const g = new THREE.Group(), olive = matte(0x4b5530, 0.75);
+    g.add(hatShell(0.03, 0.05, olive));
+    g.add(hatBrim(domeR(0.05) + 0.02, domeR(0.05) + 0.09, 0.05, olive, 0.03, 0.03));
+    const net = new THREE.Mesh(new THREE.SphereGeometry(HAT_R + 0.04, 16, 8, 0, Math.PI * 2, 0, Math.acos(0.15 / (HAT_R + 0.04))), new THREE.MeshStandardMaterial({ color: 0x2f3420, wireframe: true }));
+    g.add(net);
+    g.add(hatBand(0.04, 0.11, 0.16, matte(0x2a2a20, 0.8)));
+    return g;
+  },
   capacete() { // capacete de ferro com chifres
     const g = new THREE.Group(), iron = new THREE.MeshStandardMaterial({ color: 0x5a5e63, metalness: 0.75, roughness: 0.4 });
     g.add(hatShell(0.03, 0.04, iron));

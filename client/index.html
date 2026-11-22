@@ -39,6 +39,7 @@
       <div class="bar"><i><b id="vida" class="vida"></b></i></div>
       <div class="bar stam"><i><b id="stamina"></b></i></div>
       <div id="inv"></div>
+      <div id="buffs"></div>
     </div>
   </div>
   <div id="weapon" class="panel"></div>
@@ -75,6 +76,12 @@
 <div id="gfxPanel" hidden>
   <header><h2>Gráficos</h2><span><button id="keysOpen" type="button" class="gfx-btn">⌨ Teclas</button> <button id="gfxClose" type="button">Fechar</button></span></header>
   <label class="slider">Volume dos efeitos <input id="sfxVolGame" type="range" min="0" max="150" step="5"></label>
+  <h3 class="gfx-sec">Câmera</h3>
+  <label class="slider">FOV 1ª pessoa <span id="g_fov1pV"></span><input id="g_fov1p" type="range" min="60" max="110" step="1"></label>
+  <label class="slider">FOV 3ª pessoa <span id="g_fov3pV"></span><input id="g_fov3p" type="range" min="50" max="100" step="1"></label>
+  <label class="slider">Sensibilidade 1ª pessoa <span id="g_sens1pV"></span><input id="g_sens1p" type="range" min="10" max="300" step="5"></label>
+  <label class="slider">Sensibilidade 3ª pessoa <span id="g_sens3pV"></span><input id="g_sens3p" type="range" min="10" max="300" step="5"></label>
+  <label class="slider">Sensibilidade mirando <span id="g_sensAimV"></span><input id="g_sensAim" type="range" min="10" max="200" step="5"></label>
   <label>Predefinição <select id="gPreset"></select></label>
   <label>Modo FSR <select id="gFsr"></select></label>
   <label class="slider">Escala de renderização <input id="gScale" type="range" min="33" max="100" step="1"><small id="gScaleVal"></small></label>
@@ -149,7 +156,7 @@
     <p>Todos começam em terra, com uma arma improvisada. Pegue a plataforma de madeira grande e solde-a no único contorno do convés com [Z]. A plataforma central e o ponto do mastro são fixos.<br>
     Quando o convés estiver pronto, instale a vela com [E] junto ao mastro. Haverá calmaria, mudança gradual do clima e uma inundação jogável; embarque para a jangada partir.<br>
     Depois da partida, o barco segue uma rota linear pelo oceano. Use a vela [E] para avançar.<br>
-    O ângulo da vela [Z/C] faz pequenos ajustes de curso.<br>
+    O ângulo da vela [Z/C] vira a jangada até ~60° para cada lado ([Z] esquerda, [C] direita); solte e ela volta ao rumo norte.<br>
     <b>O controle 360° é desbloqueado apenas na batalha final.</b></p>
     <h3>Perigos do mar</h3>
     <p><b>🌊 Onda gigante:</b> chega sem aviso — repare no mar levantando no horizonte. Baixe a vela [E] e fique perto do mastro para se segurar. Com a vela cheia a jangada é arremessada e todos a bordo se machucam.<br>
@@ -157,7 +164,7 @@
     <b>⛈ Tempestade forte:</b> o céu fecha, cai muito raio e uma série de ondas gigantes vem de lados diferentes chacoalhando a jangada. Fique perto do mastro para não ser jogado longe.<br>
     <b>🌀 No redemoinho</b> o vento empurra quem está a bordo para FORA: ande contra ele (na direção do redemoinho) para se firmar, ou você escorrega e cai — e na água o redemoinho te puxa.<br>
     <b>🏝 Mar cheio / Mar seco:</b> depois da partida o mar alterna entre cheio e totalmente seco — fique de olho na água baixando. Seco, o fundo do mar vira chão: ande à vontade, junte destroços — os de metal afundam e só aparecem aí — e saqueie naufrágios com baús. A jangada fica encalhada até a água voltar; quem estiver longe precisa nadar de volta!<br>
-    <b>☠ Piratas:</b> invasões raras e anunciadas; as balsas aparecem ao longe, remando até a jangada.</p>
+    <b>☠ Piratas:</b> invasões anunciadas: às vezes balsas remando até a jangada; às vezes um <b>navio de abordagem</b> que vem de longe bombardeando com canhão, encosta no costado e a tripulação pula de corda para o convés — derrote todos e o navio foge.</p>
     <h3>Duelo de espadas</h3>
     <p>O golpe leve sai no clique; clique de novo durante o golpe para emendar o combo. <b>Espada com espada:</b> se você golpear enquanto o inimigo também está golpeando, as lâminas se chocam (CLANG) — os dois recuam e ele fica aberto para um contra-ataque. Inimigos que <b>defendem</b> seguram golpes leves e podem revidar na hora: use o <b>chute</b> (botão do meio) ou o golpe pesado para quebrar a guarda. Cuidado com o aviso <b>✋ azul</b>: é o chute deles, que atravessa o seu bloqueio — esquive ou bata antes. Piratas podem largar o <b>Sabre pirata</b>.<br>
     Inimigos não enxergam nem atiram através de paredes: use cabanas e paliçadas como cobertura.</p>
@@ -303,6 +310,14 @@
             <h3>Gráficos e imersão</h3>
             <p>Qualidade, FSR, sombras, profundidade de campo, tremor, desfoque…</p>
             <button id="btnGfx" type="button" class="primary small">⚙ Abrir opções gráficas</button>
+          </article>
+          <article class="opt-card">
+            <h3>Câmera</h3>
+            <label class="slider">FOV 1ª pessoa <span id="m_fov1pV"></span><input id="m_fov1p" type="range" min="60" max="110" step="1"></label>
+            <label class="slider">FOV 3ª pessoa <span id="m_fov3pV"></span><input id="m_fov3p" type="range" min="50" max="100" step="1"></label>
+            <label class="slider">Sensibilidade 1ª pessoa <span id="m_sens1pV"></span><input id="m_sens1p" type="range" min="10" max="300" step="5"></label>
+            <label class="slider">Sensibilidade 3ª pessoa <span id="m_sens3pV"></span><input id="m_sens3p" type="range" min="10" max="300" step="5"></label>
+            <label class="slider">Sensibilidade mirando <span id="m_sensAimV"></span><input id="m_sensAim" type="range" min="10" max="200" step="5"></label>
           </article>
           <article class="opt-card">
             <h3>Som</h3>

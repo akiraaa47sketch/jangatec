@@ -690,7 +690,7 @@ export class Build {
     const offset = new THREE.Vector3(...(piece.physOffset || obj.physicsOffset || [0, 0, 0]))
       .applyQuaternion(obj.mesh.quaternion);
     const col = {
-      type: 'box',
+      type: obj.def && obj.def.col === 'ramp' ? 'ramp' : 'box', // rampa: colisão inclinada (sobe para +Z)
       x: piece.x + offset.x, y: piece.y + offset.y, z: piece.z + offset.z,
       hx: size[0] / 2, hy: size[1] / 2, hz: size[2] / 2,
       yaw: piece.yaw,
@@ -776,6 +776,14 @@ export class Build {
   }
 
   update() {
+    if (this.active && this.held && this.held.body) { // multiplayer: posição da peça carregada (~12×/s)
+      const now = performance.now();
+      if (now - (this._dragSent || 0) > 80) {
+        this._dragSent = now;
+        const b = this.held.body, r = (v) => Math.round(v * 100) / 100, rq = (v) => Math.round(v * 1000) / 1000;
+        this.G.net.send({ t: 'drag', id: this.held.id, p: [r(b.position.x), r(b.position.y), r(b.position.z)], q: [rq(b.quaternion.x), rq(b.quaternion.y), rq(b.quaternion.z), rq(b.quaternion.w)] });
+      }
+    }
     if (this.active) {
       if (this.G.input.hit('Escape')) { this.cancel(); return; }
       if (this.G.input.act('place')) { this.place(); return; }

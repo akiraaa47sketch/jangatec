@@ -8,6 +8,7 @@ import { waveHeight } from '../world/ocean.js';
 import { makeHumanoid, animateHumanoid } from './model.js';
 import { makePill, animatePill, disposePill, PILL_DEFAULT, PILL_SCALE } from './pill.js';
 import { sfx } from '../core/sfx.js';
+import { cam as camSet } from '../core/camsettings.js';
 
 // tipo de empunhadura das armas de fogo em 3ª pessoa
 const GUN_TYPE = { revolver: 'pistol', pistola: 'pistol', escopeta: 'long', rifle: 'long', rifle_precisao: 'long' };
@@ -98,6 +99,35 @@ export class Player {
     this.weaponMesh.scale.setScalar(1.5 / PILL_SCALE); // arma "de desenho": um pouco maior
   }
 
+  // Escada de mão soldada na jangada perto de p (encostado nela, de frente)? → { top, fx, fz } (mundo)
+  ladderAt(p) {
+    const boat = this.G.boat; if (!boat) return null;
+    const [bx, bz] = boat.toLocal(p.x, p.z), by = p.y - boat.set.y;
+    for (const piece of boat.pieces.values()) {
+      const def = piece.physObj && piece.physObj.def; if (!def || !def.ladder || !piece.col) continue;
+      const c = piece.col, [lx, lz] = rot(bx - c.x, bz - c.z, -(c.yaw || 0));
+      if (Math.abs(lx) > c.hx + 0.15 || Math.abs(lz) > c.hz + 0.55) continue;
+      if (by < c.y - c.hy - 0.3 || by > c.y + c.hy + 0.1) continue;
+      // direção "para dentro" da escada (do lado em que o jogador está para o outro lado), no mundo
+      const s = lz > 0 ? -1 : 1, [dx, dz] = rot(0, s, (c.yaw || 0) + boat.yaw);
+      return { top: boat.set.y + c.y + c.hy, fx: dx, fz: dz };
+    }
+    return null;
+  }
+
+  // Recuo da arma na câmera: sobe na hora e devolve ~65% em seguida (o resto fica: controle no mouse).
+  addRecoil(up, side) {
+    this.camPitch -= up; this.camYaw -= side;
+    const r = this.recoil || (this.recoil = { p: 0, y: 0, wait: 0 });
+    r.p += up * 0.65; r.y += side * 0.5; r.wait = 0.07;
+  }
+  _recoverRecoil(dt) {
+    const r = this.recoil; if (!r) return;
+    if (r.wait > 0) { r.wait -= dt; return; }
+    const k = Math.min(1, 9 * dt), dp = r.p * k, dy = r.y * k;
+    this.camPitch += dp; this.camYaw += dy; r.p -= dp; r.y -= dy;
+  }
+
   // Tiro em 3ª pessoa: tranco nos braços, clarão na boca do cano e pose de mira por um instante.
   onShot() { this.aimHold = 0.8; this.kick = 1; this.flashT = 0.06; }
   // ganchos de animação em 3ª pessoa
@@ -111,10 +141,12 @@ export class Player {
   update(dt, t) {
     const G = this.G, inp = G.input, b = this.body, p = b.pos;
     const rotatingBuild = G.build && G.build.rotating;
+    this._recoverRecoil(dt);
     // Câmera: mouse + setas.
     if (!rotatingBuild || (G.build.cameraDragging && inp.mouse.right)) {
       // Em 1ª pessoa a sensibilidade acompanha o zoom da mira (luneta não "foge" do alvo).
-      const sens = this.firstPerson ? this.fovSens : 1;
+      const aimK = G.combat && G.combat.aiming ? camSet.sensAim : 1;
+      const sens = (this.firstPerson ? this.fovSens * camSet.sens1p : camSet.sens3p) * aimK;
       this.camYaw -= (inp.mouse.dx * 0.0025 + ((inp.held('camRight') ? 1 : 0) - (inp.held('camLeft') ? 1 : 0)) * 1.8 * dt) * sens;
       const pitchMin = this.firstPerson ? -1.5 : -0.45, pitchMax = this.firstPerson ? 1.5 : 1.3;
       this.camPitch = clamp(this.camPitch + (inp.mouse.dy * 0.0025 + ((inp.held('camDown') ? 1 : 0) - (inp.held('camUp') ? 1 : 0)) * 1.2 * dt) * sens, pitchMin, pitchMax);
@@ -164,7 +196,17 @@ export class Player {
 
     const prevY = p.y;
     const wh = waveHeight(p.x, p.z, t);
-    if (this.swimming) { b.vel.y = 0; p.y += (wh - 1.15 - p.y) * Math.min(1, 6 * dt); }
+    // escada de mão soldada na jangada: frente sobe, trás desce, solta = fica parado agarrado
+    const lad = !this.swimming && !this.downed && !this.mantle ? this.ladderAt(p) : null;
+    this.onLadder = !!lad;
+    if (lad) {
+      const climb = (inp.held('forward') ? 1 : 0) - (inp.held('back') ? 1 : 0);
+      b.vel.y = climb * 2.6; p.y += b.vel.y * dt;
+      if (p.y > lad.top - 0.05 && climb > 0) { // chegou ao topo: passa por cima da escada
+        p.y = lad.top + 0.05; b.vel.x += lad.fx * 2.5; b.vel.z += lad.fz * 2.5;
+      }
+      if (inp.act('jump')) { b.vel.y = 3; b.vel.x -= lad.fx * 3; b.vel.z -= lad.fz * 3; } // pula para trás
+    } else if (this.swimming) { b.vel.y = 0; p.y += (wh - 1.15 - p.y) * Math.min(1, 6 * dt); }
     else { b.vel.y = Math.max(b.vel.y - CFG.gravity * dt, -20); p.y += b.vel.y * dt; }
     p.x += b.vel.x * dt; p.z += b.vel.z * dt;
     if (this.drift && !this.mantle) { const f = 1 - (this.bracing || 0); p.x += this.drift.x * dt * f; p.z += this.drift.z * dt * f; } // vento/giro do furacão
@@ -262,6 +304,9 @@ export class Player {
     if (this.mantle) {
       pose = this.mantle.vault ? 'vault' : 'climb';
       progress = this.mantle.t;
+    } else if (this.onLadder) { // subindo a escada: alterna os braços (puxa / estica)
+      this.ladderPh = (this.ladderPh || 0) + Math.abs(b.vel.y) * dt * 1.6;
+      pose = 'climb'; progress = 0.12 + 0.3 * (0.5 + 0.5 * Math.sin(this.ladderPh * Math.PI));
     } else if (G.combat.swing > 0) {
       pose = 'attack';
       progress = 1 - G.combat.swing / G.combat.swingDuration;
@@ -337,7 +382,7 @@ export class Player {
     const fovTarget = vm ? vm.fovTarget : 75;
     cam.fov = lerp(cam.fov, fovTarget, Math.min(1, 14 * dt));
     cam.updateProjectionMatrix();
-    this.fovSens = clamp(Math.tan(cam.fov * Math.PI / 360) / Math.tan(75 * Math.PI / 360), 0.15, 1);
+    this.fovSens = clamp(Math.tan(cam.fov * Math.PI / 360) / Math.tan(camSet.fov1p * Math.PI / 360), 0.15, 1.2);
     cam.position.copy(_v);
     const wy = waveHeight(cam.position.x, cam.position.z, t) + 0.3;
     if (cam.position.y < wy) cam.position.y = wy;
@@ -380,7 +425,7 @@ export class Player {
     if (!typing && G.input.act('zoomOut')) this.zoom = clamp(this.zoom + 0.8, 1.8, 10);
     this.aimBlend = lerp(this.aimBlend || 0, aiming ? 1 : 0, Math.min(1, 12 * dt));
     this.camDist = lerp(this.camDist, aiming ? Math.min(this.zoom, 1.9) : this.zoom, Math.min(1, 10 * dt));
-    cam.fov = lerp(cam.fov, aiming ? 48 : 68, Math.min(1, 10 * dt));
+    cam.fov = lerp(cam.fov, aiming ? camSet.fov3p * 0.7 : camSet.fov3p, Math.min(1, 10 * dt));
     cam.updateProjectionMatrix();
     // Câmera sobre o ombro direito (o personagem não tapa a mira).
     const rx = Math.cos(this.camYaw), rz = -Math.sin(this.camYaw);

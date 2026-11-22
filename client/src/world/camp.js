@@ -25,6 +25,15 @@ function mats(shared) {
     cloth: M(0x1b1b1f, { side: THREE.DoubleSide }),
     glow: new THREE.MeshStandardMaterial({ color: 0xffc46b, emissive: 0xffa040, emissiveIntensity: 2.2, roughness: 0.4 }),
     glass: new THREE.MeshStandardMaterial({ color: 0x3a2a12, roughness: 0.3, metalness: 0.4 }),
+    sandbag: M(0xb3a073, { roughness: 0.95 }),
+    sandbagDark: M(0x9a875c, { roughness: 0.95 }),
+    concrete: M(0x9a9c97, { roughness: 0.95 }),
+    concreteDark: M(0x6e706c, { roughness: 0.9 }),
+    canvas: M(0x5f6b3e, { side: THREE.DoubleSide, roughness: 0.95 }),
+    canvasTan: M(0x9c8a5e, { side: THREE.DoubleSide, roughness: 0.95 }),
+    olive: M(0x4b5530, { roughness: 0.7 }),
+    steel: new THREE.MeshStandardMaterial({ color: 0x6d757b, metalness: 0.6, roughness: 0.45 }),
+    wire: new THREE.MeshStandardMaterial({ color: 0x8a8f93, metalness: 0.7, roughness: 0.4 }),
   };
   return MATS;
 }
@@ -170,7 +179,86 @@ export function buildCamp(type, ctx) {
   };
   const roomOf = (frame, hw, hd) => ({ x: frame.x, z: frame.z, yaw: frame.yaw, hw, hd });
 
-  const out = { rooms, crateSpots: [], fire: null, yard: [ctx.cx, ctx.cz] };
+  const out = { rooms, crateSpots: [], fire: null, yard: [ctx.cx, ctx.cz], spawns: [] };
+  // ponto de posição de inimigo: [x, z] na ilha + altura (no alto de torre) e se é posto de atirador
+  const spot = (frame, lx, lz, y = 0, high = false) => { const [x, z] = P(lx, lz, frame.yaw, frame.x, frame.z); out.spawns.push({ x, z, y, high }); };
+
+  // ---------- peças das bases novas ----------
+  // fileira de sacos de areia de (x0,z0) a (x1,z1), 'rows' camadas; colisor na altura da cobertura
+  const sandbags = (frame, x0, z0, x1, z1, rows = 3) => {
+    const len = Math.hypot(x1 - x0, z1 - z0), yaw = Math.atan2(x1 - x0, z1 - z0), n = Math.max(1, Math.round(len / 0.62));
+    for (let row = 0; row < rows; row++) for (let i = 0; i < n - (row % 2 ? 1 : 0); i++) {
+      const t = (i + 0.5 + (row % 2 ? 0.5 : 0)) / n, bag = new THREE.Mesh(new THREE.CapsuleGeometry(0.16, 0.36, 4, 8), (i + row) % 3 ? m.sandbag : m.sandbagDark);
+      bag.rotation.z = Math.PI / 2; bag.scale.set(1, 1, 0.75);
+      const g = new THREE.Group(); g.add(bag);
+      decor(frame, g, x0 + (x1 - x0) * t, 0.15 + row * 0.27, z0 + (z1 - z0) * t, yaw + Math.PI / 2 + (r() - 0.5) * 0.1);
+    }
+    const [cx, cz] = P((x0 + x1) / 2, (z0 + z1) / 2, frame.yaw, frame.x, frame.z);
+    const blockMesh = new THREE.Mesh(new THREE.BoxGeometry(0.5, rows * 0.27 + 0.1, len), m.sandbag); blockMesh.visible = false;
+    const h = rows * 0.27 + 0.1; blockMesh.position.set(cx, TOP + h / 2, cz); blockMesh.rotation.y = frame.yaw + yaw; ctx.addSolid(blockMesh);
+    set.items.push({ type: 'box', x: cx, y: TOP + h / 2, z: cz, hx: 0.25, hy: h / 2, hz: len / 2, yaw: frame.yaw + yaw });
+  };
+  // torre de vigia com plataforma onde dá para ficar em pé (colisores), parapeito e teto
+  const watchTower = (frame, lx, lz, H = 4.2, mat = m.log, roofMat = m.thatch, wide = 1.0) => {
+    for (const ox of [-wide, wide]) for (const oz of [-wide, wide]) {
+      decor(frame, cylY(0.1, H + 0.2, mat, 7), lx + ox, (H + 0.2) / 2, lz + oz);
+      const [x, z] = P(lx + ox, lz + oz, frame.yaw, frame.x, frame.z); set.items.push({ type: 'cyl', x, y: TOP + H / 2, z, hx: 0.12, hy: H / 2, hz: 0.12 });
+    }
+    for (const y of [H * 0.35, H * 0.7]) for (const [ax, az, len, ry] of [[0, -wide, 2 * wide, Math.PI / 2], [0, wide, 2 * wide, Math.PI / 2], [-wide, 0, 2 * wide, 0], [wide, 0, 2 * wide, 0]]) {
+      const b = new THREE.Mesh(boxGeo(0.08, 0.1, len), mat); decor(frame, b, lx + ax, y, lz + az, ry);
+    }
+    solid(frame, lx, H, lz, 2 * wide + 0.5, 0.14, 2 * wide + 0.5, m.floor);
+    for (const [ox, oz, w, l] of [[0, wide + 0.22, 2 * wide + 0.5, 0.08], [0, -wide - 0.22, 2 * wide + 0.5, 0.08], [wide + 0.22, 0, 0.08, 2 * wide + 0.5], [-wide - 0.22, 0, 0.08, 2 * wide + 0.5]]) {
+      solid(frame, lx + ox, H + 0.14, lz + oz, w, 0.8, l, m.plank);
+    }
+    for (const ox of [-wide - 0.2, wide + 0.2]) for (const oz of [-wide - 0.2, wide + 0.2]) decor(frame, cylY(0.06, 1.5, mat, 6), lx + ox, H + 0.85, lz + oz);
+    const roof = new THREE.Mesh(new THREE.ConeGeometry(wide * 1.75, 0.9, 4), roofMat); roof.rotation.y = Math.PI / 4; decor(frame, roof, lx, H + 2.0, lz);
+    const ladder = new THREE.Group();
+    for (const x2 of [-0.22, 0.22]) { const rail = new THREE.Mesh(boxGeo(0.07, H + 0.4, 0.07), mat); rail.position.x = x2; ladder.add(rail); }
+    for (let i = 0; i < Math.floor(H / 0.42); i++) { const rung = new THREE.Mesh(boxGeo(0.44, 0.05, 0.05), mat); rung.position.y = -H / 2 + 0.3 + i * 0.42; ladder.add(rung); }
+    ladder.rotation.x = -0.18; decor(frame, ladder, lx, H / 2, lz + wide + 0.55);
+    spot(frame, lx, lz, H + 0.2, true);
+  };
+  // barraca (lona em A) com colisor baixo
+  const tent = (frame, lx, lz, yawOff = 0, mat = m.canvas, L = 3, W = 2.2, H = 1.7) => {
+    const g = new THREE.Group();
+    // prisma de lona (triângulo W × H estendido ao longo de L) com a entrada escura na frente
+    const tri = new THREE.Shape([new THREE.Vector2(-W / 2, 0), new THREE.Vector2(W / 2, 0), new THREE.Vector2(0, H)]);
+    const body = new THREE.Mesh(new THREE.ExtrudeGeometry(tri, { depth: L, bevelEnabled: false }), mat); body.position.z = -L / 2; g.add(body);
+    const door = new THREE.Mesh(new THREE.ShapeGeometry(new THREE.Shape([new THREE.Vector2(-W * 0.22, 0), new THREE.Vector2(W * 0.22, 0), new THREE.Vector2(0, H * 0.7)])), new THREE.MeshBasicMaterial({ color: 0x1a1a14 }));
+    door.position.z = L / 2 + 0.01; g.add(door);
+    for (const s2 of [-1, 1]) { const rope = new THREE.Mesh(new THREE.CylinderGeometry(0.01, 0.01, 1.4, 4), m.rope); rope.position.set(s2 * (W / 2 + 0.35), 0.45, L / 2 - 0.2); rope.rotation.z = s2 * 0.9; g.add(rope); }
+    const pole = cylY(0.04, L + 0.2, m.log, 6); pole.rotation.x = Math.PI / 2; pole.position.y = H; g.add(pole);
+    g.traverse((o) => { if (o.isMesh) o.castShadow = true; });
+    decor(frame, g, lx, 0, lz, yawOff);
+    const [x, z] = P(lx, lz, frame.yaw, frame.x, frame.z);
+    set.items.push({ type: 'box', x, y: TOP + 0.5, z, hx: W / 2 - 0.2, hy: 0.5, hz: L / 2 - 0.4, yaw: frame.yaw + yawOff });
+    spot(frame, lx + Math.sin(yawOff) * (L / 2 + 0.8), lz + Math.cos(yawOff) * (L / 2 + 0.8));
+  };
+  // prédio de concreto: porta na frente (+Z), janelas nas laterais, laje com borda; registra cômodo
+  const concrete = (frame, W, D, H = 2.6) => {
+    const T = 0.22, hw = W / 2, hd = D / 2;
+    const wall = (x0, x1, y0, y1, z, side) => { const w = x1 - x0, h = y1 - y0; if (w < 0.05 || h < 0.05) return;
+      if (side) solid(frame, z, y0, (x0 + x1) / 2, T, h, w, m.concrete); else solid(frame, (x0 + x1) / 2, y0, z, w, h, T, m.concrete); };
+    wall(-hw, -0.55, 0, H, hd); wall(0.55, hw, 0, H, hd); wall(-0.55, 0.55, 2.05, H, hd);
+    wall(-hw, hw, 0, H, -hd);
+    for (const sx of [-1, 1]) { wall(-hd, -0.5, 0, H, sx * hw, true); wall(0.5, hd, 0, H, sx * hw, true); wall(-0.5, 0.5, 0, 1.2, sx * hw, true); wall(-0.5, 0.5, 1.75, H, sx * hw, true); }
+    solid(frame, 0, H, 0, W + 0.3, 0.2, D + 0.3, m.concreteDark);
+    for (const [ox, oz, w, l] of [[0, hd + 0.1, W + 0.3, 0.12], [0, -hd - 0.1, W + 0.3, 0.12], [hw + 0.1, 0, 0.12, D + 0.3], [-hw - 0.1, 0, 0.12, D + 0.3]]) decor(frame, new THREE.Mesh(boxGeo(w, 0.25, l), m.concreteDark), ox, H + 0.32, oz);
+    const doorG = new THREE.Mesh(boxGeo(1.05, 2.0, 0.06), m.steel); doorG.geometry.translate(0.52, 0, 0); decor(frame, doorG, -0.55, 1.0, hd + 0.13, -1.6);
+    const [rx, rz] = P(0, 0, frame.yaw, frame.x, frame.z);
+    rooms.push({ x: rx, z: rz, yaw: frame.yaw, hw, hd, door: [P(0, hd - 0.7, frame.yaw, frame.x, frame.z), P(0, hd + 1.2, frame.yaw, frame.x, frame.z)] });
+    for (const sx of [-1, 1]) spot(frame, sx * hw * 0.45, -hd * 0.3);
+    return { inside: P(hw * 0.5, -hd * 0.5, frame.yaw, frame.x, frame.z) };
+  };
+  const ammoCrate = (frame, lx, lz) => { const c = new THREE.Mesh(boxGeo(0.9, 0.45, 0.5), m.olive); decor(frame, c, lx, 0.225, lz, r() * 0.6);
+    const [x, z] = P(lx, lz, frame.yaw, frame.x, frame.z); set.items.push({ type: 'box', x, y: TOP + 0.22, z, hx: 0.45, hy: 0.23, hz: 0.25, yaw: frame.yaw }); };
+  const barbed = (frame, x0, z0, x1, z1) => { // arame farpado (decoração, sem colisão)
+    const pts = [], len = Math.hypot(x1 - x0, z1 - z0), n = Math.round(len * 8);
+    for (let i = 0; i <= n; i++) { const t = i / n, a = t * len * 7; pts.push(new THREE.Vector3(Math.cos(a) * 0.25, 0.3 + Math.sin(a) * 0.25, 0).add(new THREE.Vector3(0, 0, 0))); pts[i].x += 0; pts[i].z = t * len; }
+    const g = new THREE.Mesh(new THREE.TubeGeometry(new THREE.CatmullRomCurve3(pts), n * 2, 0.012, 4), m.wire);
+    decor(frame, g, x0, 0, z0, Math.atan2(x1 - x0, z1 - z0));
+  };
   const site = { x: ctx.cx, z: ctx.cz, yaw: ctx.yaw };
   if (type === 'hut') {
     // cabana atrás, fogueira no pátio da frente
@@ -180,6 +268,51 @@ export function buildCamp(type, ctx) {
     barrel(site, 2.6, -0.4); barrel(site, 2.9, 0.25); crateStack(site, -2.7, -0.2);
     flag(site, -2.9, 0.9, 3.4);
     out.yard = P(0, 1.6); out.fire = out.yard;
+    spot(site, -0.8, -2.6); spot(site, 1.2, 1.9); spot(site, -1.6, 1.4); spot(site, 2.2, 0.8);
+  } else if (type === 'tendas') {
+    // acampamento de barracas em volta da fogueira
+    for (let i = 0; i < 4; i++) { const a = i / 4 * Math.PI * 2 + 0.4; tent(site, Math.sin(a) * 4, Math.cos(a) * 4, a + Math.PI, i % 2 ? m.canvas : m.canvasTan); }
+    crateStack(site, 1.6, 1.4); barrel(site, -1.7, -1.3); flag(site, 0, -2.2, 3.2);
+    out.crateSpots.push(P(-1.4, 1.6)); out.yard = P(0, 0); out.fire = P(0, 0);
+    spot(site, 1.2, -0.4); spot(site, -1.1, 0.6);
+  } else if (type === 'vigia') {
+    // posto de vigia: duas torres altas com atiradores e uma barraca de apoio
+    watchTower(site, -3, -1.2, 4.6); watchTower(site, 3, 1.2, 4.2);
+    tent(site, 0.5, -3.2, 0.3, m.canvasTan);
+    crateStack(site, -0.6, 1.8); barrel(site, 1.6, -1.2);
+    out.crateSpots.push(P(0.4, 1.4)); out.yard = P(0, 0.3); out.fire = P(0.2, 0.5);
+    spot(site, -1.2, 0.2); spot(site, 1.0, 2.4);
+  } else if (type === 'bunker') {
+    // posto com anel de sacos de areia (abertura na frente) e bunker de concreto no fundo
+    const RR = 5;
+    for (let i = 0; i < 9; i++) {
+      const a0 = (i / 10) * Math.PI * 2 + Math.PI / 10, a1 = ((i + 1) / 10) * Math.PI * 2 + Math.PI / 10;
+      sandbags(site, Math.sin(a0) * RR, Math.cos(a0) * RR, Math.sin(a1) * RR, Math.cos(a1) * RR, 3);
+    }
+    const b = concrete({ x: P(0, -2.2)[0], z: P(0, -2.2)[1], yaw: ctx.yaw }, 3.4, 2.6, 2.3);
+    out.crateSpots.push(b.inside);
+    ammoCrate(site, 2.4, 1.2); ammoCrate(site, -2.6, 0.9); barrel(site, 2.9, -1.4);
+    flag(site, -3.2, -1.4, 3.6);
+    out.yard = P(0, 1.6); out.fire = P(0.2, 1.9);
+    spot(site, -1.8, 2.4); spot(site, 1.8, 2.6); spot(site, 0, 3.6); spot(site, -3.3, 0); spot(site, 3.3, 0);
+    rooms.push({ x: ctx.cx, z: ctx.cz, yaw: ctx.yaw, hw: RR * 0.9, hd: RR * 0.9, door: [P(0, RR - 1.2), P(0, RR + 1.4)], fort: true });
+  } else if (type === 'militar') {
+    // base militar: muro de sacos de areia com portão, arame farpado, duas torres de soldado,
+    // alojamento de concreto, tenda de comando, caixas de munição e mastro com bandeira
+    const S = 8;
+    sandbags(site, -S, -S, S, -S, 4); sandbags(site, -S, -S, -S, S, 4); sandbags(site, S, -S, S, S, 4);
+    sandbags(site, -S, S, -1.6, S, 4); sandbags(site, 1.6, S, S, S, 4);
+    barbed(site, -S - 0.8, S + 0.8, -1.8, S + 0.8); barbed(site, 1.8, S + 0.8, S + 0.8, S + 0.8);
+    watchTower(site, -S + 1.3, S - 1.3, 5, m.olive, m.canvas, 0.9); watchTower(site, S - 1.3, -S + 1.3, 5, m.olive, m.canvas, 0.9);
+    const bar = concrete({ x: P(-2, -S + 2.6)[0], z: P(-2, -S + 2.6)[1], yaw: ctx.yaw }, 7, 3.6, 2.8);
+    out.crateSpots.push(bar.inside);
+    tent(site, S - 2.6, 2.2, -Math.PI / 2, m.canvas, 3.6, 2.8, 2.1);
+    for (const [x, z] of [[3.2, -4.6], [4.2, -4.4], [3.6, -3.6], [-5.4, 2.2], [-5.4, 3.0]]) ammoCrate(site, x, z);
+    for (const [x, z] of [[5.6, -5.6], [6.3, -5.2]]) barrel(site, x, z);
+    flag(site, 0, 0, 5.4);
+    out.yard = P(0, 2); out.fire = P(-2.4, 3.2);
+    for (const [x, z] of [[-4, 5.5], [4, 5.5], [0, 4.2], [-6, -1], [6, 3.5], [2.5, -2], [-1.5, 1.2], [5, -1]]) spot(site, x, z);
+    rooms.push({ x: ctx.cx, z: ctx.cz, yaw: ctx.yaw, hw: S * 0.95, hd: S * 0.95, door: [P(0, S - 1.4), P(0, S + 1.6)], fort: true });
   } else {
     // paliçada quadrada com portão na frente (+Z)
     const S = 5.4, gate = 1.4;
@@ -238,6 +371,7 @@ export function buildCamp(type, ctx) {
     crateStack(site, S - 0.8, 0.6); crateStack(site, -S + 0.8, -1.6);
     rooms.push({ ...roomOf(site, S, S), door: [P(0, S - 1.2), P(0, S + 1.4)], fort: true });
     out.yard = P(0, 0.8); out.fire = out.yard;
+    for (const [x, z] of [[-3, -1.6], [3, -1.2], [-2.6, 2.6], [2.8, 2.4], [0, 3.6], [-1, -3.8]]) spot(site, x, z);
   }
   return out;
 }

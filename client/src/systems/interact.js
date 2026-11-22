@@ -178,7 +178,7 @@ export class Interact {
     if (c.remove && inp.act('unweld')) G.build.tryRemoveWelded(c.remove);
     else if (inp.act('interact') && c.run) { c.run(); if (G.viewmodel) G.viewmodel.onInteract(); }
     if (c.mast && !c.installSail) {
-      const turn = (inp.held('sailRight') ? 1 : 0) - (inp.held('sailLeft') ? 1 : 0);
+      const turn = (inp.held('sailLeft') ? 1 : 0) - (inp.held('sailRight') ? 1 : 0); // + = vira para a esquerda (+X)
       if (turn) G.boat.setSail(G.boat.sailUp, G.boat.sailAngle + turn * 0.8 * dt);
     }
   }
