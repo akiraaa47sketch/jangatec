@@ -1,6 +1,7 @@
 // Armas com raridade, atributos e munição (não quebram) + ferramentas (martelo, banjo, gancho).
 import { buildWeapon } from '../player/viewmodel-parts.js';
 import * as THREE from '../three.js';
+import { sfx } from '../core/sfx.js';
 
 export const WEAPONS = [
   { id: 'tabua_prego', nome: 'Tábua com prego', stars: 1, melee: true, dmg: 22, range: 2.1, rate: 0.62, durability: 55, color: 0x8a623a, scale: [0.8, 1, 1.4] },
@@ -8,6 +9,7 @@ export const WEAPONS = [
   { id: 'faca_manteiga', nome: 'Faca de manteiga', stars: 1, melee: true, dmg: 16, range: 1.7, rate: 0.34, durability: 38, color: 0xa5a9a8, scale: [0.4, 0.45, 0.9] },
   { id: 'bastao', nome: 'Bastão', stars: 1, melee: true, dmg: 19, range: 2.5, rate: 0.48, durability: 65, color: 0x74502e, scale: [0.55, 0.65, 1.65] },
   { id: 'facao', nome: 'Facão reforçado', stars: 2, melee: true, dmg: 38, range: 2.6, rate: 0.42, durability: 120, color: 0x555c60, scale: [0.55, 0.55, 1.35] },
+  { id: 'sabre', nome: 'Sabre pirata', stars: 3, melee: true, dmg: 34, range: 2.5, rate: 0.4, durability: 150, color: 0xb58d4a, scale: [0.5, 0.5, 1.5] },
   { id: 'revolver', nome: 'Revólver', stars: 2, dmg: 26, mag: 6, rate: 0.38, spread: 0.028, range: 60, reload: 1.55, recoil: 0.026, pellets: 1, ammo: 'municao', durability: 90, color: 0x514b45, scale: [0.8, 0.75, 0.95] },
   { id: 'pistola', nome: 'Pistola', stars: 3, dmg: 30, mag: 12, rate: 0.24, spread: 0.009, range: 100, reload: 1.1, recoil: 0.01, pellets: 1, ammo: 'municao', durability: 140, color: 0x33383c, scale: [0.9, 0.85, 0.9], automatic: true },
   { id: 'escopeta', nome: 'Escopeta', stars: 4, dmg: 12, mag: 5, rate: 0.8, spread: 0.07, range: 32, reload: 1.9, recoil: 0.04, pellets: 8, ammo: 'cartucho', durability: 110, color: 0x4c3525, scale: [1, 1, 1.7] },
@@ -20,6 +22,7 @@ export const WEAPONS = [
   { id: 'rifle_precisao', nome: 'Rifle de precisão', stars: 5, dmg: 70, mag: 5, rate: 0.9, spread: 0.001, range: 240, reload: 2.6, recoil: 0.07, pellets: 1, ammo: 'municao', durability: 240, color: 0x292f33, scale: [0.75, 0.8, 2] },
 ];
 
+const GUN_SOUND = { pistola: 'pistol', revolver: 'revolver', escopeta: 'shotgun', rifle: 'rifle', rifle_precisao: 'sniper' };
 const STARTER_WEAPONS = ['tabua_prego', 'cano', 'faca_manteiga', 'bastao'];
 const _o = new THREE.Vector3(), _dir = new THREE.Vector3(), _m = new THREE.Vector3(), _mw = new THREE.Vector3();
 const stars = (count) => '★'.repeat(count);
@@ -76,10 +79,11 @@ export class Combat {
     this.cooldown = 0;
     this.reloading = 0;
     // 3ª pessoa: o mesmo modelo detalhado usado na 1ª pessoa
-    const mesh = this.G.player.weaponMesh;
+    const mesh = this.G.player.weaponMesh, chest = this.G.player.chestMount;
     for (const old of mesh.children.slice()) mesh.remove(old);
+    if (chest) for (const old of chest.children.slice()) chest.remove(old);
     const model = buildWeapon(id);
-    if (model) { model.flashMesh.visible = false; mesh.add(model.group); }
+    if (model) { model.flashMesh.visible = false; (id === 'banjo' && chest ? chest : mesh).add(model.group); }
     this.G.player.flashMesh = model && model.muzzle ? model.flashMesh : null;
     mesh.visible = !this.buildMode;
     return true;
@@ -110,6 +114,8 @@ export class Combat {
     if (!w || !w.ammo || this.reloading > 0 || this.mags[w.id] >= w.mag) return;
     if (!inv[w.ammo]) { this.G.hud.msg('Sem munição'); return; }
     this.reloading = w.reload;
+    const pp = this.G.player.body.pos;
+    if (w.id === 'escopeta' || w.id === 'revolver') sfx.shell(pp); else sfx.click(pp, 0.85); // tira o carregador / abre
   }
 
   tracer(from, to, color = 0xfff2a0) {
@@ -155,10 +161,13 @@ export class Combat {
     }
     if (this.mags[w.id] <= 0) {
       this.startReload();
+      if (this.reloading <= 0) sfx.dry();
       if (vm && this.reloading <= 0) vm.onDry();
       return;
     }
     this.mags[w.id]--;
+    sfx.gun(G.player.body.pos, GUN_SOUND[w.id] || 'pistol');
+    if (w.id === 'rifle_precisao' || w.id === 'escopeta') setTimeout(() => (w.id === 'escopeta' ? sfx.shell(G.player.body.pos) : sfx.bolt(G.player.body.pos)), 330); // ferrolho / bomba
     if (vm) vm.onFire(w);
     else G.player.onShot();
     this.bloom = Math.min(1, (this.bloom || 0) + 0.45 + w.recoil * 8); // retícula abre com o recuo
@@ -196,10 +205,11 @@ export class Combat {
       if (this.reloading <= 0) {
         const inv = G.survival.inv, count = Math.min(w.mag - this.mags[w.id], inv[w.ammo]);
         this.mags[w.id] += count; inv[w.ammo] -= count;
+        sfx.click(G.player.body.pos, 1.1); // encaixa e trava
       }
     }
     if (!building && !looting && !G.player.dead && !G.player.downed && !G.player.mantle && !this.buildMode && w) {
-      if (inp.hit('KeyR')) this.startReload();
+      if (inp.act('reload')) this.startReload();
       const trigger = inp.mouse.leftPressed || (w.automatic && inp.mouse.left);
       const drawing = G.player.firstPerson && G.viewmodel && G.viewmodel.lowerEquip > 0.35; // arma ainda sendo sacada
       // corpo a corpo (leve/pesado/bloqueio/esquiva) fica no sistema Melee

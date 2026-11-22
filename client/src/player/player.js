@@ -6,6 +6,7 @@ import { CFG } from '../config.js';
 import { waveHeight } from '../world/ocean.js';
 import { makeHumanoid, animateHumanoid } from './model.js';
 import { makePill, animatePill, disposePill, PILL_DEFAULT, PILL_SCALE } from './pill.js';
+import { sfx } from '../core/sfx.js';
 
 // tipo de empunhadura das armas de fogo em 3ª pessoa
 const GUN_TYPE = { revolver: 'pistol', pistola: 'pistol', escopeta: 'long', rifle: 'long', rifle_precisao: 'long' };
@@ -73,6 +74,12 @@ export class Player {
     this.mesh.add(this.pillVisual);
     this.proceduralRig.visible = false;
     pill.userData.parts.hand.add(this.weaponMesh);
+    // banjo em 3ª pessoa fica no peito (pendurado na alça), não na mão como uma arma
+    if (!this.chestMount) this.chestMount = new THREE.Group();
+    pill.userData.parts.body.add(this.chestMount);
+    this.chestMount.position.set(0.05, -0.45, 0.62);
+    this.chestMount.rotation.set(0.15, Math.PI, 0);
+    this.chestMount.scale.setScalar(1.15 / PILL_SCALE);
     this.weaponMesh.position.set(0, 0, 0);
     this.weaponMesh.rotation.set(-Math.PI / 2, 0, Math.PI); // cano (-Z) segue o braço; topo para cima ao mirar
     this.weaponMesh.scale.setScalar(1.5 / PILL_SCALE); // arma "de desenho": um pouco maior
@@ -96,13 +103,13 @@ export class Player {
     if (!rotatingBuild || (G.build.cameraDragging && inp.mouse.right)) {
       // Em 1ª pessoa a sensibilidade acompanha o zoom da mira (luneta não "foge" do alvo).
       const sens = this.firstPerson ? this.fovSens : 1;
-      this.camYaw -= (inp.mouse.dx * 0.0025 + ((inp.down('ArrowRight') ? 1 : 0) - (inp.down('ArrowLeft') ? 1 : 0)) * 1.8 * dt) * sens;
+      this.camYaw -= (inp.mouse.dx * 0.0025 + ((inp.held('camRight') ? 1 : 0) - (inp.held('camLeft') ? 1 : 0)) * 1.8 * dt) * sens;
       const pitchMin = this.firstPerson ? -1.5 : -0.45, pitchMax = this.firstPerson ? 1.5 : 1.3;
-      this.camPitch = clamp(this.camPitch + (inp.mouse.dy * 0.0025 + ((inp.down('ArrowDown') ? 1 : 0) - (inp.down('ArrowUp') ? 1 : 0)) * 1.2 * dt) * sens, pitchMin, pitchMax);
+      this.camPitch = clamp(this.camPitch + (inp.mouse.dy * 0.0025 + ((inp.held('camDown') ? 1 : 0) - (inp.held('camUp') ? 1 : 0)) * 1.2 * dt) * sens, pitchMin, pitchMax);
     }
 
     if (this.dead) { this.syncMesh(0, dt); return; }
-    if ((G.interact && G.interact.lootOpen) || (G.gfxMenu && G.gfxMenu.open) || (G.tools && G.tools.menuOpen)) {
+    if ((G.interact && G.interact.lootOpen) || (G.gfxMenu && G.gfxMenu.open) || (G.keysMenu && G.keysMenu.open) || (G.tools && G.tools.menuOpen)) {
       b.vel.x = b.vel.z = 0;
       this.syncMesh(0, dt);
       return;
@@ -111,14 +118,14 @@ export class Player {
     if (G.naval && G.naval.manning) { G.naval.holdPlayer(b); this.syncMesh(0, dt); return; } // no canhão
 
     const aiming = G.combat.aiming;
-    const fwd = (inp.down('KeyW') ? 1 : 0) - (inp.down('KeyS') ? 1 : 0);
-    const side = (inp.down('KeyD') ? 1 : 0) - (inp.down('KeyA') ? 1 : 0);
+    const fwd = (inp.held('forward') ? 1 : 0) - (inp.held('back') ? 1 : 0);
+    const side = (inp.held('right') ? 1 : 0) - (inp.held('left') ? 1 : 0);
     const [fx, fz] = this.forward();
     const rx = Math.cos(this.camYaw), rz = -Math.sin(this.camYaw);
     let dx = fx * fwd + rx * side, dz = fz * fwd + rz * side;
     const len = Math.hypot(dx, dz), moving = len > 0;
     if (moving) { dx /= len; dz /= len; }
-    let speed = this.swimming ? CFG.swim : inp.down('ShiftLeft') ? CFG.run : CFG.walk;
+    let speed = this.swimming ? CFG.swim : inp.held('sprint') && !this.G.build.active ? CFG.run : CFG.walk;
     if (this.downed) speed = this.swimming ? CFG.swim * 0.6 : 0.9; // caído: só se arrasta
     if (aiming) speed = Math.min(speed, 3);
     speed *= this.speedMul || 1; // bloqueando/carregando golpe anda devagar
@@ -138,7 +145,7 @@ export class Player {
     else if (aiming || this.aimHold > 0) this.yaw = lerpAngle(this.yaw, Math.atan2(fx, fz), Math.min(1, 16 * dt));
     else if (moving) this.yaw = lerpAngle(this.yaw, Math.atan2(dx, dz), Math.min(1, 12 * dt));
 
-    if (inp.hit('Space') && !this.downed) {
+    if (inp.act('jump') && !this.downed) {
       const dir = moving ? [dx, dz] : [Math.sin(this.yaw), Math.cos(this.yaw)];
       if (!this.tryMantle(dir[0], dir[1]) && b.grounded) { b.vel.y = CFG.jumpSpeed; b.grounded = false; }
     }
@@ -151,14 +158,26 @@ export class Player {
     if (this.drift && !this.mantle) { const f = 1 - (this.bracing || 0); p.x += this.drift.x * dt * f; p.z += this.drift.z * dt * f; } // vento/giro do furacão
     G.colliders.resolve(b, prevY);
 
-    if (this.swimming && !this.wasSwimming && G.gfx) G.gfx.wetLens(0.5); // mergulho
+    if (this.swimming && !this.wasSwimming) { if (G.gfx) G.gfx.wetLens(0.5); sfx.splash(p, b.landVel < -6 || this.wasFalling); } // mergulho
+    this.wasFalling = b.vel.y < -6;
+    // passos (madeira na jangada, areia nas ilhas) e braçadas na água
+    const sp = Math.hypot(b.vel.x, b.vel.z);
+    if ((b.grounded || this.swimming) && sp > 1 && !this.dead) {
+      this.stepAcc = (this.stepAcc || 0) + sp * dt;
+      const stride = this.swimming ? 2.2 : sp > CFG.walk + 0.5 ? 1.9 : 1.45;
+      if (this.stepAcc > stride) {
+        this.stepAcc = 0;
+        const surf = this.swimming ? 'water' : b.groundSet === G.boat.set ? 'wood' : b.groundSet && b.groundSet.scrap ? 'metal' : 'sand';
+        sfx.step(surf, sp > CFG.walk + 0.5);
+      }
+    }
     if (!this.swimming && this.wasSwimming && G.gfx) G.gfx.wetLens(1);  // saiu da água: lente molhada
     this.wasSwimming = this.swimming;
     this.wasGroundedPrev = this.wasGrounded; this.wasGrounded = b.grounded;
     if (b.grounded) {
       this.swimming = false;
       b.carrier = b.groundSet;
-      if (!this.wasGroundedPrev && b.landVel < -4) this.squash = Math.min(1, (-b.landVel - 3) / 10); // amassa ao cair
+      if (!this.wasGroundedPrev && b.landVel < -4) { this.squash = Math.min(1, (-b.landVel - 3) / 10); sfx.land(Math.min(1, (-b.landVel - 4) / 10)); } // amassa ao cair
       if (b.landVel < -13) G.survival.damage((-b.landVel - 13) * 5, 'Queda');
     } else if (!this.swimming && p.y < wh - 1.0) {
       this.swimming = true; b.carrier = null; b.vel.y = 0;
@@ -225,6 +244,7 @@ export class Player {
     }
     this.mesh.rotation.x = this.dead ? -Math.PI / 2 : 0;
     this.mesh.visible = !(this.firstPerson && G.started) || !!(G.naval && G.naval.manning); // só o dono não vê o próprio corpo
+    if (this.chestMount) this.chestMount.visible = G.combat.weaponId === 'banjo' && !G.combat.buildMode;
     let pose = this.swimming ? 'swim' : G.combat.aiming ? 'aim' : 'walk';
     let progress = 0;
     if (this.mantle) {
@@ -340,8 +360,8 @@ export class Player {
     this.camTarget.lerp(_v, 1 - Math.exp(-20 * dt));
     // zoom da 3ª pessoa: [I] aproxima, [O] afasta (mira sempre puxa para perto do ombro)
     const typing = G.tools && G.tools.menuOpen;
-    if (!typing && G.input.hit('KeyI')) this.zoom = clamp(this.zoom - 0.8, 1.8, 10);
-    if (!typing && G.input.hit('KeyO')) this.zoom = clamp(this.zoom + 0.8, 1.8, 10);
+    if (!typing && G.input.act('zoomIn')) this.zoom = clamp(this.zoom - 0.8, 1.8, 10);
+    if (!typing && G.input.act('zoomOut')) this.zoom = clamp(this.zoom + 0.8, 1.8, 10);
     this.aimBlend = lerp(this.aimBlend || 0, aiming ? 1 : 0, Math.min(1, 12 * dt));
     this.camDist = lerp(this.camDist, aiming ? Math.min(this.zoom, 1.9) : this.zoom, Math.min(1, 10 * dt));
     cam.fov = lerp(cam.fov, aiming ? 48 : 68, Math.min(1, 10 * dt));

@@ -5,6 +5,7 @@
 // +Y para cima, +X para a direita do atirador.
 import * as THREE from '../three.js';
 import { woodTexture, woodBump, metalTexture, repeated } from '../world/textures.js';
+import { gunModel } from './gunmodels.js';
 
 const std = (color, roughness = 0.9, metalness = 0, extra = {}) =>
   new THREE.MeshStandardMaterial({ color, roughness, metalness, ...extra });
@@ -42,6 +43,7 @@ export const MAT = {
   tape: std(0x9a9a98, 0.75, 0.05),
   red2: std(0xc0392b, 0.6),
   brass: std(0xb58d4a, 0.5, 0.5),
+  leather: std(0x3d2716, 0.82, 0),
   red: std(0xb03a2e, 0.8),
   white: std(0xe8e4da, 0.9),
   glass: new THREE.MeshStandardMaterial({ color: 0x6fa0b5, roughness: 0.15, metalness: 0.2, transparent: true, opacity: 0.55 }),
@@ -157,8 +159,11 @@ export function buildHand(mirror = false) {
 }
 
 // Cor da luva (vem da personalização da pílula).
+// luva "realista" (formato da mão 3D): mesma cor, couro com relevo do modelo
+MAT.gloveReal = new THREE.MeshPhysicalMaterial({ color: 0xd3202b, roughness: 0.55, clearcoat: 0.35, clearcoatRoughness: 0.45, sheen: 0.4, sheenRoughness: 0.6 });
 export function setGloveColor(hex) {
   MAT.glove.color.setHex(hex);
+  MAT.gloveReal.color.setHex(hex);
   MAT.gloveSeam.color.setHex(hex).multiplyScalar(0.62); // costura um tom mais escuro
 }
 
@@ -310,8 +315,8 @@ SPECS.tabua_prego = () => {
   add(g, box(0.092, 0.03, 0.03, MAT.tape, 0, 0, -0.12)); // remendo de fita
   return {
     group: g, type: 'melee', muzzle: null, swing: ['overhead', 'slashB'],
-    hold: { p: [0.22, -0.1, -0.4], r: [0.85, 0.3, -0.12] },
-    gripR: { p: [0, 0, 0.02], r: [0, 1.55, -0.55], c: 0.95 },
+    hold: { p: [0.17, -0.14, -0.5], r: [0.9788, 0.5196, 0.5617] },
+    gripR: { p: [0, 0, 0.02], r: [-0.7854, 0, -1.5708], c: 0.95 },
   };
 };
 
@@ -326,8 +331,8 @@ SPECS.cano = () => {
   for (const yy of [-0.055, 0.055]) add(g, cylY(0.036, 0.016, MAT.iron, 0, yy, -0.6));
   return {
     group: g, type: 'melee', muzzle: null, swing: ['slashA', 'slashB'],
-    hold: { p: [0.22, -0.1, -0.4], r: [0.8, 0.25, -0.1] },
-    gripR: { p: [0, 0, 0.04], r: [0, 1.55, -0.55], c: 0.95 },
+    hold: { p: [0.17, -0.14, -0.5], r: [0.9788, 0.5196, 0.5617] },
+    gripR: { p: [0, 0, 0.04], r: [-0.7854, 0, -1.5708], c: 0.8 },
   };
 };
 
@@ -339,8 +344,8 @@ SPECS.faca_manteiga = () => {
   add(g, box(0.03, 0.024, 0.02, MAT.steel, 0, 0, -0.006));
   return {
     group: g, type: 'melee', muzzle: null, swing: ['stab', 'slashShort'],
-    hold: { p: [0.22, -0.1, -0.4], r: [0.55, 0.28, -0.1] },
-    gripR: { p: [0, 0, 0.05], r: [0, 1.55, -0.55], c: 0.9 },
+    hold: { p: [0.17, -0.14, -0.5], r: [0.9788, 0.5196, 0.5617] },
+    gripR: { p: [0, 0, 0.05], r: [-0.7854, 0, -1.5708], c: 0.9 },
   };
 };
 
@@ -354,8 +359,8 @@ SPECS.bastao = () => {
   add(g, cylZ(0.029, 0.029, 0.02, MAT.woodDark, 0, 0, -0.57, 9));
   return {
     group: g, type: 'melee', muzzle: null, swing: ['slashA', 'slashB'],
-    hold: { p: [0.22, -0.1, -0.4], r: [0.8, 0.25, -0.1] },
-    gripR: { p: [0, 0, 0.04], r: [0, 1.55, -0.55], c: 0.95 },
+    hold: { p: [0.17, -0.14, -0.5], r: [0.9788, 0.5196, 0.5617] },
+    gripR: { p: [0, 0, 0.04], r: [-0.7854, 0, -1.5708], c: 0.78 },
   };
 };
 
@@ -369,13 +374,36 @@ SPECS.facao = () => {
   for (const z of [0.03, 0.08]) add(g, box(0.026, 0.008, 0.008, MAT.brass, 0, 0.0, z));
   return {
     group: g, type: 'melee', muzzle: null, swing: ['slashA', 'slashB', 'stab'],
-    hold: { p: [0.22, -0.1, -0.4], r: [0.75, 0.28, -0.1] },
-    gripR: { p: [0, 0, 0.035], r: [0, 1.55, -0.55], c: 0.95 },
+    hold: { p: [0.17, -0.14, -0.5], r: [0.9788, 0.5196, 0.5617] },
+    gripR: { p: [0, 0, 0.035], r: [-0.7854, 0, -1.5708], c: 0.95 },
+  };
+};
+
+// Sabre pirata (cutelo): lâmina curva, guarda em concha de latão protegendo a mão e punho de couro.
+SPECS.sabre = () => {
+  const g = new THREE.Group(), L = 0.6, N = 14, pts = [];
+  const curve = (u) => 0.075 * (u / L) ** 2;              // a lâmina sobe em direção à ponta
+  for (let i = 0; i <= N; i++) { const u = (i / N) * L * 0.93; pts.push([u, 0.016 + curve(u)]); }               // dorso
+  pts.push([L, curve(L) + 0.004]);                                                                               // ponta
+  for (let i = N; i >= 0; i--) { const u = (i / N) * L * 0.9, w = 0.02 + 0.012 * Math.sin((u / L) * Math.PI * 0.9); pts.push([u, 0.016 + curve(u) - w - 0.012]); } // fio
+  add(g, profile(pts, 0.0065, MAT.steel, 0, -0.012, -0.03));
+  add(g, profile(pts.slice(0, N + 1).concat([[L * 0.93, 0.006 + curve(L * 0.93)], [0, 0.006]]), 0.0085, MAT.iron, 0, -0.012, -0.03)); // canal no dorso
+  // guarda em concha: disco de latão + arco que vai até o pomo protegendo os dedos
+  const disc = cylZ(0.04, 0.04, 0.008, MAT.brass, 0, -0.008, -0.026, 18); disc.scale.set(0.55, 1, 1); add(g, disc);
+  const bow = new THREE.Mesh(new THREE.TorusGeometry(0.075, 0.0055, 8, 22, Math.PI), MAT.brass);
+  bow.rotation.set(0, Math.PI / 2, 0); bow.position.set(0, -0.012, 0.05); bow.scale.set(1, -0.62, 1); add(g, bow); // arco do lado do fio, na frente dos dedos
+  add(g, cylZ(0.016, 0.018, 0.115, MAT.leather, 0, 0, 0.035, 10)); // punho
+  for (let i = 0; i < 5; i++) add(g, new THREE.Mesh(new THREE.TorusGeometry(0.0175, 0.0022, 6, 14), MAT.brass)).children.at(-1).position.set(0, 0, -0.012 + i * 0.024); // fio enrolado
+  const pommel = new THREE.Mesh(new THREE.SphereGeometry(0.02, 12, 10), MAT.brass); pommel.position.set(0, -0.002, 0.1); add(g, pommel);
+  return {
+    group: g, type: 'melee', muzzle: null, swing: ['slashA', 'slashB', 'stab'],
+    hold: { p: [0.17, -0.14, -0.5], r: [0.9788, 0.5196, 0.5617] },
+    gripR: { p: [0, 0, 0.035], r: [-0.7854, 0, -1.5708], c: 0.95 },
   };
 };
 
 // ----- armas de fogo -----
-SPECS.revolver = () => {
+const proceduralRevolver = () => {
   const g = new THREE.Group();
   const frame = profile([
     [0.06, 0.064], [-0.05, 0.064], [-0.075, 0.045], [-0.105, 0.0], [-0.125, -0.05], [-0.115, -0.14],
@@ -411,7 +439,31 @@ SPECS.revolver = () => {
   };
 };
 
-SPECS.pistola = () => {
+// Revólver com o modelo 3D importado (Tripo, texturas PBR). O tambor é uma malha separada que
+// gira e sai para o lado na recarga; o pivô (eixo do tambor) vem nos extras do GLB.
+SPECS.revolver = () => {
+  const m = gunModel('revolver');
+  if (!m) return proceduralRevolver();
+  const g = new THREE.Group(), drum = new THREE.Group();
+  g.add(m.group);
+  const node = m.parts.tambor;
+  if (node) {
+    const pv = new THREE.Vector3().fromArray(node.userData.pivot || [0, 0, 0]);
+    node.parent.add(drum); drum.position.copy(pv); drum.add(node); node.position.sub(pv);
+  }
+  const rdY = redDot(g, 0.028, -0.005); // sobre a ponte do armação, logo à frente do cão
+  const muzzle = new THREE.Vector3(0, 0.046, -0.215);
+  return {
+    group: g, type: 'pistol', reload: 'revolver', muzzle, sightY: rdY, adsDist: 0.27, adsFov: 64, flash: 1.1,
+    hold: { p: [0.17, -0.11, -0.46], r: [0.08, 0.06, 0] },
+    gripR: { p: [0, -0.08, 0.09], r: [0, 0, -1.55], c: 0.9, idx: 0.3, th: [-0.35, -0.2, 0.2] },
+    gripL: { p: [0, -0.115, 0.09], r: [0, 0, 1.55], c: 0.85, th: [-0.2, 0.0, 0.2] },
+    magPoint: [0, -0.02, 0.0],
+    parts: { drum },
+  };
+};
+
+const proceduralPistola = () => {
   const g = new THREE.Group();
   add(g, profile([
     [0.09, 0.02], [-0.09, 0.02], [-0.095, -0.012], [-0.075, -0.015], [-0.095, -0.135], [-0.035, -0.135],
@@ -442,6 +494,35 @@ SPECS.pistola = () => {
     gripR: { p: [0, -0.065, 0.065], r: [0, 0, -1.55], c: 0.9, idx: 0.3, th: [-0.35, -0.2, 0.2] },
     gripL: { p: [0, -0.108, 0.065], r: [0, 0, 1.55], c: 0.85, th: [-0.2, 0.0, 0.2] },
     magPoint: [0, -0.1, -0.045],
+    parts: { slide, mag },
+  };
+};
+
+// Pistola com o modelo 3D importado (Tripo, otimizado e pintado). Enquanto o GLB não carrega,
+// usa a procedural. O ferrolho é uma malha separada (recua no tiro) e leva a red dot junto.
+SPECS.pistola = () => {
+  const m = gunModel('pistola');
+  if (!m) return proceduralPistola();
+  const g = new THREE.Group(), slide = new THREE.Group();
+  g.add(m.group);
+  // o nó do GLB vem com escala/deslocamento da quantização: o ferrolho vai dentro de um grupo
+  // "limpo", que é o que recua no tiro e onde a red dot é presa
+  const node = m.parts.ferrolho;
+  if (node) { node.parent.add(slide); slide.add(node); }
+  const rdY = redDot(slide, 0.056, 0.012);
+  trigger(g, 0.02, -0.035);
+  const mag = new THREE.Group(); // carregador escondido dentro do punho (aparece na recarga)
+  add(mag, box(0.026, 0.1, 0.045, MAT.iron, 0, -0.06, 0.06));
+  add(mag, box(0.03, 0.012, 0.05, MAT.black, 0, -0.112, 0.06));
+  g.add(mag);
+  const muzzle = new THREE.Vector3(0, 0.03, -0.25);
+  return {
+    group: g, type: 'pistol', reload: 'mag', muzzle, sightY: rdY, adsDist: 0.27, adsFov: 64, flash: 1.1,
+    eject: new THREE.Vector3(0.03, 0.04, 0.0),
+    hold: { p: [0.15, -0.1, -0.44], r: [0.08, 0.05, 0] },
+    gripR: { p: [0, -0.06, 0.075], r: [0, 0, -1.55], c: 0.9, idx: 0.3, th: [-0.35, -0.2, 0.2] },
+    gripL: { p: [0, -0.1, 0.075], r: [0, 0, 1.55], c: 0.85, th: [-0.2, 0.0, 0.2] },
+    magPoint: [0, -0.1, 0.06],
     parts: { slide, mag },
   };
 };
@@ -515,7 +596,27 @@ SPECS.rifle = () => {
   };
 };
 
+// Rifle de precisão com o modelo 3D importado (Tripo, pintado por vértice); procedural enquanto carrega.
 SPECS.rifle_precisao = () => {
+  const m = gunModel('sniper');
+  if (!m) return proceduralSniper();
+  const g = new THREE.Group(); g.add(m.group);
+  const info = (m.parts.corpo && m.parts.corpo.userData) || {};
+  const mag = new THREE.Group(), bolt = new THREE.Group(); // peças da animação (o modelo é uma malha só)
+  g.add(mag, bolt);
+  const muzzle = new THREE.Vector3(...(info.muzzle || [0, 0.14, -0.89]));
+  return {
+    group: g, type: 'long', reload: 'mag', muzzle, sightY: info.sightY || 0.163, adsDist: 0.4, adsFov: 18, scope: true, flash: 1.5,
+    eject: new THREE.Vector3(0.04, 0.12, 0.0),
+    boltAction: true,
+    hold: { p: [0.16, -0.19, -0.47], r: [0.03, 0.07, 0] },
+    gripR: { p: [0, -0.07, 0.075], r: [0, 0, -1.55], c: 0.9, idx: 0.3, th: [-0.35, -0.2, 0.2] },
+    gripL: { p: [0, -0.03, -0.34], r: [0, -1.5708, 3.1416], c: 0.8, th: [0.3, -0.3, 0.2] },
+    magPoint: [0, -0.05, -0.06],
+    parts: { mag, bolt },
+  };
+};
+const proceduralSniper = () => {
   const g = new THREE.Group();
   add(g, box(0.046, 0.075, 0.28, MAT.blued, 0, 0.012, -0.06));
   add(g, cylZ(0.0135, 0.0135, 0.78, MAT.black, 0, 0.034, -0.66, 9));
@@ -595,13 +696,17 @@ SPECS.banjo = () => {
   }
   add(b, box(0.008, 0.03, 0.01, MAT.woodLight, 0.04, 0.0, 0.034));     // cavalete
   add(b, box(0.05, 0.02, 0.006, MAT.brass, 0.11, 0, 0.03));            // estandarte
+  // a pele (+Z do modelo) fica virada para FRENTE, longe de quem toca: gira 180° no eixo do braço
+  const flip = new THREE.Group(); flip.rotation.x = Math.PI;
+  for (const c of [...b.children]) flip.add(c);
+  b.add(flip);
   b.rotation.z = -0.7; b.scale.setScalar(0.8);                         // braço subindo para a esquerda
   add(g, b);
   return {
     group: g, type: 'melee', muzzle: null, swing: ['slashShort', 'slashShort'],
-    hold: { p: [0.12, -0.27, -0.56], r: [0.55, 0.3, 0.05] },
-    gripR: { p: [0.05, -0.03, 0.05], r: [0.2, 1.4, -0.9], c: 0.6 },
-    gripL: { p: [-0.22, 0.19, 0.03], r: [0, -1.4, 2.6], c: 0.7, th: [0.3, -0.3, 0.2] },
+    hold: { p: [0.1, -0.21, -0.5], r: [0.2, 0.4, 0.05] }, // quase de lado: pele para frente, como quem olha o próprio banjo
+    gripR: { p: [0.07, -0.07, -0.05], r: [0.4, 1.2, -1.1], c: 0.55 },
+    gripL: { p: [-0.22, 0.19, -0.03], r: [0, -1.4, 2.6], c: 0.7, th: [0.3, -0.3, 0.2] },
   };
 };
 

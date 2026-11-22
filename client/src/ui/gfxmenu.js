@@ -1,5 +1,6 @@
 // Painel de opções gráficas (menu inicial, tecla O ou botão ⚙ no celular) e contador de FPS (F3).
 import { GFX_PRESETS, GFX_LABELS, fsrModeOf } from '../core/graphics.js';
+import { binds } from '../core/keybinds.js';
 
 const $ = (id) => document.getElementById(id);
 
@@ -27,8 +28,8 @@ export class GfxMenu {
     $('gfxClose').onclick = () => this.toggle(false);
     $('btnGfx').onclick = () => this.toggle(true);
     addEventListener('keydown', (e) => {
-      if (e.code === 'F3') { e.preventDefault(); gfx.set('showFps', !gfx.settings.showFps); this.sync(); }
-      if (e.code === 'KeyG' && G.started && !G.build.active && !G.interact.lootOpen && !(G.tools && G.tools.menuOpen)) this.toggle(!this.open);
+      if (e.code === binds.fps) { e.preventDefault(); gfx.set('showFps', !gfx.settings.showFps); this.sync(); }
+      if (e.code === binds.gfx && G.started && !G.build.active && !G.interact.lootOpen && !(G.tools && G.tools.menuOpen)) this.toggle(!this.open);
       if (e.code === 'Escape' && this.open) this.toggle(false);
     });
     this.sync();

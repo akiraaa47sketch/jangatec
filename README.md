@@ -37,6 +37,11 @@ esquerda (empurre até o fim para correr), arraste a metade direita para girar a
 atacar/pegar, pular, interagir (E), mirar e recarregar, e no topo trocar arma, curar, câmera e tela cheia.
 Durante a construção aparecem Soltar/Soldar/Mover/Cancelar e, no mastro, ◀ Vela ▶.
 
+Teclas padrão abaixo — **todas podem ser trocadas** em Menu → Controles ou no painel de opções (⌨ Teclas),
+com teclado ou mouse. A tabela de ações fica em `client/src/core/keybinds.js`: cada ação tem um contexto
+(andando, construindo ou sempre) e nunca há tecla repetida no mesmo contexto (trocar para uma tecla em
+uso troca as duas de lugar).
+
 | Tecla | Ação |
 |---|---|
 | W A S D / Shift | andar / correr |
@@ -47,13 +52,19 @@ Durante a construção aparecem Soltar/Soldar/Mover/Cancelar e, no mastro, ◀ V
 | Botão esquerdo | pegar a peça contornada de verde |
 | Q | soltar a peça carregada |
 | Mouse + WASD | virar câmera, arrastar a peça e andar |
-| V | teletransportar a peça para o ponto indicado pela mira |
+| G (construindo) | teletransportar a peça para o ponto indicado pela mira |
+| B (construindo) | build assistida: pontos de encaixe e alinhamento automático |
 | R | liberar o cursor e abrir o gizmo de rotação |
 | Shift durante o arraste | encaixar a rotação em incrementos |
 | Botão direito no gizmo | mover a câmera sem sair da rotação |
 | Botão direito fora do gizmo / Esc | cancelar e restaurar a peça |
 | X | dessoldar peça fixada próxima |
-| Clique / botão direito | atacar ou atirar / mirar fora do build mode |
+| Clique / botão direito | atacar ou atirar / bloquear ou mirar fora do build mode |
+| Segurar clique | carregar golpe pesado (depois do golpe leve) |
+| Botão do meio | chute que quebra a guarda |
+| Q | esquivar (fora do build) |
+| V (segurar) | falar no chat de voz |
+| G · F3 | opções gráficas · contador de FPS |
 | 1 2 3 / roda do mouse | trocar entre armas do hotbar / inventário |
 | 4 / 5 | usar bandagem / kit médico |
 | F | alternar 1ª / 3ª pessoa (1ª é o padrão) |
@@ -68,7 +79,28 @@ continuam disponíveis fora do modo de rotação. [R] libera o cursor e mostra o
 para girar a peça. Segure o botão direito para mover a câmera sem sair do modo de rotação e pressione
 [R] novamente para voltar à mira. [Z] solda a peça somente quando ela estiver fisicamente encostada
 na jangada, inclusive pela lateral; a posição do cursor não define o ponto de solda. Se a peça ficar presa,
-pressione [V] para reposicioná-la no ponto indicado pela mira.
+pressione [G] para reposicioná-la no ponto indicado pela mira.
+
+**Build assistida [B]** (`client/src/build/snap.js`): mostra bolinhas nos centros, meios das bordas e cantos
+das peças da jangada (e no encaixe vazio do convés) e da peça carregada; a peça gira para alinhar com a
+vizinha (múltiplos de 90°) e gruda no ponto mais próximo, em cima ou encostada do lado. A solda usa a
+posição exata do encaixe.
+
+**Combate corpo a corpo** (`client/src/systems/melee.js`): golpe leve sai no clique, cliques guardados
+emendam o combo, segurar carrega o pesado, bloquear antes do impacto é finta, chute quebra a guarda,
+golpes simultâneos fazem as espadas se chocarem (CLANG). Inimigos defendem, revidam e chutam quem só
+bloqueia. Sons sintetizados em `client/src/core/sfx.js`. Inimigos usam linha de visão
+(`Colliders.segmentBlocked`): não veem, atiram nem batem através de paredes e saem/entram pelas portas.
+
+**Fortes de sucata** (`client/src/world/scrap.js`, `client/src/systems/siege.js`): em ilhas grandes, muro de
+chapas onduladas enferrujadas com portão, contêiner e barraco com inimigos dentro e 1–2 torres de andaime
+com um inimigo de **morteiro** (granadas em arco, anel vermelho de aviso, mira à frente da jangada). Bala de
+canhão na torre tira vida (3 acertos): ela tomba, se desmancha e fica derrubada (mensagem `naval/tower`).
+A **torreta-gancho** substitui o gancho de mão: instala no convés como o canhão e fisga caixotes, aliados e
+inimigos.
+
+**Acampamentos** (`client/src/world/camp.js`): cabana de tábuas (porta, janelas, telhado de palha em A,
+varanda com barris) ou forte com paliçada pontuda, portão, torres de vigia e cabana no fundo.
 
 Todos os jogadores começam em terra firme, com uma arma improvisada sorteada; ninguém nasce com
 pistola. A jangada inicial tem uma plataforma central indestrutível e um encaixe para uma única
@@ -144,13 +176,26 @@ cada um sai diferente (força, velocidade, tamanho, lado e sentido de giro sorte
   `create/password/max` (senha guardada como hash SHA-256) e `join-error`.
 - **Chat de voz** (`client/src/net/voice.js`): WebRTC P2P entre os jogadores da sala (sinalização pela
   mensagem `rtc` do servidor, STUN público), voz **por proximidade em 3D** ou "rádio", aperte-para-falar
-  [V] ou voz aberta com detecção de fala, volume/ganho e indicador de quem está falando no HUD.
+  (tecla configurável, padrão V) ou voz aberta com detecção de fala, volume/ganho e indicador de quem está falando no HUD.
   Sem servidor TURN: em algumas redes muito restritas a voz pode não conectar.
 - **Desempenho**: malhas paradas de ilhas, fundo do mar, naufrágios e destroços são "assadas" numa malha por
   material (`client/src/core/bake.js`, ~63% menos draw calls); destroços a mais de 70 m dormem na física; o
   raycast de pegar peças só olha o que está ao alcance; no máximo 1 chunk novo por quadro; sombras a 30 Hz
   (Ultra: todo quadro). **Modos do FSR**: Nativo, Qualidade (67%), Equilibrado (59%), Desempenho (50%) e
   Ultra desempenho (33%); as predefinições usam Desempenho/Equilibrado/Qualidade/Nativo.
+- **Pistola em 3D** (`client/public/models/pistola.glb`, carregada por `client/src/player/gunmodels.js`):
+  modelo do Tripo reduzido de ~2 mi para ~17 mil triângulos, sem o pedaço solto, com o ferrolho separado
+  (recua no tiro) e "pintado" por vértice (gunmetal, aço, polímero, painéis areia, quinas gastas e oclusão
+  de ambiente). Scripts em `tools/` (`simplify-model.mjs`, `process-pistol.mjs`, rodam com Node +
+  glTF-Transform). Enquanto o GLB carrega, a pistola procedural aparece no lugar.
+- **Revólver em 3D** (`client/public/models/revolver.glb`): modelo do Tripo com texturas PBR (madeira entalhada,
+  latão, metal oxidado), ~1,9 mi → ~30 mil triângulos, **tambor separado** detectado automaticamente
+  (`tools/process-revolver.mjs`), que gira e abre para o lado na recarga, e red dot sobre a armação.
+- **Mãos 3D em 1ª pessoa** (`client/public/models/mao.glb`): modelo do Tripo com textura PBR (pele, normal e
+  metal/aspereza), reduzido de ~1,9 mi para ~15 mil triângulos e com **rig automático** (`tools/rig-hand.mjs`):
+  detecta a mão direita, a orientação, os 4 dedos e o polegar, cria 15 ossos e os pesos de pele. Usa a mesma
+  API das mãos procedurais (`setPose`), então as armas continuam fechando os dedos no cabo/gatilho. A mão
+  esquerda é a direita espelhada. Até carregar, aparecem as luvas.
 - **Personagem**: pílula mais baixa (1,45 m, cápsula mais curta) e **rosto animado** — pisca sozinho e a boca
   mexe com o volume da voz no chat (6 quadros prontos por estilo de rosto, só troca a textura).
 - **Imersão** (menu Gráficos → Imersão, tudo opcional e salvo no navegador, fora das predefinições;

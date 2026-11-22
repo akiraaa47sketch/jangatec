@@ -228,7 +228,8 @@ function makeFaceLayer(id) {
   if (!id || !FACE_DRAW[id]) return null;
   const frames = faceFrames(id);
   const span = FACE_W / FACE_PX / R, hgt = FACE_H / FACE_PX, y1 = -L / 2 + (SPLIT - ARC), y0 = y1 - hgt;
-  const geo = new THREE.LatheGeometry([new THREE.Vector2(R + 0.004, y0), new THREE.Vector2(R + 0.004, y1)], 24, Math.PI - span / 2, span);
+  // centrado em φ = 0 (frente, +Z), para onde o personagem olha
+  const geo = new THREE.LatheGeometry([new THREE.Vector2(R + 0.004, y0), new THREE.Vector2(R + 0.004, y1)], 24, -span / 2, span);
   const mat = new THREE.MeshStandardMaterial({ map: frames[0], transparent: true, roughness: 0.35, depthWrite: false, polygonOffset: true, polygonOffsetFactor: -2 });
   const mesh = new THREE.Mesh(geo, mat); mesh.renderOrder = 1;
   return { mesh, frames, cur: 0 };
@@ -519,7 +520,7 @@ export function disposePill(pill) {
 
 // poses: walk | attack | aim | reload | use | throw | strum | hammer | climb | vault | swim | jump | row | leap
 //        | windup | heavyWindup | slam | guard | stagger | dodge | slashR | slashL | thrust | uppercut | spin
-//        | parry | roll | sidestep | crawl
+//        | parry | roll | sidestep | crawl | kick | clash
 const smooth01 = (x) => { x = Math.max(0, Math.min(1, x)); return x * x * (3 - 2 * x); };
 // Partes animadas: a pose calcula o ALVO e animatePill mistura suavemente do quadro anterior para
 // ele (sem "estalos" ao trocar de pose). Ângulos misturados pelo caminho mais curto (giros de 360°).
@@ -704,6 +705,17 @@ function poseTargets(pill, speed, dt, pose, progress) {
     const a = smooth01(progress);
     p.armR.rotation.set(-1.5, 0, -1.2); p.armL.rotation.set(-1.5, 0, 1.2);
     p.body.rotation.set(0.1, -a * Math.PI * 2, 0); p.body.position.y = BODY_Y + Math.sin(a * Math.PI) * 0.15;
+  } else if (pose === 'kick') { // chute frontal: levanta o joelho, estica a perna e volta
+    const u = Math.min(1, progress), up = u < 0.3 ? smooth01(u / 0.3) : u < 0.6 ? 1 : 1 - smooth01((u - 0.6) / 0.4);
+    const ext = u < 0.25 ? 0 : u < 0.5 ? smooth01((u - 0.25) / 0.25) : 1 - smooth01((u - 0.55) / 0.3);
+    p.legR.rotation.set(-0.9 * up - 0.75 * ext, 0, -0.05); p.legL.rotation.set(0.15 * up, 0, 0.08);
+    p.body.rotation.set(-0.28 * up, 0.12 * up, 0); p.body.position.z = -0.12 * up + 0.12 * ext; p.body.position.y = BODY_Y + 0.04 * up;
+    p.armR.rotation.set(-0.9, 0.3, -0.7 * up - 0.2); p.armL.rotation.set(-0.7, -0.2, 0.8 * up + 0.2);
+  } else if (pose === 'clash') { // espadas se chocaram: o braço é jogado para trás
+    const a = Math.sin(Math.min(1, progress) * Math.PI);
+    p.armR.rotation.set(-1.6 + 1.1 * a, 0.5 * a, -0.4 - 0.5 * a); p.armL.rotation.set(-0.5, 0, 0.5 + 0.4 * a);
+    p.body.rotation.set(-0.25 * a, 0.35 * a, 0); p.body.position.z = -0.18 * a;
+    p.legL.rotation.set(0.25 * a, 0, 0.05); p.legR.rotation.set(-0.15 * a, 0, -0.05);
   } else if (pose === 'parry') { // desvia o golpe com um tapa da arma para fora
     const a = Math.sin(Math.min(1, progress) * Math.PI);
     p.armR.rotation.set(-2.0, -0.9 * a, -0.4 - 0.8 * a); p.armL.rotation.set(-1.0, 0.4, 0.6);

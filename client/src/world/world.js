@@ -7,6 +7,8 @@ import { CFG } from '../config.js';
 import { LOOT_CONFIG, generateCrateLoot, wreckFor } from '../systems/loot.js';
 import { seabedHeight, makeSeabedChunk, makeFarSeabed } from './seabed.js';
 import { bakeStatic } from '../core/bake.js';
+import { buildCamp } from './camp.js';
+import { buildScrapCamp } from './scrap.js';
 import { makePieceMesh, PIECES } from '../boat/pieces.js';
 import { makePalm, makeRock, makeBush, makeGrassTufts } from './models.js';
 import { woodTexture, woodBump, sandTexture, sandBump, grassTexture, thatchTexture, logWallTexture, metalTexture, clothTexture as clothTex, repeated, scaleBoxUVs } from './textures.js';
@@ -283,7 +285,9 @@ export class World {
   makeIsland(id, x, z, r, starterIsland = false) {
     const G = this.G, R = starterIsland ? 15 + r() * 3 : 9 + r() * 6, diff = this.difficulty(x, z);
     const islandElevation = starterIsland ? 0 : 2.7;
-    const siteType = starterIsland ? null : r() < 0.45 ? 'fort' : 'hut';
+    // acampamento: forte de troncos, cabana, ou (ilhas grandes) forte de SUCATA com torres de morteiro
+    const siteRoll = r();
+    const siteType = starterIsland ? null : R >= 11.5 && siteRoll < 0.4 ? 'scrap' : siteRoll < 0.62 ? 'fort' : 'hut';
     const group = new THREE.Group(); group.position.set(x, islandElevation, z);
     const set = { x, z, yaw: 0, y: islandElevation, radius: R + 8, items: [] };
     const solids = [];
@@ -318,7 +322,12 @@ export class World {
     const starterCratePositions = starterIsland
       ? [[-R * 0.78, 0], [R * 0.78, -R * 0.22], [0, R * 0.78]]
       : [];
-    const houses = 1 + ((r() * 2) | 0), wallMat = shared().plaster, crates = [];
+    // acampamento (cabana ou forte) perto do meio; ruínas ficam longe dele
+    const campR = siteType === 'scrap' ? 8.6 : siteType === 'fort' ? 7.9 : 5;
+    const campA = r() * 6.28, campD = r() * Math.max(0, R - (siteType === 'scrap' ? 10.5 : siteType === 'fort' ? 9 : 6.5));
+    const campC = [Math.cos(campA) * campD, Math.sin(campA) * campD];
+    const nearCamp = (lx, lz, pad = 0) => !starterIsland && Math.hypot(lx - campC[0], lz - campC[1]) < campR + pad;
+    const houses = r() < 0.6 ? 1 : 0, wallMat = shared().plaster, crates = [];
     const houseCenters = [];
     for (let hI = 0; hI < houses; hI++) {
       let hx, hz;
@@ -335,8 +344,13 @@ export class World {
         }
         if (!found) continue;
       } else {
-        const a = r() * 6.28, dist = r() * (R - 6);
-        hx = Math.cos(a) * dist; hz = Math.sin(a) * dist;
+        let found = false;
+        for (let attempt = 0; attempt < 10 && !found; attempt++) {
+          const a = r() * 6.28, dist = r() * (R - 4);
+          hx = Math.cos(a) * dist; hz = Math.sin(a) * dist;
+          found = !nearCamp(hx, hz, 3);
+        }
+        if (!found) continue;
       }
       const yaw = r() * 6.28;
       houseCenters.push([hx, hz]);
@@ -352,7 +366,7 @@ export class World {
       wall(-1.4, 2, 1.2, 2.4, 0); wall(1.4, 2, 1.2, 1.4 + r(), 0); // vão da porta no meio
       crates.push([hx, hz]);
     }
-    if (r() < 0.6) { const a = r() * 6.28; crates.push([Math.cos(a) * (R - 2.5), Math.sin(a) * (R - 2.5)]); }
+    if (r() < 0.6) { const a = r() * 6.28, cx = Math.cos(a) * (R - 2.5), cz = Math.sin(a) * (R - 2.5); if (!nearCamp(cx, cz, 0.6)) crates.push([cx, cz]); }
     if (starterIsland) {
       crates.splice(0, crates.length, ...starterCratePositions);
     }
@@ -377,6 +391,7 @@ export class World {
       } else {
         const a = r() * 6.28, d = R * (0.5 + r() * 0.4);
         px = Math.cos(a) * d; pz = Math.sin(a) * d;
+        if (nearCamp(px, pz, 0.5)) continue;
       }
       palmCenters.push([px, pz]);
       const h = 3.5 + r() * 2;
@@ -393,7 +408,7 @@ export class World {
         !(starterIsland && inStarterBuildClearance(lx, lz, pad)) &&
         !palmCenters.some(([cx, cz]) => Math.hypot(lx - cx, lz - cz) < 1.3) &&
         !starterCratePositions.some(([cx, cz]) => Math.hypot(lx - cx, lz - cz) < 1.6) &&
-        !houseCenters.some(([cx, cz]) => Math.hypot(lx - cx, lz - cz) < 3.6);
+        !houseCenters.some(([cx, cz]) => Math.hypot(lx - cx, lz - cz) < 3.6) && !nearCamp(lx, lz, pad);
       for (let i = 0, n = 6 + ((dec() * 5) | 0); i < n; i++) {
         const a = dec() * 6.283, d = R * (0.76 + dec() * 0.22), lx = Math.cos(a) * d, lz = Math.sin(a) * d, sz = 0.28 + dec() * 0.5;
         if (!free(lx, lz, 0.6)) continue;
@@ -411,48 +426,16 @@ export class World {
       }
       if (tufts.length) group.add(makeGrassTufts(dec, tufts));
     }
-    const siteCenter = houseCenters[0] || [0, 0];
+    let siteCenter = [0, 0], rooms = [], towers = [], spawnSpots = [];
     let fireRef = null;
     if (!starterIsland) {
-      const siteYaw = r() * 6.28, woodMat = shared().logs, thatchMat = shared().thatch;
-      const addSiteBox = (lx, lz, w, h, l, yaw = 0) => {
-        const [ox, oz] = rot(lx, lz, siteYaw);
-        addBox(siteCenter[0] + ox, siteCenter[1] + oz, w, h, l, siteYaw + yaw, woodMat);
-      };
-      const addRaisedSiteBox = (lx, lz, w, h, l, baseY) => {
-        const [ox, oz] = rot(lx, lz, siteYaw);
-        const sx = siteCenter[0] + ox, sz = siteCenter[1] + oz;
-        const m = box(w, h, l, woodMat);
-        m.position.set(sx, TOP + baseY + h / 2, sz);
-        m.rotation.y = siteYaw;
-        addSolid(m);
-        set.items.push({ type: 'box', x: sx, y: TOP + baseY + h / 2, z: sz, hx: w / 2, hy: h / 2, hz: l / 2, yaw: siteYaw });
-      };
-      if (siteType === 'fort') {
-        addSiteBox(0, -4, 8.4, 2.1, 0.3);
-        addSiteBox(-4, 0, 0.3, 2.1, 8);
-        addSiteBox(4, 0, 0.3, 2.1, 8);
-        addSiteBox(-2.7, 4, 2.8, 2.1, 0.3);
-        addSiteBox(2.7, 4, 2.8, 2.1, 0.3);
-        for (const sx of [-4, 4]) for (const sz of [-4, 4]) {
-          addRaisedSiteBox(sx, sz, 0.28, 2.8, 0.28, 0);
-          addRaisedSiteBox(sx, sz, 1.2, 0.16, 1.2, 2.25);
-        }
-      } else {
-        for (const sx of [-1.25, 1.25]) for (const sz of [-1.3, 1.3]) {
-          addRaisedSiteBox(sx, sz, 0.16, 2.2, 0.16, 0);
-        }
-        for (const sx of [-0.75, 0.75]) {
-          const [ox, oz] = rot(sx, 0, siteYaw);
-          const roof = box(1.65, 0.16, 3.2, thatchMat);
-          roof.position.set(siteCenter[0] + ox, TOP + 2.25, siteCenter[1] + oz);
-          roof.rotation.set(0, siteYaw, sx < 0 ? 0.38 : -0.38);
-          addSolid(roof);
-        }
-      }
+      const campCtx = { group, set, addSolid, solidOnly: (m) => solids.push(m), TOP, cx: campC[0], cz: campC[1], yaw: r() * 6.28, r, shared: shared(), id, destroyed: this.collected };
+      const camp = siteType === 'scrap' ? buildScrapCamp(campCtx) : buildCamp(siteType, campCtx);
+      siteCenter = camp.yard; rooms = camp.rooms; towers = camp.towers || []; spawnSpots = camp.spawns || [];
+      for (const spot of camp.crateSpots) crates.push(spot);
       // Fogueira: pedras em anel, lenha cruzada e chamas em camadas (animadas em update).
       const campfire = new THREE.Group();
-      campfire.position.set(siteCenter[0], TOP, siteCenter[1]);
+      campfire.position.set(camp.fire[0], TOP, camp.fire[1]);
       const stoneMat = M(0x6f6a62, { flatShading: true });
       for (let i = 0; i < 8; i++) {
         const st = new THREE.Mesh(new THREE.DodecahedronGeometry(0.12, 0), stoneMat);
@@ -475,7 +458,7 @@ export class World {
     }
     const isl = {
       id, x, z, R, diff, group, set, solids, crates: [], enemies: [], palms: palmList,
-      starter: starterIsland, siteType, siteCenter, landLayers, allItems: set.items.slice(),
+      starter: starterIsland, siteType, siteCenter, rooms, towers, spawnSpots, landLayers, allItems: set.items.slice(),
       maxGround: islandElevation + 0.61, floodTier: null,
       fire: fireRef,
     };
@@ -514,7 +497,7 @@ export class World {
     });
     { // junta as malhas paradas da ilha (menos draw calls); fica de fora o que anima ou colide
       const solidSet = new Set(solids), palmSet = new Set(palmList), crateSet = new Set(isl.crates.map((c) => c.mesh));
-      bakeStatic(group, { keep: (o) => solidSet.has(o) || palmSet.has(o) || crateSet.has(o) || o === fireRef || (fireRef && o === fireRef.parent && o !== group) });
+      bakeStatic(group, { keep: (o) => solidSet.has(o) || o.userData.noBake || palmSet.has(o) || crateSet.has(o) || o === fireRef || (fireRef && o === fireRef.parent && o !== group) });
     }
     G.scene.add(group);
     group.updateMatrixWorld(true);
@@ -522,6 +505,7 @@ export class World {
     G.physics.addStaticSet(set);
     G.solids.push(...solids);
     this.islands.push(isl);
+    if (towers.length && G.siege) G.siege.addTowers(isl);
     if (!starterIsland) G.enemies.spawnForIsland(isl, r);
     return isl;
   }
@@ -665,6 +649,7 @@ export class World {
     for (const c of isl.crates) { const i = this.crates.indexOf(c); if (i >= 0) this.crates.splice(i, 1); }
     this.islands.splice(this.islands.indexOf(isl), 1);
     G.enemies.removeIsland(isl);
+    if (G.siege) G.siege.removeIsland(isl);
   }
 
   // Marca como coletado (loot legado — ainda funciona para caixotes).

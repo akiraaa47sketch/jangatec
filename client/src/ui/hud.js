@@ -1,6 +1,7 @@
 // HUD em DOM, enxuto: vitais, arma, hotbar, objetivo curto, avisos e prompts.
 import { ITEM_NAMES } from '../systems/survival.js';
 import { WEAPONS } from '../systems/combat.js';
+import { keyOf } from '../core/keybinds.js';
 
 const $ = (id) => document.getElementById(id);
 
@@ -114,7 +115,8 @@ export class Hud {
     const chip = (icon, label, n) => n ? `<span class="chip" title="${label}"><i>${icon}</i>${n}</span>` : '';
     const invHtml = chip('✚', 'Bandagens [4]', inv.bandagem) + chip('♥', 'Kits médicos [5]', inv.kit) +
       chip('•', 'Munição', inv.municao) + chip('▮', 'Cartuchos', inv.cartucho || 0) +
-      chip('⊛', 'Canhão improvisado (instale com E a bordo)', inv.canhao || 0);
+      chip('⊛', 'Canhão improvisado (instale a bordo)', inv.canhao || 0) +
+      chip('⚓', 'Torreta-gancho (instale a bordo)', inv.gancho || 0);
     if (invHtml !== this._inv) { $('inv').innerHTML = invHtml; this._inv = invHtml; }
     // Arma equipada
     const weaponHtml = w
@@ -137,8 +139,8 @@ export class Hud {
     crosshair.classList.toggle('build', build.active);
     crosshair.style.display = G.naval && G.naval.manning ? 'none' : '';
     const carryText = !build.active ? '' : build.rotating
-      ? `${build.held.def.nome} · arraste anel · botão direito: câmera · [R] voltar · [Z] solda · Esc cancela`
-      : `${build.held.def.nome} · roda gira · [T] endireita · [V] reposiciona · [Q] solta · [R] gizmo · [Z] solda · Esc cancela`;
+      ? `${build.held.def.nome} · arraste anel · botão direito: câmera · [${keyOf('gizmo')}] voltar · [${keyOf('weld')}] solda · Esc cancela`
+      : `${build.held.def.nome} · roda gira · [${keyOf('straighten')}] endireita · [${keyOf('resetPos')}] reposiciona · [${keyOf('place')}] solta · [${keyOf('gizmo')}] gizmo · [${keyOf('weld')}] solda · [${keyOf('assist')}] encaixe · Esc cancela`;
 
     const it = G.interact.current;
     const pickupText = build.pickupTarget
@@ -146,7 +148,7 @@ export class Hud {
       : '';
     const touch = document.body.classList.contains('touch');
     const promptText = G.player.dead ? '' : carryText || (pickupText && touch ? 'Toque em atacar para pegar ' + build.pickupTarget.def.nome : pickupText) ||
-      (it ? `[E] ${it.label}` : G.player.swimming ? '[Espaço] subir em uma borda' : '');
+      (it ? `${it.remove ? '' : `[${keyOf('interact')}]` + ' '}${it.label}` : G.player.swimming ? `[${keyOf('jump')}] subir em uma borda` : '');
     // [X] vira tecla desenhada
     const esc = (t) => t.replace(/[&<>]/g, (ch) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;' }[ch]));
     const promptHtml = esc(promptText).replace(/\[([^\]]{1,12})\]/g, '<kbd>$1</kbd>');

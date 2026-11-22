@@ -52,6 +52,7 @@
   </div>
   <!-- O estado do objeto carregado é mostrado no prompt e na mira. -->
   <div id="buildPanel" hidden></div>
+  <div id="buildAssist" hidden></div>
   <div id="hint"><kbd>H</kbd> controles · <kbd>G</kbd> gráficos · <kbd>F3</kbd> FPS · <kbd>I</kbd>/<kbd>O</kbd> zoom (3ª pessoa)</div>
 </div>
 <div id="fps" hidden></div>
@@ -64,8 +65,16 @@
 </div>
 <div id="benchResults" hidden></div>
 
+<div id="keysPanel" hidden>
+  <header><h2>Teclas</h2><button id="keysClose" type="button" class="gfx-btn">Fechar</button></header>
+  <p class="keys-note" id="keysNoteGame">Clique numa tecla e aperte a nova. Teclas repetidas trocam de lugar.</p>
+  <div class="keys-list" id="keysListGame"></div>
+  <button id="keysResetGame" type="button" class="gfx-btn">Restaurar padrão</button>
+</div>
+
 <div id="gfxPanel" hidden>
-  <header><h2>Gráficos</h2><button id="gfxClose" type="button">Fechar</button></header>
+  <header><h2>Gráficos</h2><span><button id="keysOpen" type="button" class="gfx-btn">⌨ Teclas</button> <button id="gfxClose" type="button">Fechar</button></span></header>
+  <label class="slider">Volume dos efeitos <input id="sfxVolGame" type="range" min="0" max="150" step="5"></label>
   <label>Predefinição <select id="gPreset"></select></label>
   <label>Modo FSR <select id="gFsr"></select></label>
   <label class="slider">Escala de renderização <input id="gScale" type="range" min="33" max="100" step="1"><small id="gScaleVal"></small></label>
@@ -109,18 +118,20 @@
 <div id="help" hidden>
   <div>
     <h2>Controles</h2>
+    <p class="tip">Teclas padrão — todas podem ser trocadas em Menu → Controles ou no painel de opções (botão ⌨ Teclas).</p>
     <table>
       <tr><td>W A S D</td><td>andar</td><td>Shift</td><td>correr</td></tr>
       <tr><td>Espaço</td><td>pular / subir em bordas / sair da água</td><td>Mouse ou setas</td><td>câmera</td></tr>
       <tr><td>E</td><td>abrir caixote · vela (no mastro)</td><td>Z / C</td><td>soldar no build / girar vela</td></tr>
       <tr><td>Botão esquerdo</td><td>pegar a peça contornada de verde</td><td>Q</td><td>soltar a peça carregada</td></tr>
-      <tr><td>Mouse + WASD</td><td>mover câmera, peça e personagem</td><td>V</td><td>reposicionar peça em frente à mira</td></tr>
+      <tr><td>Mouse + WASD</td><td>mover câmera, peça e personagem</td><td>G (construindo)</td><td>reposicionar peça em frente à mira</td></tr>
       <tr><td>R</td><td>liberar cursor e arrastar os anéis do gizmo</td><td>Shift durante o arraste</td><td>encaixar rotação (15°)</td></tr>
       <tr><td>Roda (carregando)</td><td>girar a peça 15° · Shift+roda inclina</td><td>T</td><td>endireitar a peça</td></tr>
+      <tr><td>B (construindo)</td><td>build assistida: a peça gruda nos pontos de encaixe</td><td>Botão do meio</td><td>chute (quebra a guarda)</td></tr>
       <tr><td>Botão direito no gizmo</td><td>mover a câmera</td><td>Esc / botão direito fora do gizmo</td><td>cancelar e restaurar peça</td></tr>
       <tr><td>1 2 3 / roda</td><td>trocar arma do inventário</td><td>R (sem construir)</td><td>recarregar</td></tr>
       <tr><td>F</td><td>alternar 1ª / 3ª pessoa</td><td>Botão direito</td><td>mirar (armas de fogo)</td></tr>
-      <tr><td>Clique / segurar</td><td>golpe leve (combo de 3) / golpe pesado (arma branca)</td><td>Botão direito · Q</td><td>bloquear (no instante certo = parry) · esquivar</td></tr>
+      <tr><td>Clique / segurar</td><td>golpe leve na hora (combo de 3) / segurar depois carrega o pesado</td><td>Botão direito · Q</td><td>bloquear (no instante certo = parry; antes do impacto = finta) · esquivar</td></tr>
       <tr><td>I / O</td><td>zoom da câmera em 3ª pessoa (perto / longe)</td><td>G · F3</td><td>opções gráficas · contador de FPS</td></tr>
       <tr><td>4 / 5</td><td>bandagem / kit médico</td><td>H</td><td>ajuda</td></tr>
       <tr><td>V (segurar)</td><td>falar no chat de voz</td><td>Menu → Opções</td><td>configurar microfone e voz</td></tr>
@@ -131,7 +142,8 @@
     <p>O contorno verde indica a peça visada que está ao alcance de coleta.</p>
     <p>[R] libera o cursor para arrastar um anel do gizmo (o anel sob o cursor acende). Os eixos seguem a jangada, não a peça: vermelho inclina para os lados, verde gira, azul inclina para frente. Segure o botão direito para mover a câmera sem sair do modo de rotação. Pressione [R] novamente para voltar à mira.<br>Atalho sem gizmo: a <b>roda do mouse</b> gira a peça 15° (Shift+roda inclina) e [T] endireita.</p>
     <p>A peça real continua visível e física enquanto é carregada: colisões, gravidade e empuxo continuam ativos. Você pode andar e virar a câmera; a peça segue o raycast da mira. No modo de rotação, arraste um dos anéis coloridos; segure o botão direito para mover a câmera sem sair do gizmo. Segure [Shift] para encaixar a rotação.</p>
-    <p>Se a peça ficar presa, pressione [V] para teletransportá-la até o ponto que a mira indica.</p>
+    <p>Se a peça ficar presa, pressione [G] para teletransportá-la até o ponto que a mira indica.</p>
+    <p><b>Build assistida [B]:</b> aparecem bolinhas nos centros, meios das bordas e cantos das peças da jangada (amarelas) e da peça que você segura (azuis). A peça gira para ficar alinhada e gruda no ponto mais próximo — em cima ou encostada do lado; a bolinha <b>verde</b> mostra onde vai encaixar. Solde com [Z] e ela fica exatamente ali.</p>
     <p>Com a peça apoiada na jangada, pressione [Z] ainda no build mode para soldar. Peças soldadas ficam rígidas presas à jangada (não entortam nem soltam). Use [X] para dessoldar uma peça próxima.</p>
     <h3>Início e navegação</h3>
     <p>Todos começam em terra, com uma arma improvisada. Pegue a plataforma de madeira grande e solde-a no único contorno do convés com [Z]. A plataforma central e o ponto do mastro são fixos.<br>
@@ -146,11 +158,17 @@
     <b>🌀 No redemoinho</b> o vento empurra quem está a bordo para FORA: ande contra ele (na direção do redemoinho) para se firmar, ou você escorrega e cai — e na água o redemoinho te puxa.<br>
     <b>🏝 Mar cheio / Mar seco:</b> depois da partida o mar alterna entre cheio e totalmente seco — fique de olho na água baixando. Seco, o fundo do mar vira chão: ande à vontade, junte destroços — os de metal afundam e só aparecem aí — e saqueie naufrágios com baús. A jangada fica encalhada até a água voltar; quem estiver longe precisa nadar de volta!<br>
     <b>☠ Piratas:</b> invasões raras e anunciadas; as balsas aparecem ao longe, remando até a jangada.</p>
+    <h3>Duelo de espadas</h3>
+    <p>O golpe leve sai no clique; clique de novo durante o golpe para emendar o combo. <b>Espada com espada:</b> se você golpear enquanto o inimigo também está golpeando, as lâminas se chocam (CLANG) — os dois recuam e ele fica aberto para um contra-ataque. Inimigos que <b>defendem</b> seguram golpes leves e podem revidar na hora: use o <b>chute</b> (botão do meio) ou o golpe pesado para quebrar a guarda. Cuidado com o aviso <b>✋ azul</b>: é o chute deles, que atravessa o seu bloqueio — esquive ou bata antes. Piratas podem largar o <b>Sabre pirata</b>.<br>
+    Inimigos não enxergam nem atiram através de paredes: use cabanas e paliçadas como cobertura.</p>
     <h3>Ferramentas</h3>
     <p><b>🔨 Martelo</b> (vem na caixa inicial): martele uma peça da jangada para consertá-la — não gasta material. Também serve de arma.<br>
-    <b>🪝 Gancho</b> (achado em naufrágios e destroços): clique para arremessar. Fisga <b>caixotes de loot boiando</b> e puxa até você, ou fisga um <b>jogador</b> e puxa ele (ótimo para resgatar quem está nadando ou caído). Clique de novo para recolher.<br>
+    <b>⚓ Torreta-gancho</b> (achada em naufrágios e destroços): instale no convés com [E] como o canhão e sente nela. O mouse mira (a linha pontilhada mostra o arco), o clique dispara o gancho e clica de novo para recolher. Fisga <b>caixotes de loot boiando</b>, <b>aliados</b> (resgate quem está nadando ou caído) e <b>inimigos</b> (puxa e deixa tonto).<br>
     <b>🪕 Banjo</b>: clique com ele na mão para tocar/parar uma música (Oh! Susanna, Drunken Sailor, Camptown Races). [B] ou botão direito abre o painel para tocar nota por nota (fileira A–Ç e Q–P; Shift = sustenido). Enquanto você toca, os <b>aliados por perto recuperam vida</b> devagar (e você um pouco).<br>
     As armas não quebram.</p>
+    <h3>Fortes de sucata</h3>
+    <p>Algumas ilhas grandes têm um <b>forte de sucata</b>: muro de chapas enferrujadas com portão, um contêiner e um barraco com inimigos dentro, e <b>torres de andaime com morteiro</b> em cima. O morteiro atira granadas em arco na sua direção (mirando onde a jangada vai estar): um <b>anel vermelho</b> marca onde ela vai cair e dá para ouvir o assobio — saia de baixo! A explosão machuca e danifica a jangada.<br>
+    Acerte a torre com <b>balas de canhão</b>: 3 acertos e ela tomba, se desmancha e o artilheiro cai junto. A torre fica derrubada para sempre. Ou invada o forte pelo portão e limpe os barracos.</p>
     <h3>Batalha naval</h3>
     <p>Bem longe na rota dá para achar um <b>canhão improvisado</b> (um galão d'água com cano de ferro) em caixas e naufrágios. A bordo, olhe para um ponto livre do convés e aperte [E] para instalar; [E] no canhão para sentar nele.<br>
     No canhão: o <b>mouse</b> (ou WASD) gira e levanta o cano, a linha pontilhada mostra a trajetória e o <b>círculo</b> marca onde a bala cai (fica vermelho quando vai acertar um navio; o arco é a recarga). <b>Clique</b> dispara, [E] sai.<br>
@@ -284,10 +302,15 @@
             <button id="btnGfx" type="button" class="primary small">⚙ Abrir opções gráficas</button>
           </article>
           <article class="opt-card">
+            <h3>Som</h3>
+            <label class="slider">Volume dos efeitos <input id="sfxVol" type="range" min="0" max="150" step="5"></label>
+            <p class="tip">Tiros, espadas, canhão, explosões, passos, mar e vento.</p>
+          </article>
+          <article class="opt-card">
             <h3>Chat de voz</h3>
             <label class="check"><input id="vListen" type="checkbox"> Ouvir a voz dos outros jogadores</label>
             <label class="check"><input id="vMic" type="checkbox"> Usar meu microfone</label>
-            <label>Modo <select id="vMode"><option value="ptt">Aperte para falar [V]</option><option value="open">Voz aberta (detecta fala)</option></select></label>
+            <label>Modo <select id="vMode"><option value="ptt">Aperte para falar (tecla em Controles)</option><option value="open">Voz aberta (detecta fala)</option></select></label>
             <label>Alcance <select id="vRange"><option value="prox">Proximidade (3D)</option><option value="all">Todos iguais (rádio)</option></select></label>
             <label class="slider">Volume das vozes <input id="vVol" type="range" min="0" max="150" step="5"></label>
             <label class="slider">Ganho do microfone <input id="vGain" type="range" min="20" max="300" step="10"></label>
@@ -299,14 +322,10 @@
 
       <section class="tab" data-tab="controls">
         <h2>Controles</h2>
-        <div class="keys-grid">
-          <div><kbd>W A S D</kbd> andar · <kbd>Shift</kbd> correr</div><div><kbd>Espaço</kbd> pular / subir</div>
-          <div><kbd>E</kbd> interagir</div><div><kbd>Clique</kbd> atacar / pegar peça</div>
-          <div><kbd>Q</kbd> esquivar · botão direito bloqueia/mira</div><div><kbd>R</kbd> recarregar · gizmo</div>
-          <div><kbd>1 2 3</kbd> <kbd>6 7 8</kbd> armas e ferramentas</div><div><kbd>4</kbd>/<kbd>5</kbd> bandagem / kit</div>
-          <div><kbd>F</kbd> 1ª / 3ª pessoa · <kbd>I</kbd>/<kbd>O</kbd> zoom</div><div><kbd>V</kbd> falar (chat de voz)</div>
-          <div><kbd>G</kbd> gráficos · <kbd>F3</kbd> FPS</div><div><kbd>H</kbd> ajuda completa</div>
-        </div>
+        <p class="tip">Clique numa tecla e aperte a nova (teclado ou mouse). Se ela já for usada por outra ação no mesmo momento do jogo, as duas trocam de lugar — nunca fica tecla repetida. Clique direito numa tecla volta ao padrão.</p>
+        <p class="keys-note" id="keysNote"></p>
+        <div class="keys-list" id="keysList"></div>
+        <button id="keysReset" type="button" class="ghost">Restaurar teclas padrão</button>
         <button id="btnHelp" type="button" class="ghost">Ver ajuda completa</button>
       </section>
     </main>

@@ -12,6 +12,46 @@ export class Colliders {
   addSet(set) { this.sets.push(set); return set; }
   removeSet(set) { const i = this.sets.indexOf(set); if (i >= 0) this.sets.splice(i, 1); }
 
+  // Linha de visão: o segmento a→b passa por dentro de algum colisor? (paredes, troncos, peças da
+  // jangada, terreno). Usado para inimigos não atirarem/baterem através de paredes.
+  segmentBlocked(ax, ay, az, bx, by, bz, shrink = 0.03) {
+    const dx = bx - ax, dy = by - ay, dz = bz - az, len2 = dx * dx + dz * dz;
+    for (const set of this.sets) {
+      // descarta conjuntos longe do segmento (distância do centro do conjunto à reta, no plano)
+      const t = len2 > 0 ? clamp(((set.x - ax) * dx + (set.z - az) * dz) / len2, 0, 1) : 0;
+      const qx = ax + dx * t - set.x, qz = az + dz * t - set.z, br = set.radius + 1;
+      if (qx * qx + qz * qz > br * br) continue;
+      const [sax, saz] = rot(ax - set.x, az - set.z, -set.yaw), [sbx, sbz] = rot(bx - set.x, bz - set.z, -set.yaw);
+      const say = ay - set.y, sby = by - set.y;
+      for (const c of set.items) {
+        if (c.noLos) continue;
+        let [p0x, p0z] = [sax - c.x, saz - c.z], [p1x, p1z] = [sbx - c.x, sbz - c.z];
+        if (c.yaw) { [p0x, p0z] = rot(p0x, p0z, -c.yaw); [p1x, p1z] = rot(p1x, p1z, -c.yaw); }
+        const p0y = say - c.y, p1y = sby - c.y, ux = p1x - p0x, uy = p1y - p0y, uz = p1z - p0z;
+        let t0 = 0, t1 = 1;
+        const slab = (p, u, h) => { // recorta [t0, t1] pela faixa -h..h
+          if (Math.abs(u) < 1e-9) return Math.abs(p) <= h;
+          let ta = (-h - p) / u, tb = (h - p) / u;
+          if (ta > tb) [ta, tb] = [tb, ta];
+          t0 = Math.max(t0, ta); t1 = Math.min(t1, tb);
+          return t0 <= t1;
+        };
+        if (!slab(p0y, uy, c.hy - shrink)) continue;
+        if (c.type === 'cyl') { // cilindro vertical: interseção do segmento com o círculo
+          const R = c.hx - shrink, A = ux * ux + uz * uz, B = 2 * (p0x * ux + p0z * uz), C = p0x * p0x + p0z * p0z - R * R;
+          if (A < 1e-12) { if (C <= 0) return true; continue; }
+          const disc = B * B - 4 * A * C;
+          if (disc < 0) continue;
+          const sq = Math.sqrt(disc), ca = (-B - sq) / (2 * A), cb = (-B + sq) / (2 * A);
+          if (Math.max(t0, ca) <= Math.min(t1, cb)) return true;
+          continue;
+        }
+        if (slab(p0x, ux, c.hx - shrink) && slab(p0z, uz, c.hz - shrink)) return true;
+      }
+    }
+    return false;
+  }
+
   // Resolve o corpo contra o mundo. body: { pos, vel, radius, height, grounded, groundSet }
   resolve(body, prevY) {
     const p = body.pos, r = body.radius, h = body.height;

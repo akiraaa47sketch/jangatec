@@ -10,6 +10,8 @@ import * as THREE from '../three.js';
 import { clamp } from '../core/util.js';
 import { waveHeight } from '../world/ocean.js';
 import { buildWeapon } from '../player/viewmodel-parts.js';
+import { keyOf } from '../core/keybinds.js';
+import { sfx } from '../core/sfx.js';
 
 export const MUSIC = { healAllies: 1.6, healSelf: 0.5, radius: 12, hearing: 45 };
 export const HOOK = { speed: 30, range: 30, pull: 13 };
@@ -202,22 +204,32 @@ export class Tools {
     }
     return pl.weaponMesh.getWorldPosition(out);
   }
-  throwHook() {
+  // turret: { pos, vel, origin(out), turret } → disparado da torreta-gancho; sem nada → arremesso da mão
+  throwHook(turret = null) {
     const G = this.G, cam = G.camera, dir = new THREE.Vector3();
-    cam.getWorldDirection(dir);
-    const pos = this._hand(new THREE.Vector3()).addScaledVector(dir, 0.4);
-    G.player.onThrow();
-    this.hook = { state: 'fly', pos, vel: dir.multiplyScalar(HOOK.speed).add(new THREE.Vector3(0, 2.5, 0)), t: 0, crate: null };
+    let pos, vel;
+    if (turret) { pos = turret.pos.clone(); vel = turret.vel.clone(); }
+    else {
+      cam.getWorldDirection(dir);
+      pos = this._hand(new THREE.Vector3()).addScaledVector(dir, 0.4);
+      vel = dir.multiplyScalar(HOOK.speed).add(new THREE.Vector3(0, 2.5, 0));
+      G.player.onThrow();
+      if (G.player.weaponMesh) G.player.weaponMesh.visible = false;
+    }
+    this.hook = { state: 'fly', pos, vel, t: 0, crate: null, origin: turret ? turret.origin : null, turret: turret ? turret.turret : null };
     this.hookMesh.visible = this.rope.visible = true;
-    if (G.player.weaponMesh) G.player.weaponMesh.visible = false;
+    sfx.hookThrow(pos);
   }
+  _origin(out) { return this.hook && this.hook.origin ? this.hook.origin(out) : this._hand(out); }
   _endHook() {
+    const tur = this.hook && this.hook.turret;
+    if (tur && tur.hookTip) tur.hookTip.visible = true; // gancho de volta na boca da torreta
     this.hook = null; this.hookMesh.visible = this.rope.visible = false;
     const G = this.G; if (G.player.weaponMesh) G.player.weaponMesh.visible = !G.combat.buildMode && !!G.combat.weapon;
   }
   _updateHook(dt, t) {
     const h = this.hook; if (!h) return;
-    const G = this.G, hand = this._hand(new THREE.Vector3()), pp = G.player.body.pos;
+    const G = this.G, hand = this._origin(new THREE.Vector3()), pp = G.player.body.pos;
     h.t += dt;
     if (h.state === 'fly') {
       const prev = h.pos.clone();
@@ -225,7 +237,19 @@ export class Tools {
       // caixote boiando?
       const naval = G.naval;
       if (naval) for (const c of naval.crates.values()) {
-        if (c.mesh.position.distanceTo(h.pos) < 1.4) { h.state = 'crate'; h.crate = c.id; G.hud.msg('Gancho preso no caixote — puxando!'); break; }
+        if (c.mesh.position.distanceTo(h.pos) < 1.4) { h.state = 'crate'; h.crate = c.id; G.hud.msg('Gancho preso no caixote — puxando!'); sfx.hookHit(h.pos); break; }
+      }
+      // inimigo? (piratas nas balsas, gente na praia): puxa ele para perto e deixa tonto
+      if (h.state === 'fly') for (const e of G.enemies.list) {
+        if (e.state === 'dead' || e.def.mortar) continue;
+        const ep = e.body.pos;
+        if (Math.hypot(ep.x - h.pos.x, ep.y + 0.9 - h.pos.y, ep.z - h.pos.z) < 1.2) {
+          h.state = 'enemy'; h.enemy = e; h.t = 0; sfx.hookHit(h.pos);
+          if (G.melee) G.melee.staggerEnemy(e, 1.6);
+          G.enemies.damage(e, 8);
+          G.hud.msg(`${e.def.nome} fisgado — puxando!`);
+          break;
+        }
       }
       // jogador?
       if (h.state === 'fly') for (const [id, r] of G.net.remotes) {
@@ -250,7 +274,19 @@ export class Tools {
       if (!c || h.t > 14) h.state = 'back';
       else {
         h.pos.copy(c.mesh.position); h.pos.y += 0.45;
-        if (!G.naval.pullCrate(c.id, pp.x, pp.z)) { G.hud.msg('Caixote ao alcance — [E] para abrir'); h.state = 'back'; }
+        if (!G.naval.pullCrate(c.id, pp.x, pp.z)) { G.hud.msg(`Caixote ao alcance — [${keyOf('interact')}] para abrir`); h.state = 'back'; }
+      }
+    } else if (h.state === 'enemy') {
+      const e = h.enemy;
+      if (!e || e.state === 'dead' || h.t > 1.2) h.state = 'back';
+      else {
+        const ep = e.body.pos, dx = hand.x - ep.x, dz = hand.z - ep.z, d = Math.hypot(dx, dz);
+        if (d < 2.2) h.state = 'back';
+        else {
+          if (e.pirate) { h.state = 'back'; } // pirata na balsa: só leva o tranco (a balsa não vem junto)
+          else { ep.x += dx / d * 11 * dt; ep.z += dz / d * 11 * dt; }
+          h.pos.set(ep.x, ep.y + 0.9, ep.z);
+        }
       }
     } else if (h.state === 'player') {
       const r = G.net.remotes.get(h.player);
@@ -260,6 +296,7 @@ export class Tools {
     if (h.state === 'back') {
       const d = hand.clone().sub(h.pos), len = d.length();
       if (len < 0.8) { this._endHook(); return; }
+      if (h.origin && !h.winched) { h.winched = true; sfx.winch(hand, Math.min(1.5, len / 40)); }
       h.pos.addScaledVector(d, Math.min(1, 40 * dt / len));
     }
     this.hookMesh.position.copy(h.pos);
@@ -297,7 +334,7 @@ export class Tools {
     const banjo = w && w.tool === 'banjo' && !G.player.dead && !G.player.downed;
     if (!banjo) { if (this.menuOpen) this.toggleMenu(false); if (this.song) this.stopSong(); }
     if (banjo && !G.build.active && !G.interact.lootOpen && !(G.naval && G.naval.manning)) {
-      if (inp.hit('KeyB') || (!this.menuOpen && inp.mouse.rightPressed)) this.toggleMenu(!this.menuOpen);
+      if (inp.act('banjoMenu') || (!this.menuOpen && inp.mouse.rightPressed)) this.toggleMenu(!this.menuOpen);
       else if (this.menuOpen && inp.hit('Escape')) this.toggleMenu(false);
       if (this.menuOpen) for (const [code, m] of KEYS) if (inp.hit(code)) this.strum(m + (inp.down('ShiftLeft') || inp.down('ShiftRight') ? 1 : 0));
     }
