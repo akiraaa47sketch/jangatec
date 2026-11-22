@@ -8,6 +8,7 @@ import { waveHeight } from '../world/ocean.js';
 import { makeHumanoid, animateHumanoid } from './model.js';
 import { makePill, animatePill, disposePill, PILL_DEFAULT, PILL_SCALE } from './pill.js';
 import { sfx } from '../core/sfx.js';
+import { cam as camSet } from '../core/camsettings.js';
 
 // tipo de empunhadura das armas de fogo em 3ª pessoa
 const GUN_TYPE = { revolver: 'pistol', pistola: 'pistol', escopeta: 'long', rifle: 'long', rifle_precisao: 'long' };
@@ -114,6 +115,19 @@ export class Player {
     return null;
   }
 
+  // Recuo da arma na câmera: sobe na hora e devolve ~65% em seguida (o resto fica: controle no mouse).
+  addRecoil(up, side) {
+    this.camPitch -= up; this.camYaw -= side;
+    const r = this.recoil || (this.recoil = { p: 0, y: 0, wait: 0 });
+    r.p += up * 0.65; r.y += side * 0.5; r.wait = 0.07;
+  }
+  _recoverRecoil(dt) {
+    const r = this.recoil; if (!r) return;
+    if (r.wait > 0) { r.wait -= dt; return; }
+    const k = Math.min(1, 9 * dt), dp = r.p * k, dy = r.y * k;
+    this.camPitch += dp; this.camYaw += dy; r.p -= dp; r.y -= dy;
+  }
+
   // Tiro em 3ª pessoa: tranco nos braços, clarão na boca do cano e pose de mira por um instante.
   onShot() { this.aimHold = 0.8; this.kick = 1; this.flashT = 0.06; }
   // ganchos de animação em 3ª pessoa
@@ -127,10 +141,12 @@ export class Player {
   update(dt, t) {
     const G = this.G, inp = G.input, b = this.body, p = b.pos;
     const rotatingBuild = G.build && G.build.rotating;
+    this._recoverRecoil(dt);
     // Câmera: mouse + setas.
     if (!rotatingBuild || (G.build.cameraDragging && inp.mouse.right)) {
       // Em 1ª pessoa a sensibilidade acompanha o zoom da mira (luneta não "foge" do alvo).
-      const sens = this.firstPerson ? this.fovSens : 1;
+      const aimK = G.combat && G.combat.aiming ? camSet.sensAim : 1;
+      const sens = (this.firstPerson ? this.fovSens * camSet.sens1p : camSet.sens3p) * aimK;
       this.camYaw -= (inp.mouse.dx * 0.0025 + ((inp.held('camRight') ? 1 : 0) - (inp.held('camLeft') ? 1 : 0)) * 1.8 * dt) * sens;
       const pitchMin = this.firstPerson ? -1.5 : -0.45, pitchMax = this.firstPerson ? 1.5 : 1.3;
       this.camPitch = clamp(this.camPitch + (inp.mouse.dy * 0.0025 + ((inp.held('camDown') ? 1 : 0) - (inp.held('camUp') ? 1 : 0)) * 1.2 * dt) * sens, pitchMin, pitchMax);
@@ -366,7 +382,7 @@ export class Player {
     const fovTarget = vm ? vm.fovTarget : 75;
     cam.fov = lerp(cam.fov, fovTarget, Math.min(1, 14 * dt));
     cam.updateProjectionMatrix();
-    this.fovSens = clamp(Math.tan(cam.fov * Math.PI / 360) / Math.tan(75 * Math.PI / 360), 0.15, 1);
+    this.fovSens = clamp(Math.tan(cam.fov * Math.PI / 360) / Math.tan(camSet.fov1p * Math.PI / 360), 0.15, 1.2);
     cam.position.copy(_v);
     const wy = waveHeight(cam.position.x, cam.position.z, t) + 0.3;
     if (cam.position.y < wy) cam.position.y = wy;
@@ -409,7 +425,7 @@ export class Player {
     if (!typing && G.input.act('zoomOut')) this.zoom = clamp(this.zoom + 0.8, 1.8, 10);
     this.aimBlend = lerp(this.aimBlend || 0, aiming ? 1 : 0, Math.min(1, 12 * dt));
     this.camDist = lerp(this.camDist, aiming ? Math.min(this.zoom, 1.9) : this.zoom, Math.min(1, 10 * dt));
-    cam.fov = lerp(cam.fov, aiming ? 48 : 68, Math.min(1, 10 * dt));
+    cam.fov = lerp(cam.fov, aiming ? camSet.fov3p * 0.7 : camSet.fov3p, Math.min(1, 10 * dt));
     cam.updateProjectionMatrix();
     // Câmera sobre o ombro direito (o personagem não tapa a mira).
     const rx = Math.cos(this.camYaw), rz = -Math.sin(this.camYaw);

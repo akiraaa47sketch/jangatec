@@ -76,6 +76,12 @@
 <div id="gfxPanel" hidden>
   <header><h2>Gráficos</h2><span><button id="keysOpen" type="button" class="gfx-btn">⌨ Teclas</button> <button id="gfxClose" type="button">Fechar</button></span></header>
   <label class="slider">Volume dos efeitos <input id="sfxVolGame" type="range" min="0" max="150" step="5"></label>
+  <h3 class="gfx-sec">Câmera</h3>
+  <label class="slider">FOV 1ª pessoa <span id="g_fov1pV"></span><input id="g_fov1p" type="range" min="60" max="110" step="1"></label>
+  <label class="slider">FOV 3ª pessoa <span id="g_fov3pV"></span><input id="g_fov3p" type="range" min="50" max="100" step="1"></label>
+  <label class="slider">Sensibilidade 1ª pessoa <span id="g_sens1pV"></span><input id="g_sens1p" type="range" min="10" max="300" step="5"></label>
+  <label class="slider">Sensibilidade 3ª pessoa <span id="g_sens3pV"></span><input id="g_sens3p" type="range" min="10" max="300" step="5"></label>
+  <label class="slider">Sensibilidade mirando <span id="g_sensAimV"></span><input id="g_sensAim" type="range" min="10" max="200" step="5"></label>
   <label>Predefinição <select id="gPreset"></select></label>
   <label>Modo FSR <select id="gFsr"></select></label>
   <label class="slider">Escala de renderização <input id="gScale" type="range" min="33" max="100" step="1"><small id="gScaleVal"></small></label>
@@ -304,6 +310,14 @@
             <h3>Gráficos e imersão</h3>
             <p>Qualidade, FSR, sombras, profundidade de campo, tremor, desfoque…</p>
             <button id="btnGfx" type="button" class="primary small">⚙ Abrir opções gráficas</button>
+          </article>
+          <article class="opt-card">
+            <h3>Câmera</h3>
+            <label class="slider">FOV 1ª pessoa <span id="m_fov1pV"></span><input id="m_fov1p" type="range" min="60" max="110" step="1"></label>
+            <label class="slider">FOV 3ª pessoa <span id="m_fov3pV"></span><input id="m_fov3p" type="range" min="50" max="100" step="1"></label>
+            <label class="slider">Sensibilidade 1ª pessoa <span id="m_sens1pV"></span><input id="m_sens1p" type="range" min="10" max="300" step="5"></label>
+            <label class="slider">Sensibilidade 3ª pessoa <span id="m_sens3pV"></span><input id="m_sens3p" type="range" min="10" max="300" step="5"></label>
+            <label class="slider">Sensibilidade mirando <span id="m_sensAimV"></span><input id="m_sensAim" type="range" min="10" max="200" step="5"></label>
           </article>
           <article class="opt-card">
             <h3>Som</h3>

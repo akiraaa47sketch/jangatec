@@ -7,6 +7,7 @@
 // - Tudo é procedural (molas + keyframes), sem depender de clipes de animação.
 import { PILL_COLORS, sanitizePill } from './pill.js';
 import * as THREE from '../three.js';
+import { cam as camSet } from '../core/camsettings.js';
 import { clamp, lerp } from '../core/util.js';
 import { CFG } from '../config.js';
 import {
@@ -573,7 +574,7 @@ export class ViewModel {
     this.camOff.roll = Math.sin(bp) * 0.006 * this.bobAmp * (1 - adsEff * 0.8) * bobK + shakeR * 0.03 * shk;
     this.camOff.pitch = shake * 0.02 * shk + land * 0.02 * bobK;
     if (this.swimCam) { this.camOff.y += this.swimCam.y; this.camOff.pitch += this.swimCam.pitch; this.camOff.roll += this.swimCam.roll; }
-    const baseFov = this.sprint > 0.01 ? 75 + 5 * this.sprint : 75;
+    const baseFov = camSet.fov1p + 5 * this.sprint;
     this.fovTarget = spec && spec.type !== 'melee' ? lerp(baseFov, spec.adsFov, adsEff) : baseFov;
 
     // luneta e mira

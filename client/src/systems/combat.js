@@ -22,6 +22,8 @@ export const WEAPONS = [
   { id: 'rifle_precisao', nome: 'Rifle de precisão', stars: 5, dmg: 70, mag: 5, rate: 0.9, spread: 0.001, range: 240, reload: 2.6, recoil: 0.07, pellets: 1, ammo: 'municao', durability: 240, color: 0x292f33, scale: [0.75, 0.8, 2] },
 ];
 
+// recuo por arma: [sobe (rad), lado (rad)]
+const RECOIL = { pistola: [0.045, 0.014], revolver: [0.08, 0.02], escopeta: [0.12, 0.035], rifle: [0.03, 0.016], rifle_precisao: [0.15, 0.025] };
 const GUN_SOUND = { pistola: 'pistol', revolver: 'revolver', escopeta: 'shotgun', rifle: 'rifle', rifle_precisao: 'sniper' };
 const STARTER_WEAPONS = ['tabua_prego', 'cano', 'faca_manteiga', 'bastao'];
 const _o = new THREE.Vector3(), _dir = new THREE.Vector3(), _m = new THREE.Vector3(), _mw = new THREE.Vector3();
@@ -192,7 +194,10 @@ export class Combat {
       this.tracer(origin.clone(), end);
     }
     this._useDurability(w);
-    G.player.camPitch -= w.recoil;
+    // recuo: a mira sobe e puxa para o lado; volta só uma parte (automáticas acumulam)
+    const rk = RECOIL[w.id] || [w.recoil * 3, w.recoil];
+    const aimK = this.aiming ? 0.7 : 1;
+    G.player.addRecoil(rk[0] * aimK * (0.85 + Math.random() * 0.3), rk[1] * aimK * (Math.random() * 2 - 0.6));
     if (this.mags[w.id] <= 0) this.startReload();
   }
 
