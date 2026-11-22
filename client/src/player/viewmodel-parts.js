@@ -300,10 +300,12 @@ function tape(g, z, r, n = 3, along = 0.022) {
 // ----- corpo a corpo -----
 SPECS.tabua_prego = () => {
   const g = new THREE.Group();
-  add(g, box(0.09, 0.026, 0.64, MAT.woodLight, 0, 0, -0.22));
+  add(g, box(0.09, 0.026, 0.5, MAT.woodLight, 0, 0, -0.3));
   add(g, box(0.07, 0.02, 0.1, MAT.wood, 0.012, 0.004, -0.56)); // ponta lascada
-  add(g, box(0.095, 0.034, 0.13, MAT.wrap, 0, 0, 0.02));       // pano na empunhadura
-  add(g, box(0.097, 0.036, 0.012, MAT.cloth, 0, 0, -0.045));
+  const neck = profile([[0, 0.045], [0.06, 0.02], [0.06, -0.02], [0, -0.045]], 0.026, MAT.woodLight, 0, 0, -0.05); neck.rotation.z = Math.PI / 2; add(g, neck); // tábua afinando
+  add(g, box(0.036, 0.026, 0.15, MAT.woodLight, 0, 0, 0.035));  // cabo talhado (cabe na mão)
+  add(g, box(0.04, 0.03, 0.12, MAT.wrap, 0, 0, 0.04));          // pano na empunhadura
+  add(g, box(0.042, 0.032, 0.012, MAT.cloth, 0, 0, -0.02));
   for (const [x, z, bend] of [[-0.022, -0.4, 0], [0.02, -0.42, 0.3], [-0.01, -0.5, -0.25], [0.024, -0.52, 0.1], [0.0, -0.33, -0.15]]) {
     const nail = cylY(0.005, 0.075, MAT.iron, x, 0.04, z, 6); nail.rotation.z = bend; add(g, nail);
     add(g, cylY(0.011, 0.005, MAT.iron, x, 0.016, z, 8));
@@ -316,23 +318,25 @@ SPECS.tabua_prego = () => {
   return {
     group: g, type: 'melee', muzzle: null, swing: ['overhead', 'slashB'],
     hold: { p: [0.17, -0.14, -0.5], r: [0.9788, 0.5196, 0.5617] },
-    gripR: { p: [0, 0, 0.02], r: [-0.7854, 0, -1.5708], c: 0.95 },
+    gripR: { p: [0, 0, 0.045], r: [-0.7854, 0, -1.5708], c: 0.95 },
   };
 };
 
 SPECS.cano = () => {
   const g = new THREE.Group();
-  add(g, cylZ(0.024, 0.024, 0.66, MAT.iron, 0, 0, -0.25, 9));
+  add(g, cylZ(0.024, 0.024, 0.56, MAT.iron, 0, 0, -0.3, 9));
+  add(g, cylZ(0.024, 0.016, 0.04, MAT.iron, 0, 0, -0.0, 9));     // redução para o cano fino do cabo
+  add(g, cylZ(0.016, 0.016, 0.14, MAT.iron, 0, 0, 0.08, 9));
   add(g, cylZ(0.04, 0.04, 0.028, MAT.rust, 0, 0, -0.56, 9));
   add(g, cylZ(0.03, 0.03, 0.02, MAT.rust, 0, 0, -0.3, 9));
-  tape(g, 0.1, 0.029, 6, 0.024);
-  add(g, cylZ(0.031, 0.031, 0.012, MAT.strap, 0, 0, -0.04, 9));
+  tape(g, 0.13, 0.019, 6, 0.022);
+  add(g, cylZ(0.021, 0.021, 0.012, MAT.strap, 0, 0, 0.012, 9));
   const tee = cylY(0.032, 0.11, MAT.rust, 0, 0, -0.6); add(g, tee);       // conexão em T na ponta
   for (const yy of [-0.055, 0.055]) add(g, cylY(0.036, 0.016, MAT.iron, 0, yy, -0.6));
   return {
     group: g, type: 'melee', muzzle: null, swing: ['slashA', 'slashB'],
     hold: { p: [0.17, -0.14, -0.5], r: [0.9788, 0.5196, 0.5617] },
-    gripR: { p: [0, 0, 0.04], r: [-0.7854, 0, -1.5708], c: 0.8 },
+    gripR: { p: [0, 0, 0.07], r: [-0.7854, 0, -1.5708], c: 0.95 },
   };
 };
 
@@ -658,20 +662,21 @@ const proceduralSniper = () => {
 
 // ----- ferramentas -----
 SPECS.martelo = () => {
-  const g = new THREE.Group();
-  add(g, cylZ(0.016, 0.02, 0.36, MAT.woodLight, 0, 0, -0.12, 12));   // cabo
-  tape(g, 0.05, 0.021, 3, 0.022);                                       // empunhadura
-  add(g, box(0.042, 0.05, 0.046, MAT.iron, 0, 0, -0.32));              // cabeça
-  add(g, cylY(0.024, 0.05, MAT.steel, 0, 0.045, -0.32, 14));           // face de bater
-  add(g, cylY(0.027, 0.008, MAT.steel, 0, 0.072, -0.32, 14));
+  // cabeça girada 180° no cabo: a face de bater fica do lado dos nós dos dedos (para onde o golpe vai)
+  const g = new THREE.Group(), h = new THREE.Group(); h.rotation.z = Math.PI; g.add(h);
+  add(h, cylZ(0.016, 0.02, 0.36, MAT.woodLight, 0, 0, -0.12, 12));   // cabo
+  tape(h, 0.05, 0.021, 3, 0.022);                                       // empunhadura
+  add(h, box(0.042, 0.05, 0.046, MAT.iron, 0, 0, -0.32));              // cabeça
+  add(h, cylY(0.024, 0.05, MAT.steel, 0, 0.045, -0.32, 14));           // face de bater
+  add(h, cylY(0.027, 0.008, MAT.steel, 0, 0.072, -0.32, 14));
   for (const x of [-0.009, 0.009]) {                                    // unha (tira prego)
-    const c = box(0.011, 0.075, 0.02, MAT.iron, x, -0.055, -0.312); c.rotation.x = 0.45; add(g, c);
+    const c = box(0.011, 0.075, 0.02, MAT.iron, x, -0.055, -0.312); c.rotation.x = 0.45; add(h, c);
   }
-  add(g, box(0.003, 0.03, 0.02, MAT.black, 0, -0.07, -0.3));           // fenda da unha
+  add(h, box(0.003, 0.03, 0.02, MAT.black, 0, -0.07, -0.3));           // fenda da unha
   return {
     group: g, type: 'melee', muzzle: null, swing: ['overhead', 'overhead'],
-    hold: { p: [0.22, -0.1, -0.4], r: [0.8, 0.25, -0.1] },
-    gripR: { p: [0, 0, 0.04], r: [0, 1.55, -0.55], c: 0.95 },
+    hold: { p: [0.17, -0.14, -0.5], r: [0.9788, 0.5196, 0.5617] },
+    gripR: { p: [0, 0, 0.04], r: [-0.7854, 0, -1.5708], c: 0.95 },
   };
 };
 
