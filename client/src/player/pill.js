@@ -228,7 +228,7 @@ function faceFrames(id) {
 function makeFaceLayer(id) {
   if (!id || !FACE_DRAW[id]) return null;
   const frames = faceFrames(id);
-  const span = FACE_W / FACE_PX / R, hgt = FACE_H / FACE_PX, y1 = -L / 2 + (SPLIT - ARC), y0 = y1 - hgt;
+  const span = FACE_W / FACE_PX / R, hgt = FACE_H / FACE_PX, y1 = L / 2 - 0.07, y0 = y1 - hgt; // na "cabeça": parte de cima da cápsula, acima da emenda
   // centrado em φ = 0 (frente, +Z), para onde o personagem olha
   const geo = new THREE.LatheGeometry([new THREE.Vector2(R + 0.004, y0), new THREE.Vector2(R + 0.004, y1)], 24, -span / 2, span);
   const mat = new THREE.MeshStandardMaterial({ map: frames[0], transparent: true, roughness: 0.35, depthWrite: false, polygonOffset: true, polygonOffsetFactor: -2 });
