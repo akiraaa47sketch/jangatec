@@ -64,14 +64,12 @@ if (hi < 0) throw new Error('nenhuma mão direita detectada');
 const H = A[hi], tris = comps[hi];
 console.log('mãos:', A.map((a) => (a.right ? 'direita' : 'esquerda')).join(', '));
 
-// ---------- para a convenção do jogo ----------
-const Z = H.F.clone().negate(), Y = H.Pn.clone().negate(); Y.addScaledVector(Z, -Y.dot(Z)).normalize();
-const X = new THREE.Vector3().crossVectors(Y, Z);
-const SCALE = 0.185 / H.len;
+// ---------- para a convenção do jogo (2 passadas: a 2ª usa a linha dos nós dos dedos) ----------
+function pass(X, Y, Z, W0, SCALE) {
 const ids = [...new Set(tris.flatMap((t) => [I[t], I[t + 1], I[t + 2]]))], remap = new Map(ids.map((i, k) => [i, k]));
 const pos = new Float32Array(ids.length * 3), nor = new Float32Array(ids.length * 3), uv = new Float32Array(ids.length * 2);
 ids.forEach((i, k) => {
-  const d = v3(i).sub(H.wrist);
+  const d = v3(i).sub(W0);
   pos.set([d.dot(X) * SCALE, d.dot(Y) * SCALE, d.dot(Z) * SCALE + 0.012], k * 3);
   const n = new THREE.Vector3(N[i * 3], N[i * 3 + 1], N[i * 3 + 2]);
   nor.set([n.dot(X), n.dot(Y), n.dot(Z)], k * 3);
@@ -121,6 +119,31 @@ const tTip = pv(tb[tb.length - 1]);
 const thumbChain = [tBase, tBase.clone().lerp(tTip, 0.5), tTip];
 console.log('dedos x:', cx.map((v) => v.toFixed(3)).join(' '), 'zK', zK.toFixed(3), 'zmin', zmin.toFixed(3), 'polegar verts', thumbSet.length);
 
+  return { pos, nor, uv, idx, n, pv, zmin, zK, cx, fingerOf, isThumb, chains, thumbChain };
+}
+let X = H.F.clone().negate(), Y0 = H.Pn.clone().negate(), Zb = X; // placeholder
+{ const Z = H.F.clone().negate(), Y = H.Pn.clone().negate(); Y.addScaledVector(Z, -Y.dot(Z)).normalize(); X = new THREE.Vector3().crossVectors(Y, Z); Y0 = Y; Zb = Z; }
+let SCALE = 0.185 / H.len;
+let R = pass(X, Y0, Zb, H.wrist, SCALE);
+{ // nova base: dedos = punho → nó do dedo médio; lateral = nó do indicador → nó do mindinho
+  const toModel = (v) => H.wrist.clone().addScaledVector(X, v.x / SCALE).addScaledVector(Y0, v.y / SCALE).addScaledVector(Zb, (v.z - 0.012) / SCALE);
+  const k0 = toModel(R.chains[0][0]), k1 = toModel(R.chains[1][0]), k2 = toModel(R.chains[2][0]), k3 = toModel(R.chains[3][0]);
+  const kmid = k1.clone().add(k2).multiplyScalar(0.5);
+  const Zn = H.wrist.clone().sub(kmid).normalize();             // +Z aponta para o punho (dedos em -Z)
+  const Xn = k3.clone().sub(k0); Xn.addScaledVector(Zn, -Xn.dot(Zn)).normalize(); // indicador em -X
+  const Yn = new THREE.Vector3().crossVectors(Zn, Xn);           // dorso +Y, palma -Y
+  if (Yn.dot(Y0) < 0) console.warn('atenção: palma invertida na 2ª passada');
+  X = Xn; Y0 = Yn; Zb = Zn;
+  SCALE = 0.095 / H.wrist.distanceTo(kmid);                      // punho → nós = 9,5 cm (como a luva)
+  R = pass(X, Y0, Zb, H.wrist, SCALE);
+}
+const { pos, nor, uv, idx, n, pv, zmin, zK, cx, fingerOf, isThumb, chains, thumbChain } = R;
+// raio do antebraço (para o punho da luva)
+const rs = []; for (let k = 0; k < n; k++) if (pos[k * 3 + 2] > -0.005 && pos[k * 3 + 2] < 0.03) rs.push(Math.hypot(pos[k * 3], pos[k * 3 + 1]));
+rs.sort((a, b) => a - b);
+const cuffR = rs.length ? rs[Math.floor(rs.length * 0.85)] : 0.03;
+console.log('raio do punho', cuffR.toFixed(3));
+
 // ---------- ossos ----------
 // cada osso: -Z ao longo do segmento, -Y para a palma
 const bones = []; // { name, parent, world: Matrix4 }
@@ -136,6 +159,15 @@ chains.forEach((c, f) => {
 });
 bones.push({ name: 'pol_0', parent: 0, world: frame(thumbChain[0], thumbChain[1]) });
 bones.push({ name: 'pol_1', parent: bones.length - 1, world: frame(thumbChain[1], thumbChain[2]) });
+// quanto cada junta JÁ está dobrada no modelo (ângulo em torno do X do osso, em relação ao anterior)
+const restBend = bones.map((b, i) => {
+  if (!/^d\d_/.test(b.name)) return 0;
+  const dir = new THREE.Vector3(0, 0, -1).transformDirection(b.world);
+  const par = b.parent === 0 ? new THREE.Vector3(0, 0, -1) : new THREE.Vector3(0, 0, -1).transformDirection(bones[b.parent].world);
+  const ax = new THREE.Vector3(1, 0, 0).transformDirection(b.world);
+  return Math.atan2(new THREE.Vector3().crossVectors(par, dir).dot(ax), par.dot(dir));
+});
+console.log('dobras de repouso (graus):', restBend.map((a) => Math.round(a * 57.3)).join(' '));
 const segs = []; // segmento de cada osso (para pesos)
 chains.forEach((c, f) => { for (let j = 0; j < 3; j++) segs[1 + f * 3 + j] = [c[j], c[j + 1]]; });
 segs[13] = [thumbChain[0], thumbChain[1]]; segs[14] = [thumbChain[1], thumbChain[2]];
@@ -176,13 +208,13 @@ const nodes = bones.map((b) => doc.createNode(b.name));
 const local = bones.map((b) => (b.parent < 0 ? b.world.clone() : new THREE.Matrix4().copy(bones[b.parent].world).invert().multiply(b.world)));
 bones.forEach((b, i) => {
   const t = new THREE.Vector3(), q = new THREE.Quaternion(), s = new THREE.Vector3(); local[i].decompose(t, q, s);
-  nodes[i].setTranslation(t.toArray()).setRotation(q.toArray());
+  nodes[i].setTranslation(t.toArray()).setRotation(q.toArray()).setExtras({ bend: restBend[i] });
   if (b.parent >= 0) nodes[b.parent].addChild(nodes[i]);
 });
 const ibm = new Float32Array(bones.length * 16); bones.forEach((b, i) => ibm.set(new THREE.Matrix4().copy(b.world).invert().toArray(), i * 16));
 const skin = doc.createSkin('mao').setSkeleton(nodes[0]).setInverseBindMatrices(acc('MAT4', ibm));
 for (const nd of nodes) skin.addJoint(nd);
-const meshNode = doc.createNode('pele').setMesh(mesh).setSkin(skin);
+const meshNode = doc.createNode('pele').setMesh(mesh).setSkin(skin).setExtras({ cuffR });
 scene.addChild(nodes[0]).addChild(meshNode);
 await doc.transform(
   textureCompress({ encoder: sharp, targetFormat: 'jpeg', quality: 88, resize: [2048, 2048], slots: /^baseColor/ }),
