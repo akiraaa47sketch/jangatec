@@ -95,8 +95,7 @@ export class MainMenu {
       const slots = Array.from({ length: r.max }, (_, k) => `<i class="${k < r.players ? 'f' : ''}"></i>`).join('');
       const where = r.phase === 'depart' ? `navegando · ${r.dist} m` : PHASE[r.phase] || r.phase;
       return `<div class="srv${full ? ' full' : ''}" style="animation-delay:${i * 40}ms">
-        <div class="ic${r.locked ? ' lock' : ''}">${r.locked ? '🔒' : '⛵'}</div>
-        <div><div class="nm">${esc(r.title)}</div><div class="meta">${r.host ? 'capitão ' + esc(r.host) + ' · ' : ''}${esc(where)}</div></div>
+        <div><div class="nm">${esc(r.title)}${r.locked ? '<span class="tag">senha</span>' : ''}</div><div class="meta">${r.host ? 'capitão ' + esc(r.host) + ' · ' : ''}${esc(where)}</div></div>
         <div class="slots" title="${r.players}/${r.max} jogadores">${slots}</div>
         <button type="button" class="primary small" data-room="${esc(r.id)}"${full ? ' disabled' : ''}>${full ? 'Cheia' : 'Entrar'}</button>
       </div>`;

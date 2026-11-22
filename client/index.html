@@ -218,46 +218,50 @@
         <text x="320" y="264" text-anchor="middle" class="jg-tag">SOBREVIVA · CONSTRUA · NAVEGUE</text>
       </svg></div>
       <nav class="menu-nav" role="tablist">
-        <button type="button" data-tab="play" class="on"><i>⚓</i><span>Jogar</span></button>
-        <button type="button" data-tab="servers"><i>🌐</i><span>Servidores</span><b id="liveCount" hidden></b></button>
-        <button type="button" data-tab="char"><i>💊</i><span>Personagem</span></button>
-        <button type="button" data-tab="options"><i>⚙</i><span>Opções</span></button>
-        <button type="button" data-tab="controls"><i>⌨</i><span>Controles</span></button>
+        <button type="button" data-tab="play" class="on">Jogar</button>
+        <button type="button" data-tab="servers">Servidores<b id="liveCount" hidden></b></button>
+        <button type="button" data-tab="char">Personagem</button>
+        <button type="button" data-tab="options">Opções</button>
+        <button type="button" data-tab="controls">Controles</button>
       </nav>
-      <label class="captain"><span>Capitão</span><input id="name" maxlength="16" placeholder="Náufrago" autocomplete="nickname"></label>
+      <label class="captain"><span>Nome do capitão</span><input id="name" maxlength="16" placeholder="Náufrago" autocomplete="nickname"></label>
     </aside>
 
     <main class="menu-main">
       <section class="tab on" data-tab="play">
+        <p class="eyebrow">Novo jogo</p>
         <h2>Zarpar</h2>
         <p class="lead">Sobreviva, construa sua jangada e explore um oceano que seca e enche.</p>
         <div class="play-grid">
           <article class="play-card solo">
-            <h3>Solo</h3><p>Um mundo só seu. Use uma seed para repetir um mapa.</p>
+            <h3>Solo</h3>
+            <p>Um mundo só seu. Use uma seed para repetir o mesmo mapa.</p>
             <label>Seed <input id="seed" inputmode="numeric" placeholder="aleatória"></label>
             <button id="btnSolo" type="button" class="primary">Jogar solo</button>
           </article>
           <article class="play-card multi">
-            <h3>Multiplayer</h3><p>Até 4 náufragos, com chat de voz por proximidade.</p>
-            <button id="btnQuick" type="button" class="primary">Entrar na sala pública</button>
-            <button type="button" class="ghost" data-goto="servers">Ver servidores / criar sala</button>
+            <h3>Multiplayer</h3>
+            <p>Até 4 náufragos na mesma jangada, com chat de voz por proximidade.</p>
+            <button id="btnQuick" type="button" class="primary">Sala pública</button>
+            <button type="button" class="ghost" data-goto="servers">Ver servidores ou criar sala</button>
           </article>
-          <article class="play-card bench">
-            <h3>Benchmark</h3><p>Teste o FPS com explosões, ondas, furacão e mar seco.</p>
-            <button id="btnBench" type="button" class="ghost">📊 Rodar benchmark</button>
-          </article>
+        </div>
+        <div class="play-foot">
+          <span>Teste de desempenho com explosões, ondas, furacão e mar seco.</span>
+          <button id="btnBench" type="button" class="link">Rodar benchmark</button>
         </div>
       </section>
 
       <section class="tab" data-tab="servers">
+        <p class="eyebrow">Multiplayer</p>
         <div class="tab-head">
           <h2>Servidores</h2>
           <span class="live" id="liveState"><i></i><b>conectando…</b></span>
         </div>
         <div class="srv-tools">
           <input id="srvSearch" type="search" placeholder="Buscar sala…">
-          <button id="srvRefresh" type="button" class="ghost icon" title="Atualizar">⟳</button>
-          <button id="srvNew" type="button" class="primary small">＋ Criar sala</button>
+          <button id="srvRefresh" type="button" class="ghost icon" title="Atualizar lista">Atualizar</button>
+          <button id="srvNew" type="button" class="primary small">Criar sala</button>
         </div>
         <form id="srvCreate" class="srv-create" hidden>
           <label>Nome da sala <input id="newTitle" maxlength="28" placeholder="Jangada do capitão" required></label>
@@ -276,39 +280,33 @@
         </details>
       </section>
 
-      <section class="tab" data-tab="char">
-        <h2>Personagem</h2>
-        <p class="lead">Personalize sua pílula — arraste a prévia para girar.</p>
-    <section id="characterOptions" aria-label="Personalização do personagem">
-      <div class="char-layout">
-        <canvas id="charPreview" width="220" height="270" aria-label="Prévia do personagem"></canvas>
-        <div class="char-fields">
-          <div id="optsPilula">
-            <div class="swatch-row"><span>Cápsula</span><div class="swatches" data-key="cap"></div></div>
-            <div class="swatch-row"><span>Base</span><div class="swatches" data-key="base"></div></div>
-            <div class="swatch-row"><span>Luvas</span><div class="swatches" data-key="gloves"></div></div>
-            <label for="pillFace">Rosto <select id="pillFace"></select></label>
-            <label for="pillBoots">Calçado <select id="pillBoots"></select></label>
-            <div class="swatch-row"><span>Cor do calçado</span><div class="swatches" data-key="bootColor"></div></div>
-            <label for="pillHat">Chapéu <select id="pillHat"></select></label>
-            <div class="swatch-row"><span>Cor do chapéu</span><div class="swatches" data-key="hatColor"></div></div>
-            <label for="pillOutfit">Roupa <select id="pillOutfit"></select></label>
-            <div class="swatch-row"><span>Cor da roupa</span><div class="swatches" data-key="outfitColor"></div></div>
-            <label for="pillBack">Acessório <select id="pillBack"></select></label>
-            <button id="pillRandom" type="button" class="alt">🎲 Aleatório</button>
+      <section class="tab tab-char" data-tab="char">
+        <div class="char-layout" id="characterOptions">
+          <div class="char-stage">
+            <canvas id="charPreview" aria-label="Prévia do personagem"></canvas>
+            <p class="char-hint">Arraste para girar</p>
+            <div class="char-actions">
+              <button id="pillRandom" type="button" class="ghost">Aleatório</button>
+              <button id="pillReset" type="button" class="ghost">Padrão</button>
+            </div>
+          </div>
+          <div class="char-edit">
+            <p class="eyebrow">Aparência</p>
+            <h2>Personagem</h2>
+            <nav class="char-cats" id="charCats" role="tablist"></nav>
+            <div class="char-panel" id="charPanel"></div>
           </div>
         </div>
-      </div>
-    </section>
       </section>
 
       <section class="tab" data-tab="options">
+        <p class="eyebrow">Ajustes</p>
         <h2>Opções</h2>
         <div class="opt-grid">
           <article class="opt-card">
             <h3>Gráficos e imersão</h3>
             <p>Qualidade, FSR, sombras, profundidade de campo, tremor, desfoque…</p>
-            <button id="btnGfx" type="button" class="primary small">⚙ Abrir opções gráficas</button>
+            <button id="btnGfx" type="button" class="primary small">Abrir opções gráficas</button>
           </article>
           <article class="opt-card">
             <h3>Câmera</h3>
@@ -338,6 +336,7 @@
       </section>
 
       <section class="tab" data-tab="controls">
+        <p class="eyebrow">Teclado e mouse</p>
         <h2>Controles</h2>
         <p class="tip">Clique numa tecla e aperte a nova (teclado ou mouse). Se ela já for usada por outra ação no mesmo momento do jogo, as duas trocam de lugar — nunca fica tecla repetida. Clique direito numa tecla volta ao padrão.</p>
         <p class="keys-note" id="keysNote"></p>
@@ -350,7 +349,7 @@
   <p id="menuStatus" role="status"></p>
   <div id="pwModal" class="modal" hidden>
     <form class="modal-card" id="pwForm">
-      <h3>🔒 <span id="pwRoom">Sala</span></h3>
+      <h3><span id="pwRoom">Sala</span></h3>
       <p>Essa sala tem senha.</p>
       <input id="pwInput" type="password" maxlength="32" placeholder="Senha" autocomplete="off">
       <p class="err" id="pwErr"></p>

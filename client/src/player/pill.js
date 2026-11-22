@@ -736,6 +736,17 @@ function poseTargets(pill, speed, dt, pose, progress) {
     p.armR.rotation.set(0.9 * k2 + tr, 0, -0.35 - 0.4 * k2); p.armL.rotation.set(-0.9 * k2, 0, 0.35);
     p.body.rotation.set(-0.1 * k2, 0.45 * k2, 0.04 * k2); p.body.position.y = BODY_Y - 0.1 * k2;
     p.legL.rotation.set(-0.45 * k2, 0, 0.1); p.legR.rotation.set(0.35 * k2, 0, -0.1);
+  } else if (pose === 'charge') { // carregando o pesado: arma por cima do ombro, tronco torcido, base larga
+    const k2 = smooth01(progress), full = progress >= 1 ? 1 : 0, tr = Math.sin(ph * 31) * (0.012 + 0.03 * full) * k2;
+    p.armR.rotation.set(-2.35 * k2 + tr, 0.25 * k2, -0.55 * k2); p.armL.rotation.set(-1.95 * k2 - tr, -0.55 * k2, 0.65 * k2);
+    p.body.rotation.set(-0.14 * k2, 0.65 * k2 + tr, 0.06 * k2); p.body.position.y = BODY_Y - 0.15 * k2;
+    p.legL.rotation.set(-0.55 * k2, 0, 0.18 * k2); p.legR.rotation.set(0.45 * k2, 0, -0.18 * k2);
+  } else if (pose === 'heavyStrike') { // solta a carga: corte diagonal de cima, avançando, e volta
+    const u = Math.min(1, progress), a = u < 0.42 ? smooth01(u / 0.42) : 1, back = u > 0.68 ? smooth01((u - 0.68) / 0.32) : 0, h = 1 - back;
+    const rx = -2.35 + 2.0 * a, ry = 0.25 - 0.75 * a, rz = -0.55 + 0.35 * a;
+    p.armR.rotation.set(rx * h, ry * h, rz * h); p.armL.rotation.set((-1.95 + 1.7 * a) * h, (-0.55 + 0.4 * a) * h, (0.65 - 0.2 * a) * h);
+    p.body.rotation.set((-0.14 + 0.6 * a) * h, (0.65 - 1.2 * a) * h, (0.06 - 0.12 * a) * h); p.body.position.y = BODY_Y - (0.15 + 0.08 * a) * h;
+    p.legL.rotation.set(-0.75 * a * h, 0, 0.18 * h); p.legR.rotation.set(0.55 * a * h, 0, -0.18 * h);
   } else if (pose === 'heavyWindup') { // os dois braços para o alto
     const k2 = smooth01(progress);
     p.armR.rotation.set(-2.9 * k2, 0, -0.25 * k2); p.armL.rotation.set(-2.9 * k2, 0, 0.25 * k2);

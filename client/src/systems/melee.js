@@ -14,7 +14,7 @@ export const MELEE = {
   light: { cost: 8, combo: [1, 1.15, 1.6], window: 0.7, knock: [2.4, 2.8, 6] },
   heavy: { cost: 22, minHold: 0.24, maxCharge: 0.7, mult: [1.7, 2.6], knock: 8 },
   block: { mult: 0.2, heavyMult: 0.5, cost: 14, parry: 0.18, arc: 0.3 },
-  dodge: { cost: 20, speed: 11.5, dur: 0.34, iframes: 0.3, cd: 0.45 },
+  dodge: { cost: 20, speed: 10, dur: 0.34, iframes: 0.28, cd: 0.5 }, // arranque que desacelera (~1,9 m)
   kick: { cost: 14, dur: 0.42, range: 1.8, dmg: 5, knock: 7, breakStun: 1.3 }, // chute quebra-guarda
   clash: { window: 0.14, recover: 0.42 },     // espadas se chocando: janela antes do golpe dele e recuo
   enemy: { recover: 0.32, heavyRecover: 0.6, lunge: 3.6, evade: 0.16 }, // ritmo dos inimigos
@@ -102,12 +102,23 @@ export class Melee {
       // cambalhota para frente/trás, passo lateral para os lados
       const along = dx * fx + dz * fz, side = dx * rx + dz * rz;
       const anim = Math.abs(along) >= Math.abs(side) ? 'roll' : 'sidestep';
-      this.dodge = { vx: dx * MELEE.dodge.speed, vz: dz * MELEE.dodge.speed, t: 0, anim, dir: anim === 'roll' ? Math.sign(along) || -1 : -Math.sign(side) || 1, side };
+      this.dodge = { vx: dx * MELEE.dodge.speed, vz: dz * MELEE.dodge.speed, t: 0, dur: MELEE.dodge.dur, anim, dir: anim === 'roll' ? Math.sign(along) || -1 : -Math.sign(side) || 1, side };
       this.iframes = MELEE.dodge.iframes; this.dodgeCd = MELEE.dodge.cd;
       this.cancelCharge(); this.pending = null; G.combat.cooldown = 0; this.buffer = 0;
       if (G.viewmodel && pl.firstPerson) G.viewmodel.springs.kickRx.kick(1.5);
     }
     pl.dash = this.dodge;
+    // carga máxima do pesado: brilho de faíscas na arma + som curto (solta agora!)
+    if (this.charging && !this.chargeFull && this.holdT >= MELEE.heavy.maxCharge) {
+      this.chargeFull = true;
+      const [fx, fz] = pl.forward(), p = pl.body.pos;
+      const at = new THREE.Vector3(p.x + fx * 0.35 + fz * 0.25, p.y + 1.75, p.z + fz * 0.35 - fx * 0.25);
+      sfx.block(at);
+      if (pl.firstPerson) { if (G.viewmodel) G.viewmodel.springs.kickRx.kick(-0.8); } // em 1ª pessoa as faíscas ficariam na cara da câmera
+      else this.sparks(at, 10);
+      if (G.events) G.events.shake = Math.max(G.events.shake, 0.06);
+    }
+    if (!this.charging) this.chargeFull = false;
 
     // pancada do jogador no momento certo da animação
     if (this.pending) {
@@ -167,10 +178,10 @@ export class Melee {
     // golpe com um leve atraso (peso da arma): o leve leva ~0,3 s e o impacto vem perto da metade
     const dur = heavy ? clamp(w.rate * 1.05, 0.42, 0.6) : clamp(w.rate * (finisher ? 0.82 : 0.68), 0.27, 0.44);
     const pick = (l) => l[(Math.random() * l.length) | 0];
-    let pose = heavy ? pick(['slam', 'spin']) : finisher ? pick(['thrust', 'uppercut', 'spin']) : step === 0 ? 'slashR' : 'slashL';
+    let pose = heavy ? 'heavyStrike' : finisher ? pick(['thrust', 'uppercut', 'spin']) : step === 0 ? 'slashR' : 'slashL';
     if (w.tool === 'martelo') pose = heavy ? 'slam' : 'hammer'; // martelo: marteladas de cima para baixo
-    const style = heavy ? (pose === 'spin' ? 'slashA' : 'overhead') : finisher ? (pose === 'thrust' ? 'stab' : 'overhead') : step === 0 ? 'slashA' : 'slashB';
-    let impact = dur * (pose === 'spin' ? 0.55 : 0.4);
+    const style = heavy ? (pose === 'slam' ? 'overhead' : 'heavy') : finisher ? (pose === 'thrust' ? 'stab' : 'overhead') : step === 0 ? 'slashA' : 'slashB';
+    let impact = dur * (pose === 'spin' ? 0.55 : pose === 'heavyStrike' ? 0.42 : 0.4);
     if (pl.firstPerson && G.viewmodel) impact = G.viewmodel.onSwing(w, style, dur) * G.viewmodel.strikeFraction(w);
     G.combat.swing = G.combat.swingDuration = dur;
     // pode emendar o próximo golpe logo depois do impacto (o resto da animação é cancelável)
