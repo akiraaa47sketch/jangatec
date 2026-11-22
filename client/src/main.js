@@ -199,7 +199,7 @@ const startBenchmark = () => { start(4242); G.bench = new Benchmark(G); };
 preloadHand('./models/mao.glb').then((ok) => { if (ok) G.viewmodel.upgradeHands(buildRealHand); });
 preloadHand('./models/mao_3p.glb', '3p').then((ok) => { if (ok) upgradeWaitingPills(); }); // mãos das pílulas (3ª pessoa)
 // modelo 3D da pistola: carrega em segundo plano e troca o procedural quando ficar pronto
-for (const [id, url] of [['pistola', './models/pistola.glb'], ['revolver', './models/revolver.glb'], ['sniper', './models/sniper.glb']]) {
+for (const [id, url] of [['pistola', './models/pistola.glb'], ['revolver', './models/revolver.glb'], ['sniper', './models/sniper.glb'], ['martelo', './models/martelo.glb']]) {
   preloadGun(id, url).then((ok) => {
     const wid = id === 'sniper' ? 'rifle_precisao' : id;
     if (ok) G.viewmodel.specs.delete(wid);

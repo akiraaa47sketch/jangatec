@@ -661,7 +661,18 @@ const proceduralSniper = () => {
 };
 
 // ----- ferramentas -----
+// Martelo com o modelo 3D importado (Tripo, PBR); o procedural fica enquanto o GLB carrega.
 SPECS.martelo = () => {
+  const m = gunModel('martelo');
+  if (!m) return proceduralMartelo();
+  const g = new THREE.Group(); g.add(m.group);
+  return {
+    group: g, type: 'melee', muzzle: null, swing: ['overhead', 'overhead'],
+    hold: { p: [0.17, -0.14, -0.5], r: [0.9788, 0.5196, 0.5617] },
+    gripR: { p: [0, 0, 0.04], r: [-0.7854, 0, -1.5708], c: 0.95 },
+  };
+};
+const proceduralMartelo = () => {
   // cabeça girada 180° no cabo: a face de bater fica do lado dos nós dos dedos (para onde o golpe vai)
   const g = new THREE.Group(), h = new THREE.Group(); h.rotation.z = Math.PI; g.add(h);
   add(h, cylZ(0.016, 0.02, 0.36, MAT.woodLight, 0, 0, -0.12, 12));   // cabo
