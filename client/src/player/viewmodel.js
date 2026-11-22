@@ -177,6 +177,21 @@ export class ViewModel {
     this.swingT = 0;
     return this.swingDur;
   }
+  // chute em 1ª pessoa: a bota sobe de baixo da tela, acerta e volta (as mãos abrem para o lado)
+  onKick(dur = 0.42) {
+    if (!this.boot) {
+      const b = new THREE.Group(), leather = new THREE.MeshStandardMaterial({ color: 0x3a2416, roughness: 0.75 });
+      const shin = new THREE.Mesh(new THREE.CylinderGeometry(0.075, 0.065, 0.4, 14), leather); shin.position.y = 0.2;
+      const cuff = new THREE.Mesh(new THREE.CylinderGeometry(0.088, 0.082, 0.07, 14), leather); cuff.position.y = 0.38;
+      const foot = new THREE.Mesh(new THREE.CapsuleGeometry(0.068, 0.14, 4, 10), leather); foot.rotation.x = Math.PI / 2; foot.position.set(0, 0.0, -0.08);
+      const sole = new THREE.Mesh(new THREE.BoxGeometry(0.13, 0.025, 0.28), new THREE.MeshStandardMaterial({ color: 0x1a120c, roughness: 0.9 })); sole.position.set(0, -0.06, -0.08);
+      b.add(shin, cuff, foot, sole); b.visible = false;
+      this.boot = b; this.group.add(b);
+    }
+    this.kickT = 0; this.kickDur = dur;
+    this.springs.kickRx.kick(-1.2);
+  }
+  onClash() { this.springs.kickZ.kick(3.5); this.springs.kickRx.kick(4); this.springs.shakeR.kick((Math.random() - 0.5) * 3); }
   onMeleeHit() {
     this.springs.hit.kick(-1.1);
     this.springs.shake.kick(-0.5 + Math.random() * 0.1);
@@ -417,6 +432,17 @@ export class ViewModel {
       for (let i = 0; i < 6; i++) { if (i < 3) P[i] += swingOff[i]; else R[i - 3] += swingOff[i]; }
     }
 
+    // chute: bota de baixo para a frente; a arma abre para o lado durante o chute
+    if (this.kickDur > 0 && this.boot) {
+      this.kickT += dt;
+      const u = this.kickT / this.kickDur, out = u < 0.4 ? smooth(u / 0.4) : 1 - smooth((u - 0.55) / 0.45);
+      const k = clamp(out, 0, 1);
+      this.boot.visible = u < 1;
+      this.boot.position.set(0.06, -0.95 + 0.5 * k, -0.15 - 0.45 * k);
+      this.boot.rotation.set(-1.25 * k - 0.2, 0, 0.1);
+      P[0] += 0.08 * k; P[1] -= 0.06 * k; R[2] -= 0.3 * k;
+      if (u >= 1) { this.kickDur = 0; this.boot.visible = false; }
+    }
     // corpo a corpo: guarda (arma atravessada na frente) e carga do golpe pesado (puxa para trás)
     const mel = this.G.melee;
     this.blockW = approach(this.blockW || 0, mel && mel.blocking ? 1 : 0, dt * 12);

@@ -52,6 +52,7 @@
   </div>
   <!-- O estado do objeto carregado é mostrado no prompt e na mira. -->
   <div id="buildPanel" hidden></div>
+  <div id="buildAssist" hidden></div>
   <div id="hint"><kbd>H</kbd> controles · <kbd>G</kbd> gráficos · <kbd>F3</kbd> FPS · <kbd>I</kbd>/<kbd>O</kbd> zoom (3ª pessoa)</div>
 </div>
 <div id="fps" hidden></div>
@@ -64,8 +65,15 @@
 </div>
 <div id="benchResults" hidden></div>
 
+<div id="keysPanel" hidden>
+  <header><h2>Teclas</h2><button id="keysClose" type="button" class="gfx-btn">Fechar</button></header>
+  <p class="keys-note" id="keysNoteGame">Clique numa tecla e aperte a nova. Teclas repetidas trocam de lugar.</p>
+  <div class="keys-list" id="keysListGame"></div>
+  <button id="keysResetGame" type="button" class="gfx-btn">Restaurar padrão</button>
+</div>
+
 <div id="gfxPanel" hidden>
-  <header><h2>Gráficos</h2><button id="gfxClose" type="button">Fechar</button></header>
+  <header><h2>Gráficos</h2><span><button id="keysOpen" type="button" class="gfx-btn">⌨ Teclas</button> <button id="gfxClose" type="button">Fechar</button></span></header>
   <label>Predefinição <select id="gPreset"></select></label>
   <label>Modo FSR <select id="gFsr"></select></label>
   <label class="slider">Escala de renderização <input id="gScale" type="range" min="33" max="100" step="1"><small id="gScaleVal"></small></label>
@@ -299,14 +307,10 @@
 
       <section class="tab" data-tab="controls">
         <h2>Controles</h2>
-        <div class="keys-grid">
-          <div><kbd>W A S D</kbd> andar · <kbd>Shift</kbd> correr</div><div><kbd>Espaço</kbd> pular / subir</div>
-          <div><kbd>E</kbd> interagir</div><div><kbd>Clique</kbd> atacar / pegar peça</div>
-          <div><kbd>Q</kbd> esquivar · botão direito bloqueia/mira</div><div><kbd>R</kbd> recarregar · gizmo</div>
-          <div><kbd>1 2 3</kbd> <kbd>6 7 8</kbd> armas e ferramentas</div><div><kbd>4</kbd>/<kbd>5</kbd> bandagem / kit</div>
-          <div><kbd>F</kbd> 1ª / 3ª pessoa · <kbd>I</kbd>/<kbd>O</kbd> zoom</div><div><kbd>V</kbd> falar (chat de voz)</div>
-          <div><kbd>G</kbd> gráficos · <kbd>F3</kbd> FPS</div><div><kbd>H</kbd> ajuda completa</div>
-        </div>
+        <p class="tip">Clique numa tecla e aperte a nova (teclado ou mouse). Se ela já for usada por outra ação no mesmo momento do jogo, as duas trocam de lugar — nunca fica tecla repetida. Clique direito numa tecla volta ao padrão.</p>
+        <p class="keys-note" id="keysNote"></p>
+        <div class="keys-list" id="keysList"></div>
+        <button id="keysReset" type="button" class="ghost">Restaurar teclas padrão</button>
         <button id="btnHelp" type="button" class="ghost">Ver ajuda completa</button>
       </section>
     </main>

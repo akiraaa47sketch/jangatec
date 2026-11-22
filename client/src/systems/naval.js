@@ -17,6 +17,7 @@ import { sea, waveHeight } from '../world/ocean.js';
 import { Explosions } from '../world/explosions.js';
 import { makeWarship, drawShipHp, shipHalfWidth, SHIP } from '../world/navalmodels.js';
 import { PIECES } from '../boat/pieces.js';
+import { keyOf } from '../core/keybinds.js';
 
 export const NAVAL = {
   first: [150, 300],          // s (com canhão instalado e mar cheio) até a 1ª batalha
@@ -135,7 +136,7 @@ export class Naval {
     G.survival.inv.canhao--;
     G.boat.addPiece(piece);
     G.net.send({ t: 'add', piece });
-    G.hud.msg('Canhão instalado! [E] nele para usar');
+    G.hud.msg(`Canhão instalado! [${keyOf('interact')}] nele para usar`);
   }
 
   man(piece) {
@@ -726,8 +727,8 @@ export class Naval {
     const G = this.G, inp = G.input, piece = G.boat.pieces.get(this.manning);
     if (!piece || G.player.dead || G.player.downed || !G.player.aboard && !G.player.body.carrier) { this.leave(); return; }
     // mira: mouse/setas giram o cano (limitado) e levantam/abaixam
-    const keysYaw = ((inp.down('KeyA') || inp.down('ArrowLeft')) ? 1 : 0) - ((inp.down('KeyD') || inp.down('ArrowRight')) ? 1 : 0);
-    const keysEl = ((inp.down('KeyW') || inp.down('ArrowUp')) ? 1 : 0) - ((inp.down('KeyS') || inp.down('ArrowDown')) ? 1 : 0);
+    const keysYaw = ((inp.held('left') || inp.held('camLeft')) ? 1 : 0) - ((inp.held('right') || inp.held('camRight')) ? 1 : 0);
+    const keysEl = ((inp.held('forward') || inp.held('camUp')) ? 1 : 0) - ((inp.held('back') || inp.held('camDown')) ? 1 : 0);
     this.aimYaw = clamp(this.aimYaw - inp.mouse.dx * 0.0022 + keysYaw * 0.9 * dt, -1.3, 1.3);
     this.aimElev = clamp(this.aimElev - inp.mouse.dy * 0.0016 + keysEl * 0.35 * dt, -0.06, 0.62);
     this._setAim(piece, this.aimYaw, this.aimElev);

@@ -10,6 +10,7 @@ import * as THREE from '../three.js';
 import { clamp } from '../core/util.js';
 import { waveHeight } from '../world/ocean.js';
 import { buildWeapon } from '../player/viewmodel-parts.js';
+import { keyOf } from '../core/keybinds.js';
 
 export const MUSIC = { healAllies: 1.6, healSelf: 0.5, radius: 12, hearing: 45 };
 export const HOOK = { speed: 30, range: 30, pull: 13 };
@@ -250,7 +251,7 @@ export class Tools {
       if (!c || h.t > 14) h.state = 'back';
       else {
         h.pos.copy(c.mesh.position); h.pos.y += 0.45;
-        if (!G.naval.pullCrate(c.id, pp.x, pp.z)) { G.hud.msg('Caixote ao alcance — [E] para abrir'); h.state = 'back'; }
+        if (!G.naval.pullCrate(c.id, pp.x, pp.z)) { G.hud.msg(`Caixote ao alcance — [${keyOf('interact')}] para abrir`); h.state = 'back'; }
       }
     } else if (h.state === 'player') {
       const r = G.net.remotes.get(h.player);
@@ -297,7 +298,7 @@ export class Tools {
     const banjo = w && w.tool === 'banjo' && !G.player.dead && !G.player.downed;
     if (!banjo) { if (this.menuOpen) this.toggleMenu(false); if (this.song) this.stopSong(); }
     if (banjo && !G.build.active && !G.interact.lootOpen && !(G.naval && G.naval.manning)) {
-      if (inp.hit('KeyB') || (!this.menuOpen && inp.mouse.rightPressed)) this.toggleMenu(!this.menuOpen);
+      if (inp.act('banjoMenu') || (!this.menuOpen && inp.mouse.rightPressed)) this.toggleMenu(!this.menuOpen);
       else if (this.menuOpen && inp.hit('Escape')) this.toggleMenu(false);
       if (this.menuOpen) for (const [code, m] of KEYS) if (inp.hit(code)) this.strum(m + (inp.down('ShiftLeft') || inp.down('ShiftRight') ? 1 : 0));
     }

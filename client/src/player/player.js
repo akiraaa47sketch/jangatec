@@ -102,13 +102,13 @@ export class Player {
     if (!rotatingBuild || (G.build.cameraDragging && inp.mouse.right)) {
       // Em 1ª pessoa a sensibilidade acompanha o zoom da mira (luneta não "foge" do alvo).
       const sens = this.firstPerson ? this.fovSens : 1;
-      this.camYaw -= (inp.mouse.dx * 0.0025 + ((inp.down('ArrowRight') ? 1 : 0) - (inp.down('ArrowLeft') ? 1 : 0)) * 1.8 * dt) * sens;
+      this.camYaw -= (inp.mouse.dx * 0.0025 + ((inp.held('camRight') ? 1 : 0) - (inp.held('camLeft') ? 1 : 0)) * 1.8 * dt) * sens;
       const pitchMin = this.firstPerson ? -1.5 : -0.45, pitchMax = this.firstPerson ? 1.5 : 1.3;
-      this.camPitch = clamp(this.camPitch + (inp.mouse.dy * 0.0025 + ((inp.down('ArrowDown') ? 1 : 0) - (inp.down('ArrowUp') ? 1 : 0)) * 1.2 * dt) * sens, pitchMin, pitchMax);
+      this.camPitch = clamp(this.camPitch + (inp.mouse.dy * 0.0025 + ((inp.held('camDown') ? 1 : 0) - (inp.held('camUp') ? 1 : 0)) * 1.2 * dt) * sens, pitchMin, pitchMax);
     }
 
     if (this.dead) { this.syncMesh(0, dt); return; }
-    if ((G.interact && G.interact.lootOpen) || (G.gfxMenu && G.gfxMenu.open) || (G.tools && G.tools.menuOpen)) {
+    if ((G.interact && G.interact.lootOpen) || (G.gfxMenu && G.gfxMenu.open) || (G.keysMenu && G.keysMenu.open) || (G.tools && G.tools.menuOpen)) {
       b.vel.x = b.vel.z = 0;
       this.syncMesh(0, dt);
       return;
@@ -117,14 +117,14 @@ export class Player {
     if (G.naval && G.naval.manning) { G.naval.holdPlayer(b); this.syncMesh(0, dt); return; } // no canhão
 
     const aiming = G.combat.aiming;
-    const fwd = (inp.down('KeyW') ? 1 : 0) - (inp.down('KeyS') ? 1 : 0);
-    const side = (inp.down('KeyD') ? 1 : 0) - (inp.down('KeyA') ? 1 : 0);
+    const fwd = (inp.held('forward') ? 1 : 0) - (inp.held('back') ? 1 : 0);
+    const side = (inp.held('right') ? 1 : 0) - (inp.held('left') ? 1 : 0);
     const [fx, fz] = this.forward();
     const rx = Math.cos(this.camYaw), rz = -Math.sin(this.camYaw);
     let dx = fx * fwd + rx * side, dz = fz * fwd + rz * side;
     const len = Math.hypot(dx, dz), moving = len > 0;
     if (moving) { dx /= len; dz /= len; }
-    let speed = this.swimming ? CFG.swim : inp.down('ShiftLeft') ? CFG.run : CFG.walk;
+    let speed = this.swimming ? CFG.swim : inp.held('sprint') && !this.G.build.active ? CFG.run : CFG.walk;
     if (this.downed) speed = this.swimming ? CFG.swim * 0.6 : 0.9; // caído: só se arrasta
     if (aiming) speed = Math.min(speed, 3);
     speed *= this.speedMul || 1; // bloqueando/carregando golpe anda devagar
@@ -144,7 +144,7 @@ export class Player {
     else if (aiming || this.aimHold > 0) this.yaw = lerpAngle(this.yaw, Math.atan2(fx, fz), Math.min(1, 16 * dt));
     else if (moving) this.yaw = lerpAngle(this.yaw, Math.atan2(dx, dz), Math.min(1, 12 * dt));
 
-    if (inp.hit('Space') && !this.downed) {
+    if (inp.act('jump') && !this.downed) {
       const dir = moving ? [dx, dz] : [Math.sin(this.yaw), Math.cos(this.yaw)];
       if (!this.tryMantle(dir[0], dir[1]) && b.grounded) { b.vel.y = CFG.jumpSpeed; b.grounded = false; }
     }
@@ -347,8 +347,8 @@ export class Player {
     this.camTarget.lerp(_v, 1 - Math.exp(-20 * dt));
     // zoom da 3ª pessoa: [I] aproxima, [O] afasta (mira sempre puxa para perto do ombro)
     const typing = G.tools && G.tools.menuOpen;
-    if (!typing && G.input.hit('KeyI')) this.zoom = clamp(this.zoom - 0.8, 1.8, 10);
-    if (!typing && G.input.hit('KeyO')) this.zoom = clamp(this.zoom + 0.8, 1.8, 10);
+    if (!typing && G.input.act('zoomIn')) this.zoom = clamp(this.zoom - 0.8, 1.8, 10);
+    if (!typing && G.input.act('zoomOut')) this.zoom = clamp(this.zoom + 0.8, 1.8, 10);
     this.aimBlend = lerp(this.aimBlend || 0, aiming ? 1 : 0, Math.min(1, 12 * dt));
     this.camDist = lerp(this.camDist, aiming ? Math.min(this.zoom, 1.9) : this.zoom, Math.min(1, 10 * dt));
     cam.fov = lerp(cam.fov, aiming ? 48 : 68, Math.min(1, 10 * dt));

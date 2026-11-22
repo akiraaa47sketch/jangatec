@@ -1,5 +1,7 @@
 import * as THREE from '../three.js';
 import { clamp } from '../core/util.js';
+import { keyOf } from '../core/keybinds.js';
+import { BuildSnap } from './snap.js';
 
 const PICKUP_DISTANCE = 2.8;
 const BUILD_DISTANCE = 7;
@@ -37,6 +39,20 @@ export class Build {
     this.ndc = new THREE.Vector2();
     this.gizmo = this._makeRotationGizmo();
     G.scene.add(this.gizmo);
+    this.snap = new BuildSnap(G); // build assistida (pontos de encaixe)
+  }
+
+  toggleAssist() {
+    const on = this.snap.toggle();
+    this.G.hud.msg(on ? `Build assistida LIGADA — a peça gruda nos pontos (bolinhas) · [${keyOf('assist')}] desliga` : `Build assistida desligada · [${keyOf('assist')}] liga`);
+    this._syncAssistBadge();
+  }
+  _syncAssistBadge() {
+    const el = document.getElementById('buildAssist');
+    if (!el) return;
+    el.hidden = !this.active;
+    el.classList.toggle('on', this.snap.on);
+    el.innerHTML = `<kbd>${keyOf('assist')}</kbd> Build assistida: <b>${this.snap.on ? 'LIGADA' : 'desligada'}</b>`;
   }
 
   get rotating() { return this.active && this.rotationMode; }
@@ -156,7 +172,8 @@ export class Build {
     G.physics.setHoldTarget(obj, position, quaternion);
     this._updateHeldTarget();
     G.net.send({ t: 'carry', id: obj.id, by: G.net.id, state: this.original.placed ? this._state(obj, this.original) : null });
-    G.hud.msg(`Segurando ${obj.def.nome} — encoste na jangada para soldar · [V] reposiciona · [Q] solta · [R] gizmo · [Z] solda`);
+    G.hud.msg(`Segurando ${obj.def.nome} — encoste na jangada para soldar · [${keyOf('resetPos')}] reposiciona · [${keyOf('place')}] solta · [${keyOf('gizmo')}] gizmo · [${keyOf('weld')}] solda · [${keyOf('assist')}] build assistida`);
+    this._syncAssistBadge();
   }
 
   _rayTargets(includePickupHitboxes = false) {
@@ -306,7 +323,10 @@ export class Build {
     const distance = offset.length();
     if (distance > BUILD_DISTANCE) position.copy(playerPosition).addScaledVector(offset, BUILD_DISTANCE / distance);
     const quaternion = new THREE.Quaternion().setFromEuler(rotation);
-    this.candidate = { position: position.clone(), quaternion, isWater, valid: true };
+    // build assistida: alinha e gruda nos pontos das peças vizinhas (não mexe durante o gizmo)
+    const snapped = !this.rotationMode && this.snap.apply(position, quaternion, size, this._physicsOffset(this.held));
+    if (this.rotationMode) this.snap.hide();
+    this.candidate = { position: position.clone(), quaternion, isWater, valid: true, snapped };
     this.G.physics.setHoldTarget(this.held, position, quaternion);
   }
 
@@ -404,7 +424,7 @@ export class Build {
     this.cameraDragging = false;
     this.G.input.setCursorMode(true);
     this._updateRotationGizmo();
-    this.G.hud.msg('Gizmo ativo — arraste um anel para girar · [R] voltar');
+    this.G.hud.msg(`Gizmo ativo — arraste um anel para girar · [${keyOf('gizmo')}] voltar`);
     return true;
   }
 
@@ -474,7 +494,7 @@ export class Build {
     }
     drag.prev.copy(cur);
     drag.accumulatedAngle += d;
-    const targetAngle = this.G.input.down('ShiftLeft')
+    const targetAngle = this.G.input.held('fine')
       ? Math.round(drag.accumulatedAngle / ROTATION_STEP) * ROTATION_STEP
       : drag.accumulatedAngle;
     const deltaAngle = targetAngle - drag.appliedAngle;
@@ -516,7 +536,9 @@ export class Build {
     this.held = null;
     this.original = null;
     this.gizmo.visible = false;
+    this.snap.hide();
     document.body.classList.remove('build-mode');
+    this._syncAssistBadge();
     if (this.G.input.cursorMode) this.G.input.setCursorMode(false);
     this.G.combat.setBuildMode(false);
   }
@@ -606,10 +628,13 @@ export class Build {
     }
     const G = this.G, boat = G.boat, mesh = obj.mesh;
     const slot = this.pendingDeckSlot;
-    const position = new THREE.Vector3(obj.body.position.x, obj.body.position.y, obj.body.position.z);
-    const quaternion = new THREE.Quaternion(
+    let position = new THREE.Vector3(obj.body.position.x, obj.body.position.y, obj.body.position.z);
+    let quaternion = new THREE.Quaternion(
       obj.body.quaternion.x, obj.body.quaternion.y, obj.body.quaternion.z, obj.body.quaternion.w
     );
+    // build assistida: solda exatamente no encaixe (a física deixa a peça a milímetros dele)
+    const c = this.candidate;
+    if (c && c.snapped && c.position.distanceTo(position) < 0.4) { position = c.position.clone(); quaternion = c.quaternion.clone(); }
     mesh.position.copy(position);
     mesh.quaternion.copy(quaternion);
     G.physics.releaseHold(obj, {
@@ -753,15 +778,18 @@ export class Build {
   update() {
     if (this.active) {
       if (this.G.input.hit('Escape')) { this.cancel(); return; }
+      if (this.G.input.act('place')) { this.place(); return; }
+      if (this.G.input.act('assist')) this.toggleAssist();
+      if (this.G.input.act('gizmo')) this.toggleRotationMode();
       if (this.cameraDragging && !this.G.input.mouse.right) this.endCameraDrag();
       if (this.rotationMode) this._updateGizmoDrag();
       const inp = this.G.input;
-      if (inp.mouse.wheel) this._quickRotate(Math.sign(inp.mouse.wheel), inp.down('ShiftLeft'));
-      if (inp.hit('KeyT')) { this.rotation.set(0, this.G.boat.yaw, 0); if (this.rotationMode) this.rotationQuaternion = new THREE.Quaternion().setFromEuler(this.rotation); }
-      if (this.G.input.hit('KeyV')) this.resetHeldPosition();
+      if (inp.mouse.wheel) this._quickRotate(Math.sign(inp.mouse.wheel), inp.held('fine'));
+      if (inp.act('straighten')) { this.rotation.set(0, this.G.boat.yaw, 0); if (this.rotationMode) this.rotationQuaternion = new THREE.Quaternion().setFromEuler(this.rotation); }
+      if (this.G.input.act('resetPos')) this.resetHeldPosition();
       else this._updateHeldTarget();
       this._updateRotationGizmo();
-      if (this.G.input.hit('KeyZ')) this.weld(this.held);
+      if (this.G.input.act('weld')) this.weld(this.held);
       return;
     }
     this.updatePickupTarget();

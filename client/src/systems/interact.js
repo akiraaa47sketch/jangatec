@@ -1,4 +1,5 @@
 // Interação com [E]: caixas de loot, mastro e reanimar aliados caídos; [X]: peças soldadas.
+import { keyOf } from '../core/keybinds.js';
 const REVIVE_TIME = 2.5;
 export class Interact {
   constructor(G) {
@@ -41,7 +42,7 @@ export class Interact {
       });
     } else if (G.startup.departed && G.player.aboard) {
       const [mx, mz] = G.boat.mastWorld(), dist = Math.hypot(mx - p.x, mz - p.z);
-      if (dist < 2.6) consider(dist + 0.5, { mast: true, label: (G.boat.sailUp ? 'Baixar vela' : 'Levantar vela') + '   [Z] [C] girar vela', run: () => G.boat.setSail(!G.boat.sailUp, G.boat.sailAngle) });
+      if (dist < 2.6) consider(dist + 0.5, { mast: true, label: (G.boat.sailUp ? 'Baixar vela' : 'Levantar vela') + `   [${keyOf('sailLeft')}] [${keyOf('sailRight')}] girar vela`, run: () => G.boat.setSail(!G.boat.sailUp, G.boat.sailAngle) });
     }
 
     // Canhões: usar, instalar (com o item no inventário) e consertar peças danificadas
@@ -79,7 +80,7 @@ export class Interact {
         if (piece.startSlotId && !G.startup.departed) continue;
         const d = Math.hypot(piece.x - plx, piece.z - plz);
         if (d < 2.0) {
-          consider(d + 0.3, { remove: id, label: `[X] Dessoldar ${piece.physObj.def.nome}` });
+          consider(d + 0.3, { remove: id, label: `[${keyOf('unweld')}] Dessoldar ${piece.physObj.def.nome}` });
           break; // apenas a mais próxima
         }
       }
@@ -160,7 +161,7 @@ export class Interact {
     if (!c || !c.revive) this.reviveT = 0;
     if (!c) return;
     if (c.revive) { // segurar E por REVIVE_TIME segundos
-      if (inp.down('KeyE')) {
+      if (inp.held('interact')) {
         this.reviveT = (this.reviveT || 0) + dt;
         c.label = `Reanimando ${c.name}… ${Math.min(100, Math.round(this.reviveT / REVIVE_TIME * 100))}%`;
         if (this.reviveT >= REVIVE_TIME) {
@@ -171,10 +172,10 @@ export class Interact {
       } else this.reviveT = 0;
       return;
     }
-    if (c.remove && inp.hit('KeyX')) G.build.tryRemoveWelded(c.remove);
-    else if (inp.hit('KeyE') && c.run) { c.run(); if (G.viewmodel) G.viewmodel.onInteract(); }
+    if (c.remove && inp.act('unweld')) G.build.tryRemoveWelded(c.remove);
+    else if (inp.act('interact') && c.run) { c.run(); if (G.viewmodel) G.viewmodel.onInteract(); }
     if (c.mast && !c.installSail) {
-      const turn = (inp.down('KeyC') ? 1 : 0) - (inp.down('KeyZ') ? 1 : 0);
+      const turn = (inp.held('sailRight') ? 1 : 0) - (inp.held('sailLeft') ? 1 : 0);
       if (turn) G.boat.setSail(G.boat.sailUp, G.boat.sailAngle + turn * 0.8 * dt);
     }
   }

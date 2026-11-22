@@ -8,6 +8,7 @@ export const WEAPONS = [
   { id: 'faca_manteiga', nome: 'Faca de manteiga', stars: 1, melee: true, dmg: 16, range: 1.7, rate: 0.34, durability: 38, color: 0xa5a9a8, scale: [0.4, 0.45, 0.9] },
   { id: 'bastao', nome: 'Bastão', stars: 1, melee: true, dmg: 19, range: 2.5, rate: 0.48, durability: 65, color: 0x74502e, scale: [0.55, 0.65, 1.65] },
   { id: 'facao', nome: 'Facão reforçado', stars: 2, melee: true, dmg: 38, range: 2.6, rate: 0.42, durability: 120, color: 0x555c60, scale: [0.55, 0.55, 1.35] },
+  { id: 'sabre', nome: 'Sabre pirata', stars: 3, melee: true, dmg: 34, range: 2.5, rate: 0.4, durability: 150, color: 0xb58d4a, scale: [0.5, 0.5, 1.5] },
   { id: 'revolver', nome: 'Revólver', stars: 2, dmg: 26, mag: 6, rate: 0.38, spread: 0.028, range: 60, reload: 1.55, recoil: 0.026, pellets: 1, ammo: 'municao', durability: 90, color: 0x514b45, scale: [0.8, 0.75, 0.95] },
   { id: 'pistola', nome: 'Pistola', stars: 3, dmg: 30, mag: 12, rate: 0.24, spread: 0.009, range: 100, reload: 1.1, recoil: 0.01, pellets: 1, ammo: 'municao', durability: 140, color: 0x33383c, scale: [0.9, 0.85, 0.9], automatic: true },
   { id: 'escopeta', nome: 'Escopeta', stars: 4, dmg: 12, mag: 5, rate: 0.8, spread: 0.07, range: 32, reload: 1.9, recoil: 0.04, pellets: 8, ammo: 'cartucho', durability: 110, color: 0x4c3525, scale: [1, 1, 1.7] },
@@ -200,7 +201,7 @@ export class Combat {
       }
     }
     if (!building && !looting && !G.player.dead && !G.player.downed && !G.player.mantle && !this.buildMode && w) {
-      if (inp.hit('KeyR')) this.startReload();
+      if (inp.act('reload')) this.startReload();
       const trigger = inp.mouse.leftPressed || (w.automatic && inp.mouse.left);
       const drawing = G.player.firstPerson && G.viewmodel && G.viewmodel.lowerEquip > 0.35; // arma ainda sendo sacada
       // corpo a corpo (leve/pesado/bloqueio/esquiva) fica no sistema Melee

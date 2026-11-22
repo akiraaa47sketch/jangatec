@@ -89,6 +89,9 @@ export class Enemies {
       const r = Math.random();
       const loot = r < 0.4 ? { municao: 6 } : r < 0.75 ? { bandagem: 1 } : r < 0.85 ? { cartucho: 4 } : null;
       this.G.hud.msg(`${e.def.nome} derrotado` + (loot ? '  ' + this.G.survival.add(loot) : ''));
+      // piratas (e às vezes saqueadores) largam o sabre
+      const dropChance = e.type === 'pirata' ? 0.45 : e.type === 'melee' ? 0.12 : 0;
+      if (dropChance && Math.random() < dropChance && !this.G.combat.owned.has('sabre') && this.G.combat.unlockWeapon('sabre') === true) this.G.hud.msg('Você pegou um Sabre pirata ★★★!');
     }
   }
 

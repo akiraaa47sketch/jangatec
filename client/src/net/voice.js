@@ -6,6 +6,7 @@
 //   • Quem está falando aparece no HUD (e o ícone acende acima do personagem).
 // Só o servidor STUN público é usado (descobre o IP); redes muito restritas podem não conectar.
 import * as THREE from '../three.js';
+import { keyOf } from '../core/keybinds.js';
 
 const ICE = [{ urls: ['stun:stun.l.google.com:19302', 'stun:stun1.l.google.com:19302'] }];
 const KEY = 'jangatec-voz';
@@ -149,7 +150,7 @@ export class Voice {
     if (this.track) {
       const inp = G.input, typing = (G.tools && G.tools.menuOpen) || G.build.active || !G.started;
       let talk = false;
-      if (this.settings.mode === 'ptt') talk = this.touchTalk || (!typing && inp.down(this.settings.key));
+      if (this.settings.mode === 'ptt') talk = this.touchTalk || (!typing && inp.held('ptt'));
       else {
         this.level = this.micLevel();
         if (this.level > 0.02) this.hang = 0.35; else this.hang -= dt;
@@ -185,7 +186,7 @@ export class Voice {
   _hud() {
     const el = this.hud; if (!el) return;
     const G = this.G, rows = [];
-    if (this.on && this.settings.mic) rows.push(`<div class="me${this.talking ? ' on' : ''}"><i>🎙</i>${this.talking ? 'Falando' : this.settings.mode === 'ptt' ? `Segure <kbd>${this.settings.key.replace('Key', '')}</kbd> para falar` : 'Microfone aberto'}</div>`);
+    if (this.on && this.settings.mic) rows.push(`<div class="me${this.talking ? ' on' : ''}"><i>🎙</i>${this.talking ? 'Falando' : this.settings.mode === 'ptt' ? `Segure <kbd>${keyOf('ptt')}</kbd> para falar` : 'Microfone aberto'}</div>`);
     if (this.on) for (const [id, r] of G.net.remotes) {
       const p = this.peers.get(id);
       if ((p && p.speaking > 0) || (r.s && r.s.tk)) rows.push(`<div class="on"><i>🔊</i>${(r.s && r.s.n) || 'Aliado'}</div>`);

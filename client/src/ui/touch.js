@@ -1,6 +1,8 @@
 // Controles de toque (celular/tablet): joystick à esquerda, arrastar a metade direita gira a
 // câmera e botões contextuais à direita. Os botões disparam os MESMOS eventos de teclado/mouse
 // do computador, então nenhum sistema do jogo precisa saber que está no celular.
+import { binds } from '../core/keybinds.js';
+
 export const isTouchDevice = () =>
   (('ontouchstart' in window) || navigator.maxTouchPoints > 0) && matchMedia('(pointer: coarse)').matches;
 
@@ -44,11 +46,11 @@ export class TouchControls {
         <button data-act="reload" title="Recarregar">${ICON.reload}</button>
       </div>
       <div class="tCtx" id="tBuild">
-        <button data-key="KeyQ">Soltar</button><button data-key="KeyZ">Soldar</button>
-        <button data-key="KeyV">Mover p/ mira</button><button data-key="Escape">Cancelar</button>
+        <button data-bact="place">Soltar</button><button data-bact="weld">Soldar</button>
+        <button data-bact="resetPos">Mover p/ mira</button><button data-bact="assist">Encaixe</button><button data-key="Escape">Cancelar</button>
       </div>
       <div class="tCtx" id="tSail">
-        <button data-hold="KeyZ">◀ Vela</button><button data-hold="KeyC">Vela ▶</button>
+        <button data-bact="sailLeft">◀ Vela</button><button data-bact="sailRight">Vela ▶</button>
       </div>`;
     this.root.hidden = true; // só aparece durante a partida (não cobre o menu)
     document.body.appendChild(this.root);
@@ -63,8 +65,8 @@ export class TouchControls {
   }
 
   setKeys(down) {
-    for (const code of ['KeyW', 'KeyA', 'KeyS', 'KeyD', 'ShiftLeft']) {
-      const want = down.has(code), has = this.held.has(code);
+    for (const [act, code] of ['forward', 'left', 'back', 'right', 'sprint'].map((a) => [a, binds[a]])) {
+      const want = down.has(act), has = this.held.has(code);
       if (want && !has) { key('keydown', code); this.held.add(code); }
       if (!want && has) { key('keyup', code); this.held.delete(code); }
     }
@@ -81,9 +83,9 @@ export class TouchControls {
       if (len > R) { dx *= R / len; dy *= R / len; }
       knob.style.transform = `translate(${dx}px, ${dy}px)`;
       const nx = dx / R, ny = dy / R, keys = new Set(), dead = 0.28;
-      if (ny < -dead) keys.add('KeyW'); if (ny > dead) keys.add('KeyS');
-      if (nx < -dead) keys.add('KeyA'); if (nx > dead) keys.add('KeyD');
-      if (Math.hypot(nx, ny) > 0.92 && ny < 0) keys.add('ShiftLeft'); // empurrar até o fim = correr
+      if (ny < -dead) keys.add('forward'); if (ny > dead) keys.add('back');
+      if (nx < -dead) keys.add('left'); if (nx > dead) keys.add('right');
+      if (Math.hypot(nx, ny) > 0.92 && ny < 0) keys.add('sprint'); // empurrar até o fim = correr
       this.setKeys(keys);
     };
     stickEl.addEventListener('touchstart', (e) => {
@@ -140,16 +142,16 @@ export class TouchControls {
         inp.mouse.right = !inp.mouse.right; if (inp.mouse.right) inp.mouse.rightPressed = true;
         el.classList.toggle('lock', inp.mouse.right);
       });
-      else if (act === 'dodge') press(el, () => key('keydown', 'KeyQ'), () => key('keyup', 'KeyQ'));
-      else if (act === 'jump') press(el, () => key('keydown', 'Space'), () => key('keyup', 'Space'));
-      else if (act === 'use') press(el, () => key('keydown', 'KeyE'), () => key('keyup', 'KeyE'));
-      else if (act === 'reload') press(el, () => key('keydown', 'KeyR'), () => key('keyup', 'KeyR'));
+      else if (act === 'dodge') press(el, () => key('keydown', binds.dodge), () => key('keyup', binds.dodge));
+      else if (act === 'jump') press(el, () => key('keydown', binds.jump), () => key('keyup', binds.jump));
+      else if (act === 'use') press(el, () => key('keydown', binds.interact), () => key('keyup', binds.interact));
+      else if (act === 'reload') press(el, () => key('keydown', binds.reload), () => key('keyup', binds.reload));
       else if (act === 'swap') press(el, () => { inp.mouse.wheel += 1; });
       else if (act === 'heal') press(el, () => {
-        const code = G.survival.inv.bandagem > 0 ? 'Digit4' : 'Digit5';
+        const code = G.survival.inv.bandagem > 0 ? binds.bandage : binds.medkit;
         key('keydown', code); key('keyup', code);
       });
-      else if (act === 'cam') press(el, () => { key('keydown', 'KeyF'); key('keyup', 'KeyF'); });
+      else if (act === 'cam') press(el, () => { key('keydown', binds.camera); key('keyup', binds.camera); });
       else if (act === 'gfx') press(el, () => G.gfxMenu.toggle(!G.gfxMenu.open));
       else if (act === 'mic') press(el, () => { G.voice.touchTalk = true; }, () => { G.voice.touchTalk = false; });
       else if (act === 'full') press(el, () => {
@@ -160,12 +162,14 @@ export class TouchControls {
     }
     for (const el of this.root.querySelectorAll('[data-key]')) press(el, () => key('keydown', el.dataset.key), () => key('keyup', el.dataset.key));
     for (const el of this.root.querySelectorAll('[data-hold]')) press(el, () => key('keydown', el.dataset.hold), () => key('keyup', el.dataset.hold));
+    // botões ligados a ações: usam a tecla configurada no momento
+    for (const el of this.root.querySelectorAll("[data-bact]")) press(el, () => key("keydown", binds[el.dataset.bact]), () => key("keyup", binds[el.dataset.bact]));
   }
 
   // Mostra os botões que fazem sentido agora (construção, vela no mastro, arma de fogo).
   update() {
     const G = this.G, $ = (id) => document.getElementById(id);
-    this.root.hidden = !G.started || G.interact.lootOpen || (G.gfxMenu && G.gfxMenu.open) || !!G.bench;
+    this.root.hidden = !G.started || G.interact.lootOpen || (G.gfxMenu && G.gfxMenu.open) || (G.keysMenu && G.keysMenu.open) || !!G.bench;
     if (this.root.hidden) return;
     $('tBuild').classList.toggle('show', !!G.build.active);
     const cur = G.interact.current;

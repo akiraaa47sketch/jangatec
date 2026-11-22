@@ -24,6 +24,7 @@ import { CharacterMenu } from './ui/character.js';
 import { TouchControls, isTouchDevice } from './ui/touch.js';
 import { Graphics } from './core/graphics.js';
 import { GfxMenu } from './ui/gfxmenu.js';
+import { KeysMenu } from './ui/keysmenu.js';
 import { Benchmark } from './systems/benchmark.js';
 import { Melee } from './systems/melee.js';
 import { Voice } from './net/voice.js';
@@ -97,6 +98,7 @@ G.viewmodel.scene.environmentIntensity = scene.environmentIntensity;
 window.G = G; // útil para depurar no console
 G.gfx = new Graphics(G, { renderer, scene, camera, sun, mobile: MOBILE }); // pipeline + opções gráficas
 G.gfxMenu = new GfxMenu(G);
+G.keysMenu = new KeysMenu(G);
 if (MOBILE) G.touch = new TouchControls(G);
 
 canvas.addEventListener('mousedown', (e) => {
@@ -134,16 +136,6 @@ addEventListener('mouseup', (e) => {
   if (e.button === 2) G.build.endCameraDrag();
 });
 addEventListener('keydown', (e) => {
-  if (e.code === 'KeyR' && !e.repeat && G.input.enabled && G.build.active) {
-    e.preventDefault();
-    G.build.toggleRotationMode();
-    return;
-  }
-  if (e.code === 'KeyQ' && G.input.enabled && G.build.active) {
-    e.preventDefault();
-    G.build.place();
-    return;
-  }
   if (e.code === 'Escape' && G.input.enabled && G.build.active) {
     G.build.cancel();
     e.preventDefault();
@@ -219,15 +211,14 @@ const now = () => (Date.now() / 1000) % 100000; // relógio comum: ondas parecid
 function hotkeys() {
   const inp = G.input;
   if (!G.tools.menuOpen) { // com o painel do banjo aberto as letras viram notas
-    if (inp.hit('KeyH')) $('help').hidden = !$('help').hidden;
-    if (inp.hit('KeyF')) G.player.setFirstPerson(!G.player.firstPerson);
+    if (inp.act('help')) $('help').hidden = !$('help').hidden;
+    if (inp.act('camera')) G.player.setFirstPerson(!G.player.firstPerson);
   }
-  if (G.build.active || G.interact.lootOpen || G.gfxMenu.open || G.naval.manning || G.tools.menuOpen) return;
-  for (let i = 0; i < 3; i++) if (inp.hit('Digit' + (i + 1))) G.combat.select(i);
-  for (let i = 3; i < 6; i++) if (inp.hit('Digit' + (i + 3))) G.combat.select(i); // 6 7 8 = ferramentas/extras
+  if (G.build.active || G.interact.lootOpen || G.gfxMenu.open || G.keysMenu.open || G.naval.manning || G.tools.menuOpen) return;
+  for (let i = 0; i < 6; i++) if (inp.act('slot' + (i + 1))) G.combat.select(i);
   if (inp.mouse.wheel) G.combat.cycle(Math.sign(inp.mouse.wheel));
-  if (inp.hit('Digit4')) G.survival.use('bandagem');
-  if (inp.hit('Digit5')) G.survival.use('kit');
+  if (inp.act('bandage')) G.survival.use('bandagem');
+  if (inp.act('medkit')) G.survival.use('kit');
 }
 
 function frame() {

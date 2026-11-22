@@ -43,6 +43,7 @@ export const MAT = {
   tape: std(0x9a9a98, 0.75, 0.05),
   red2: std(0xc0392b, 0.6),
   brass: std(0xb58d4a, 0.5, 0.5),
+  leather: std(0x3d2716, 0.82, 0),
   red: std(0xb03a2e, 0.8),
   white: std(0xe8e4da, 0.9),
   glass: new THREE.MeshStandardMaterial({ color: 0x6fa0b5, roughness: 0.15, metalness: 0.2, transparent: true, opacity: 0.55 }),
@@ -163,6 +164,7 @@ MAT.gloveReal = new THREE.MeshPhysicalMaterial({ color: 0xd3202b, roughness: 0.5
 export function setGloveColor(hex) {
   MAT.glove.color.setHex(hex);
   MAT.gloveReal.color.setHex(hex);
+  for (const c of MAT.gloveReal.userData.caps || []) c.color.setHex(hex).multiply(new THREE.Color(0.42, 0.3, 0.26));
   MAT.gloveSeam.color.setHex(hex).multiplyScalar(0.62); // costura um tom mais escuro
 }
 
@@ -371,6 +373,29 @@ SPECS.facao = () => {
   add(g, box(0.026, 0.036, 0.02, MAT.black, 0, 0, 0.13));
   add(g, box(0.034, 0.012, 0.016, MAT.brass, 0, 0.012, -0.034));
   for (const z of [0.03, 0.08]) add(g, box(0.026, 0.008, 0.008, MAT.brass, 0, 0.0, z));
+  return {
+    group: g, type: 'melee', muzzle: null, swing: ['slashA', 'slashB', 'stab'],
+    hold: { p: [0.22, -0.1, -0.4], r: [0.75, 0.28, -0.1] },
+    gripR: { p: [0, 0, 0.035], r: [0, 1.55, -0.55], c: 0.95 },
+  };
+};
+
+// Sabre pirata (cutelo): lâmina curva, guarda em concha de latão protegendo a mão e punho de couro.
+SPECS.sabre = () => {
+  const g = new THREE.Group(), L = 0.6, N = 14, pts = [];
+  const curve = (u) => 0.075 * (u / L) ** 2;              // a lâmina sobe em direção à ponta
+  for (let i = 0; i <= N; i++) { const u = (i / N) * L * 0.93; pts.push([u, 0.016 + curve(u)]); }               // dorso
+  pts.push([L, curve(L) + 0.004]);                                                                               // ponta
+  for (let i = N; i >= 0; i--) { const u = (i / N) * L * 0.9, w = 0.02 + 0.012 * Math.sin((u / L) * Math.PI * 0.9); pts.push([u, 0.016 + curve(u) - w - 0.012]); } // fio
+  add(g, profile(pts, 0.0065, MAT.steel, 0, -0.012, -0.03));
+  add(g, profile(pts.slice(0, N + 1).concat([[L * 0.93, 0.006 + curve(L * 0.93)], [0, 0.006]]), 0.0085, MAT.iron, 0, -0.012, -0.03)); // canal no dorso
+  // guarda em concha: disco de latão + arco que vai até o pomo protegendo os dedos
+  const disc = cylZ(0.04, 0.04, 0.008, MAT.brass, 0, -0.008, -0.026, 18); disc.scale.set(0.55, 1, 1); add(g, disc);
+  const bow = new THREE.Mesh(new THREE.TorusGeometry(0.075, 0.0055, 8, 22, Math.PI), MAT.brass);
+  bow.rotation.set(0, Math.PI / 2, 0); bow.position.set(0, -0.012, 0.05); bow.scale.set(1, 0.62, 1); add(g, bow);
+  add(g, cylZ(0.016, 0.018, 0.115, MAT.leather, 0, 0, 0.035, 10)); // punho
+  for (let i = 0; i < 5; i++) add(g, new THREE.Mesh(new THREE.TorusGeometry(0.0175, 0.0022, 6, 14), MAT.brass)).children.at(-1).position.set(0, 0, -0.012 + i * 0.024); // fio enrolado
+  const pommel = new THREE.Mesh(new THREE.SphereGeometry(0.02, 12, 10), MAT.brass); pommel.position.set(0, -0.002, 0.1); add(g, pommel);
   return {
     group: g, type: 'melee', muzzle: null, swing: ['slashA', 'slashB', 'stab'],
     hold: { p: [0.22, -0.1, -0.4], r: [0.75, 0.28, -0.1] },
