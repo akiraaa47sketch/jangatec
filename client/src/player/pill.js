@@ -2,6 +2,8 @@
 // chapéus) + animação própria. Altura do modelo ≈ 3,24 unidades; o jogo escala para ~1,75 m.
 import * as THREE from '../three.js';
 import { attachRealHands, animateRealHands } from './pillhands.js';
+import { PILL_OUTFITS, PILL_BACKS, makeOutfit, makeBack, OUTFIT_DEPTH } from './clothes.js';
+export { PILL_OUTFITS, PILL_BACKS };
 
 // ---------- opções de personalização ----------
 const C = (nome, hex) => ({ nome, hex });
@@ -28,7 +30,7 @@ export const PILL_HATS = [
   { id: 'bone', nome: 'Boné' }, { id: 'cartola', nome: 'Cartola' }, { id: 'capitao', nome: 'Capitão' },
   { id: 'coroa', nome: 'Coroa' }, { id: 'gorro', nome: 'Gorro' },
 ];
-export const PILL_DEFAULT = { cap: 0, base: 0, gloves: 0, face: 'tedio', boots: 'tenis', bootColor: 0, hat: 'nenhum', hatColor: 1 };
+export const PILL_DEFAULT = { cap: 0, base: 0, gloves: 0, face: 'tedio', boots: 'tenis', bootColor: 0, hat: 'nenhum', hatColor: 1, outfit: 'nenhuma', outfitColor: 9, back: 'nenhum' };
 
 // Garante índices/ids válidos (aparência vinda da rede ou do localStorage).
 export function sanitizePill(o = {}) {
@@ -39,6 +41,8 @@ export function sanitizePill(o = {}) {
     gloves: idx(o.gloves, PILL_COLORS, PILL_DEFAULT.gloves), face: id(o.face, PILL_FACES, PILL_DEFAULT.face),
     boots: id(o.boots, PILL_BOOTS, PILL_DEFAULT.boots), bootColor: idx(o.bootColor, PILL_COLORS, PILL_DEFAULT.bootColor),
     hat: id(o.hat, PILL_HATS, PILL_DEFAULT.hat), hatColor: idx(o.hatColor, PILL_COLORS, PILL_DEFAULT.hatColor),
+    outfit: id(o.outfit, PILL_OUTFITS, PILL_DEFAULT.outfit), outfitColor: idx(o.outfitColor, PILL_COLORS, PILL_DEFAULT.outfitColor),
+    back: id(o.back, PILL_BACKS, PILL_DEFAULT.back),
   };
 }
 export function randomPill() {
@@ -47,19 +51,22 @@ export function randomPill() {
     cap: pick(PILL_COLORS.length), base: pick(PILL_BASE_COLORS.length), gloves: pick(PILL_COLORS.length),
     face: pickId(PILL_FACES), boots: pickId(PILL_BOOTS), bootColor: pick(PILL_COLORS.length),
     hat: pickId(PILL_HATS), hatColor: pick(PILL_COLORS.length),
+    outfit: pickId(PILL_OUTFITS), outfitColor: pick(PILL_COLORS.length), back: pickId(PILL_BACKS),
   };
 }
-// Código curto para a rede: "cap.base.gloves.face.boots.bootColor.hat.hatColor"
+// Código curto para a rede: "cap.base.gloves.face.boots.bootColor.hat.hatColor.outfit.outfitColor.back"
 export function encodePill(o) {
   const p = sanitizePill(o);
   return [p.cap, p.base, p.gloves, PILL_FACES.findIndex((f) => f.id === p.face), PILL_BOOTS.findIndex((b) => b.id === p.boots),
-    p.bootColor, PILL_HATS.findIndex((h) => h.id === p.hat), p.hatColor].join('.');
+    p.bootColor, PILL_HATS.findIndex((h) => h.id === p.hat), p.hatColor,
+    PILL_OUTFITS.findIndex((x) => x.id === p.outfit), p.outfitColor, PILL_BACKS.findIndex((x) => x.id === p.back)].join('.');
 }
 export function decodePill(code) {
   const n = String(code || '').split('.').map((v) => parseInt(v, 10));
   return sanitizePill({
     cap: n[0], base: n[1], gloves: n[2], face: PILL_FACES[n[3]]?.id, boots: PILL_BOOTS[n[4]]?.id,
     bootColor: n[5], hat: PILL_HATS[n[6]]?.id, hatColor: n[7],
+    outfit: PILL_OUTFITS[n[8]]?.id, outfitColor: n[9], back: PILL_BACKS[n[10]]?.id, // códigos antigos: sem roupa
   });
 }
 
@@ -502,6 +509,15 @@ export function makePill(options = {}) {
       shoulder.add(hand); parts.hand = hand;
     }
   }
+  // roupa (tronco + mangas nos ombros) e acessório (costas / ombro esquerdo)
+  if (!options.npc) {
+    const anims = [];
+    const outfit = makeOutfit(o.outfit, PILL_COLORS[o.outfitColor] ? PILL_COLORS[o.outfitColor].hex : 0x7a4a2a);
+    if (outfit) { body.add(outfit.body); if (outfit.sleeves.R) parts.armR.add(outfit.sleeves.R); if (outfit.sleeves.L) parts.armL.add(outfit.sleeves.L); }
+    const back = makeBack(o.back, PILL_COLORS[o.outfitColor] ? PILL_COLORS[o.outfitColor].hex : 0xa83a2c, OUTFIT_DEPTH[o.outfit] || 0);
+    if (back) { body.add(back.body); if (back.shoulderL) parts.armL.add(back.shoulderL); if (back.anim) anims.push(back.anim); }
+    if (anims.length) parts.clothesAnim = anims;
+  }
   const hat = (HATS[o.hat] || HATS.nenhum)(o.hatColor);
   if (hat) { hat.scale.setScalar(1.3); hat.position.y = TOP_Y - 0.08; body.add(hat); parts.hat = hat; }
   root.userData.parts = parts; root.userData.phase = 0; root.userData.pill = o; root.userData.face = face;
@@ -552,6 +568,7 @@ export function animatePill(pill, speed, dt, pose = 'walk', progress = 0) {
   animateFace(pill.userData, dt);
   pill.userData.pose = pose;
   animateRealHands(pill, dt);
+  if (p.clothesAnim) for (const f of p.clothesAnim) f(dt, speed, pill.userData.phase || 0);
 }
 
 // Pisca de vez em quando; a boca abre conforme o volume da voz (userData.talk 0..1, chat de voz).
