@@ -27,6 +27,7 @@ import { Graphics } from './core/graphics.js';
 import { GfxMenu } from './ui/gfxmenu.js';
 import { Benchmark } from './systems/benchmark.js';
 import { Melee } from './systems/melee.js';
+import { Naval } from './systems/naval.js';
 
 const $ = (id) => document.getElementById(id);
 const canvas = $('c');
@@ -80,6 +81,7 @@ G.viewmodel = new ViewModel(G, { sun, hemisphere }); // braços/arma em 1ª pess
 G.startup = new Startup(G, { sun, hemisphere });
 G.build = new Build(G);     // Sistema unificado de posicionamento físico
 G.interact = new Interact(G);
+G.naval = new Naval(G);     // canhões, navios piratas e dano por peça
 const atmo = new Atmosphere(renderer, scene, { sun, hemisphere }); // céu, IBL e sombras
 const ocean = new Ocean(scene, atmo);
 ocean.islandSource = () => G.world.islands;
@@ -94,7 +96,7 @@ if (MOBILE) G.touch = new TouchControls(G);
 
 canvas.addEventListener('mousedown', (e) => {
   if (!G.build.active) {
-    if (e.button === 0) {
+    if (e.button === 0 && !G.naval.manning) {
       const target = G.build.updatePickupTarget();
       if (target && G.build.tryPickup(target)) {
         e.preventDefault();
@@ -217,7 +219,7 @@ function hotkeys() {
   const inp = G.input;
   if (inp.hit('KeyH')) $('help').hidden = !$('help').hidden;
   if (inp.hit('KeyF')) G.player.setFirstPerson(!G.player.firstPerson);
-  if (G.build.active || G.interact.lootOpen || G.gfxMenu.open) return;
+  if (G.build.active || G.interact.lootOpen || G.gfxMenu.open || G.naval.manning) return;
   for (let i = 0; i < 3; i++) if (inp.hit('Digit' + (i + 1))) G.combat.select(i);
   if (inp.mouse.wheel) G.combat.cycle(Math.sign(inp.mouse.wheel));
   if (inp.hit('Digit4')) G.survival.use('bandagem');
@@ -263,6 +265,7 @@ function frame() {
   G.physics.update(dt, t);
   G.enemies.update(dt);
   G.events.update(dt, t);
+  G.naval.update(dt, t);
   if (G.bench) G.bench.update(dt);
   G.interact.update(dt);
   G.combat.update(dt);

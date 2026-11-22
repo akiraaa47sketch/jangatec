@@ -135,6 +135,17 @@ cada um sai diferente (força, velocidade, tamanho, lado e sentido de giro sorte
   água e vai puxando aos poucos (mais forte com o tempo e perto do centro). Levante a vela e gire-a para
   o lado oposto; se a jangada chegar ao centro, ela é sugada, gira e é cuspida com dano.
 
+- **Batalha naval** (`client/src/systems/naval.js`, constantes em `NAVAL`/`PIECE_HP`; modelos em
+  `client/src/world/navalmodels.js`): o **canhão improvisado** (galão d'água + cano) e as balas só saem em
+  caixas/naufrágios a partir da região 3 (~640 m da rota). Instalado no convés, vira uma peça da jangada;
+  sentado nele, a mira mostra a trajetória balística e uma retícula em círculo no ponto de impacto. As
+  balas têm física (gravidade + velocidade da jangada) e são simuladas em todos os clientes; o host decide o
+  dano. Com um canhão instalado, o host sorteia batalhas (raras): 1–2 **navios piratas grandes** emparelham
+  e disparam bordadas; têm vida, pegam fogo, inclinam e **afundam** (dão loot). **Cada peça da jangada tem
+  vida** (maior para peças grandes/de metal); destruída, solta-se. Só a plataforma do mastro é
+  indestrutível. [E] conserta peças. Durante a batalha a maré é segurada no cheio (`Naval.holdK` em
+  `tide.js`) e nenhum outro evento/invasão começa.
+
 - **Oceano que seca** (`client/src/systems/tide.js`, constantes em `TIDE`): só dois estados — **mar cheio**
   e **mar seco** — num ciclo de 6 min (seco ≈ 2 min 24 s), com uma transição rápida (16 s) entre eles,
   calculado do relógio comum. Seco, a água desce abaixo do **fundo do mar** (`client/src/world/seabed.js`)

@@ -101,6 +101,17 @@ kbd { display: inline-block; min-width: 1.6em; padding: 1px 6px; margin: 0 2px; 
 #scopeOverlay::before, #scopeOverlay::after { content: ''; position: absolute; left: 50%; top: 50%; background: rgba(0, 0, 0, 0.8); transform: translate(-50%, -50%); }
 #scopeOverlay::before { width: 54vmin; height: 1px; }
 #scopeOverlay::after { width: 1px; height: 54vmin; }
+/* retícula do canhão: círculo no ponto de impacto previsto; o arco mostra a recarga */
+#cannonReticle { position: absolute; width: 54px; height: 54px; margin: -27px 0 0 -27px; --r: 1; --c: var(--brass-2); }
+#cannonReticle::before { content: ''; position: absolute; inset: 0; border-radius: 50%;
+  background: conic-gradient(var(--c) calc(var(--r) * 360deg), rgba(255, 255, 255, 0.18) 0);
+  -webkit-mask: radial-gradient(circle, transparent 22px, #000 23px); mask: radial-gradient(circle, transparent 22px, #000 23px);
+  filter: drop-shadow(0 0 2px rgba(0, 0, 0, 0.9)); }
+#cannonReticle i { position: absolute; inset: 0; margin: auto; width: 6px; height: 6px; border-radius: 50%; background: #fff; box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.5); }
+#cannonReticle.lock { --c: #ff5a3a; }
+#cannonReticle.ready::before { animation: none; }
+#cannonReticle::after { content: attr(data-ammo) ' ●'; position: absolute; left: 50%; top: 60px; transform: translateX(-50%);
+  font: 800 12px var(--ui); white-space: nowrap; }
 /* dica de teclas: aparece no começo e some sozinha */
 #hint { position: absolute; left: 16px; top: 16px; font-size: 11.5px; opacity: 0.75; transition: opacity 1.2s; }
 #hint.gone { opacity: 0; }

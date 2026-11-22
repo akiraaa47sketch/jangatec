@@ -173,7 +173,7 @@ function handle(ws, m) {
       const crate = room.crates.get(m.id);
       if (!validCrateId(m.id, room.seed, m) || !ws.openedCrates.has(m.id) || !crate ||
           !canReachCrate(room, ws, m) || typeof m.item !== 'string' ||
-          !/^(madeira|metal|pano|bandagem|kit|municao|cartucho|arma_[a-z0-9_]+)$/.test(m.item)) {
+          !/^(madeira|metal|pano|bandagem|kit|municao|cartucho|canhao|bala_canhao|arma_[a-z0-9_]+)$/.test(m.item)) {
         send(ws, { t: 'crate:error', id: m.id });
         break;
       }
@@ -247,7 +247,7 @@ function handle(ws, m) {
       const e = m.e;
       if (room.hostId !== ws.id || !e || !['tsunami', 'furacao'].includes(e.kind) ||
           typeof e.id !== 'string' || e.id.length > 40) break;
-      const keys = ['t0', 'dur', 'ox', 'oz', 'dx', 'dz', 'speed', 'A', 'sigma', 'cx', 'cz', 'fx', 'fz', 'lat', 'latV', 'ahead'];
+      const keys = ['t0', 'dur', 'ox', 'oz', 'dx', 'dz', 'speed', 'A', 'sigma', 'cx', 'cz', 'fx', 'fz', 'lat', 'latV', 'ahead', 'R', 'depth', 'spin'];
       const clean = { id: e.id, kind: e.kind, end: !!e.end };
       for (const key of keys) {
         if (e[key] === undefined) continue;
@@ -257,6 +257,15 @@ function handle(ws, m) {
       if (!Number.isFinite(clean.t0) || !Number.isFinite(clean.dur) || clean.dur > 120) break;
       room.event = clean.end ? null : clean;
       broadcast(room, { t: 'event', e: clean }, ws);
+      break;
+    }
+    case 'naval': {
+      // Batalha naval: o host manda navios/dano/estado; qualquer um pode disparar, mirar e consertar.
+      const HOST = ['ships', 'php', 'sunk', 'boom'], ANY = ['fire', 'aim', 'repair'];
+      if (typeof m.k !== 'string' || !(HOST.includes(m.k) || ANY.includes(m.k))) break;
+      if (HOST.includes(m.k) && room.hostId !== ws.id) break;
+      if (JSON.stringify(m).length > 6000) break;
+      broadcast(room, m, ws);
       break;
     }
     case 'physics': {

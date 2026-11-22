@@ -99,7 +99,7 @@ export class Enemies {
     if (this.pirateSpawnTimer > 0) return;
     if (G.startup.waterLevel < 0.5) { this.pirateSpawnTimer = 20; return; } // oceano seco: sem balsas
     // Nunca junto com uma onda gigante/furacão, nem com outra invasão em andamento.
-    if ((G.events && G.events.active) || this.list.some((e) => e.pirate && e.state !== 'dead')) {
+    if ((G.events && G.events.active) || (G.naval && G.naval.active) || this.list.some((e) => e.pirate && e.state !== 'dead')) {
       this.pirateSpawnTimer = 20;
       return;
     }

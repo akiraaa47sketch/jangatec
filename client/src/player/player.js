@@ -102,6 +102,7 @@ export class Player {
       return;
     }
     if (this.mantle) { this.updateMantle(dt); this.syncMesh(0, dt); return; }
+    if (G.naval && G.naval.manning) { G.naval.holdPlayer(b); this.syncMesh(0, dt); return; } // no canhão
 
     const aiming = G.combat.aiming;
     const fwd = (inp.down('KeyW') ? 1 : 0) - (inp.down('KeyS') ? 1 : 0);
@@ -203,7 +204,7 @@ export class Player {
       this.mesh.rotation.y = this.yaw;
     }
     this.mesh.rotation.x = this.dead ? -Math.PI / 2 : 0;
-    this.mesh.visible = !(this.firstPerson && G.started); // só o dono não vê o próprio corpo
+    this.mesh.visible = !(this.firstPerson && G.started) || !!(G.naval && G.naval.manning); // só o dono não vê o próprio corpo
     let pose = this.swimming ? 'swim' : G.combat.aiming ? 'aim' : 'walk';
     let progress = 0;
     if (this.mantle) {
@@ -288,6 +289,7 @@ export class Player {
       xh.classList.toggle('melee', !!(tp && w && w.melee));
       if (tp) xh.style.setProperty('--s', (1 + (this.G.combat.bloom || 0) * 0.9 - (this.aimBlend || 0) * 0.3).toFixed(3));
     }
+    if (this.G.naval && this.G.naval.manning && this.G.naval.updateCamera(this.G.camera, dt, t)) return;
     if (this.firstPerson) { this.updateFirstPersonCamera(dt, t); return; }
     const G = this.G, cam = G.camera, aiming = G.combat.aiming;
     this.mesh.updateWorldMatrix(true, false);

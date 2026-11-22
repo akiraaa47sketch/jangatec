@@ -5,6 +5,7 @@ import { WEAPONS } from './combat.js';
 export const ITEM_NAMES = {
   madeira: 'Madeira', metal: 'Metal', pano: 'Pano', bandagem: 'Bandagem',
   kit: 'Kit médico', municao: 'Munição', cartucho: 'Cartuchos',
+  canhao: 'Canhão improvisado', bala_canhao: 'Balas de canhão',
 };
 const USE = {
   bandagem: (s) => { s.vida = clamp(s.vida + 30, 0, 100); return 'Bandagem aplicada'; },
@@ -16,7 +17,7 @@ export class Survival {
   constructor(G) {
     this.G = G;
     this.vida = 100;
-    this.inv = { madeira: 0, metal: 0, pano: 0, bandagem: 0, kit: 0, municao: 0, cartucho: 0 };
+    this.inv = { madeira: 0, metal: 0, pano: 0, bandagem: 0, kit: 0, municao: 0, cartucho: 0, canhao: 0, bala_canhao: 0 };
     this.deadTimer = 0;
   }
   add(loot) {

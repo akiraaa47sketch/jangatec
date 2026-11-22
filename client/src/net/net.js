@@ -85,6 +85,7 @@ export class Net {
       case 'start': G.startup.applyState(m.state); break;
       case 'msg': G.hud.msg(m.text); break;
       case 'event': G.events.receive(m.e); break;
+      case 'naval': if (G.naval) G.naval.receive(m); break;
       case 'revive': if (m.id === this.id) G.survival.revive(m.by); break;
       case 'carry': {
         G.world.applyCarryState(m.id, m.by, m.state);

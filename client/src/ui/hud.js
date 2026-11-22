@@ -113,7 +113,8 @@ export class Hud {
     $('objective').textContent = G.startup.objective;
     const chip = (icon, label, n) => n ? `<span class="chip" title="${label}"><i>${icon}</i>${n}</span>` : '';
     const invHtml = chip('✚', 'Bandagens [4]', inv.bandagem) + chip('♥', 'Kits médicos [5]', inv.kit) +
-      chip('•', 'Munição', inv.municao) + chip('▮', 'Cartuchos', inv.cartucho || 0);
+      chip('•', 'Munição', inv.municao) + chip('▮', 'Cartuchos', inv.cartucho || 0) +
+      chip('⊛', 'Canhão improvisado (instale com E a bordo)', inv.canhao || 0) + chip('◉', 'Balas de canhão', inv.bala_canhao || 0);
     if (invHtml !== this._inv) { $('inv').innerHTML = invHtml; this._inv = invHtml; }
     // Arma equipada
     const weaponHtml = w
@@ -134,6 +135,7 @@ export class Hud {
     const build = G.build;
     const crosshair = $('crosshair');
     crosshair.classList.toggle('build', build.active);
+    crosshair.style.display = G.naval && G.naval.manning ? 'none' : '';
     const carryText = !build.active ? '' : build.rotating
       ? `${build.held.def.nome} · arraste anel · botão direito: câmera · [R] voltar · [Z] solda · Esc cancela`
       : `${build.held.def.nome} · roda gira · [T] endireita · [V] reposiciona · [Q] solta · [R] gizmo · [Z] solda · Esc cancela`;

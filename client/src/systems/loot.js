@@ -140,6 +140,16 @@ export function generateCrateLoot(seed, id, difficulty, playerCount = 1) {
     else if (weapon === 'rifle_precisao') add('municao', 5 + Math.floor(random() * 6));
   }
 
+  // Canhão improvisado (galão d'água) só aparece longe na rota (região 3+, ~640 m) — e naufrágios
+  // escondem mais. Vem com algumas balas; balas avulsas também aparecem por lá.
+  if (regionIndex >= 2) {
+    const wreck = id.startsWith('b');
+    if (random() < (wreck ? 0.3 : 0.14) + (regionIndex - 2) * 0.05) {
+      add('canhao', 1);
+      add('bala_canhao', 6 + Math.floor(random() * 5));
+    } else if (random() < 0.3 + (regionIndex - 2) * 0.08) add('bala_canhao', 3 + Math.floor(random() * 5));
+  }
+
   if (random() < 0.25 + regionIndex * 0.08) {
     add(regionIndex >= 2 && random() < 0.16 ? 'kit' : 'bandagem', 1 + (random() < 0.35 ? 1 : 0));
   }

@@ -2,6 +2,7 @@
 // size = [largura X, altura Y, comprimento Z]; col = tipo de colisor.
 import * as THREE from '../three.js';
 import { woodTexture, woodBump, metalTexture, scaleBoxUVs } from '../world/textures.js';
+import { makeCannonMesh } from '../world/navalmodels.js';
 
 export const STARTER_PLATFORM_SIZE = 6;
 
@@ -15,6 +16,7 @@ export const PIECES = {
   parede:     { nome: 'Parede',      size: [2, 2, 0.2],     custo: { madeira: 2 }, cor: 0x7a5c38 },
   suporte:    { nome: 'Suporte',     size: [0.3, 2, 0.3],   custo: { madeira: 1 }, cor: 0x6b4f30 },
   chapa:      { nome: 'Chapa',       size: [2, 0.1, 2],     custo: { metal: 2 },   cor: 0x8f979c, metal: true },
+  canhao:     { nome: 'Canhão improvisado', size: [1.0, 0.9, 1.5], custo: {}, cor: 0x3f8fd8, hidden: true, make: makeCannonMesh },
   mastro:     { nome: 'Mastro',      size: [0.3, 5, 0.3],   custo: {}, cor: 0x5d4428, col: 'cyl', fixed: true, hidden: true },
 };
 export const BUILD_LIST = Object.keys(PIECES).filter((k) => !PIECES[k].hidden);
@@ -33,6 +35,7 @@ function wedgeGeometry(w, h, l) {
 
 export function makePieceMesh(type, ghost = false) {
   const def = PIECES[type], [w, h, l] = def.size;
+  if (def.make && !ghost) return def.make();
   const wood = !ghost && !def.metal;
   const mat = ghost
     ? new THREE.MeshBasicMaterial({ color: 0x55ff88, transparent: true, opacity: 0.45, depthWrite: false, side: THREE.DoubleSide })

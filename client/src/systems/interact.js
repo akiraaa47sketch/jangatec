@@ -13,6 +13,8 @@ export class Interact {
     if (G.build.active) return null;
     let best = null, bd = Infinity;
     const consider = (d, o) => { if (d < bd) { bd = d; best = o; } };
+    const naval = G.naval;
+    if (naval && naval.manning) return { cannon: true, label: 'Sair do canhão · clique dispara · mouse mira', run: () => naval.leave() };
 
     // Aliado caído por perto: segurar E reanima
     for (const [id, r] of G.net.remotes) {
@@ -40,6 +42,26 @@ export class Interact {
     } else if (G.startup.departed && G.player.aboard) {
       const [mx, mz] = G.boat.mastWorld(), dist = Math.hypot(mx - p.x, mz - p.z);
       if (dist < 2.6) consider(dist + 0.5, { mast: true, label: (G.boat.sailUp ? 'Baixar vela' : 'Levantar vela') + '   [Z] [C] girar vela', run: () => G.boat.setSail(!G.boat.sailUp, G.boat.sailAngle) });
+    }
+
+    // Canhões: usar, instalar (com o item no inventário) e consertar peças danificadas
+    if (naval && G.player.aboard) {
+      const boat = G.boat, [plx, plz] = boat.toLocal(p.x, p.z);
+      for (const c of naval.cannons) {
+        const d = Math.hypot(c.x - plx, c.z - plz);
+        if (d < 1.9) consider(d + 0.2, { label: `Usar canhão (balas: ${G.survival.inv.bala_canhao})`, run: () => naval.man(c) });
+      }
+      if (G.survival.inv.canhao > 0 && naval.canInstallHere()) consider(1.6, { label: 'Instalar canhão aqui', run: () => naval.install() });
+      let dmg = null, dd = 2.2;
+      for (const piece of boat.pieces.values()) {
+        if (!naval.destructible(piece)) continue;
+        const max = naval.maxHp(piece), hp = naval.hpOf(piece), d = Math.hypot(piece.x - plx, piece.z - plz);
+        if (hp < max - 0.5 && d < dd) { dd = d; dmg = { piece, pct: Math.round(100 * hp / max) }; }
+      }
+      if (dmg) {
+        const nome = dmg.piece.physObj ? dmg.piece.physObj.def.nome : (dmg.piece.type === 'canhao' ? 'canhão' : 'peça');
+        consider(dd + 0.25, { label: `Consertar ${nome} (${dmg.pct}%)`, run: () => naval.repair(dmg.piece) });
+      }
     }
 
     // Peças soldadas próximas que podem ser removidas

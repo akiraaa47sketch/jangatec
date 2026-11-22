@@ -80,7 +80,7 @@ export class Melee {
     if (this.dodge) { this.dodge.t += dt; if (this.dodge.t >= MELEE.dodge.dur) this.dodge = null; }
     this.updateNums(dt);
 
-    const free = !G.build.active && !G.interact.lootOpen && !pl.dead && !pl.downed && !pl.mantle && !pl.swimming && !(G.gfxMenu && G.gfxMenu.open) && !G.bench;
+    const free = !G.build.active && !(G.naval && G.naval.manning) && !G.interact.lootOpen && !pl.dead && !pl.downed && !pl.mantle && !pl.swimming && !(G.gfxMenu && G.gfxMenu.open) && !G.bench;
     // esquiva [Q] (com qualquer arma)
     if (free && inp.hit('KeyQ') && !this.dodge && this.dodgeCd <= 0 && this.stunT <= 0 && this.stamina >= MELEE.dodge.cost * 0.5) {
       this.spend(MELEE.dodge.cost);

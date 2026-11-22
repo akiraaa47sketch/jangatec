@@ -747,7 +747,7 @@ export class ViewModel {
 
   // ---------- desenho ----------
   render(renderer) {
-    if (!this.active || this.G.player.dead) return;
+    if (!this.active || this.G.player.dead || (this.G.naval && this.G.naval.manning)) return;
     const r = renderer;
     r.autoClear = false;
     r.clearDepth();

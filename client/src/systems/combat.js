@@ -194,7 +194,7 @@ export class Combat {
 
   update(dt) {
     const G = this.G, inp = G.input, w = this.weapon;
-    const building = G.build.active, looting = G.interact.lootOpen;
+    const building = G.build.active || !!(G.naval && G.naval.manning), looting = G.interact.lootOpen;
     this.cooldown -= dt;
     this.bloom = Math.max(0, (this.bloom || 0) - dt * 2.5);
     this.aiming = !!w && !building && !looting && !!w.ammo && inp.mouse.right && !G.player.dead && !G.player.downed && !G.player.swimming;
