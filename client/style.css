@@ -291,6 +291,8 @@ body.touch #fps { left: auto; right: calc(14px + env(safe-area-inset-right)); to
 #gfxPanel label.slider { display: grid; grid-template-columns: 1fr 52%; }
 #gfxPanel label.slider small { grid-column: 1 / -1; color: var(--ink-dim); font-size: 11.5px; text-align: right; margin-top: -4px; }
 #gfxPanel label.check { justify-content: flex-start; }
+#gfxPanel h3.gfx-sec { margin: 16px 0 4px; padding-top: 12px; border-top: 1px solid var(--line); font: 400 22px var(--display); color: var(--brass-2); }
+#gfxPanel h3.gfx-sec small { font: 600 11px var(--ui); color: var(--ink-dim); }
 #gfxPanel select { flex: 0 0 52%; background: #12303f; border: 1px solid rgba(224, 172, 76, 0.35); border-radius: 7px; color: var(--ink); padding: 7px 9px; font: inherit; }
 #gfxPanel input[type=range] { accent-color: var(--brass); width: 100%; }
 #gfxPanel input[type=checkbox] { accent-color: var(--brass); width: 18px; height: 18px; }

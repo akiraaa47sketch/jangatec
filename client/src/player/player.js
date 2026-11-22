@@ -137,6 +137,9 @@ export class Player {
     p.x += b.vel.x * dt; p.z += b.vel.z * dt;
     G.colliders.resolve(b, prevY);
 
+    if (this.swimming && !this.wasSwimming && G.gfx) G.gfx.wetLens(0.5); // mergulho
+    if (!this.swimming && this.wasSwimming && G.gfx) G.gfx.wetLens(1);  // saiu da água: lente molhada
+    this.wasSwimming = this.swimming;
     if (b.grounded) {
       this.swimming = false;
       b.carrier = b.groundSet;

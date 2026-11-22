@@ -9,6 +9,7 @@ export class GfxMenu {
     const gfx = G.gfx, s = gfx.settings;
     const opts = (id, map) => { $(id).replaceChildren(...Object.entries(map).map(([v, t]) => new Option(t, v))); };
     opts('gPreset', GFX_LABELS.preset); opts('gUpscaler', GFX_LABELS.upscaler); opts('gShadows', GFX_LABELS.shadows);
+    opts('gDof', GFX_LABELS.dof);
     opts('gMsaa', GFX_LABELS.msaa); opts('gView', GFX_LABELS.view); opts('gWater', GFX_LABELS.water); opts('gPixel', GFX_LABELS.pixelCap);
     const num = (v) => (Number.isNaN(Number(v)) ? v : Number(v));
     $('gPreset').onchange = (e) => { if (e.target.value in GFX_PRESETS) gfx.setPreset(e.target.value); this.sync(); };
@@ -16,6 +17,9 @@ export class GfxMenu {
     bind('gUpscaler', 'upscaler', String); bind('gShadows', 'shadows', String); bind('gMsaa', 'msaa'); bind('gView', 'view');
     bind('gWater', 'water', String); bind('gPixel', 'pixelCap'); bind('gBloom', 'bloom', Boolean); bind('gGrade', 'grade', Boolean);
     bind('gFps', 'showFps', Boolean);
+    bind('gDof', 'dof', String); bind('gMotion', 'motion', Boolean); bind('gBob', 'bob', Boolean);
+    bind('gWet', 'wet', Boolean); bind('gLowHp', 'lowHp', Boolean); bind('gGrain', 'grain', Boolean);
+    $('gShake').oninput = (e) => { gfx.set('shake', Number(e.target.value) / 100); this.sync(); };
     $('gScale').oninput = (e) => { gfx.set('scale', Number(e.target.value) / 100); this.sync(); };
     // nitidez: 0 (suave) … 100 (máxima) ↔ RCAS em stops 2 … 0
     $('gSharp').oninput = (e) => { gfx.set('sharpness', 2 - Number(e.target.value) / 50); this.sync(); };
@@ -42,6 +46,9 @@ export class GfxMenu {
     $('gPreset').value = s.preset; $('gUpscaler').value = s.upscaler; $('gShadows').value = s.shadows;
     $('gMsaa').value = String(s.msaa); $('gView').value = String(s.view); $('gWater').value = s.water; $('gPixel').value = String(s.pixelCap);
     $('gBloom').checked = s.bloom; $('gGrade').checked = s.grade; $('gFps').checked = s.showFps;
+    $('gDof').value = s.dof; $('gMotion').checked = s.motion; $('gBob').checked = s.bob;
+    $('gWet').checked = s.wet; $('gLowHp').checked = s.lowHp; $('gGrain').checked = s.grain;
+    $('gShake').value = Math.round(s.shake * 100); $('gShakeVal').textContent = s.shake > 0 ? `${Math.round(s.shake * 100)}%` : 'desligado';
     $('gScale').value = Math.round(s.scale * 100);
     $('gScaleVal').textContent = `${Math.round(s.scale * 100)}% · ${g.inSize.x}×${g.inSize.y} → ${g.outSize.x}×${g.outSize.y}`;
     $('gSharp').value = Math.round((2 - s.sharpness) * 50);

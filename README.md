@@ -135,6 +135,12 @@ cada um sai diferente (força, velocidade, tamanho, lado e sentido de giro sorte
   água e vai puxando aos poucos (mais forte com o tempo e perto do centro). Levante a vela e gire-a para
   o lado oposto; se a jangada chegar ao centro, ela é sugada, gira e é cuspida com dano.
 
+- **Imersão** (menu Gráficos → Imersão, tudo opcional e salvo no navegador, fora das predefinições;
+  `client/src/core/graphics.js`): tremor da câmera (0–100%, suave e com rotação), profundidade de campo
+  (foco automático — no personagem em 3ª pessoa, no centro ao mirar/1ª pessoa), desfoque de movimento
+  da rotação da câmera, balanço ao andar, água na lente (sair do mar, respingos, onda/redemoinho),
+  efeito de vida baixa (dessatura + bordas vermelhas no ritmo do coração) e granulado + aberração
+  cromática. A cena agora é renderizada com textura de profundidade para isso.
 - **Ferramentas** (`client/src/systems/tools.js`, modelos em `viewmodel-parts.js`): **martelo** (caixa
   inicial) conserta a jangada; **gancho** (naufrágios/destroços) arremessado com física, puxa caixotes
   boiando e jogadores (mensagem `yank`); **banjo** com som sintetizado (Karplus–Strong), músicas de

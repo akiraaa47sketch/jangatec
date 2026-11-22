@@ -521,9 +521,10 @@ export class ViewModel {
     }
 
     // ---- câmera: bob, tranco, FOV ----
-    this.camOff.y = -Math.abs(Math.cos(bp)) * 0.025 * this.bobAmp * (1 - adsEff * 0.8) + land * 0.06;
-    this.camOff.roll = Math.sin(bp) * 0.006 * this.bobAmp * (1 - adsEff * 0.8) + shakeR * 0.03;
-    this.camOff.pitch = shake * 0.02 + land * 0.02;
+    const gs = this.G.gfx ? this.G.gfx.settings : null, bobK = gs && !gs.bob ? 0 : 1, shk = gs ? gs.shake : 1;
+    this.camOff.y = (-Math.abs(Math.cos(bp)) * 0.025 * this.bobAmp * (1 - adsEff * 0.8) + land * 0.06) * bobK;
+    this.camOff.roll = Math.sin(bp) * 0.006 * this.bobAmp * (1 - adsEff * 0.8) * bobK + shakeR * 0.03 * shk;
+    this.camOff.pitch = shake * 0.02 * shk + land * 0.02 * bobK;
     const baseFov = this.sprint > 0.01 ? 75 + 5 * this.sprint : 75;
     this.fovTarget = spec && spec.type !== 'melee' ? lerp(baseFov, spec.adsFov, adsEff) : baseFov;
 

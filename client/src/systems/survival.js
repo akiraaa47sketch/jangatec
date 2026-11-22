@@ -50,6 +50,7 @@ export class Survival {
     if (this.G.player.downed) { this.bleed -= n * 0.15; return; } // apanhar caído encurta o tempo
     this.vida -= n;
     if (this.G.viewmodel) this.G.viewmodel.onHurt(n);
+    if (this.G.events) this.G.events.shake = Math.max(this.G.events.shake, Math.min(0.55, n / 50)); // tranco ao levar dano
     this.G.hud.flash('hurt');
     if (this.vida <= 0) {
       this.vida = 0;

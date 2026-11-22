@@ -211,6 +211,7 @@ export class Naval {
     const G = this.G;
     this._removeBall(b);
     if (kind === 'water') {
+      if (G.gfx && G.camera.position.distanceTo(point) < 9) G.gfx.wetLens(0.9); // espirro na cara
       for (let i = 0; i < 26; i++) {
         const a = Math.random() * 6.28, s = Math.random();
         this.splash.emit(point.x, point.y, point.z, Math.cos(a) * 2.2 * s, 6 + Math.random() * 7, Math.sin(a) * 2.2 * s, 1.1 + Math.random() * 0.5, 0.55 + Math.random() * 0.5, 14);

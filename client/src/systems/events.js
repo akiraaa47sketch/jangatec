@@ -198,10 +198,15 @@ export class Events {
 
   applyShake(camera, dt) {
     if (this.shake <= 0) return;
-    const s = this.shake * 0.18;
-    camera.position.x += (Math.random() - 0.5) * s;
-    camera.position.y += (Math.random() - 0.5) * s;
-    camera.position.z += (Math.random() - 0.5) * s;
+    const mul = this.G.gfx ? this.G.gfx.shakeMul : 1; // menu Gráficos → Imersão → Tremor
+    this.shakeT = (this.shakeT || 0) + dt;
+    if (mul > 0) {
+      // tremor suave (ruído de senos) em vez de pulos aleatórios: posição + um pouco de rotação
+      const s = this.shake * 0.16 * mul, t = this.shakeT * 31;
+      const n = (a, b) => Math.sin(t * a + b) * 0.6 + Math.sin(t * a * 2.3 + b * 1.7) * 0.4;
+      camera.position.x += n(1.0, 0.3) * s; camera.position.y += n(1.3, 2.1) * s; camera.position.z += n(0.9, 4.2) * s;
+      camera.rotateX(n(1.1, 1.2) * s * 0.05); camera.rotateZ(n(0.8, 3.3) * s * 0.07);
+    }
     this.shake = Math.max(0, this.shake - dt * 0.9);
   }
 
@@ -240,6 +245,7 @@ export class Events {
     const G = this.G, boat = G.boat, B = EVENT_BALANCE.tsunami, player = G.player, b = player.body;
     const sailUp = boat.sailUp;
     this.shake = 1;
+    if (G.gfx && G.player.aboard) G.gfx.wetLens(1);
     if (this._isHost()) {
       const push = sailUp ? 9 : 3.5;
       boat.fling = { vx: e.dx * push, vz: e.dz * push, t: 2.2, T: 2.2 };
@@ -299,6 +305,7 @@ export class Events {
       this._hurricaneSucked(e, dx / d, dz / d);
     }
     if (G.player.aboard && !this.sucked) this.shake = Math.max(this.shake, 0.22 * k * reach * (1.2 - q * 0.6));
+    if (G.gfx && G.player.aboard && k * reach > 0.5 && Math.random() < dt * 0.4) G.gfx.wetLens(0.55); // spray do redemoinho
   }
 
   _hurricaneSucked(e, ux, uz) {
