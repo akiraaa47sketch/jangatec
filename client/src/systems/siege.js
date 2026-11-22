@@ -13,7 +13,7 @@ export const SIEGE = {
   towerHp: 100,
   ballDmg: [34, 44],          // dano de cada bala de canhão na torre (3 acertos derrubam)
   splashTower: 2.6,           // bala que explode perto da torre também machuca (metade)
-  mortar: { range: 80, minRange: 9, cd: [5.5, 8], flight: [2.6, 4.2], scatter: 3.2, radius: 3.6, dmg: 30 },
+  mortar: { range: 80, minRange: 18, cd: [5.5, 8], flight: [2.6, 4.2], scatter: 3.2, radius: 3.6, dmg: 30 },
 };
 
 const _v = new THREE.Vector3(), _a = new THREE.Vector3(), UP = new THREE.Vector3(0, 1, 0);

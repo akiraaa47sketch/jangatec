@@ -314,7 +314,18 @@ export class World {
     const islandElevation = starterIsland ? 0 : 2.7;
     // acampamento: forte de troncos, cabana, ou (ilhas grandes) forte de SUCATA com torres de morteiro
     const siteRoll = r();
-    const siteType = starterIsland ? null : R >= 11.5 && siteRoll < 0.4 ? 'scrap' : siteRoll < 0.62 ? 'fort' : 'hut';
+    // mais longe na rota = bases mais perigosas; base militar só no fim (dificuldade 3+) em ilha grande
+    const SITES = [
+      [['hut', 1], ['tendas', 1]],
+      [['hut', 1], ['tendas', 1], ['fort', 1], ['vigia', 1]],
+      [['fort', 1], ['vigia', 1], ['bunker', 1.2], ['scrap', 1]],
+      [['bunker', 1], ['scrap', 1], ['vigia', 0.6], ['militar', 1.6]],
+      [['bunker', 0.7], ['scrap', 1], ['militar', 2.4]],
+    ][diff];
+    const MIN_R = { scrap: 11.5, militar: 12, bunker: 10 };
+    const options = SITES.filter(([t]) => R >= (MIN_R[t] || 0)), totalW = options.reduce((a, [, w]) => a + w, 0);
+    let siteType = null;
+    if (!starterIsland) { let roll = siteRoll * totalW; for (const [t, w] of options) { roll -= w; if (roll <= 0) { siteType = t; break; } } siteType = siteType || options[options.length - 1][0]; }
     const group = new THREE.Group(); group.position.set(x, islandElevation, z);
     const set = { x, z, yaw: 0, y: islandElevation, radius: R + 8, items: [] };
     const solids = [];
@@ -350,8 +361,9 @@ export class World {
       ? [[-R * 0.78, 0], [R * 0.78, -R * 0.22], [0, R * 0.78]]
       : [];
     // acampamento (cabana ou forte) perto do meio; ruínas ficam longe dele
-    const campR = siteType === 'scrap' ? 8.6 : siteType === 'fort' ? 7.9 : 5;
-    const campA = r() * 6.28, campD = r() * Math.max(0, R - (siteType === 'scrap' ? 10.5 : siteType === 'fort' ? 9 : 6.5));
+    const CAMP_R = { hut: 5, tendas: 5.6, vigia: 6, fort: 7.9, bunker: 6, scrap: 8.6, militar: 9.6 };
+    const campR = CAMP_R[siteType] || 5;
+    const campA = r() * 6.28, campD = r() * Math.max(0, R - campR - 1.4);
     const campC = [Math.cos(campA) * campD, Math.sin(campA) * campD];
     const nearCamp = (lx, lz, pad = 0) => !starterIsland && Math.hypot(lx - campC[0], lz - campC[1]) < campR + pad;
     const houses = r() < 0.6 ? 1 : 0, wallMat = shared().plaster, crates = [];
@@ -458,7 +470,8 @@ export class World {
     if (!starterIsland) {
       const campCtx = { group, set, addSolid, solidOnly: (m) => solids.push(m), TOP, cx: campC[0], cz: campC[1], yaw: r() * 6.28, r, shared: shared(), id, destroyed: this.collected };
       const camp = siteType === 'scrap' ? buildScrapCamp(campCtx) : buildCamp(siteType, campCtx);
-      siteCenter = camp.yard; rooms = camp.rooms; towers = camp.towers || []; spawnSpots = camp.spawns || [];
+      siteCenter = camp.yard; rooms = camp.rooms; towers = camp.towers || [];
+      spawnSpots = (camp.spawns || []).map((p) => (Array.isArray(p) ? { x: p[0], z: p[1], y: 0, high: false } : p));
       for (const spot of camp.crateSpots) crates.push(spot);
       // Fogueira: pedras em anel, lenha cruzada e chamas em camadas (animadas em update).
       const campfire = new THREE.Group();
