@@ -18,6 +18,7 @@ import { Explosions } from '../world/explosions.js';
 import { makeWarship, drawShipHp, shipHalfWidth, SHIP } from '../world/navalmodels.js';
 import { PIECES } from '../boat/pieces.js';
 import { keyOf } from '../core/keybinds.js';
+import { sfx } from '../core/sfx.js';
 
 export const NAVAL = {
   first: [150, 300],          // s (com canhão instalado e mar cheio) até a 1ª batalha
@@ -192,6 +193,7 @@ export class Naval {
       this.smoke.emit(o.x, o.y, o.z, v.x * 0.03 * s + (Math.random() - 0.5), v.y * 0.03 * s + Math.random() * 0.8, v.z * 0.03 * s + (Math.random() - 0.5), 1.6 + Math.random(), 1.2, -0.3, 2.2);
       this.flames.emit(o.x, o.y, o.z, v.x * 0.06 * s, v.y * 0.06 * s, v.z * 0.06 * s, 0.18, 1.1, 0, 1);
     }
+    sfx.cannon(o);
     const d = this.G.camera.position.distanceTo(o);
     if (d < 25) this.G.events.shake = Math.max(this.G.events.shake, 0.35 * (1 - d / 25));
   }
@@ -212,6 +214,7 @@ export class Naval {
     const G = this.G;
     this._removeBall(b);
     if (kind === 'water') {
+      sfx.splash(point, true);
       if (G.gfx && G.camera.position.distanceTo(point) < 9) G.gfx.wetLens(0.9); // espirro na cara
       for (let i = 0; i < 26; i++) {
         const a = Math.random() * 6.28, s = Math.random();
@@ -220,6 +223,7 @@ export class Naval {
       return;
     }
     this.boom.spawn(point, kind === 'ship' ? 1.3 : 0.9);
+    sfx.explosion(point, kind === 'ship' ? 1.2 : 0.9);
     for (let i = 0; i < 10; i++) this.smoke.emit(point.x, point.y, point.z, (Math.random() - 0.5) * 2, 1 + Math.random() * 2, (Math.random() - 0.5) * 2, 2.5, 1.4, -0.2, 2);
     // jogador local perto da explosão
     const pl = G.player, pp = pl.body.pos;
@@ -340,6 +344,7 @@ export class Naval {
     const piece = hit && hit.object.buildPiece;
     if (!piece || !G.boat.pieces.has(piece.id)) return false;
     for (let i = 0; i < 8; i++) this.flames.emit(hit.point.x, hit.point.y, hit.point.z, (Math.random() - 0.5) * 3, Math.random() * 3, (Math.random() - 0.5) * 3, 0.25, 0.25, 9);
+    sfx.hammer(hit.point);
     if (!this.destructible(piece)) return true;
     const max = this.maxHp(piece), hp = this.hpOf(piece);
     if (hp >= max - 0.5) { G.hud.msg('Essa peça já está inteira'); return true; }

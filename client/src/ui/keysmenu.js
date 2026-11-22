@@ -1,6 +1,7 @@
 // Menu de teclas: lista todas as ações por categoria; clique numa tecla e aperte a nova (teclado ou
 // mouse). Se a tecla já era usada por outra ação no mesmo contexto, as duas trocam de lugar.
 // Aparece na aba "Controles" do menu inicial e no painel de opções durante o jogo.
+import { setSfxVolume, sfxVolume, sfx } from '../core/sfx.js';
 import { ACTIONS, CATS, binds, keyName, setBind, resetBinds, onBindsChange, RESERVED } from '../core/keybinds.js';
 
 const $ = (id) => document.getElementById(id);
@@ -17,6 +18,13 @@ export class KeysMenu {
     if ($('keysOpen')) $('keysOpen').onclick = () => this.toggle(true);
     if ($('keysClose')) $('keysClose').onclick = () => this.toggle(false);
     onBindsChange(() => this.render());
+    // volume dos efeitos (menu e painel do jogo)
+    for (const id of ['sfxVol', 'sfxVolGame']) {
+      const el = $(id); if (!el) continue;
+      el.value = Math.round(sfxVolume() * 100);
+      el.oninput = () => { setSfxVolume(Number(el.value) / 100); for (const o of ['sfxVol', 'sfxVolGame']) if ($(o)) $(o).value = el.value; };
+      el.onchange = () => sfx.ui();
+    }
     // captura da nova tecla (fase de captura: chega antes do jogo)
     const take = (code, e) => {
       if (!this.waiting) return;

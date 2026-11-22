@@ -6,6 +6,7 @@ import { CFG } from '../config.js';
 import { waveHeight } from '../world/ocean.js';
 import { makeHumanoid, animateHumanoid } from './model.js';
 import { makePill, animatePill, disposePill, PILL_DEFAULT, PILL_SCALE } from './pill.js';
+import { sfx } from '../core/sfx.js';
 
 // tipo de empunhadura das armas de fogo em 3ª pessoa
 const GUN_TYPE = { revolver: 'pistol', pistola: 'pistol', escopeta: 'long', rifle: 'long', rifle_precisao: 'long' };
@@ -157,14 +158,26 @@ export class Player {
     if (this.drift && !this.mantle) { const f = 1 - (this.bracing || 0); p.x += this.drift.x * dt * f; p.z += this.drift.z * dt * f; } // vento/giro do furacão
     G.colliders.resolve(b, prevY);
 
-    if (this.swimming && !this.wasSwimming && G.gfx) G.gfx.wetLens(0.5); // mergulho
+    if (this.swimming && !this.wasSwimming) { if (G.gfx) G.gfx.wetLens(0.5); sfx.splash(p, b.landVel < -6 || this.wasFalling); } // mergulho
+    this.wasFalling = b.vel.y < -6;
+    // passos (madeira na jangada, areia nas ilhas) e braçadas na água
+    const sp = Math.hypot(b.vel.x, b.vel.z);
+    if ((b.grounded || this.swimming) && sp > 1 && !this.dead) {
+      this.stepAcc = (this.stepAcc || 0) + sp * dt;
+      const stride = this.swimming ? 2.2 : sp > CFG.walk + 0.5 ? 1.9 : 1.45;
+      if (this.stepAcc > stride) {
+        this.stepAcc = 0;
+        const surf = this.swimming ? 'water' : b.groundSet === G.boat.set ? 'wood' : b.groundSet && b.groundSet.scrap ? 'metal' : 'sand';
+        sfx.step(surf, sp > CFG.walk + 0.5);
+      }
+    }
     if (!this.swimming && this.wasSwimming && G.gfx) G.gfx.wetLens(1);  // saiu da água: lente molhada
     this.wasSwimming = this.swimming;
     this.wasGroundedPrev = this.wasGrounded; this.wasGrounded = b.grounded;
     if (b.grounded) {
       this.swimming = false;
       b.carrier = b.groundSet;
-      if (!this.wasGroundedPrev && b.landVel < -4) this.squash = Math.min(1, (-b.landVel - 3) / 10); // amassa ao cair
+      if (!this.wasGroundedPrev && b.landVel < -4) { this.squash = Math.min(1, (-b.landVel - 3) / 10); sfx.land(Math.min(1, (-b.landVel - 4) / 10)); } // amassa ao cair
       if (b.landVel < -13) G.survival.damage((-b.landVel - 13) * 5, 'Queda');
     } else if (!this.swimming && p.y < wh - 1.0) {
       this.swimming = true; b.carrier = null; b.vel.y = 0;

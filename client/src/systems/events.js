@@ -13,6 +13,7 @@
 import * as THREE from '../three.js';
 import { clamp, clock, mulberry32 } from '../core/util.js';
 import { sea, eventHeight } from '../world/ocean.js';
+import { sfx, ambience } from '../core/sfx.js';
 
 export const EVENT_BALANCE = {
   first: [300, 480],         // s depois da partida até o primeiro evento
@@ -207,6 +208,10 @@ export class Events {
     if (!G.started) return;
     if (this._isHost()) this._schedule(dt, t);
     const e = this.current;
+    // som ambiente: mar e vento (mais forte na tempestade e no furacão)
+    const amb = !e ? 0 : e.kind === 'tempestade' ? 1 : e.kind === 'furacao' ? 0.85 : 0.35;
+    this.ambK = (this.ambK || 0) + (amb - (this.ambK || 0)) * Math.min(1, dt * 0.5);
+    ambience(this.ambK, G.startup && G.startup.waterLevel < 0.5 ? 0.15 : 1);
     if (e) {
       if (t > e.t0 + e.dur) this._end();
       else if (e.kind === 'tsunami') this._updateTsunami(e, dt, t);
@@ -216,12 +221,14 @@ export class Events {
     if (!e || e.kind !== 'furacao') G.player.drift = null;
     if (e && e.kind === 'tempestade' && Math.random() < dt * 0.6 * this.stormBoost(t)) {
       this.flash = 1; G.hud.flash('lightning'); this.shake = Math.max(this.shake, 0.15);
+      sfx.thunder(0.2 + Math.random() * 1.2, Math.random());
     }
     // relâmpagos durante o furacão
     if (this.flash > 0) this.flash = Math.max(0, this.flash - dt * 3);
     if (e && e.kind === 'furacao' && Math.random() < dt * 0.35 * this.stormBoost(t)) {
       this.flash = 1;
       G.hud.flash('lightning');
+      sfx.thunder(0.3 + Math.random() * 1.5, Math.random() * 0.7);
     }
     G.startup.hemisphere.intensity += this.flash * 2.2;
   }

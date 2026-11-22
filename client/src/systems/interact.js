@@ -1,5 +1,6 @@
 // Interação com [E]: caixas de loot, mastro e reanimar aliados caídos; [X]: peças soldadas.
 import { keyOf } from '../core/keybinds.js';
+import { sfx } from '../core/sfx.js';
 const REVIVE_TIME = 2.5;
 export class Interact {
   constructor(G) {
@@ -90,6 +91,7 @@ export class Interact {
   }
 
   openCrate(crate) {
+    sfx.crate();
     const G = this.G;
     this.openCrateId = crate.id;
     this.lootOpen = true;

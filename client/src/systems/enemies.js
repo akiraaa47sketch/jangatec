@@ -8,6 +8,7 @@ import { woodTexture, woodBump, repeated, scaleBoxUVs } from '../world/textures.
 import { CFG } from '../config.js';
 import { makeEnemyPill, animateEnemy } from './evilpills.js';
 import { inRoom } from '../world/camp.js';
+import { sfx } from '../core/sfx.js';
 
 export const ENEMY_TYPES = {
   melee:    { nome: 'Saqueador', hp: 60,  speed: 3.2, dmg: 10, range: 1.8, cd: 1.0, cor: 0xa83a32, scale: 1 },
@@ -95,6 +96,7 @@ export class Enemies {
     if (!e.pirate && e.state !== 'chase' && e.state !== 'attack') e.state = 'chase'; // levou tiro: percebe o jogador
     if (e.hp <= 0) {
       e.state = 'dead'; e.timer = 5; e.deathT = 0;
+      sfx.enemyDown(e.body.pos);
       if (this.G.melee) { this.G.melee.tokens.delete(e); this.G.melee.setTell(e, null); this.G.melee.updateStars(e, 0, false); }
       this.G.world.collected.add(e.id);
       const r = Math.random();

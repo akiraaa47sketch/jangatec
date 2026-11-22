@@ -1,6 +1,7 @@
 // Vida e inventário simples (contadores por item).
 import { clamp } from '../core/util.js';
 import { WEAPONS } from './combat.js';
+import { sfx } from '../core/sfx.js';
 
 export const ITEM_NAMES = {
   madeira: 'Madeira', metal: 'Metal', pano: 'Pano', bandagem: 'Bandagem',
@@ -22,6 +23,7 @@ export class Survival {
   }
   add(loot) {
     const parts = [];
+    if (Object.keys(loot).length) sfx.pickup();
     for (const k in loot) {
       if (k.startsWith('arma_')) {
         const id = k.slice(5);
@@ -50,6 +52,7 @@ export class Survival {
     if (this.G.player.dead) return;
     if (this.G.player.downed) { this.bleed -= n * 0.15; return; } // apanhar caído encurta o tempo
     this.vida -= n;
+    if (n >= 3) sfx.hurt();
     if (this.G.viewmodel) this.G.viewmodel.onHurt(n);
     this.G.player.onHurt(n);
     if (this.G.events) this.G.events.shake = Math.max(this.G.events.shake, Math.min(0.55, n / 50)); // tranco ao levar dano

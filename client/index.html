@@ -74,6 +74,7 @@
 
 <div id="gfxPanel" hidden>
   <header><h2>Gráficos</h2><span><button id="keysOpen" type="button" class="gfx-btn">⌨ Teclas</button> <button id="gfxClose" type="button">Fechar</button></span></header>
+  <label class="slider">Volume dos efeitos <input id="sfxVolGame" type="range" min="0" max="150" step="5"></label>
   <label>Predefinição <select id="gPreset"></select></label>
   <label>Modo FSR <select id="gFsr"></select></label>
   <label class="slider">Escala de renderização <input id="gScale" type="range" min="33" max="100" step="1"><small id="gScaleVal"></small></label>
@@ -296,6 +297,11 @@
             <h3>Gráficos e imersão</h3>
             <p>Qualidade, FSR, sombras, profundidade de campo, tremor, desfoque…</p>
             <button id="btnGfx" type="button" class="primary small">⚙ Abrir opções gráficas</button>
+          </article>
+          <article class="opt-card">
+            <h3>Som</h3>
+            <label class="slider">Volume dos efeitos <input id="sfxVol" type="range" min="0" max="150" step="5"></label>
+            <p class="tip">Tiros, espadas, canhão, explosões, passos, mar e vento.</p>
           </article>
           <article class="opt-card">
             <h3>Chat de voz</h3>

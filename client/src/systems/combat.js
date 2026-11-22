@@ -1,6 +1,7 @@
 // Armas com raridade, atributos e munição (não quebram) + ferramentas (martelo, banjo, gancho).
 import { buildWeapon } from '../player/viewmodel-parts.js';
 import * as THREE from '../three.js';
+import { sfx } from '../core/sfx.js';
 
 export const WEAPONS = [
   { id: 'tabua_prego', nome: 'Tábua com prego', stars: 1, melee: true, dmg: 22, range: 2.1, rate: 0.62, durability: 55, color: 0x8a623a, scale: [0.8, 1, 1.4] },
@@ -21,6 +22,7 @@ export const WEAPONS = [
   { id: 'rifle_precisao', nome: 'Rifle de precisão', stars: 5, dmg: 70, mag: 5, rate: 0.9, spread: 0.001, range: 240, reload: 2.6, recoil: 0.07, pellets: 1, ammo: 'municao', durability: 240, color: 0x292f33, scale: [0.75, 0.8, 2] },
 ];
 
+const GUN_SOUND = { pistola: 'pistol', revolver: 'revolver', escopeta: 'shotgun', rifle: 'rifle', rifle_precisao: 'sniper' };
 const STARTER_WEAPONS = ['tabua_prego', 'cano', 'faca_manteiga', 'bastao'];
 const _o = new THREE.Vector3(), _dir = new THREE.Vector3(), _m = new THREE.Vector3(), _mw = new THREE.Vector3();
 const stars = (count) => '★'.repeat(count);
@@ -112,6 +114,8 @@ export class Combat {
     if (!w || !w.ammo || this.reloading > 0 || this.mags[w.id] >= w.mag) return;
     if (!inv[w.ammo]) { this.G.hud.msg('Sem munição'); return; }
     this.reloading = w.reload;
+    const pp = this.G.player.body.pos;
+    if (w.id === 'escopeta' || w.id === 'revolver') sfx.shell(pp); else sfx.click(pp, 0.85); // tira o carregador / abre
   }
 
   tracer(from, to, color = 0xfff2a0) {
@@ -157,10 +161,13 @@ export class Combat {
     }
     if (this.mags[w.id] <= 0) {
       this.startReload();
+      if (this.reloading <= 0) sfx.dry();
       if (vm && this.reloading <= 0) vm.onDry();
       return;
     }
     this.mags[w.id]--;
+    sfx.gun(G.player.body.pos, GUN_SOUND[w.id] || 'pistol');
+    if (w.id === 'rifle_precisao' || w.id === 'escopeta') setTimeout(() => (w.id === 'escopeta' ? sfx.shell(G.player.body.pos) : sfx.bolt(G.player.body.pos)), 330); // ferrolho / bomba
     if (vm) vm.onFire(w);
     else G.player.onShot();
     this.bloom = Math.min(1, (this.bloom || 0) + 0.45 + w.recoil * 8); // retícula abre com o recuo
@@ -198,6 +205,7 @@ export class Combat {
       if (this.reloading <= 0) {
         const inv = G.survival.inv, count = Math.min(w.mag - this.mags[w.id], inv[w.ammo]);
         this.mags[w.id] += count; inv[w.ammo] -= count;
+        sfx.click(G.player.body.pos, 1.1); // encaixa e trava
       }
     }
     if (!building && !looting && !G.player.dead && !G.player.downed && !G.player.mantle && !this.buildMode && w) {

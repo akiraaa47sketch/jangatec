@@ -317,7 +317,7 @@ SPECS.tabua_prego = () => {
   return {
     group: g, type: 'melee', muzzle: null, swing: ['overhead', 'slashB'],
     hold: { p: [0.22, -0.1, -0.4], r: [0.85, 0.3, -0.12] },
-    gripR: { p: [0, 0, 0.02], r: [0, 1.55, -0.55], c: 0.95 },
+    gripR: { p: [0, 0, 0.02], r: [-1.5708, 0, -1.5708], c: 0.95 },
   };
 };
 
@@ -333,7 +333,7 @@ SPECS.cano = () => {
   return {
     group: g, type: 'melee', muzzle: null, swing: ['slashA', 'slashB'],
     hold: { p: [0.22, -0.1, -0.4], r: [0.8, 0.25, -0.1] },
-    gripR: { p: [0, 0, 0.04], r: [0, 1.55, -0.55], c: 0.95 },
+    gripR: { p: [0, 0, 0.04], r: [-1.5708, 0, -1.5708], c: 0.8 },
   };
 };
 
@@ -346,7 +346,7 @@ SPECS.faca_manteiga = () => {
   return {
     group: g, type: 'melee', muzzle: null, swing: ['stab', 'slashShort'],
     hold: { p: [0.22, -0.1, -0.4], r: [0.55, 0.28, -0.1] },
-    gripR: { p: [0, 0, 0.05], r: [0, 1.55, -0.55], c: 0.9 },
+    gripR: { p: [0, 0, 0.05], r: [-1.5708, 0, -1.5708], c: 0.9 },
   };
 };
 
@@ -361,7 +361,7 @@ SPECS.bastao = () => {
   return {
     group: g, type: 'melee', muzzle: null, swing: ['slashA', 'slashB'],
     hold: { p: [0.22, -0.1, -0.4], r: [0.8, 0.25, -0.1] },
-    gripR: { p: [0, 0, 0.04], r: [0, 1.55, -0.55], c: 0.95 },
+    gripR: { p: [0, 0, 0.04], r: [-1.5708, 0, -1.5708], c: 0.78 },
   };
 };
 
@@ -376,7 +376,7 @@ SPECS.facao = () => {
   return {
     group: g, type: 'melee', muzzle: null, swing: ['slashA', 'slashB', 'stab'],
     hold: { p: [0.22, -0.1, -0.4], r: [0.75, 0.28, -0.1] },
-    gripR: { p: [0, 0, 0.035], r: [0, 1.55, -0.55], c: 0.95 },
+    gripR: { p: [0, 0, 0.035], r: [-1.5708, 0, -1.5708], c: 0.95 },
   };
 };
 
@@ -392,14 +392,14 @@ SPECS.sabre = () => {
   // guarda em concha: disco de latão + arco que vai até o pomo protegendo os dedos
   const disc = cylZ(0.04, 0.04, 0.008, MAT.brass, 0, -0.008, -0.026, 18); disc.scale.set(0.55, 1, 1); add(g, disc);
   const bow = new THREE.Mesh(new THREE.TorusGeometry(0.075, 0.0055, 8, 22, Math.PI), MAT.brass);
-  bow.rotation.set(0, Math.PI / 2, 0); bow.position.set(0, -0.012, 0.05); bow.scale.set(1, 0.62, 1); add(g, bow);
+  bow.rotation.set(0, Math.PI / 2, 0); bow.position.set(0, -0.012, 0.05); bow.scale.set(1, -0.62, 1); add(g, bow); // arco do lado do fio, na frente dos dedos
   add(g, cylZ(0.016, 0.018, 0.115, MAT.leather, 0, 0, 0.035, 10)); // punho
   for (let i = 0; i < 5; i++) add(g, new THREE.Mesh(new THREE.TorusGeometry(0.0175, 0.0022, 6, 14), MAT.brass)).children.at(-1).position.set(0, 0, -0.012 + i * 0.024); // fio enrolado
   const pommel = new THREE.Mesh(new THREE.SphereGeometry(0.02, 12, 10), MAT.brass); pommel.position.set(0, -0.002, 0.1); add(g, pommel);
   return {
     group: g, type: 'melee', muzzle: null, swing: ['slashA', 'slashB', 'stab'],
     hold: { p: [0.22, -0.1, -0.4], r: [0.75, 0.28, -0.1] },
-    gripR: { p: [0, 0, 0.035], r: [0, 1.55, -0.55], c: 0.95 },
+    gripR: { p: [0, 0, 0.035], r: [-1.5708, 0, -1.5708], c: 0.95 },
   };
 };
 
@@ -597,7 +597,27 @@ SPECS.rifle = () => {
   };
 };
 
+// Rifle de precisão com o modelo 3D importado (Tripo, pintado por vértice); procedural enquanto carrega.
 SPECS.rifle_precisao = () => {
+  const m = gunModel('sniper');
+  if (!m) return proceduralSniper();
+  const g = new THREE.Group(); g.add(m.group);
+  const info = (m.parts.corpo && m.parts.corpo.userData) || {};
+  const mag = new THREE.Group(), bolt = new THREE.Group(); // peças da animação (o modelo é uma malha só)
+  g.add(mag, bolt);
+  const muzzle = new THREE.Vector3(...(info.muzzle || [0, 0.14, -0.89]));
+  return {
+    group: g, type: 'long', reload: 'mag', muzzle, sightY: info.sightY || 0.163, adsDist: 0.4, adsFov: 18, scope: true, flash: 1.5,
+    eject: new THREE.Vector3(0.04, 0.12, 0.0),
+    boltAction: true,
+    hold: { p: [0.15, -0.16, -0.42], r: [0.03, 0.09, 0] },
+    gripR: { p: [0, -0.07, 0.075], r: [0, 0, -1.55], c: 0.9, idx: 0.3, th: [-0.35, -0.2, 0.2] },
+    gripL: { p: [0, 0.02, -0.42], r: [0, -1.5708, 3.1416], c: 0.8, th: [0.3, -0.3, 0.2] },
+    magPoint: [0, -0.02, -0.12],
+    parts: { mag, bolt },
+  };
+};
+const proceduralSniper = () => {
   const g = new THREE.Group();
   add(g, box(0.046, 0.075, 0.28, MAT.blued, 0, 0.012, -0.06));
   add(g, cylZ(0.0135, 0.0135, 0.78, MAT.black, 0, 0.034, -0.66, 9));
