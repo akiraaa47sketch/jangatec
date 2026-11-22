@@ -376,7 +376,7 @@ SPECS.facao = () => {
 };
 
 // ----- armas de fogo -----
-SPECS.revolver = () => {
+const proceduralRevolver = () => {
   const g = new THREE.Group();
   const frame = profile([
     [0.06, 0.064], [-0.05, 0.064], [-0.075, 0.045], [-0.105, 0.0], [-0.125, -0.05], [-0.115, -0.14],
@@ -408,6 +408,30 @@ SPECS.revolver = () => {
     gripR: { p: [0, -0.08, 0.085], r: [0, 0, -1.55], c: 0.9, idx: 0.3, th: [-0.35, -0.2, 0.2] },
     gripL: { p: [0, -0.115, 0.085], r: [0, 0, 1.55], c: 0.85, th: [-0.2, 0.0, 0.2] },
     magPoint: [0, -0.02, -0.02],
+    parts: { drum },
+  };
+};
+
+// Revólver com o modelo 3D importado (Tripo, texturas PBR). O tambor é uma malha separada que
+// gira e sai para o lado na recarga; o pivô (eixo do tambor) vem nos extras do GLB.
+SPECS.revolver = () => {
+  const m = gunModel('revolver');
+  if (!m) return proceduralRevolver();
+  const g = new THREE.Group(), drum = new THREE.Group();
+  g.add(m.group);
+  const node = m.parts.tambor;
+  if (node) {
+    const pv = new THREE.Vector3().fromArray(node.userData.pivot || [0, 0, 0]);
+    node.parent.add(drum); drum.position.copy(pv); drum.add(node); node.position.sub(pv);
+  }
+  const rdY = redDot(g, 0.028, -0.005); // sobre a ponte do armação, logo à frente do cão
+  const muzzle = new THREE.Vector3(0, 0.046, -0.215);
+  return {
+    group: g, type: 'pistol', reload: 'revolver', muzzle, sightY: rdY, adsDist: 0.27, adsFov: 64, flash: 1.1,
+    hold: { p: [0.17, -0.11, -0.46], r: [0.08, 0.06, 0] },
+    gripR: { p: [0, -0.08, 0.09], r: [0, 0, -1.55], c: 0.9, idx: 0.3, th: [-0.35, -0.2, 0.2] },
+    gripL: { p: [0, -0.115, 0.09], r: [0, 0, 1.55], c: 0.85, th: [-0.2, 0.0, 0.2] },
+    magPoint: [0, -0.02, 0.0],
     parts: { drum },
   };
 };

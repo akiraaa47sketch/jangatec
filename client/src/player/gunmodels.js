@@ -31,7 +31,8 @@ export function preloadGun(id, url) {
   const loader = new GLTFLoader(); loader.setMeshoptDecoder(MeshoptDecoder);
   const entry = { scene: null };
   entry.promise = loader.loadAsync(url).then((gltf) => {
-    gltf.scene.traverse((o) => { if (o.isMesh) { o.material = gunMaterial(); o.castShadow = true; } });
+    // GLB "pintado" por vértice usa o material especial; GLB com texturas PBR mantém o material dele
+    gltf.scene.traverse((o) => { if (o.isMesh) { if (o.geometry.attributes._surf) o.material = gunMaterial(); o.castShadow = true; } });
     entry.scene = gltf.scene;
     return entry.scene;
   }).catch((e) => { console.warn('Modelo de arma não carregou:', id, e); return null; });

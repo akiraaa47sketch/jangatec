@@ -203,9 +203,11 @@ const startBenchmark = () => { start(4242); G.bench = new Benchmark(G); };
 // mãos 3D realistas da 1ª pessoa (com esqueleto): trocam as luvas quando carregam
 preloadHand('./models/mao.glb').then((ok) => { if (ok) G.viewmodel.upgradeHands(buildRealHand); });
 // modelo 3D da pistola: carrega em segundo plano e troca o procedural quando ficar pronto
-preloadGun('pistola', './models/pistola.glb').then((ok) => {
-  if (ok && G.started && G.combat.weaponId === 'pistola') { G.combat.equip('pistola'); if (G.viewmodel.shownId === 'pistola') G.viewmodel.showWeapon('pistola'); }
-});
+for (const [id, url] of [['pistola', './models/pistola.glb'], ['revolver', './models/revolver.glb']]) {
+  preloadGun(id, url).then((ok) => {
+    if (ok && G.started && G.combat.weaponId === id) { G.combat.equip(id); if (G.viewmodel.shownId === id) G.viewmodel.showWeapon(id); }
+  });
+}
 G.mainMenu = new MainMenu(G, { solo: (seed) => start(seed), multi: (welcome) => start(welcome.seed, welcome), bench: startBenchmark });
 $('help').onclick = () => { $('help').hidden = true; };
 try { if (sessionStorage.getItem('mare-alta-bench')) { sessionStorage.removeItem('mare-alta-bench'); setTimeout(startBenchmark, 600); } } catch { /* ok */ }

@@ -156,6 +156,9 @@ cada um sai diferente (força, velocidade, tamanho, lado e sentido de giro sorte
   (recua no tiro) e "pintado" por vértice (gunmetal, aço, polímero, painéis areia, quinas gastas e oclusão
   de ambiente). Scripts em `tools/` (`simplify-model.mjs`, `process-pistol.mjs`, rodam com Node +
   glTF-Transform). Enquanto o GLB carrega, a pistola procedural aparece no lugar.
+- **Revólver em 3D** (`client/public/models/revolver.glb`): modelo do Tripo com texturas PBR (madeira entalhada,
+  latão, metal oxidado), ~1,9 mi → ~30 mil triângulos, **tambor separado** detectado automaticamente
+  (`tools/process-revolver.mjs`), que gira e abre para o lado na recarga, e red dot sobre a armação.
 - **Mãos 3D em 1ª pessoa** (`client/public/models/mao.glb`): modelo do Tripo com textura PBR (pele, normal e
   metal/aspereza), reduzido de ~1,9 mi para ~15 mil triângulos e com **rig automático** (`tools/rig-hand.mjs`):
   detecta a mão direita, a orientação, os 4 dedos e o polegar, cria 15 ossos e os pesos de pele. Usa a mesma
