@@ -595,13 +595,17 @@ SPECS.banjo = () => {
   }
   add(b, box(0.008, 0.03, 0.01, MAT.woodLight, 0.04, 0.0, 0.034));     // cavalete
   add(b, box(0.05, 0.02, 0.006, MAT.brass, 0.11, 0, 0.03));            // estandarte
+  // a pele (+Z do modelo) fica virada para FRENTE, longe de quem toca: gira 180° no eixo do braço
+  const flip = new THREE.Group(); flip.rotation.x = Math.PI;
+  for (const c of [...b.children]) flip.add(c);
+  b.add(flip);
   b.rotation.z = -0.7; b.scale.setScalar(0.8);                         // braço subindo para a esquerda
   add(g, b);
   return {
     group: g, type: 'melee', muzzle: null, swing: ['slashShort', 'slashShort'],
-    hold: { p: [0.12, -0.27, -0.56], r: [0.55, 0.3, 0.05] },
-    gripR: { p: [0.05, -0.03, 0.05], r: [0.2, 1.4, -0.9], c: 0.6 },
-    gripL: { p: [-0.22, 0.19, 0.03], r: [0, -1.4, 2.6], c: 0.7, th: [0.3, -0.3, 0.2] },
+    hold: { p: [0.1, -0.21, -0.5], r: [0.2, 0.4, 0.05] }, // quase de lado: pele para frente, como quem olha o próprio banjo
+    gripR: { p: [0.07, -0.07, -0.05], r: [0.4, 1.2, -1.1], c: 0.55 },
+    gripL: { p: [-0.22, 0.19, -0.03], r: [0, -1.4, 2.6], c: 0.7, th: [0.3, -0.3, 0.2] },
   };
 };
 

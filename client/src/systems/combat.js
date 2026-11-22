@@ -76,10 +76,11 @@ export class Combat {
     this.cooldown = 0;
     this.reloading = 0;
     // 3ª pessoa: o mesmo modelo detalhado usado na 1ª pessoa
-    const mesh = this.G.player.weaponMesh;
+    const mesh = this.G.player.weaponMesh, chest = this.G.player.chestMount;
     for (const old of mesh.children.slice()) mesh.remove(old);
+    if (chest) for (const old of chest.children.slice()) chest.remove(old);
     const model = buildWeapon(id);
-    if (model) { model.flashMesh.visible = false; mesh.add(model.group); }
+    if (model) { model.flashMesh.visible = false; (id === 'banjo' && chest ? chest : mesh).add(model.group); }
     this.G.player.flashMesh = model && model.muzzle ? model.flashMesh : null;
     mesh.visible = !this.buildMode;
     return true;

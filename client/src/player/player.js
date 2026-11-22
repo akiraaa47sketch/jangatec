@@ -73,6 +73,12 @@ export class Player {
     this.mesh.add(this.pillVisual);
     this.proceduralRig.visible = false;
     pill.userData.parts.hand.add(this.weaponMesh);
+    // banjo em 3ª pessoa fica no peito (pendurado na alça), não na mão como uma arma
+    if (!this.chestMount) this.chestMount = new THREE.Group();
+    pill.userData.parts.body.add(this.chestMount);
+    this.chestMount.position.set(0.05, -0.45, 0.62);
+    this.chestMount.rotation.set(0.15, Math.PI, 0);
+    this.chestMount.scale.setScalar(1.15 / PILL_SCALE);
     this.weaponMesh.position.set(0, 0, 0);
     this.weaponMesh.rotation.set(-Math.PI / 2, 0, Math.PI); // cano (-Z) segue o braço; topo para cima ao mirar
     this.weaponMesh.scale.setScalar(1.5 / PILL_SCALE); // arma "de desenho": um pouco maior
@@ -225,6 +231,7 @@ export class Player {
     }
     this.mesh.rotation.x = this.dead ? -Math.PI / 2 : 0;
     this.mesh.visible = !(this.firstPerson && G.started) || !!(G.naval && G.naval.manning); // só o dono não vê o próprio corpo
+    if (this.chestMount) this.chestMount.visible = G.combat.weaponId === 'banjo' && !G.combat.buildMode;
     let pose = this.swimming ? 'swim' : G.combat.aiming ? 'aim' : 'walk';
     let progress = 0;
     if (this.mantle) {
