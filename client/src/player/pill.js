@@ -350,104 +350,147 @@ const BOOTS = {
   },
 };
 
-// ---------- chapéus (origem no topo da cápsula) ----------
+// ---------- chapéus ----------
+// Origem no CENTRO DA CÚPULA de cima (raio R). Cada chapéu tem uma "copa" que é uma casca da própria
+// cúpula (raio R + espessura) e a aba/faixa começa exatamente onde a cúpula tem aquele raio, então o
+// chapéu fica encaixado na cabeça (sem vão nem flutuar) e nada desce até os olhos.
+const HAT_R = 0.5;
+const domeR = (h) => Math.sqrt(Math.max(0, HAT_R * HAT_R - h * h));       // raio da cúpula na altura h
+// casca esférica que cobre a cúpula do topo até a altura hBottom
+function hatShell(t, hBottom, mat, wS = 40, hS = 16) {
+  const r = HAT_R + t;
+  const m = new THREE.Mesh(new THREE.SphereGeometry(r, wS, hS, 0, Math.PI * 2, 0, Math.acos(Math.max(-1, Math.min(1, hBottom / r)))), mat);
+  m.material.side = THREE.DoubleSide; return m;
+}
+// aba: anel com espessura entre rIn e rOut na altura h (perfil por lathe; droop = quanto a ponta cai)
+function hatBrim(rIn, rOut, h, mat, thick = 0.03, droop = 0) {
+  const pts = [V2l(rIn, h - thick / 2), V2l(rOut, h - thick / 2 - droop), V2l(rOut + thick * 0.4, h - droop), V2l(rOut, h + thick / 2 - droop), V2l(rIn, h + thick / 2)];
+  return new THREE.Mesh(new THREE.LatheGeometry(pts, 56), mat);
+}
+// faixa (fita) colada na copa entre as alturas h0 e h1
+function hatBand(t, h0, h1, mat) {
+  const pts = []; for (let i = 0; i <= 6; i++) { const h = h0 + (h1 - h0) * i / 6; pts.push(V2l(domeR(h) + t, h)); }
+  return new THREE.Mesh(new THREE.LatheGeometry(pts, 56), mat);
+}
+const V2l = (x, y) => new THREE.Vector2(x, y);
+const at = (m, x, y, z) => { m.position.set(x, y, z); return m; };
+
 const HATS = {
   nenhum: () => null,
-  bandana(color) {
+  bandana(color) { // lenço amarrado: cobre a cúpula, nó e pontas atrás
     const g = new THREE.Group(), m = matte(typeof color === 'number' && color > 64 ? color : 0x8b1d1d, 0.85);
-    const cap = new THREE.Mesh(new THREE.SphereGeometry(0.49, 28, 14, 0, Math.PI * 2, 0, Math.PI / 2), m); cap.scale.y = 0.62; cap.position.y = -0.24; g.add(cap);
-    const knot = new THREE.Mesh(new THREE.SphereGeometry(0.07, 10, 8), m); knot.position.set(0, -0.14, -0.48); g.add(knot);
-    for (const sd of [-1, 1]) { const tail = new THREE.Mesh(new THREE.BoxGeometry(0.08, 0.32, 0.03), m); tail.position.set(sd * 0.07, -0.3, -0.5); tail.rotation.set(0.3, 0, sd * 0.25); g.add(tail); }
+    g.add(hatShell(0.012, 0.13, m));
+    g.add(hatBand(0.016, 0.11, 0.17, matte(new THREE.Color(m.color).multiplyScalar(0.75).getHex(), 0.85))); // dobra da barra
+    const knot = at(new THREE.Mesh(new THREE.SphereGeometry(0.065, 12, 10), m), 0, 0.16, -domeR(0.16) - 0.04); g.add(knot);
+    for (const sd of [-1, 1]) {
+      const tail = new THREE.Mesh(new THREE.ConeGeometry(0.06, 0.3, 4, 1), m); tail.scale.z = 0.25;
+      at(tail, sd * 0.07, 0.02, -domeR(0.1) - 0.06); tail.rotation.set(Math.PI + 0.25, 0, sd * 0.3); g.add(tail);
+    }
     return g;
   },
   capacete() { // capacete de ferro com chifres
     const g = new THREE.Group(), iron = new THREE.MeshStandardMaterial({ color: 0x5a5e63, metalness: 0.75, roughness: 0.4 });
-    const dome = new THREE.Mesh(new THREE.SphereGeometry(0.52, 28, 14, 0, Math.PI * 2, 0, Math.PI / 2), iron); dome.position.y = -0.26; g.add(dome);
-    const rim = new THREE.Mesh(new THREE.TorusGeometry(0.52, 0.04, 8, 32), iron); rim.rotation.x = Math.PI / 2; rim.position.y = -0.25; g.add(rim);
+    g.add(hatShell(0.03, 0.04, iron));
+    g.add(hatBand(0.045, 0.03, 0.09, iron));
     const horn = matte(0xe8dcc0, 0.6);
     for (const sd of [-1, 1]) {
-      const h = new THREE.Mesh(new THREE.ConeGeometry(0.09, 0.45, 12), horn);
-      h.position.set(sd * 0.46, 0.02, 0); h.rotation.z = -sd * 0.9; g.add(h);
+      const h = new THREE.Mesh(new THREE.ConeGeometry(0.08, 0.4, 12), horn);
+      at(h, sd * (domeR(0.24) + 0.1), 0.34, 0); h.rotation.z = -sd * 0.75; g.add(h);
+      g.add(at(new THREE.Mesh(new THREE.SphereGeometry(0.085, 10, 8), iron), sd * domeR(0.24), 0.24, 0)); // base do chifre
     }
-    for (let i = 0; i < 6; i++) { const rv = new THREE.Mesh(new THREE.SphereGeometry(0.03, 8, 6), iron); const a = i / 6 * Math.PI * 2; rv.position.set(Math.sin(a) * 0.53, -0.22, Math.cos(a) * 0.53); g.add(rv); }
+    for (let i = 0; i < 8; i++) { const a = i / 8 * Math.PI * 2, r = domeR(0.06) + 0.05; g.add(at(new THREE.Mesh(new THREE.SphereGeometry(0.022, 8, 6), iron), Math.sin(a) * r, 0.06, Math.cos(a) * r)); }
     return g;
   },
   pirata(color) {
-    // Tricórnio: aba com três pontas (uma para a frente) e laterais viradas para cima.
-    const g = new THREE.Group(), felt = matte(0x2a1f1a, 0.9);
-    const brimGeo = new THREE.CylinderGeometry(1, 1, 0.05, 72, 1);
-    const pos = brimGeo.attributes.position;
-    for (let i = 0; i < pos.count; i++) {
-      const x = pos.getX(i), z = pos.getZ(i), rad = Math.hypot(x, z);
-      if (rad < 1e-3) continue;
-      const th = Math.atan2(x, z), corner = Math.pow(Math.max(0, Math.cos(3 * th)), 2);
-      const r = 0.48 + 0.16 * corner;
-      pos.setX(i, x / rad * r); pos.setZ(i, z / rad * r);
-      pos.setY(i, pos.getY(i) + 0.2 * (1 - Math.pow(Math.max(0, Math.cos(3 * th)), 0.6)));
+    // Tricórnio: copa encaixada na cabeça; aba de três pontas (uma para a frente) com os lados virados para cima.
+    const g = new THREE.Group(), felt = matte(0x2a1f1a, 0.9), hb = 0.2, rIn = domeR(hb) - 0.01;
+    g.add(hatShell(0.02, hb - 0.01, felt));
+    const brimGeo = new THREE.CylinderGeometry(1, 1, 0.035, 96, 1, true);
+    const ring = new THREE.RingGeometry(0, 1, 96, 4); void ring;
+    // aba feita como anel deformado: entre rIn e a borda de três pontas, levantando nos lados
+    const N = 96, M = 5, pos = [], idx = [];
+    for (let i = 0; i <= N; i++) {
+      const th = i / N * Math.PI * 2, corner = Math.pow(Math.max(0, Math.cos(3 * th)), 2);
+      const rOut = rIn + 0.13 + 0.13 * corner, up = 0.2 * (1 - Math.pow(Math.max(0, Math.cos(3 * th)), 0.6));
+      for (let j = 0; j <= M; j++) {
+        const u = j / M, r = rIn + (rOut - rIn) * u, y = hb + up * u * u;
+        pos.push(Math.sin(th) * r, y, Math.cos(th) * r);
+      }
     }
-    brimGeo.computeVertexNormals();
-    const brim = new THREE.Mesh(brimGeo, felt); brim.position.y = -0.04; g.add(brim);
-    const crown = new THREE.Mesh(new THREE.SphereGeometry(0.33, 24, 12, 0, Math.PI * 2, 0, Math.PI / 2), felt);
-    crown.scale.y = 0.8; crown.position.y = -0.02; g.add(crown);
-    const trim = new THREE.Mesh(new THREE.TorusGeometry(0.335, 0.018, 6, 32), matte(PILL_COLORS[color].hex, 0.5));
-    trim.rotation.x = Math.PI / 2; trim.position.y = 0.0; g.add(trim);
-    const skull = new THREE.Mesh(new THREE.CircleGeometry(0.06, 16), matte(0xf2ede0, 0.6));
-    skull.position.set(0, 0.12, 0.31); skull.rotation.x = -0.5; g.add(skull);
-    for (const s of [-1, 1]) { // ossos cruzados
-      const bone = new THREE.Mesh(new THREE.CapsuleGeometry(0.012, 0.1, 4, 6), matte(0xf2ede0, 0.6));
-      bone.position.set(0, 0.06, 0.32); bone.rotation.set(-0.5, 0, s * 0.9); g.add(bone);
+    for (let i = 0; i < N; i++) for (let j = 0; j < M; j++) { const a = i * (M + 1) + j, b = a + M + 1; idx.push(a, b, a + 1, b, b + 1, a + 1); }
+    const bg = new THREE.BufferGeometry(); bg.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3)); bg.setIndex(idx); bg.computeVertexNormals();
+    const brim = new THREE.Mesh(bg, felt); brim.material.side = THREE.DoubleSide; g.add(brim);
+    brimGeo.dispose();
+    g.add(hatBand(0.024, hb, hb + 0.06, matte(PILL_COLORS[color].hex, 0.5))); // fita na base da copa
+    const skull = at(new THREE.Mesh(new THREE.CircleGeometry(0.06, 16), matte(0xf2ede0, 0.6)), 0, 0.36, domeR(0.36) + 0.025); skull.rotation.x = -0.75; g.add(skull);
+    for (const s of [-1, 1]) {
+      const bone = at(new THREE.Mesh(new THREE.CapsuleGeometry(0.012, 0.1, 4, 6), matte(0xf2ede0, 0.6)), 0, 0.3, domeR(0.3) + 0.03);
+      bone.rotation.set(-0.7, 0, s * 0.9); g.add(bone);
     }
     return g;
   },
   palha(color) {
-    const g = new THREE.Group(), straw = matte(0xd9b66a, 0.95);
-    const brim = new THREE.Mesh(new THREE.CylinderGeometry(0.72, 0.75, 0.04, 40), straw); brim.position.y = -0.03; g.add(brim);
-    const crown = new THREE.Mesh(new THREE.SphereGeometry(0.33, 28, 14, 0, Math.PI * 2, 0, Math.PI / 2), straw); crown.scale.y = 0.75; g.add(crown);
-    const band = new THREE.Mesh(new THREE.CylinderGeometry(0.335, 0.335, 0.07, 32, 1, true), matte(PILL_COLORS[color].hex, 0.6)); band.position.y = 0.04; g.add(band);
+    const g = new THREE.Group(), straw = matte(0xd9b66a, 0.95), hb = 0.24;
+    const crown = new THREE.Mesh(new THREE.CylinderGeometry(domeR(hb) - 0.02, domeR(hb) + 0.02, 0.32, 36, 1, false), straw); at(crown, 0, hb + 0.14, 0); g.add(crown);
+    g.add(hatBrim(domeR(hb) - 0.01, 0.82, hb, straw, 0.03, 0.06));
+    g.add(hatBand(0.03, hb + 0.01, hb + 0.08, matte(PILL_COLORS[color].hex, 0.6)));
     return g;
   },
-  bone(color) {
-    const g = new THREE.Group(), m = matte(PILL_COLORS[color].hex, 0.75);
-    const crown = new THREE.Mesh(new THREE.SphereGeometry(0.4, 28, 14, 0, Math.PI * 2, 0, Math.PI / 2), m); crown.scale.y = 0.7; crown.position.y = -0.12; g.add(crown);
-    const bill = new THREE.Mesh(new THREE.CylinderGeometry(0.3, 0.3, 0.035, 24, 1, false, -Math.PI / 2, Math.PI), m);
-    bill.scale.set(1, 1, 0.9); bill.position.set(0, -0.12, 0.33); bill.rotation.x = 0.12; g.add(bill);
-    const button = new THREE.Mesh(new THREE.SphereGeometry(0.04, 10, 8), m); button.position.y = 0.16; g.add(button);
+  bone(color) { // boné: copa justa na cabeça, aba para a frente e botão em cima
+    const g = new THREE.Group(), m = matte(PILL_COLORS[color].hex, 0.75), hb = 0.14;
+    g.add(hatShell(0.014, hb, m));
+    for (let i = 0; i < 6; i++) { // costuras dos gomos
+      const seam = new THREE.Mesh(new THREE.TorusGeometry(HAT_R + 0.017, 0.004, 4, 32, Math.acos(hb / (HAT_R + 0.017))), matte(new THREE.Color(PILL_COLORS[color].hex).multiplyScalar(0.6).getHex(), 0.8));
+      seam.rotation.set(0, i / 6 * Math.PI, Math.PI / 2 - Math.acos(hb / (HAT_R + 0.017)) ); seam.rotation.order = 'YXZ'; g.add(seam);
+    }
+    const rf = domeR(hb);
+    const bill = new THREE.Mesh(new THREE.CylinderGeometry(0.3, 0.3, 0.03, 28, 1, false, -Math.PI / 2, Math.PI), m);
+    bill.scale.set(1, 1, 0.85); at(bill, 0, hb + 0.01, rf - 0.04); bill.rotation.x = 0.18; g.add(bill);
+    g.add(at(new THREE.Mesh(new THREE.SphereGeometry(0.035, 10, 8), m), 0, HAT_R + 0.02, 0));
     return g;
   },
   cartola(color) {
-    const g = new THREE.Group(), m = matte(0x1d1d22, 0.55);
-    const brim = new THREE.Mesh(new THREE.CylinderGeometry(0.5, 0.5, 0.04, 32), m); brim.position.y = -0.02; g.add(brim);
-    const crown = new THREE.Mesh(new THREE.CylinderGeometry(0.3, 0.28, 0.6, 32), m); crown.position.y = 0.3; g.add(crown);
-    const band = new THREE.Mesh(new THREE.CylinderGeometry(0.285, 0.285, 0.09, 32, 1, true), matte(PILL_COLORS[color].hex, 0.6)); band.position.y = 0.06; g.add(band);
+    const g = new THREE.Group(), m = matte(0x1d1d22, 0.55), r = 0.33, hb = Math.sqrt(HAT_R * HAT_R - r * r) - 0.02;
+    g.add(at(new THREE.Mesh(new THREE.CylinderGeometry(r - 0.01, r, 0.62, 36), m), 0, hb + 0.31, 0));
+    g.add(hatBrim(r - 0.005, 0.52, hb + 0.01, m, 0.035, -0.03)); // aba virando para cima nas pontas
+    g.add(at(new THREE.Mesh(new THREE.CylinderGeometry(r + 0.006, r + 0.006, 0.09, 36, 1, true), matte(PILL_COLORS[color].hex, 0.6)), 0, hb + 0.08, 0));
     return g;
   },
   capitao() {
-    const g = new THREE.Group();
-    const top = new THREE.Mesh(new THREE.CylinderGeometry(0.46, 0.36, 0.14, 32), matte(0xf5f3ee, 0.6)); top.position.y = 0.12; g.add(top);
-    const band = new THREE.Mesh(new THREE.CylinderGeometry(0.36, 0.36, 0.12, 32), matte(0x1b2333, 0.7)); band.position.y = 0.0; g.add(band);
-    const bill = new THREE.Mesh(new THREE.CylinderGeometry(0.28, 0.28, 0.03, 24, 1, false, -Math.PI / 2, Math.PI), matte(0x111111, 0.3));
-    bill.position.set(0, -0.05, 0.28); bill.rotation.x = 0.25; g.add(bill);
-    const badge = new THREE.Mesh(new THREE.CircleGeometry(0.06, 16), new THREE.MeshStandardMaterial({ color: 0xd8b04a, metalness: 0.8, roughness: 0.3 }));
-    badge.position.set(0, 0.02, 0.365); g.add(badge);
+    const g = new THREE.Group(), r = 0.42, hb = Math.sqrt(HAT_R * HAT_R - r * r) - 0.03;
+    g.add(at(new THREE.Mesh(new THREE.CylinderGeometry(r + 0.01, r + 0.01, 0.13, 40), matte(0x1b2333, 0.7)), 0, hb + 0.065, 0));
+    const top = new THREE.Mesh(new THREE.CylinderGeometry(0.52, r + 0.01, 0.13, 40), matte(0xf5f3ee, 0.6)); at(top, 0, hb + 0.19, 0); top.scale.z = 0.95; g.add(top);
+    g.add(at(new THREE.Mesh(new THREE.CylinderGeometry(0.52, 0.52, 0.02, 40), matte(0xe8e4da, 0.6)), 0, hb + 0.26, 0));
+    const bill = new THREE.Mesh(new THREE.CylinderGeometry(0.27, 0.27, 0.025, 24, 1, false, -Math.PI / 2, Math.PI), matte(0x111111, 0.3));
+    at(bill, 0, hb + 0.01, r - 0.03); bill.rotation.x = 0.28; g.add(bill);
+    const badge = new THREE.Mesh(new THREE.CircleGeometry(0.055, 16), new THREE.MeshStandardMaterial({ color: 0xd8b04a, metalness: 0.8, roughness: 0.3 }));
+    at(badge, 0, hb + 0.17, 0.505); badge.rotation.x = -0.15; g.add(badge);
     return g;
   },
   coroa() {
-    const g = new THREE.Group(), gold = new THREE.MeshStandardMaterial({ color: 0xe0b23a, metalness: 0.85, roughness: 0.25 });
-    const ring = new THREE.Mesh(new THREE.CylinderGeometry(0.3, 0.3, 0.14, 32, 1, true), gold); ring.material.side = THREE.DoubleSide; ring.position.y = 0.02; g.add(ring);
+    const g = new THREE.Group(), gold = new THREE.MeshStandardMaterial({ color: 0xe0b23a, metalness: 0.85, roughness: 0.25, side: THREE.DoubleSide });
+    const r = 0.33, hb = Math.sqrt(HAT_R * HAT_R - r * r) - 0.015;
+    g.add(at(new THREE.Mesh(new THREE.CylinderGeometry(r + 0.02, r, 0.14, 36, 1, true), gold), 0, hb + 0.07, 0));
+    const rim = at(new THREE.Mesh(new THREE.TorusGeometry(r + 0.005, 0.018, 6, 36), gold), 0, hb, 0); rim.rotation.x = Math.PI / 2; g.add(rim);
     for (let i = 0; i < 6; i++) {
-      const a = i / 6 * Math.PI * 2, spike = new THREE.Mesh(new THREE.ConeGeometry(0.06, 0.16, 8), gold);
-      spike.position.set(Math.sin(a) * 0.29, 0.16, Math.cos(a) * 0.29); g.add(spike);
-      const gem = new THREE.Mesh(new THREE.SphereGeometry(0.03, 10, 8), new THREE.MeshPhysicalMaterial({ color: [0xd3202b, 0x2d6cdf, 0x2e9e4f][i % 3], roughness: 0.1, clearcoat: 1 }));
-      gem.position.set(Math.sin(a) * 0.305, 0.03, Math.cos(a) * 0.305); g.add(gem);
+      const a = i / 6 * Math.PI * 2, spike = new THREE.Mesh(new THREE.ConeGeometry(0.055, 0.16, 8), gold);
+      at(spike, Math.sin(a) * (r + 0.02), hb + 0.22, Math.cos(a) * (r + 0.02)); g.add(spike);
+      g.add(at(new THREE.Mesh(new THREE.SphereGeometry(0.022, 8, 6), gold), Math.sin(a) * (r + 0.02), hb + 0.31, Math.cos(a) * (r + 0.02)));
+      const gem = new THREE.Mesh(new THREE.SphereGeometry(0.028, 10, 8), new THREE.MeshPhysicalMaterial({ color: [0xd3202b, 0x2d6cdf, 0x2e9e4f][i % 3], roughness: 0.1, clearcoat: 1 }));
+      at(gem, Math.sin(a) * (r + 0.03), hb + 0.07, Math.cos(a) * (r + 0.03)); g.add(gem);
     }
-    g.position.y = -0.03;
+    g.rotation.z = 0.12; // coroa meio de lado, charmosa
     return g;
   },
-  gorro(color) {
-    const g = new THREE.Group(), m = matte(PILL_COLORS[color].hex, 0.95);
-    const cap = new THREE.Mesh(new THREE.SphereGeometry(0.47, 28, 16, 0, Math.PI * 2, 0, Math.PI / 2), m); cap.scale.y = 0.85; cap.position.y = -0.2; g.add(cap);
-    const fold = new THREE.Mesh(new THREE.TorusGeometry(0.47, 0.06, 10, 32), m); fold.rotation.x = Math.PI / 2; fold.position.y = -0.18; g.add(fold);
-    const pom = new THREE.Mesh(new THREE.IcosahedronGeometry(0.11, 1), matte(0xf4f1ea, 1)); pom.position.y = 0.24; g.add(pom);
+  gorro(color) { // gorro de lã: justo na cabeça, barra dobrada e pompom
+    const g = new THREE.Group(), m = matte(PILL_COLORS[color].hex, 0.95), hb = 0.09;
+    const cap = hatShell(0.025, hb, m); cap.scale.y = 1.12; g.add(cap);
+    g.add(hatBand(0.045, hb - 0.01, hb + 0.11, m));                                           // barra dobrada
+    for (let i = 0; i < 28; i++) { // canelado da barra
+      const a = i / 28 * Math.PI * 2, rib = new THREE.Mesh(new THREE.BoxGeometry(0.012, 0.11, 0.012), matte(new THREE.Color(PILL_COLORS[color].hex).multiplyScalar(0.82).getHex(), 0.95));
+      const rr = domeR(hb + 0.05) + 0.052; at(rib, Math.sin(a) * rr, hb + 0.05, Math.cos(a) * rr); rib.rotation.y = a; g.add(rib);
+    }
+    g.add(at(new THREE.Mesh(new THREE.IcosahedronGeometry(0.1, 2), matte(0xf4f1ea, 1)), 0, (HAT_R + 0.025) * 1.12 + 0.06, 0));
     return g;
   },
 };
@@ -519,7 +562,7 @@ export function makePill(options = {}) {
     if (anims.length) parts.clothesAnim = anims;
   }
   const hat = (HATS[o.hat] || HATS.nenhum)(o.hatColor);
-  if (hat) { hat.scale.setScalar(1.3); hat.position.y = TOP_Y - 0.08; body.add(hat); parts.hat = hat; }
+  if (hat) { hat.position.y = L / 2; hat.rotation.x = -0.1; body.add(hat); parts.hat = hat; } // assentado na cúpula, levemente para trás
   root.userData.parts = parts; root.userData.phase = 0; root.userData.pill = o; root.userData.face = face;
   root.userData.blinkT = 1 + Math.random() * 3;
   root.traverse((m) => { if (m.isMesh) { m.castShadow = true; m.receiveShadow = true; } });
