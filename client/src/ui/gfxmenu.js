@@ -23,7 +23,7 @@ export class GfxMenu {
     $('btnGfx').onclick = () => this.toggle(true);
     addEventListener('keydown', (e) => {
       if (e.code === 'F3') { e.preventDefault(); gfx.set('showFps', !gfx.settings.showFps); this.sync(); }
-      if (e.code === 'KeyG' && G.started && !G.build.active && !G.interact.lootOpen) this.toggle(!this.open);
+      if (e.code === 'KeyG' && G.started && !G.build.active && !G.interact.lootOpen && !(G.tools && G.tools.menuOpen)) this.toggle(!this.open);
       if (e.code === 'Escape' && this.open) this.toggle(false);
     });
     this.sync();

@@ -80,6 +80,13 @@
   <p class="gfx-tip">Escala abaixo de 100% + FSR = mais FPS: a cena é desenhada menor e reconstruída na resolução da tela com nitidez adaptativa.</p>
 </div>
 
+<div id="banjoPanel" hidden>
+  <header><h2>♪ Banjo</h2><button type="button" data-close="1">Fechar [B]</button></header>
+  <p class="tip">Toque nota por nota pelo teclado ou clicando. <kbd>Shift</kbd> = sustenido. Aliados por perto recuperam vida enquanto você toca.</p>
+  <div class="frets"></div>
+  <div class="songs"></div>
+</div>
+
 <div id="lootPanel" hidden>
   <header>
     <h2 id="lootTitle">Caixa de suprimentos</h2>
@@ -106,6 +113,7 @@
       <tr><td>Clique / segurar</td><td>golpe leve (combo de 3) / golpe pesado (arma branca)</td><td>Botão direito · Q</td><td>bloquear (no instante certo = parry) · esquivar</td></tr>
       <tr><td>I / O</td><td>zoom da câmera em 3ª pessoa (perto / longe)</td><td>G · F3</td><td>opções gráficas · contador de FPS</td></tr>
       <tr><td>4 / 5</td><td>bandagem / kit médico</td><td>H</td><td>ajuda</td></tr>
+      <tr><td>6 7 8</td><td>slots extras (ferramentas)</td><td>B / botão direito (banjo)</td><td>painel de notas do banjo</td></tr>
     </table>
     <h3>Construção</h3>
     <p><b>CONTORNO VERDE → CLIQUE ESQUERDO PEGA → MOUSE/CÂMERA ARRASTA → [Q] SOLTA</b></p>
@@ -125,11 +133,17 @@
     <b>🌀 Furacão:</b> o mar se abre num redemoinho gigante ao lado da rota e vai sugando a jangada aos poucos. Levante a vela e gire-a para o lado <b>oposto</b> ao redemoinho ([Z] ou [C]). Se a jangada chegar ao centro, ela é sugada, gira e é cuspida para fora — com dano.<br>
     <b>🏝 Mar cheio / Mar seco:</b> depois da partida o mar alterna entre cheio e totalmente seco — fique de olho na água baixando. Seco, o fundo do mar vira chão: ande à vontade, junte destroços — os de metal afundam e só aparecem aí — e saqueie naufrágios com baús. A jangada fica encalhada até a água voltar; quem estiver longe precisa nadar de volta!<br>
     <b>☠ Piratas:</b> invasões raras e anunciadas; as balsas aparecem ao longe, remando até a jangada.</p>
+    <h3>Ferramentas</h3>
+    <p><b>🔨 Martelo</b> (vem na caixa inicial): martele uma peça da jangada para consertá-la — não gasta material. Também serve de arma.<br>
+    <b>🪝 Gancho</b> (achado em naufrágios e destroços): clique para arremessar. Fisga <b>caixotes de loot boiando</b> e puxa até você, ou fisga um <b>jogador</b> e puxa ele (ótimo para resgatar quem está nadando ou caído). Clique de novo para recolher.<br>
+    <b>🪕 Banjo</b>: clique com ele na mão para tocar/parar uma música (Oh! Susanna, Drunken Sailor, Camptown Races). [B] ou botão direito abre o painel para tocar nota por nota (fileira A–Ç e Q–P; Shift = sustenido). Enquanto você toca, os <b>aliados por perto recuperam vida</b> devagar (e você um pouco).<br>
+    As armas não quebram.</p>
     <h3>Batalha naval</h3>
-    <p>Bem longe na rota dá para achar um <b>canhão improvisado</b> (um galão d'água com cano de ferro) e <b>balas de canhão</b> em caixas e naufrágios. A bordo, olhe para um ponto livre do convés e aperte [E] para instalar; [E] no canhão para sentar nele.<br>
+    <p>Bem longe na rota dá para achar um <b>canhão improvisado</b> (um galão d'água com cano de ferro) em caixas e naufrágios. A bordo, olhe para um ponto livre do convés e aperte [E] para instalar; [E] no canhão para sentar nele.<br>
     No canhão: o <b>mouse</b> (ou WASD) gira e levanta o cano, a linha pontilhada mostra a trajetória e o <b>círculo</b> marca onde a bala cai (fica vermelho quando vai acertar um navio; o arco é a recarga). <b>Clique</b> dispara, [E] sai.<br>
-    Depois que você tem um canhão instalado, <b>navios piratas grandes</b> aparecem de vez em quando, emparelham ao lado e disparam bordadas. Cada acerto danifica, incendeia e inclina o navio — alguns acertos e ele <b>afunda</b>, deixando balas, metal, madeira e munição.<br>
-    <b>Cada peça da jangada tem vida</b>: as balas inimigas danificam a peça atingida (e um pouco as vizinhas); destruída, ela se solta. Só a <b>plataforma do mastro é indestrutível</b>. Perto de uma peça danificada, [E] conserta (1 madeira, ou 1 metal para peças de metal).<br>
+    As balas do canhão são <b>infinitas</b>, mas a recarga é longa (~7 s).<br>
+    Depois que você tem um canhão instalado, <b>navios piratas grandes</b> aparecem de vez em quando, emparelham ao lado e disparam bordadas. Cada acerto danifica, incendeia e inclina o navio — alguns acertos e ele <b>afunda</b>, soltando <b>caixotes de loot que boiam</b> (pegue com [E] ou puxe com o gancho).<br>
+    <b>Cada peça da jangada tem vida</b>: as balas inimigas danificam a peça atingida (e um pouco as vizinhas); destruída, ela se solta. Só a <b>plataforma do mastro é indestrutível</b>. Conserte as peças <b>martelando</b> com o martelo.<br>
     Durante a batalha o mar <b>não seca</b> — a seca só acontece fora de combate.</p>
     <p>Se todos saírem do barco durante a viagem, a vela baixa automaticamente.</p>
     <p>As armas têm raridade e durabilidade. Explore ilhas mais distantes para encontrar equipamentos melhores.<br>

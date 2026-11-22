@@ -261,11 +261,27 @@ function handle(ws, m) {
     }
     case 'naval': {
       // Batalha naval: o host manda navios/dano/estado; qualquer um pode disparar, mirar e consertar.
-      const HOST = ['ships', 'php', 'sunk', 'boom'], ANY = ['fire', 'aim', 'repair'];
+      const HOST = ['ships', 'php', 'sunk', 'boom', 'crates', 'took'], ANY = ['fire', 'aim', 'repair', 'take', 'pull'];
       if (typeof m.k !== 'string' || !(HOST.includes(m.k) || ANY.includes(m.k))) break;
       if (HOST.includes(m.k) && room.hostId !== ws.id) break;
       if (JSON.stringify(m).length > 6000) break;
+      m.from = ws.id; // quem mandou (pegar/puxar caixote)
       broadcast(room, m, ws);
+      break;
+    }
+    case 'music': {
+      // nota do banjo: repassa para a sala (todos ouvem, mais baixo de longe)
+      if (!Number.isFinite(m.n)) break;
+      const now = Date.now();
+      if (now - (ws.lastNote || 0) < 40) break; // anti-spam
+      ws.lastNote = now;
+      broadcast(room, { t: 'music', id: ws.id, n: Math.max(30, Math.min(100, m.n | 0)) }, ws);
+      break;
+    }
+    case 'yank': {
+      // gancho fisgou um jogador: avisa a sala (só o alvo reage)
+      if (typeof m.id !== 'string' || !room.players.has(m.id) || m.id === ws.id || ![m.x, m.y, m.z].every(Number.isFinite)) break;
+      broadcast(room, { t: 'yank', id: m.id, x: m.x, y: m.y, z: m.z, by: ws.name });
       break;
     }
     case 'physics': {

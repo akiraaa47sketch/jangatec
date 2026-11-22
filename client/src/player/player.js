@@ -96,7 +96,7 @@ export class Player {
     }
 
     if (this.dead) { this.syncMesh(0, dt); return; }
-    if ((G.interact && G.interact.lootOpen) || (G.gfxMenu && G.gfxMenu.open)) {
+    if ((G.interact && G.interact.lootOpen) || (G.gfxMenu && G.gfxMenu.open) || (G.tools && G.tools.menuOpen)) {
       b.vel.x = b.vel.z = 0;
       this.syncMesh(0, dt);
       return;
@@ -120,6 +120,7 @@ export class Player {
     b.vel.x += (dx * speed - b.vel.x) * k;
     b.vel.z += (dz * speed - b.vel.z) * k;
     if (this.dash) { b.vel.x = this.dash.vx; b.vel.z = this.dash.vz; } // esquiva [Q]
+    if (this.yank) { b.vel.x = this.yank.vx; b.vel.z = this.yank.vz; if (this.swimming) b.pos.y += 3.5 * dt; } // puxado pelo gancho
     if (this.firstPerson) this.yaw = Math.atan2(fx, fz);
     else if (aiming || this.aimHold > 0) this.yaw = lerpAngle(this.yaw, Math.atan2(fx, fz), Math.min(1, 16 * dt));
     else if (moving) this.yaw = lerpAngle(this.yaw, Math.atan2(dx, dz), Math.min(1, 12 * dt));
@@ -296,8 +297,9 @@ export class Player {
     this.mesh.getWorldPosition(_v); _v.y += this.downed ? 0.7 : 1.6;
     this.camTarget.lerp(_v, 1 - Math.exp(-20 * dt));
     // zoom da 3ª pessoa: [I] aproxima, [O] afasta (mira sempre puxa para perto do ombro)
-    if (G.input.hit('KeyI')) this.zoom = clamp(this.zoom - 0.8, 1.8, 10);
-    if (G.input.hit('KeyO')) this.zoom = clamp(this.zoom + 0.8, 1.8, 10);
+    const typing = G.tools && G.tools.menuOpen;
+    if (!typing && G.input.hit('KeyI')) this.zoom = clamp(this.zoom - 0.8, 1.8, 10);
+    if (!typing && G.input.hit('KeyO')) this.zoom = clamp(this.zoom + 0.8, 1.8, 10);
     this.aimBlend = lerp(this.aimBlend || 0, aiming ? 1 : 0, Math.min(1, 12 * dt));
     this.camDist = lerp(this.camDist, aiming ? Math.min(this.zoom, 1.9) : this.zoom, Math.min(1, 10 * dt));
     cam.fov = lerp(cam.fov, aiming ? 48 : 68, Math.min(1, 10 * dt));

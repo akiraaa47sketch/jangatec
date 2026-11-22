@@ -28,6 +28,7 @@ import { GfxMenu } from './ui/gfxmenu.js';
 import { Benchmark } from './systems/benchmark.js';
 import { Melee } from './systems/melee.js';
 import { Naval } from './systems/naval.js';
+import { Tools } from './systems/tools.js';
 
 const $ = (id) => document.getElementById(id);
 const canvas = $('c');
@@ -82,6 +83,7 @@ G.startup = new Startup(G, { sun, hemisphere });
 G.build = new Build(G);     // Sistema unificado de posicionamento físico
 G.interact = new Interact(G);
 G.naval = new Naval(G);     // canhões, navios piratas e dano por peça
+G.tools = new Tools(G);     // banjo (música que cura) e gancho
 const atmo = new Atmosphere(renderer, scene, { sun, hemisphere }); // céu, IBL e sombras
 const ocean = new Ocean(scene, atmo);
 ocean.islandSource = () => G.world.islands;
@@ -217,10 +219,13 @@ const now = () => (Date.now() / 1000) % 100000; // relógio comum: ondas parecid
 
 function hotkeys() {
   const inp = G.input;
-  if (inp.hit('KeyH')) $('help').hidden = !$('help').hidden;
-  if (inp.hit('KeyF')) G.player.setFirstPerson(!G.player.firstPerson);
-  if (G.build.active || G.interact.lootOpen || G.gfxMenu.open || G.naval.manning) return;
+  if (!G.tools.menuOpen) { // com o painel do banjo aberto as letras viram notas
+    if (inp.hit('KeyH')) $('help').hidden = !$('help').hidden;
+    if (inp.hit('KeyF')) G.player.setFirstPerson(!G.player.firstPerson);
+  }
+  if (G.build.active || G.interact.lootOpen || G.gfxMenu.open || G.naval.manning || G.tools.menuOpen) return;
   for (let i = 0; i < 3; i++) if (inp.hit('Digit' + (i + 1))) G.combat.select(i);
+  for (let i = 3; i < 6; i++) if (inp.hit('Digit' + (i + 3))) G.combat.select(i); // 6 7 8 = ferramentas/extras
   if (inp.mouse.wheel) G.combat.cycle(Math.sign(inp.mouse.wheel));
   if (inp.hit('Digit4')) G.survival.use('bandagem');
   if (inp.hit('Digit5')) G.survival.use('kit');
@@ -266,6 +271,7 @@ function frame() {
   G.enemies.update(dt);
   G.events.update(dt, t);
   G.naval.update(dt, t);
+  G.tools.update(dt, t);
   if (G.bench) G.bench.update(dt);
   G.interact.update(dt);
   G.combat.update(dt);

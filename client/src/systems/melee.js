@@ -80,7 +80,7 @@ export class Melee {
     if (this.dodge) { this.dodge.t += dt; if (this.dodge.t >= MELEE.dodge.dur) this.dodge = null; }
     this.updateNums(dt);
 
-    const free = !G.build.active && !(G.naval && G.naval.manning) && !G.interact.lootOpen && !pl.dead && !pl.downed && !pl.mantle && !pl.swimming && !(G.gfxMenu && G.gfxMenu.open) && !G.bench;
+    const free = !G.build.active && !(G.naval && G.naval.manning) && !(G.tools && G.tools.menuOpen) && !G.interact.lootOpen && !pl.dead && !pl.downed && !pl.mantle && !pl.swimming && !(G.gfxMenu && G.gfxMenu.open) && !G.bench;
     // esquiva [Q] (com qualquer arma)
     if (free && inp.hit('KeyQ') && !this.dodge && this.dodgeCd <= 0 && this.stunT <= 0 && this.stamina >= MELEE.dodge.cost * 0.5) {
       this.spend(MELEE.dodge.cost);
@@ -133,7 +133,7 @@ export class Melee {
 
   attack(heavy, charge) {
     const G = this.G, w = this.weapon, pl = G.player;
-    if (!w || G.combat.durability[w.id] <= 0) { if (w) G.hud.msg(`${w.nome} está quebrada`); return; }
+    if (!w) return;
     const cfg = heavy ? MELEE.heavy : MELEE.light;
     if (this.stamina < cfg.cost * 0.4) { this.say(pl, 'SEM FÔLEGO', '#9fb4c8'); return; }
     this.spend(cfg.cost);
@@ -182,6 +182,8 @@ export class Melee {
       e.knock = { x: dx / d * knock, z: dz / d * knock };
       this.num(e.body.pos, Math.round(dmg), color, label);
     }
+    // martelo: martelar uma peça da jangada conserta ela
+    if (w.tool === 'martelo' && G.naval && G.naval.hammer()) hits++;
     if (hits) {
       G.hitStop = heavy ? 0.1 : finisher ? 0.08 : 0.045;
       if (G.events) G.events.shake = Math.max(G.events.shake, heavy ? 0.35 : 0.12);

@@ -29,9 +29,6 @@ export class Survival {
         if (result === true) {
           const weapon = WEAPONS.find((entry) => entry.id === id);
           parts.push(weapon ? `${weapon.nome} ${'★'.repeat(weapon.stars)} adquirido` : 'Arma adquirida');
-        } else if (result === 'repaired') {
-          const weapon = WEAPONS.find((entry) => entry.id === id);
-          parts.push(`${weapon ? weapon.nome : id} reparado`);
         }
         continue;
       }

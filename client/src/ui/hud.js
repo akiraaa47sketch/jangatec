@@ -114,20 +114,20 @@ export class Hud {
     const chip = (icon, label, n) => n ? `<span class="chip" title="${label}"><i>${icon}</i>${n}</span>` : '';
     const invHtml = chip('✚', 'Bandagens [4]', inv.bandagem) + chip('♥', 'Kits médicos [5]', inv.kit) +
       chip('•', 'Munição', inv.municao) + chip('▮', 'Cartuchos', inv.cartucho || 0) +
-      chip('⊛', 'Canhão improvisado (instale com E a bordo)', inv.canhao || 0) + chip('◉', 'Balas de canhão', inv.bala_canhao || 0);
+      chip('⊛', 'Canhão improvisado (instale com E a bordo)', inv.canhao || 0);
     if (invHtml !== this._inv) { $('inv').innerHTML = invHtml; this._inv = invHtml; }
     // Arma equipada
     const weaponHtml = w
       ? `<div class="wname">${w.nome}</div><div class="stars">${'★'.repeat(w.stars)}${'☆'.repeat(5 - w.stars)}</div>` +
-        (w.ammo ? `<div class="ammo">${c.reloading > 0 ? '<small>recarregando…</small>' : c.mags[w.id]} <small>/ ${inv[w.ammo]}</small></div>` : '') +
-        `<div class="dur"><b style="width:${Math.round(100 * c.durability[w.id] / w.durability)}%"></b></div>`
+        (w.ammo ? `<div class="ammo">${c.reloading > 0 ? '<small>recarregando…</small>' : c.mags[w.id]} <small>/ ${inv[w.ammo]}</small></div>` : '')
       : '<div class="wname">Mãos vazias</div>';
     if (weaponHtml !== this._weapon) { $('weapon').innerHTML = weaponHtml; this._weapon = weaponHtml; }
     // Hotbar em tábuas
     let hot = '';
     for (let i = 0; i < c.hotbar.length; i++) {
       const id = c.hotbar[i], weapon = id && WEAPONS.find((entry) => entry.id === id);
-      hot += `<span class="hotbar-slot${id === c.weaponId ? ' active' : ''}${weapon ? '' : ' empty'}"><span class="n">${i + 1}</span>` +
+      if (i >= 3 && !id) continue; // slots extras (6–8) só aparecem quando ocupados
+      hot += `<span class="hotbar-slot${id === c.weaponId ? ' active' : ''}${weapon ? '' : ' empty'}"><span class="n">${i < 3 ? i + 1 : i + 3}</span>` +
         (weapon ? `${weapon.nome}<span class="s">${'★'.repeat(weapon.stars)}</span>` : '—') + '</span>';
     }
     if (hot !== this._hot) { $('hotbar').innerHTML = hot; this._hot = hot; }

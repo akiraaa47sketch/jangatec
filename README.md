@@ -135,15 +135,20 @@ cada um sai diferente (força, velocidade, tamanho, lado e sentido de giro sorte
   água e vai puxando aos poucos (mais forte com o tempo e perto do centro). Levante a vela e gire-a para
   o lado oposto; se a jangada chegar ao centro, ela é sugada, gira e é cuspida com dano.
 
+- **Ferramentas** (`client/src/systems/tools.js`, modelos em `viewmodel-parts.js`): **martelo** (caixa
+  inicial) conserta a jangada; **gancho** (naufrágios/destroços) arremessado com física, puxa caixotes
+  boiando e jogadores (mensagem `yank`); **banjo** com som sintetizado (Karplus–Strong), músicas de
+  domínio público no clique e painel nota por nota ([B]); quem ouve por perto recupera vida (flag `mu` no
+  estado do jogador, notas pela mensagem `music`). As armas **não quebram** mais.
 - **Batalha naval** (`client/src/systems/naval.js`, constantes em `NAVAL`/`PIECE_HP`; modelos em
-  `client/src/world/navalmodels.js`): o **canhão improvisado** (galão d'água + cano) e as balas só saem em
-  caixas/naufrágios a partir da região 3 (~640 m da rota). Instalado no convés, vira uma peça da jangada;
+  `client/src/world/navalmodels.js`): o **canhão improvisado** (galão d'água + cano) só sai em
+  caixas/naufrágios a partir da região 3 (~640 m da rota); as balas são infinitas, com recarga longa (7 s). Instalado no convés, vira uma peça da jangada;
   sentado nele, a mira mostra a trajetória balística e uma retícula em círculo no ponto de impacto. As
   balas têm física (gravidade + velocidade da jangada) e são simuladas em todos os clientes; o host decide o
   dano. Com um canhão instalado, o host sorteia batalhas (raras): 1–2 **navios piratas grandes** emparelham
-  e disparam bordadas; têm vida, pegam fogo, inclinam e **afundam** (dão loot). **Cada peça da jangada tem
+  e disparam bordadas; têm vida, pegam fogo, inclinam e **afundam**, soltando **caixotes de loot que boiam**. **Cada peça da jangada tem
   vida** (maior para peças grandes/de metal); destruída, solta-se. Só a plataforma do mastro é
-  indestrutível. [E] conserta peças. Durante a batalha a maré é segurada no cheio (`Naval.holdK` em
+  indestrutível. O **martelo** conserta peças (martelando, sem gastar material). Durante a batalha a maré é segurada no cheio (`Naval.holdK` em
   `tide.js`) e nenhum outro evento/invasão começa.
 
 - **Oceano que seca** (`client/src/systems/tide.js`, constantes em `TIDE`): só dois estados — **mar cheio**
