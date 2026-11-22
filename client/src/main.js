@@ -1,7 +1,6 @@
 // Ponto de entrada: monta a cena, cria os sistemas e roda o loop principal.
 // G é o contexto compartilhado entre os módulos (cada sistema fica no seu arquivo).
 import * as THREE from './three.js';
-import { DEFAULT_SERVER } from './config.js';
 import { Input } from './core/input.js';
 import { Colliders } from './world/colliders.js';
 import { Ocean, sea } from './world/ocean.js';
@@ -27,6 +26,8 @@ import { Graphics } from './core/graphics.js';
 import { GfxMenu } from './ui/gfxmenu.js';
 import { Benchmark } from './systems/benchmark.js';
 import { Melee } from './systems/melee.js';
+import { Voice } from './net/voice.js';
+import { MainMenu } from './ui/mainmenu.js';
 import { Naval } from './systems/naval.js';
 import { Tools } from './systems/tools.js';
 
@@ -65,6 +66,7 @@ G.input = new Input(canvas);
 G.colliders = new Colliders();
 G.hud = new Hud(G);
 G.net = new Net(G);
+G.voice = new Voice(G); // chat de voz (WebRTC, proximidade 3D)
 G.survival = new Survival(G);
 G.combat = new Combat(G);
 G.enemies = new Enemies(G);
@@ -153,8 +155,6 @@ addEventListener('keydown', (e) => {
 });
 
 // ---------- Menu ----------
-$('server').value = DEFAULT_SERVER;
-const status = (s) => { $('menuStatus').textContent = s; };
 const charMenu = new CharacterMenu((appearance) => G.player.setAppearance(appearance));
 window.__charMenu = charMenu; // depuração
 const characterAppearance = () => charMenu.appearance;
@@ -197,20 +197,10 @@ function start(seed, welcome) {
   G.hud.msg(`${G.combat.weapon.nome} ${'★'.repeat(G.combat.weapon.stars)} equipada · complete a jangada e procure as caixas`);
   G.input.requestLock();
 }
-$('btnSolo').onclick = () => {
-  const s = parseInt($('seed').value, 10);
-  start(Number.isFinite(s) ? s : Math.floor(Math.random() * 1e9));
-};
-$('btnMulti').onclick = () => {
-  status('Conectando… (o Render grátis pode levar até 1 min para acordar)');
-  G.net.connect($('server').value.trim(), $('name').value.trim() || 'Náufrago', $('room').value.trim() || 'publica')
-    .then((m) => start(m.seed, m))
-    .catch((e) => status(`${e.message}. Confira o endereço do servidor ou jogue solo.`));
-};
-$('help').onclick = () => { $('help').hidden = true; };
 // Benchmark: mundo fixo (seed 4242), câmera roteirizada e relatório de FPS no fim.
 const startBenchmark = () => { start(4242); G.bench = new Benchmark(G); };
-$('btnBench').onclick = startBenchmark;
+G.mainMenu = new MainMenu(G, { solo: (seed) => start(seed), multi: (welcome) => start(welcome.seed, welcome), bench: startBenchmark });
+$('help').onclick = () => { $('help').hidden = true; };
 try { if (sessionStorage.getItem('mare-alta-bench')) { sessionStorage.removeItem('mare-alta-bench'); setTimeout(startBenchmark, 600); } } catch { /* ok */ }
 
 // ---------- Loop ----------
@@ -278,6 +268,7 @@ function frame() {
   G.melee.update(dt);
   G.survival.update(dt);
   G.net.update(dt);
+  G.voice.update(dt);
   atmo.update(dt, camera);
   ocean.update(t, camera.position.x, camera.position.z);
   G.hud.update(dt);

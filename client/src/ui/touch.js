@@ -33,6 +33,7 @@ export class TouchControls {
         <button data-act="cam" title="1ª/3ª pessoa">${ICON.cam}</button>
         <button data-act="full" title="Tela cheia">${ICON.full}</button>
         <button data-act="gfx" title="Gráficos">${ICON.gear}</button>
+        <button data-act="mic" title="Segure para falar">🎙</button>
       </div>
       <div class="tPad">
         <button class="big" data-act="attack" title="Atacar / pegar">${ICON.attack}</button>
@@ -150,6 +151,7 @@ export class TouchControls {
       });
       else if (act === 'cam') press(el, () => { key('keydown', 'KeyF'); key('keyup', 'KeyF'); });
       else if (act === 'gfx') press(el, () => G.gfxMenu.toggle(!G.gfxMenu.open));
+      else if (act === 'mic') press(el, () => { G.voice.touchTalk = true; }, () => { G.voice.touchTalk = false; });
       else if (act === 'full') press(el, () => {
         const d = document.documentElement;
         if (document.fullscreenElement) document.exitFullscreen?.();
@@ -172,5 +174,6 @@ export class TouchControls {
     this.root.querySelector('[data-act="aim"]').style.display = w ? '' : 'none'; // arma branca: bloquear
     this.root.querySelector('[data-act="reload"]').style.display = w && w.ammo ? '' : 'none';
     this.root.querySelector('[data-act="use"]').classList.toggle('pulse', !!cur);
+    this.root.querySelector('[data-act="mic"]').style.display = G.voice && G.voice.on && G.voice.settings.mic ? '' : 'none';
   }
 }

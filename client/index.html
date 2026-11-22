@@ -7,8 +7,8 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Pirata+One&family=Nunito:wght@500;700;800&display=swap" rel="stylesheet">
-<title>Maré Alta</title>
-<link rel="icon" href="data:,">
+<title>Jangatec</title>
+<link rel="icon" type="image/svg+xml" href="./jangatec-icon.svg">
 <link rel="stylesheet" href="./style.css">
 </head>
 <body>
@@ -23,6 +23,7 @@
     <div class="bleed"><i id="bleedFill"></i></div>
   </div>
   <div id="crosshair"></div>
+  <div id="voiceHud"></div>
   <div id="cannonReticle" hidden><i></i></div>
   <div id="objective"></div>
   <div id="statsBox" class="panel">
@@ -121,6 +122,7 @@
       <tr><td>Clique / segurar</td><td>golpe leve (combo de 3) / golpe pesado (arma branca)</td><td>Botão direito · Q</td><td>bloquear (no instante certo = parry) · esquivar</td></tr>
       <tr><td>I / O</td><td>zoom da câmera em 3ª pessoa (perto / longe)</td><td>G · F3</td><td>opções gráficas · contador de FPS</td></tr>
       <tr><td>4 / 5</td><td>bandagem / kit médico</td><td>H</td><td>ajuda</td></tr>
+      <tr><td>V (segurar)</td><td>falar no chat de voz</td><td>Menu → Opções</td><td>configurar microfone e voz</td></tr>
       <tr><td>6 7 8</td><td>slots extras (ferramentas)</td><td>B / botão direito (banjo)</td><td>painel de notas do banjo</td></tr>
     </table>
     <h3>Construção</h3>
@@ -160,14 +162,97 @@
 </div>
 
 <div id="menu">
-  <div class="card">
-    <div class="logo">
-      <svg class="logo-wave" viewBox="0 0 120 24" aria-hidden="true"><path d="M0 14c10 0 10-8 20-8s10 8 20 8 10-8 20-8 10 8 20 8 10-8 20-8 10 8 20 8v10H0z"/></svg>
-      <h1>Maré Alta</h1>
-    </div>
-    <p class="sub">Sobreviva, construa sua jangada e explore um oceano que seca e enche.</p>
+  <div class="menu-shell">
+    <aside class="menu-side">
+      <div class="brand"><svg class="jg-logo" viewBox="0 0 640 270" role="img" aria-label="Jangatec">
+        <defs>
+          <linearGradient id="jgBrass" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#fff3c9"/><stop offset=".38" stop-color="#f3cf7e"/><stop offset=".62" stop-color="#e0ac4c"/><stop offset="1" stop-color="#8a6420"/></linearGradient>
+          <linearGradient id="jgSail" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#fffaf0"/><stop offset="1" stop-color="#e2d2aa"/></linearGradient>
+          <linearGradient id="jgSea" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#6fd6f5"/><stop offset="1" stop-color="#1d6f9a"/></linearGradient>
+          <filter id="jgShadow" x="-10%" y="-10%" width="120%" height="140%"><feDropShadow dx="0" dy="5" stdDeviation="5" flood-color="#000" flood-opacity=".55"/></filter>
+        </defs>
+        <g class="jg-raft" filter="url(#jgShadow)">
+          <circle cx="352" cy="44" r="34" fill="#f3cf7e" opacity=".22"/>
+          <rect x="316" y="10" width="6" height="86" rx="2" fill="#4a2f1c"/>
+          <path class="jg-sail" d="M324 14 Q384 44 374 94 L324 94 Z" fill="url(#jgSail)" stroke="#8a6420" stroke-width="2.5"/>
+          <rect x="337" y="52" width="26" height="11" rx="5.5" fill="#e2553f"/><rect x="350" y="52" width="13" height="11" rx="5.5" fill="#f6eedb"/>
+          <path d="M322 8 L342 14 L322 20 Z" fill="#e2553f"/>
+          <path d="M318 96 L292 68 M320 96 L262 94" stroke="#b59b6a" stroke-width="1.6"/>
+          <g fill="#8a6239" stroke="#3b2408" stroke-width="2"><rect x="258" y="94" width="24" height="14" rx="3"/><rect x="282" y="94" width="24" height="14" rx="3"/><rect x="306" y="94" width="24" height="14" rx="3"/><rect x="330" y="94" width="24" height="14" rx="3"/><rect x="354" y="94" width="24" height="14" rx="3"/></g>
+          <path d="M264 101 H372" stroke="#b59b6a" stroke-width="2" stroke-dasharray="3 5"/>
+        </g>
+        <g class="jg-waves">
+          <path class="w1" d="M0 112 q20 -12 40 0 t40 0 t40 0 t40 0 t40 0 t40 0 t40 0 t40 0 t40 0 t40 0 t40 0 t40 0 t40 0 t40 0 t40 0 t40 0 t40 0 t40 0 V126 H0 Z" fill="url(#jgSea)" opacity=".9"/>
+          <path class="w2" d="M0 118 q20 -9 40 0 t40 0 t40 0 t40 0 t40 0 t40 0 t40 0 t40 0 t40 0 t40 0 t40 0 t40 0 t40 0 t40 0 t40 0 t40 0 t40 0 t40 0 V130 H0 Z" fill="#1d6f9a" opacity=".75"/>
+        </g>
+        <text x="320" y="222" text-anchor="middle" class="jg-word" filter="url(#jgShadow)">JANGATEC</text>
+        <text x="320" y="222" text-anchor="middle" class="jg-word-hi">JANGATEC</text>
+        <path d="M150 238 Q320 252 490 238" fill="none" stroke="#b59b6a" stroke-width="4" stroke-dasharray="6 3" stroke-linecap="round"/>
+        <text x="320" y="264" text-anchor="middle" class="jg-tag">SOBREVIVA · CONSTRUA · NAVEGUE</text>
+      </svg></div>
+      <nav class="menu-nav" role="tablist">
+        <button type="button" data-tab="play" class="on"><i>⚓</i><span>Jogar</span></button>
+        <button type="button" data-tab="servers"><i>🌐</i><span>Servidores</span><b id="liveCount" hidden></b></button>
+        <button type="button" data-tab="char"><i>💊</i><span>Personagem</span></button>
+        <button type="button" data-tab="options"><i>⚙</i><span>Opções</span></button>
+        <button type="button" data-tab="controls"><i>⌨</i><span>Controles</span></button>
+      </nav>
+      <label class="captain"><span>Capitão</span><input id="name" maxlength="16" placeholder="Náufrago" autocomplete="nickname"></label>
+    </aside>
+
+    <main class="menu-main">
+      <section class="tab on" data-tab="play">
+        <h2>Zarpar</h2>
+        <p class="lead">Sobreviva, construa sua jangada e explore um oceano que seca e enche.</p>
+        <div class="play-grid">
+          <article class="play-card solo">
+            <h3>Solo</h3><p>Um mundo só seu. Use uma seed para repetir um mapa.</p>
+            <label>Seed <input id="seed" inputmode="numeric" placeholder="aleatória"></label>
+            <button id="btnSolo" type="button" class="primary">Jogar solo</button>
+          </article>
+          <article class="play-card multi">
+            <h3>Multiplayer</h3><p>Até 4 náufragos, com chat de voz por proximidade.</p>
+            <button id="btnQuick" type="button" class="primary">Entrar na sala pública</button>
+            <button type="button" class="ghost" data-goto="servers">Ver servidores / criar sala</button>
+          </article>
+          <article class="play-card bench">
+            <h3>Benchmark</h3><p>Teste o FPS com explosões, ondas, furacão e mar seco.</p>
+            <button id="btnBench" type="button" class="ghost">📊 Rodar benchmark</button>
+          </article>
+        </div>
+      </section>
+
+      <section class="tab" data-tab="servers">
+        <div class="tab-head">
+          <h2>Servidores</h2>
+          <span class="live" id="liveState"><i></i><b>conectando…</b></span>
+        </div>
+        <div class="srv-tools">
+          <input id="srvSearch" type="search" placeholder="Buscar sala…">
+          <button id="srvRefresh" type="button" class="ghost icon" title="Atualizar">⟳</button>
+          <button id="srvNew" type="button" class="primary small">＋ Criar sala</button>
+        </div>
+        <form id="srvCreate" class="srv-create" hidden>
+          <label>Nome da sala <input id="newTitle" maxlength="28" placeholder="Jangada do capitão" required></label>
+          <label>Senha <input id="newPass" maxlength="32" type="password" placeholder="opcional — deixe vazio para sala aberta"></label>
+          <div class="row2">
+            <label>Jogadores <select id="newMax"><option value="2">2</option><option value="3">3</option><option value="4" selected>4</option></select></label>
+            <label>Seed <input id="newSeed" inputmode="numeric" placeholder="aleatória"></label>
+          </div>
+          <div class="row2"><button type="button" class="ghost" id="srvCancel">Cancelar</button><button type="submit" class="primary">Criar e entrar</button></div>
+        </form>
+        <div id="srvList" class="srv-list" aria-live="polite"></div>
+        <details class="srv-adv"><summary>Avançado</summary>
+          <label>Servidor <input id="server" spellcheck="false"></label>
+          <label>Entrar pelo nome <input id="room" maxlength="24" placeholder="nome-da-sala"></label>
+          <button id="btnMulti" type="button" class="ghost">Entrar nessa sala</button>
+        </details>
+      </section>
+
+      <section class="tab" data-tab="char">
+        <h2>Personagem</h2>
+        <p class="lead">Personalize sua pílula — arraste a prévia para girar.</p>
     <section id="characterOptions" aria-label="Personalização do personagem">
-      <h2>Personalize sua pílula</h2>
       <div class="char-layout">
         <canvas id="charPreview" width="220" height="270" aria-label="Prévia do personagem"></canvas>
         <div class="char-fields">
@@ -185,19 +270,53 @@
         </div>
       </div>
     </section>
-    <button id="btnSolo">Jogar solo</button>
-    <div class="menu-row">
-      <button id="btnGfx" type="button" class="alt">⚙ Opções gráficas</button>
-      <button id="btnBench" type="button" class="alt">📊 Benchmark</button>
-    </div>
-    <label>Seed (opcional) <input id="seed" inputmode="numeric" placeholder="aleatória"></label>
-    <hr>
-    <label>Nome <input id="name" maxlength="16" placeholder="Náufrago"></label>
-    <label>Sala <input id="room" maxlength="24" placeholder="publica"></label>
-    <label>Servidor <input id="server" spellcheck="false"></label>
-    <button id="btnMulti" class="alt">Multiplayer (1–4)</button>
-    <p id="menuStatus"></p>
-    <p class="keys">WASD andar · Espaço pular · E interagir · clique para pegar peças · H controles</p>
+      </section>
+
+      <section class="tab" data-tab="options">
+        <h2>Opções</h2>
+        <div class="opt-grid">
+          <article class="opt-card">
+            <h3>Gráficos e imersão</h3>
+            <p>Qualidade, FSR, sombras, profundidade de campo, tremor, desfoque…</p>
+            <button id="btnGfx" type="button" class="primary small">⚙ Abrir opções gráficas</button>
+          </article>
+          <article class="opt-card">
+            <h3>Chat de voz</h3>
+            <label class="check"><input id="vListen" type="checkbox"> Ouvir a voz dos outros jogadores</label>
+            <label class="check"><input id="vMic" type="checkbox"> Usar meu microfone</label>
+            <label>Modo <select id="vMode"><option value="ptt">Aperte para falar [V]</option><option value="open">Voz aberta (detecta fala)</option></select></label>
+            <label>Alcance <select id="vRange"><option value="prox">Proximidade (3D)</option><option value="all">Todos iguais (rádio)</option></select></label>
+            <label class="slider">Volume das vozes <input id="vVol" type="range" min="0" max="150" step="5"></label>
+            <label class="slider">Ganho do microfone <input id="vGain" type="range" min="20" max="300" step="10"></label>
+            <div class="meter"><i id="vMeter"></i></div>
+            <p class="tip" id="vTip">O microfone só é pedido quando você marcar a opção.</p>
+          </article>
+        </div>
+      </section>
+
+      <section class="tab" data-tab="controls">
+        <h2>Controles</h2>
+        <div class="keys-grid">
+          <div><kbd>W A S D</kbd> andar · <kbd>Shift</kbd> correr</div><div><kbd>Espaço</kbd> pular / subir</div>
+          <div><kbd>E</kbd> interagir</div><div><kbd>Clique</kbd> atacar / pegar peça</div>
+          <div><kbd>Q</kbd> esquivar · botão direito bloqueia/mira</div><div><kbd>R</kbd> recarregar · gizmo</div>
+          <div><kbd>1 2 3</kbd> <kbd>6 7 8</kbd> armas e ferramentas</div><div><kbd>4</kbd>/<kbd>5</kbd> bandagem / kit</div>
+          <div><kbd>F</kbd> 1ª / 3ª pessoa · <kbd>I</kbd>/<kbd>O</kbd> zoom</div><div><kbd>V</kbd> falar (chat de voz)</div>
+          <div><kbd>G</kbd> gráficos · <kbd>F3</kbd> FPS</div><div><kbd>H</kbd> ajuda completa</div>
+        </div>
+        <button id="btnHelp" type="button" class="ghost">Ver ajuda completa</button>
+      </section>
+    </main>
+  </div>
+  <p id="menuStatus" role="status"></p>
+  <div id="pwModal" class="modal" hidden>
+    <form class="modal-card" id="pwForm">
+      <h3>🔒 <span id="pwRoom">Sala</span></h3>
+      <p>Essa sala tem senha.</p>
+      <input id="pwInput" type="password" maxlength="32" placeholder="Senha" autocomplete="off">
+      <p class="err" id="pwErr"></p>
+      <div class="row2"><button type="button" class="ghost" id="pwCancel">Cancelar</button><button type="submit" class="primary">Entrar</button></div>
+    </form>
   </div>
 </div>
 

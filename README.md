@@ -1,3 +1,5 @@
+<p align="center"><img src="client/public/jangatec-logo.png" alt="Jangatec" width="560"></p>
+
 # Maré Alta — protótipo
 
 Jogo 3D de sobrevivência, exploração e construção em alto-mar, no navegador.
@@ -135,6 +137,15 @@ cada um sai diferente (força, velocidade, tamanho, lado e sentido de giro sorte
   água e vai puxando aos poucos (mais forte com o tempo e perto do centro). Levante a vela e gire-a para
   o lado oposto; se a jangada chegar ao centro, ela é sugada, gira e é cuspida com dano.
 
+- **Menu e servidores** (`client/src/ui/mainmenu.js`): menu em abas (Jogar · Servidores · Personagem ·
+  Opções · Controles) sobre a cena 3D. A aba Servidores lista as salas **ao vivo** (atualiza a cada 4 s,
+  busca, jogadores, capitão, fase/distância), cria sala com **nome, senha opcional, limite de jogadores e
+  seed**, e pede a senha ao entrar em sala trancada. No servidor: mensagens `list`/`rooms`, `join` com
+  `create/password/max` (senha guardada como hash SHA-256) e `join-error`.
+- **Chat de voz** (`client/src/net/voice.js`): WebRTC P2P entre os jogadores da sala (sinalização pela
+  mensagem `rtc` do servidor, STUN público), voz **por proximidade em 3D** ou "rádio", aperte-para-falar
+  [V] ou voz aberta com detecção de fala, volume/ganho e indicador de quem está falando no HUD.
+  Sem servidor TURN: em algumas redes muito restritas a voz pode não conectar.
 - **Imersão** (menu Gráficos → Imersão, tudo opcional e salvo no navegador, fora das predefinições;
   `client/src/core/graphics.js`): tremor da câmera (0–100%, suave e com rotação), profundidade de campo
   (foco automático — no personagem em 3ª pessoa, no centro ao mirar/1ª pessoa), desfoque de movimento
