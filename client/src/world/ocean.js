@@ -7,9 +7,10 @@ import { SKY_GLSL, skyUniformDefs } from './atmosphere.js';
 export const sea = {
   level: 0, amp: 1,
   surge: { A: 0, ox: 0, oz: 0, dx: 1, dz: 0, front: 0, sigma: 10 },
-  vortex: { k: 0, x: 0, z: 0, R: 30, depth: 2.2 },
+  vortex: { k: 0, x: 0, z: 0, R: 70, depth: 9, spin: 1 },
 };
 
+const sstep = (a, b, x) => { const u = Math.min(1, Math.max(0, (x - a) / (b - a))); return u * u * (3 - 2 * u); };
 // Altura extra dos eventos. Mesma fórmula em EVENTS_GLSL logo abaixo.
 export function eventHeight(x, z, t) {
   let h = 0;
@@ -22,9 +23,14 @@ export function eventHeight(x, z, t) {
   }
   const v = sea.vortex;
   if (v.k > 0) {
+    // redemoinho: bacia larga + garganta funda no centro + braços em espiral que giram
     const dx = x - v.x, dz = z - v.z, r = Math.hypot(dx, dz), q = r / v.R;
-    const spiral = Math.sin(r * 0.32 - Math.atan2(dz, dx) * 3 + t * 2.6) * 0.55 * Math.exp(-r / 70);
-    h += v.k * (-v.depth * Math.exp(-q * q) + spiral);
+    if (q < 2.2) {
+      const tq = r / (v.R * 0.14);
+      const ph = 5 * Math.atan2(dz, dx) - v.spin * (r * 0.24 + t * 2.0);
+      const env = sstep(0.06, 0.3, q) * Math.exp(-q * q * 0.9);
+      h += v.k * (-v.depth * Math.exp(-q * q * 1.8) - v.depth * 0.7 * Math.exp(-tq * tq) + Math.sin(ph) * (0.35 + v.depth * 0.05) * env);
+    }
   }
   return h;
 }
@@ -77,7 +83,8 @@ const EVENTS_GLSL = `
 uniform vec4 uSurge;  // ox, oz, dx, dz
 uniform vec3 uSurge2; // A, sigma, front
 uniform vec4 uVortex; // x, z, R, depth
-uniform float uVortexK;
+uniform float uVortexK; uniform float uVortexS;
+float vortexStripe = 0.0, vortexDeep = 0.0;
 float eventH(vec2 p, float t) {
   float h = 0.0;
   if (uSurge2.x > 0.0) {
@@ -87,15 +94,22 @@ float eventH(vec2 p, float t) {
   }
   if (uVortexK > 0.0) {
     vec2 dv = p - uVortex.xy; float r = length(dv), q = r / uVortex.z;
-    float spiral = sin(r * 0.32 - atan(dv.y, dv.x) * 3.0 + t * 2.6) * 0.55 * exp(-r / 70.0);
-    h += uVortexK * (-uVortex.w * exp(-q * q) + spiral);
+    if (q < 2.2) {
+      float tq = r / (uVortex.z * 0.14);
+      float ph = 5.0 * atan(dv.y, dv.x) - uVortexS * (r * 0.24 + t * 2.0);
+      float env = smoothstep(0.06, 0.3, q) * exp(-q * q * 0.9);
+      float sp = sin(ph);
+      h += uVortexK * (-uVortex.w * exp(-q * q * 1.8) - uVortex.w * 0.7 * exp(-tq * tq) + sp * (0.35 + uVortex.w * 0.05) * env);
+      vortexStripe = uVortexK * smoothstep(0.78, 1.0, sp) * env * 1.2;
+      vortexDeep = uVortexK * exp(-q * q * 1.8);
+    }
   }
   return h;
 }`;
 
 const VERT = /* glsl */`
 uniform float uTime; uniform float uAmp; uniform float uLevel;
-varying vec3 vWorld; varying vec3 vN; varying float vHn; varying float vEv;
+varying vec3 vWorld; varying vec3 vN; varying float vHn; varying float vEv; varying vec2 vVx;
 #include <fog_pars_vertex>
 ${WAVES_GLSL}
 ${EVENTS_GLSL}
@@ -103,6 +117,7 @@ void main() {
   vec4 wp = modelMatrix * vec4(position, 1.0);
   vec3 w = waves(wp.xz, uTime);
   float e = eventH(wp.xz, uTime);
+  vVx = vec2(vortexStripe, vortexDeep);
   vec2 eg = vec2(0.0);
   if (uSurge2.x > 0.0 || uVortexK > 0.0) {
     eg = vec2(eventH(wp.xz + vec2(0.6, 0.0), uTime) - e, eventH(wp.xz + vec2(0.0, 0.6), uTime) - e) / 0.6;
@@ -122,7 +137,7 @@ const FRAG = /* glsl */`
 uniform float uTime; uniform float uLight;
 uniform vec3 uDeep; uniform vec3 uShallow;
 uniform vec3 uIsl[6];
-varying vec3 vWorld; varying vec3 vN; varying float vHn; varying float vEv;
+varying vec3 vWorld; varying vec3 vN; varying float vHn; varying float vEv; varying vec2 vVx;
 #include <fog_pars_fragment>
 ${SKY_GLSL}
 float hash(vec2 p) { vec3 p3 = fract(vec3(p.xyx) * 0.1031); p3 += dot(p3, p3.yzx + 33.33); return fract((p3.x + p3.y) * p3.z); }
@@ -178,6 +193,9 @@ void main() {
   float foam = crest * (0.5 + 0.5 * n2) * (1.0 - smoothstep(150.0, 300.0, dist));
   foam = max(foam * 0.9, shore * (0.6 + 0.4 * n2));
   foam = max(foam, smoothstep(0.25, 0.85, vEv + (n2 - 0.5) * 0.35));
+  // redemoinho: água escura e funda no centro + faixas de espuma girando
+  col *= 1.0 - 0.45 * vVx.y;
+  foam = max(foam, clamp(vVx.x * smoothstep(0.25, 0.8, n2 + n1 * 0.4), 0.0, 0.8));
   col = mix(col, vec3(0.92, 0.97, 1.0) * (0.45 + 0.55 * uLight), clamp(foam, 0.0, 1.0));
 
   gl_FragColor = vec4(col, max(mix(0.94, 0.55, shallow), foam));
@@ -219,7 +237,7 @@ export class Ocean {
       uDeep: { value: new THREE.Color() }, uShallow: { value: new THREE.Color() },
       uIsl: { value: Array.from({ length: 6 }, () => new THREE.Vector3(0, 0, -1e4)) },
       uSurge: { value: new THREE.Vector4(0, 0, 1, 0) }, uSurge2: { value: new THREE.Vector3(0, 10, 0) },
-      uVortex: { value: new THREE.Vector4(0, 0, 30, 2) }, uVortexK: { value: 0 },
+      uVortex: { value: new THREE.Vector4(0, 0, 70, 9) }, uVortexK: { value: 0 }, uVortexS: { value: 1 },
     });
     this.material = new THREE.ShaderMaterial({
       uniforms, vertexShader: VERT, fragmentShader: FRAG, transparent: true, depthWrite: true, fog: true,
@@ -244,7 +262,7 @@ export class Ocean {
     u.uTime.value = t; u.uAmp.value = sea.amp; u.uLevel.value = sea.level; u.uLight.value = st.light;
     const sg = sea.surge, vx = sea.vortex;
     u.uSurge.value.set(sg.ox, sg.oz, sg.dx, sg.dz); u.uSurge2.value.set(sg.A, sg.sigma, sg.front);
-    u.uVortex.value.set(vx.x, vx.z, vx.R, vx.depth); u.uVortexK.value = vx.k;
+    u.uVortex.value.set(vx.x, vx.z, vx.R, vx.depth); u.uVortexK.value = vx.k; u.uVortexS.value = vx.spin || 1;
     u.uDeep.value.copy(DEEP[0]).lerp(DEEP[1], st.storm);
     u.uShallow.value.copy(SHALLOW[0]).lerp(SHALLOW[1], st.storm);
     this.atmo.applySky(u);

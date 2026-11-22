@@ -1,19 +1,21 @@
 // Eventos aleatórios em alto-mar (só depois da partida):
 //   • Onda gigante (tsunami): uma frente de água atravessa o mar. Baixe a vela e segure-se
 //     perto do mastro; com a vela cheia a jangada é arremessada e todos se machucam.
-//   • Furacão: o olho passa ao lado da rota e puxa a jangada. Levante a vela e gire-a para o
-//     lado OPOSTO ao olho para não ser sugado.
+//   • Furacão: o mar se abre num REDEMOINHO gigante ao lado da rota que gira e vai sugando a
+//     jangada aos poucos. Levante a vela e gire-a para o lado OPOSTO ao redemoinho para escapar.
+// Nada é anunciado: os eventos são raros, chegam do nada e cada um sai um pouco diferente.
 // O host sorteia e anuncia o evento pela rede; todos os clientes derivam o estado do mesmo
 // relógio comum (clock), então ondas e funil aparecem iguais para todos. Só o host move o barco.
 import * as THREE from '../three.js';
 import { clamp, clock } from '../core/util.js';
-import { sea } from '../world/ocean.js';
+import { sea, eventHeight } from '../world/ocean.js';
 
 export const EVENT_BALANCE = {
-  first: [95, 135],          // s depois da partida até o primeiro evento
-  interval: [120, 190],      // s entre o fim de um evento e o próximo
-  tsunami: { speed: 15, startDist: 235, A: 4.6, sigma: 11, damage: 22, knock: 8.5 },
-  furacao: { dur: 58, pull: 2.5, eyeR: 13, ahead: 45, side: 64, damage: 30 },
+  first: [300, 480],         // s depois da partida até o primeiro evento
+  interval: [420, 780],      // s entre o fim de um evento e o próximo (raros de propósito)
+  tsunami: { speed: [13, 18], startDist: 235, A: [3.6, 5.6], sigma: [9, 13], damage: 22, knock: 8.5 },
+  // R = raio do redemoinho, depth = fundura do funil d'água, pull = puxão (m/s), swirl = giro (m/s)
+  furacao: { dur: [55, 75], pull: 1.55, swirl: 2.2, R: [60, 85], depth: [7, 11], ahead: 40, damage: 30 },
 };
 const between = ([a, b]) => a + Math.random() * (b - a);
 const smooth = (x) => { x = clamp(x, 0, 1); return x * x * (3 - 2 * x); };
@@ -112,9 +114,10 @@ export class Events {
     if (G.enemies.list.some((e) => e.pirate && e.state !== 'dead')) { this.timer = 15; return; }
     const tide = G.startup.tide.state; // só com o mar cheio e longe da próxima seca
     if (G.startup.waterLevel < 0.5 || (tide && (tide.phase.id === 'seco' || tide.nextIn < 75))) { this.timer = 15; return; }
-    const kind = this.lastKind === 'tsunami' ? (Math.random() < 0.7 ? 'furacao' : 'tsunami')
-      : this.lastKind === 'furacao' ? (Math.random() < 0.7 ? 'tsunami' : 'furacao')
-        : (Math.random() < 0.5 ? 'tsunami' : 'furacao');
+    // quase nunca repete o mesmo tipo em seguida; às vezes o mar simplesmente fica quieto
+    if (Math.random() < 0.18) { this.timer = between([90, 200]); return; }
+    const other = this.lastKind === 'tsunami' ? 'furacao' : 'tsunami';
+    const kind = !this.lastKind ? (Math.random() < 0.5 ? 'tsunami' : 'furacao') : Math.random() < 0.85 ? other : this.lastKind;
     this.begin(kind === 'tsunami' ? this._makeTsunami(t) : this._makeHurricane(t), true);
   }
 
@@ -123,23 +126,24 @@ export class Events {
     // Vem de qualquer lado, menos exatamente por trás (assim dá para ver a parede chegando).
     const rel = (Math.random() < 0.5 ? 1 : -1) * (0.35 + Math.random() * 2.1);
     const a = boat.yaw + Math.PI + rel; // direção de onde a onda vem
-    const sx = Math.sin(a), sz = Math.cos(a);
+    const sx = Math.sin(a), sz = Math.cos(a), speed = between(B.speed);
     return {
-      id: `ev${Math.floor(t * 10)}`, kind: 'tsunami', t0: t, dur: (B.startDist + 170) / B.speed,
+      id: `ev${Math.floor(t * 10)}`, kind: 'tsunami', t0: t, dur: (B.startDist + 170) / speed,
       ox: boat.x + sx * B.startDist, oz: boat.z + sz * B.startDist, dx: -sx, dz: -sz,
-      speed: B.speed, A: B.A, sigma: B.sigma,
+      speed, A: between(B.A), sigma: between(B.sigma),
     };
   }
 
   _makeHurricane(t) {
     const B = EVENT_BALANCE.furacao, boat = this.G.boat;
     const fx = Math.sin(boat.yaw), fz = Math.cos(boat.yaw), lx = fz, lz = -fx; // lx,lz = local +X
-    const side = Math.random() < 0.5 ? 1 : -1;
-    // O olho anda ao lado da rota, acompanhando a jangada: começa à frente e termina atrás
-    // (passa lado a lado no meio do evento). Baixar a vela não deixa o furacão "passar".
+    const side = Math.random() < 0.5 ? 1 : -1, R = between(B.R);
+    // O redemoinho se abre ao lado da rota (a jangada já começa na borda dele) e acompanha a
+    // jangada: começa um pouco à frente e termina atrás. Baixar a vela não faz ele "passar".
     return {
-      id: `ev${Math.floor(t * 10)}`, kind: 'furacao', t0: t, dur: B.dur,
-      cx: boat.x, cz: boat.z, fx, fz, lat: side * B.side, latV: -side * 0.45, ahead: B.ahead,
+      id: `ev${Math.floor(t * 10)}`, kind: 'furacao', t0: t, dur: between(B.dur),
+      cx: boat.x, cz: boat.z, fx, fz, lat: side * R * (0.92 + Math.random() * 0.18), latV: -side * (0.15 + Math.random() * 0.15),
+      ahead: B.ahead * (0.6 + Math.random() * 0.8), R, depth: between(B.depth), spin: Math.random() < 0.5 ? 1 : -1,
     };
   }
 
@@ -151,12 +155,6 @@ export class Events {
     this.sucked = false;
     this.lastKind = e.kind;
     this._ensureVisuals();
-    const hud = this.G.hud;
-    if (e.kind === 'tsunami') {
-      hud.msg('🌊 Uma ONDA GIGANTE se aproxima! Baixe a vela e segure no mastro.');
-    } else {
-      hud.msg('🌀 Um FURACÃO se formou ao lado da rota! Gire a vela para o lado oposto ao olho.');
-    }
     if (announce && this.G.net.online) this.G.net.send({ t: 'event', e });
   }
 
@@ -175,7 +173,6 @@ export class Events {
     const enemies = this.G.enemies;
     enemies.pirateSpawnTimer = Math.max(enemies.pirateSpawnTimer, 45); // folga antes de piratas
     if (this.visuals) this._hideVisuals();
-    this.G.hud.setEvent(null);
   }
 
   // ---------- loop ----------
@@ -231,19 +228,9 @@ export class Events {
     Object.assign(sea.surge, { A: e.A * ramp, ox: e.ox, oz: e.oz, dx: e.dx, dz: e.dz, front, sigma: e.sigma });
 
     const sd = (boat.x - e.ox) * e.dx + (boat.z - e.oz) * e.dz - front; // >0: onda ainda não chegou
-    if (sd > 0 && !this.impacted) {
-      const secs = Math.ceil(sd / e.speed), rel = this._relativeDir(boat.x - e.dx * 50, boat.z - e.dz * 50);
-      const holding = this._holdingMast();
-      const advice = boat.sailUp ? 'BAIXE A VELA [E no mastro]' : holding ? 'Segure firme no mastro!' : 'Corra para perto do mastro!';
-      G.hud.setEvent({
-        kind: 'tsunami', title: `🌊 ONDA GIGANTE ${rel.label} — ${secs}s`,
-        text: advice, arrow: rel.ang, meter: clamp(1 - sd / B.startDist, 0, 1), good: !boat.sailUp && holding,
-      });
-    } else if (!this.impacted && sd <= 0) {
+    if (!this.impacted && sd <= 0) {
       this.impacted = true;
       this._tsunamiImpact(e);
-    } else if (this.impacted && sd < -40) {
-      G.hud.setEvent(null);
     }
     this._updateSpray(e, front, ramp, t);
   }
@@ -275,50 +262,42 @@ export class Events {
       G.survival.damage(10, 'Onda gigante');
       G.hud.msg('A onda te engoliu!');
     }
-    G.hud.setEvent({ kind: 'tsunami', title: '🌊 IMPACTO!', text: holding ? 'Segurou firme!' : 'Volte para a jangada!', meter: 1, good: holding && !sailUp });
   }
 
   _updateHurricane(e, dt, t) {
     const G = this.G, boat = G.boat, B = EVENT_BALANCE.furacao, u = t - e.t0;
-    const k = smooth(u / 9) * (1 - smooth((u - e.dur + 9) / 9));
+    const R = e.R || 70, depth = e.depth || 9, spin = e.spin || 1, eyeR = R * 0.17;
+    // o redemoinho "abre" devagar (~14 s) e fecha no fim
+    const k = smooth(u / 14) * (1 - smooth((u - e.dur + 10) / 10));
     const lx0 = e.fz, lz0 = -e.fx; // eixo lateral (+X local no início)
     const along = (boat.x - e.cx) * e.fx + (boat.z - e.cz) * e.fz + e.ahead * (1 - 2 * u / e.dur);
     const lat = e.lat + e.latV * u;
     const cx = e.cx + e.fx * along + lx0 * lat, cz = e.cz + e.fz * along + lz0 * lat;
-    Object.assign(sea.vortex, { k, x: cx, z: cz, R: 24, depth: 2.4 });
-    this._updateFunnel(cx, cz, k, dt, t);
+    Object.assign(sea.vortex, { k, x: cx, z: cz, R, depth, spin });
+    this._updateFunnel(cx, cz, k, dt, t, R, spin);
 
     const dx = cx - boat.x, dz = cz - boat.z, d = Math.hypot(dx, dz) || 1;
     const [lx] = boat.toLocal(cx, cz);
-    const side = lx >= 0 ? 1 : -1;                // olho à esquerda (+X local) ou à direita
+    const side = lx >= 0 ? 1 : -1;                // redemoinho à esquerda (+X local) ou à direita
     const away = clamp(-side * boat.sailAngle / 0.6, -1, 1); // 1 = vela toda para o lado oposto
     const factor = boat.sailUp ? (away >= 0 ? 1 - 0.85 * away : 1 - 0.5 * away) : 0.9;
-    const reach = clamp(1 - (d - B.eyeR) / 120, 0, 1);
-    const pull = B.pull * reach * k * factor;
+    const q = d / R, reach = clamp(1.35 - q, 0, 1);          // fora de ~1.35 R não puxa
+    // puxão cresce aos poucos com o tempo e com a proximidade do centro
+    const grow = smooth(u / 30) * 0.6 + 0.4;
+    const pull = B.pull * reach * k * factor * grow * (0.55 + 0.9 * clamp(1 - q, 0, 1));
+    const swirl = B.swirl * reach * k * (0.4 + 0.6 * clamp(1 - q, 0, 1));
 
     if (this._isHost() && !this.sucked && G.startup.departed) {
-      boat.x += (dx / d) * pull * dt;
-      boat.z += (dz / d) * pull * dt;
+      const ux = dx / d, uz = dz / d;
+      boat.x += (ux * pull + -uz * swirl * spin) * dt;
+      boat.z += (uz * pull + ux * swirl * spin) * dt;
+      boat.yaw += swirl * spin * dt / Math.max(d, 10) * 0.6; // a jangada gira junto com a água
     }
-    if (!this.sucked && d < B.eyeR + 2 && k > 0.3) {
+    if (!this.sucked && d < eyeR + 2 && k > 0.5) {
       this.sucked = true;
       this._hurricaneSucked(e, dx / d, dz / d);
     }
-    if (this.sucked) {
-      G.hud.setEvent({ kind: 'furacao', title: '🌀 SUGADO PELO FURACÃO!', text: 'Segure-se! A jangada foi cuspida para fora.', meter: 1, good: false });
-      return;
-    }
-    const key = -side > 0 ? 'C' : 'Z';
-    const sideName = side > 0 ? 'bombordo (esquerda)' : 'estibordo (direita)';
-    const rel = this._relativeDir(cx, cz);
-    const text = !boat.sailUp
-      ? `Levante a vela e gire-a com [${key}] para fugir do olho`
-      : away > 0.6 ? 'Vela contra o vento — está escapando!' : `Gire a vela para o lado oposto: segure [${key}] no mastro`;
-    G.hud.setEvent({
-      kind: 'furacao', title: `🌀 FURACÃO a ${Math.round(d)} m — ${sideName}`,
-      text, arrow: rel.ang, meter: clamp(pull / B.pull, 0, 1), good: boat.sailUp && away > 0.6, meterLabel: 'puxão',
-    });
-    if (G.player.aboard) this.shake = Math.max(this.shake, 0.25 * k * reach);
+    if (G.player.aboard && !this.sucked) this.shake = Math.max(this.shake, 0.22 * k * reach * (1.2 - q * 0.6));
   }
 
   _hurricaneSucked(e, ux, uz) {
@@ -368,7 +347,7 @@ export class Events {
     const N = 700, pos = new Float32Array(N * 3);
     V.sprayData = Array.from({ length: N }, () => ({ r: 7 + Math.random() * 34, a: Math.random() * 6.28, h: Math.random(), s: 0.6 + Math.random() }));
     const sg = new THREE.BufferGeometry(); sg.setAttribute('position', new THREE.BufferAttribute(pos, 3));
-    V.spray = new THREE.Points(sg, new THREE.PointsMaterial({ color: 0xdfe8ee, size: 0.9, map: softDot(), transparent: true, opacity: 0, depthWrite: false }));
+    V.spray = new THREE.Points(sg, new THREE.PointsMaterial({ color: 0xdfe8ee, size: 1.3, map: softDot(), transparent: true, opacity: 0, depthWrite: false }));
     V.spray.frustumCulled = false;
     const plank = new THREE.BoxGeometry(0.35, 0.08, 1.6);
     V.debris = new THREE.InstancedMesh(plank, new THREE.MeshStandardMaterial({ color: 0x6d5234, roughness: 1 }), 36);
@@ -390,11 +369,11 @@ export class Events {
     V.funnel.visible = V.spray.visible = V.debris.visible = V.crest.visible = false;
   }
 
-  _updateFunnel(cx, cz, k, dt, t) {
+  _updateFunnel(cx, cz, k, dt, t, R = 70, spin = 1) {
     const V = this.visuals;
     V.funnel.visible = V.spray.visible = V.debris.visible = k > 0.01;
     if (!V.funnel.visible) return;
-    V.funnel.position.set(cx, sea.level - 3, cz);
+    V.funnel.position.set(cx, sea.level - sea.vortex.depth * 1.5, cz);
     // o funil se inclina e serpenteia um pouco
     V.funnel.rotation.z = Math.sin(t * 0.21) * 0.07;
     V.funnel.rotation.x = Math.cos(t * 0.17) * 0.06;
@@ -405,21 +384,24 @@ export class Events {
     V.cloud.rotation.z += dt * 0.05;
     V.cloud.material.opacity = k * 0.9;
     const sp = V.spray.geometry.attributes.position.array;
+    // espuma girando na parede do redemoinho, descendo em espiral para o centro
+    const sc = R / 41;
     V.sprayData.forEach((p, i) => {
-      p.a += dt * (2.2 + 18 / p.r) * p.s;
-      p.h = (p.h + dt * 0.25 * p.s) % 1;
-      const r = p.r * (1 + p.h * 0.6);
-      sp[i * 3] = cx + Math.cos(p.a) * r;
-      sp[i * 3 + 1] = sea.level + p.h * 14;
-      sp[i * 3 + 2] = cz + Math.sin(p.a) * r;
+      p.a += dt * (0.5 + 9 / p.r) * p.s * spin;
+      p.h = (p.h + dt * 0.08 * p.s) % 1;
+      const r = Math.max(3, p.r * sc * (1.15 - p.h * 0.95));
+      const x = cx + Math.cos(p.a) * r, z = cz + Math.sin(p.a) * r;
+      sp[i * 3] = x;
+      sp[i * 3 + 1] = sea.level + eventHeight(x, z, t) + 0.35 + (i % 5 === 0 ? (1 - p.h) * 3 : 0);
+      sp[i * 3 + 2] = z;
     });
     V.spray.geometry.attributes.position.needsUpdate = true;
-    V.spray.material.opacity = k * 0.5;
+    V.spray.material.opacity = k * 0.7;
     const m = new THREE.Matrix4(), q = new THREE.Quaternion(), e3 = new THREE.Euler(), one = new THREE.Vector3(1, 1, 1), pv = new THREE.Vector3();
     V.debrisData.forEach((d, i) => {
-      d.a += dt * (1.4 + 25 / d.r);
+      d.a += dt * (0.6 + 14 / d.r) * spin;
       d.y += dt * 1.5; if (d.y > 60) d.y = 2;
-      const r = d.r + d.y * 0.25;
+      const r = (d.r + d.y * 0.25) * sc * 0.8;
       e3.set(t * 2 + d.s, t * 1.3 + d.s, t * 1.7);
       m.compose(pv.set(cx + Math.cos(d.a) * r, sea.level + d.y, cz + Math.sin(d.a) * r), q.setFromEuler(e3), one.setScalar(k));
       V.debris.setMatrixAt(i, m);

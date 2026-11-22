@@ -22,89 +22,72 @@ kbd { display: inline-block; min-width: 1.6em; padding: 1px 6px; margin: 0 2px; 
   font: 800 0.85em/1.4 var(--ui); color: var(--navy); background: linear-gradient(#fbe7b5, var(--brass));
   border: 1px solid var(--brass-dark); box-shadow: 0 2px 0 var(--brass-dark); vertical-align: 1px; text-shadow: none; }
 
-/* ---------- painéis do HUD ---------- */
-#hud { position: fixed; inset: 0; z-index: 3; pointer-events: none; text-shadow: 0 1px 2px rgba(0, 0, 0, 0.7); }
-.panel { position: absolute; background: var(--panel); border: 1px solid var(--line); border-radius: 10px;
-  box-shadow: inset 0 0 0 3px rgba(13, 34, 48, 0.85), inset 0 0 0 4px rgba(224, 172, 76, 0.22), 0 6px 18px rgba(0, 0, 0, 0.35); }
+/* ---------- painéis do HUD ----------
+   Minimalista: vidro escuro, filete de latão, números em Pirata One. Só o essencial na tela. */
+#hud { position: fixed; inset: 0; z-index: 3; pointer-events: none; text-shadow: 0 1px 2px rgba(0, 0, 0, 0.6); }
+.panel { position: absolute; background: linear-gradient(180deg, rgba(14, 38, 54, 0.62), rgba(8, 24, 35, 0.72));
+  -webkit-backdrop-filter: blur(6px); backdrop-filter: blur(6px);
+  border: 1px solid rgba(224, 172, 76, 0.32); border-radius: 14px 4px 14px 4px; box-shadow: 0 8px 22px rgba(0, 0, 0, 0.28); }
+.panel::before { content: ''; position: absolute; left: 12px; right: 12px; top: -1px; height: 2px; border-radius: 2px;
+  background: linear-gradient(90deg, transparent, var(--brass), transparent); opacity: 0.8; }
 
-/* vida: boia salva-vidas */
-#statsBox { left: 14px; top: 14px; display: flex; gap: 12px; align-items: center; padding: 10px 14px 10px 10px; min-width: 250px; }
-#lifeRing { position: relative; width: 62px; height: 62px; flex: 0 0 auto; }
-#lifeRing svg { width: 100%; height: 100%; transform: rotate(-90deg); filter: drop-shadow(0 2px 3px rgba(0, 0, 0, 0.5)); }
-#lifeRing circle { fill: none; stroke-width: 11; }
-.ring-bg { stroke: rgba(0, 0, 0, 0.45); }
-.ring-stripes { stroke: #f4efe4; stroke-dasharray: 19.6 19.6; opacity: 0.18; }
+/* vitais: boia salva-vidas compacta no canto inferior esquerdo */
+#statsBox { left: 16px; bottom: 16px; display: flex; gap: 10px; align-items: center; padding: 8px 12px 8px 8px; width: 232px; }
+#lifeRing { position: relative; width: 50px; height: 50px; flex: 0 0 auto; }
+#lifeRing svg { width: 100%; height: 100%; transform: rotate(-90deg); }
+#lifeRing circle { fill: none; stroke-width: 9; }
+.ring-bg { stroke: rgba(0, 0, 0, 0.4); }
+.ring-stripes { stroke: #f4efe4; stroke-dasharray: 19.6 19.6; opacity: 0.16; }
 .ring-fg { stroke: var(--coral); stroke-dasharray: 157 157; transition: stroke-dashoffset 0.3s, stroke 0.3s; }
 #lifeRing.low .ring-fg { stroke: #ff3b2b; animation: beat 0.9s infinite; }
 @keyframes beat { 50% { opacity: 0.55; } }
-#vidaNum { position: absolute; inset: 0; display: grid; place-items: center; font: 800 17px var(--ui); }
-.stats-col { flex: 1; min-width: 0; }
-.bar i { display: block; height: 7px; background: rgba(0, 0, 0, 0.5); border-radius: 4px; overflow: hidden; }
+#vidaNum { position: absolute; inset: 0; display: grid; place-items: center; font: 400 19px/1 var(--display); }
+.stats-col { flex: 1; min-width: 0; display: grid; gap: 4px; }
+.bar i { display: block; height: 5px; background: rgba(0, 0, 0, 0.45); border-radius: 3px; overflow: hidden; }
+.bar.stam i { height: 3px; }
 .bar b { display: block; height: 100%; transition: width 0.25s; }
 .vida { background: linear-gradient(90deg, #b8322a, var(--coral)); }
-#inv { display: flex; flex-wrap: wrap; gap: 5px; margin-top: 8px; }
-.chip { display: inline-flex; align-items: center; gap: 5px; padding: 2px 8px 2px 4px; border-radius: 999px;
-  background: rgba(0, 0, 0, 0.32); border: 1px solid rgba(224, 172, 76, 0.28); font-size: 12.5px; }
-.chip i { width: 18px; height: 18px; border-radius: 50%; display: grid; place-items: center; font-style: normal; font-size: 11px;
+#stamina { background: linear-gradient(90deg, #d9b25e, var(--brass-2)); }
+#stamina.low { background: #ff8a5c; }
+#inv { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 3px; min-height: 0; }
+#inv:empty { display: none; }
+.chip { display: inline-flex; align-items: center; gap: 4px; padding: 1px 7px 1px 3px; border-radius: 999px;
+  background: rgba(0, 0, 0, 0.28); font-size: 11.5px; font-weight: 800; }
+.chip i { width: 15px; height: 15px; border-radius: 50%; display: grid; place-items: center; font-style: normal; font-size: 9px;
   background: var(--brass); color: var(--navy); text-shadow: none; }
-.chip.zero { opacity: 0.45; }
 
-/* navegação + maré */
-#topRight { position: absolute; right: 14px; top: 14px; display: flex; flex-direction: column; gap: 8px; align-items: flex-end; }
-#topRight .panel { position: relative; }
-#boatBox { display: flex; gap: 10px; align-items: center; padding: 9px 13px; min-width: 240px; max-width: 330px; font-size: 12.5px; }
-#arrow { width: 40px; height: 40px; flex: 0 0 auto; display: grid; place-items: center; font-size: 20px; color: var(--brass-2);
-  border-radius: 50%; border: 2px solid var(--brass); background: radial-gradient(circle, var(--navy-3), var(--navy));
-  box-shadow: inset 0 0 0 3px rgba(0, 0, 0, 0.35); }
-#arrow::before { content: ''; }
-#boatInfo { display: grid; gap: 2px; }
-#boatInfo .row { display: flex; gap: 6px; align-items: baseline; white-space: nowrap; }
-#boatInfo .k { color: var(--ink-dim); font-size: 11.5px; text-transform: uppercase; letter-spacing: 0.04em; }
-#boatInfo .v { font-weight: 800; }
-#boatInfo .sail-up { color: var(--green); } #boatInfo .sail-down { color: #ffb36b; }
-#tideBox { display: flex; gap: 10px; align-items: center; padding: 8px 13px; min-width: 200px; font-size: 12.5px; }
-#tideBox > div:last-child { display: grid; }
-#tideName { font: 400 19px/1 var(--display); letter-spacing: 0.02em; }
-#tideNext { color: var(--ink-dim); }
-#tideGauge { position: relative; width: 14px; height: 40px; border-radius: 7px; background: rgba(0, 0, 0, 0.5);
-  border: 1px solid var(--line); overflow: hidden; }
-#tideFill { position: absolute; left: 0; right: 0; bottom: 0; background: linear-gradient(#a8ecff, var(--sea) 40%, #1d6f9a); transition: height 0.4s; }
-#tideBox.seco #tideName { color: #f3d28a; } #tideBox.cheio #tideName { color: #8fe0ff; }
-
-/* objetivo: faixa de pergaminho */
-#objective { position: absolute; top: 14px; left: 50%; transform: translateX(-50%); padding: 7px 26px; max-width: min(520px, 60vw);
-  font: 800 13.5px var(--ui); text-align: center; color: var(--parchment-ink); text-shadow: none;
-  background: linear-gradient(#f7ebcf, var(--parchment)); border-radius: 4px;
-  clip-path: polygon(0 0, 100% 0, 97% 50%, 100% 100%, 0 100%, 3% 50%);
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.35); }
+/* objetivo: fita fina no topo (some quando não há objetivo) */
+#objective { position: absolute; top: 14px; left: 50%; transform: translateX(-50%); padding: 5px 22px; max-width: min(520px, 60vw);
+  font: 800 12.5px var(--ui); letter-spacing: 0.02em; text-align: center; color: var(--parchment-ink); text-shadow: none;
+  background: linear-gradient(#f7ebcf, var(--parchment)); border-radius: 3px;
+  clip-path: polygon(0 0, 100% 0, 97% 50%, 100% 100%, 0 100%, 3% 50%); opacity: 0.92; }
+#objective:empty { display: none; }
 
 /* mensagens */
-#msgs { position: absolute; left: 50%; top: 56px; transform: translateX(-50%); display: grid; justify-items: center; gap: 5px; }
-#msgs div { background: rgba(10, 30, 43, 0.86); border: 1px solid var(--line); border-left: 4px solid var(--brass);
-  border-radius: 6px; padding: 5px 14px; max-width: min(560px, 80vw); text-align: center; animation: toast 4s forwards; }
+#msgs { position: absolute; left: 50%; top: 50px; transform: translateX(-50%); display: grid; justify-items: center; gap: 4px; }
+#msgs div { background: rgba(8, 24, 35, 0.7); border-radius: 999px; padding: 4px 16px; max-width: min(560px, 80vw); text-align: center;
+  font-size: 13px; box-shadow: inset 0 0 0 1px rgba(224, 172, 76, 0.3); animation: toast 4s forwards; }
 @keyframes toast { 0% { opacity: 0; transform: translateY(-6px); } 6%, 82% { opacity: 1; transform: none; } 100% { opacity: 0; } }
 
 /* arma e hotbar */
-#weapon { right: 14px; bottom: 14px; padding: 9px 14px; min-width: 190px; text-align: right; }
-#weapon .wname { font: 400 22px/1 var(--display); letter-spacing: 0.02em; }
-#weapon .stars { color: var(--brass-2); font-size: 12px; letter-spacing: 2px; }
-#weapon .ammo { font: 800 24px/1.1 var(--ui); }
-#weapon .ammo small { font-size: 13px; color: var(--ink-dim); }
-#weapon .dur { height: 4px; margin-top: 6px; border-radius: 2px; background: rgba(0, 0, 0, 0.5); overflow: hidden; }
+#weapon { right: 16px; bottom: 16px; padding: 8px 14px 9px; min-width: 170px; text-align: right; }
+#weapon .wname { font: 400 20px/1 var(--display); letter-spacing: 0.02em; }
+#weapon .stars { color: var(--brass-2); font-size: 10px; letter-spacing: 2px; opacity: 0.85; }
+#weapon .ammo { font: 400 30px/1 var(--display); margin-top: 2px; }
+#weapon .ammo small { font: 700 12px var(--ui); color: var(--ink-dim); }
+#weapon .dur { height: 3px; margin-top: 6px; border-radius: 2px; background: rgba(0, 0, 0, 0.45); overflow: hidden; }
 #weapon .dur b { display: block; height: 100%; background: var(--brass); }
-#hotbar { position: absolute; left: 50%; bottom: 14px; transform: translateX(-50%); display: flex; gap: 6px; }
-.hotbar-slot { position: relative; min-width: 112px; padding: 8px 10px 7px; border-radius: 7px; text-align: center; font-size: 12px;
-  background: repeating-linear-gradient(90deg, rgba(0, 0, 0, 0) 0 22px, rgba(0, 0, 0, 0.08) 22px 24px),
-    linear-gradient(#7a5532, #5a3d22); border: 1px solid #2e1f10;
-  box-shadow: inset 0 1px 0 rgba(255, 230, 180, 0.25), 0 3px 0 #2e1f10; }
-.hotbar-slot .n { position: absolute; top: -8px; left: -6px; width: 20px; height: 20px; border-radius: 50%; display: grid; place-items: center;
-  font: 800 11px var(--ui); color: var(--navy); background: var(--brass); border: 1px solid var(--brass-dark); text-shadow: none; }
-.hotbar-slot .s { display: block; color: var(--brass-2); font-size: 10px; letter-spacing: 1px; }
-.hotbar-slot.empty { opacity: 0.55; }
-.hotbar-slot.active { border-color: var(--brass-2); box-shadow: 0 0 0 2px var(--brass), 0 0 14px rgba(224, 172, 76, 0.6), 0 3px 0 #2e1f10; transform: translateY(-3px); }
+#hotbar { position: absolute; left: 50%; bottom: 16px; transform: translateX(-50%); display: flex; gap: 5px; }
+.hotbar-slot { position: relative; min-width: 96px; padding: 6px 10px 5px; border-radius: 10px 3px 10px 3px; text-align: center; font-size: 11.5px;
+  background: rgba(8, 24, 35, 0.55); border: 1px solid rgba(224, 172, 76, 0.22); transition: transform 0.15s, border-color 0.15s; }
+.hotbar-slot .n { position: absolute; top: -7px; left: -5px; width: 16px; height: 16px; border-radius: 50%; display: grid; place-items: center;
+  font: 800 10px var(--ui); color: var(--navy); background: var(--brass); text-shadow: none; }
+.hotbar-slot .s { display: block; color: var(--brass-2); font-size: 9px; letter-spacing: 1px; }
+.hotbar-slot.empty { opacity: 0.4; }
+.hotbar-slot.active { border-color: var(--brass-2); background: rgba(60, 42, 14, 0.6); box-shadow: 0 0 12px rgba(224, 172, 76, 0.35); transform: translateY(-3px); }
 
-#prompt { position: absolute; left: 50%; top: 60%; transform: translateX(-50%); font-size: 16px; font-weight: 800; white-space: nowrap;
-  padding: 5px 14px; border-radius: 8px; background: rgba(10, 30, 43, 0.55); }
+#prompt { position: absolute; left: 50%; top: 60%; transform: translateX(-50%); font-size: 15px; font-weight: 800; white-space: nowrap;
+  padding: 4px 14px; border-radius: 999px; background: rgba(8, 24, 35, 0.5); }
 #prompt:empty { display: none; }
 #crosshair { position: absolute; left: 50%; top: 50%; width: 14px; height: 14px; margin: -7px; border-radius: 50%;
   border: 2px solid rgba(255, 255, 255, 0.9); box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.5); }
@@ -118,7 +101,9 @@ kbd { display: inline-block; min-width: 1.6em; padding: 1px 6px; margin: 0 2px; 
 #scopeOverlay::before, #scopeOverlay::after { content: ''; position: absolute; left: 50%; top: 50%; background: rgba(0, 0, 0, 0.8); transform: translate(-50%, -50%); }
 #scopeOverlay::before { width: 54vmin; height: 1px; }
 #scopeOverlay::after { width: 1px; height: 54vmin; }
-#hint { position: absolute; left: 14px; bottom: 14px; font-size: 12px; opacity: 0.85; }
+/* dica de teclas: aparece no começo e some sozinha */
+#hint { position: absolute; left: 16px; top: 16px; font-size: 11.5px; opacity: 0.75; transition: opacity 1.2s; }
+#hint.gone { opacity: 0; }
 #buildPanel { left: 14px; top: 44px; width: 250px; }
 #vignette { position: absolute; inset: 0; opacity: 0; }
 #vignette.hurt { box-shadow: inset 0 0 140px 40px rgba(200, 30, 20, 0.8); animation: pulse 0.5s; }
@@ -242,9 +227,7 @@ body.touch #hotbar { bottom: 10px; }
 body.touch .hotbar-slot { min-width: 76px; padding: 6px 6px 5px; font-size: 11px; }
 body.touch #weapon { bottom: auto; right: calc(14px + env(safe-area-inset-right)); top: 66px; padding: 6px 10px; min-width: 0; }
 body.touch #weapon .wname { font-size: 17px; } body.touch #weapon .ammo { font-size: 18px; }
-body.touch #topRight { right: auto; left: calc(14px + env(safe-area-inset-left)); top: 104px; align-items: flex-start; }
-body.touch #boatBox { min-width: 0; padding: 6px 10px; } body.touch #arrow { width: 30px; height: 30px; font-size: 15px; }
-body.touch #statsBox { min-width: 0; max-width: 200px; padding: 6px 8px 6px 6px; gap: 8px; } body.touch #lifeRing { width: 46px; height: 46px; }
+body.touch #statsBox { width: auto; max-width: 200px; left: calc(14px + env(safe-area-inset-left)); bottom: auto; top: 10px; padding: 5px 8px 5px 5px; gap: 8px; } body.touch #lifeRing { width: 40px; height: 40px; }
 body.touch #statsBox .bar { display: none; } body.touch #inv { margin-top: 0; gap: 3px; } body.touch .chip { font-size: 11px; padding: 1px 6px 1px 2px; }
 body.touch #objective { max-width: 30vw; font-size: 11px; padding: 4px 16px; top: 10px; }
 body.touch #msgs { top: 44px; } body.touch #msgs div { font-size: 12px; padding: 3px 10px; }
@@ -260,7 +243,6 @@ body.touch #prompt { top: 34%; font-size: 14px; }
 }
 @media (max-height: 460px) {
   #boatInfo .row.extra { display: none; }
-  #tideBox { padding: 5px 10px; } #tideGauge { height: 30px; }
 }
 
 /* ---------- opções gráficas e FPS ---------- */

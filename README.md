@@ -121,22 +121,25 @@ balsas, lançar ganchos, voar até o convés e atacar quem estiver a bordo.
 
 ### Eventos do mar e balanceamento
 
-Depois da partida o céu abre aos poucos e, de tempos em tempos (~2–3 min), o host sorteia um evento
+Depois da partida o céu abre aos poucos. Os eventos são **raros e sem aviso** (primeiro entre 5 e 8 min,
+depois 7–13 min entre eles, às vezes o mar só fica quieto), quase nunca repetem o mesmo tipo em seguida e
+cada um sai diferente (força, velocidade, tamanho, lado e sentido de giro sorteados). O host sorteia
 (`client/src/systems/events.js`, constantes em `EVENT_BALANCE`):
 
-- **Onda gigante**: uma frente de água de ~4,5 m atravessa o mar (entra em `waveHeight` e no shader,
+- **Onda gigante**: uma frente de água de 3,6–5,6 m atravessa o mar (entra em `waveHeight` e no shader,
   então barco, detritos e nadadores sentem a onda). Baixe a vela e fique perto do mastro; com a vela
   cheia a jangada é arremessada e quem está a bordo leva dano. Quem está longe do mastro é jogado
   pelo convés.
-- **Furacão**: um funil com nuvem em espiral, spray e destroços passa ao lado da rota e puxa a jangada
-  para o olho (o mar afunda e gira em espiral ali). Levante a vela e gire-a para o lado oposto ao olho;
-  se a jangada chegar ao olho, ela é sugada, gira e é cuspida com dano.
+- **Furacão / redemoinho**: o mar se abre num **redemoinho gigante** (60–85 m de raio, funil d'água de
+  7–11 m com garganta funda, braços de espuma girando) ao lado da rota. Ele gira a jangada junto com a
+  água e vai puxando aos poucos (mais forte com o tempo e perto do centro). Levante a vela e gire-a para
+  o lado oposto; se a jangada chegar ao centro, ela é sugada, gira e é cuspida com dano.
 
 - **Oceano que seca** (`client/src/systems/tide.js`, constantes em `TIDE`): só dois estados — **mar cheio**
   e **mar seco** — num ciclo de 6 min (seco ≈ 2 min 24 s), com uma transição rápida (16 s) entre eles,
   calculado do relógio comum. Seco, a água desce abaixo do **fundo do mar** (`client/src/world/seabed.js`)
   e dá para andar livremente por ele. A jangada encalha até a água voltar. **Itens pesados afundam**
-  (placa metálica, calha, sucata e pedaço de casa, `sinks: true` em `DEBRIS`): ficam no fundo e só são
+  (placa metálica, calha, sucata, pedaço de casa, tambor de metal e telha ondulada, `sinks: true` em `DEBRIS`): ficam no fundo e só são
   alcançáveis com o mar seco. **Naufrágios** (30% dos chunks sem ilha) têm 1–2 baús e destroços em volta.
 
 Eventos são anunciados pela rede (`t: 'event'`) e derivados do relógio comum, então todos os

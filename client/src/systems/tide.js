@@ -36,8 +36,8 @@ export function tideAt(t) {
 }
 
 const MESSAGES = {
-  seco: 'O MAR ESTÁ SECANDO! Em instantes dá para andar pelo fundo: destroços e naufrágios com loot.',
-  cheio: 'O MAR ESTÁ VOLTANDO — corra para a jangada!',
+  seco: 'A água está baixando…',
+  cheio: 'O mar está voltando — volte para a jangada!',
 };
 
 export class Tide {

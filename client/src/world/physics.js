@@ -303,12 +303,18 @@ export class Physics {
     record.body.angularVelocity.set(0, 0, 0);
     record.body.collisionFilterGroup = GROUP_RAFT;
     record.body.collisionFilterMask = GROUP_DEBRIS | GROUP_TERRAIN;
+    // Solda rígida: a peça vira CINEMÁTICA e segue exatamente a pose gravada na jangada (a malha é
+    // filha do barco). Com corpo dinâmico + LockConstraint ela cedia ao peso/impactos — entortava e
+    // desgrudava.
+    record.dynMass = record.body.mass;
+    record.body.type = CANNON.Body.KINEMATIC;
+    record.body.mass = 0; record.body.updateMassProperties();
+    record.kinematic = true;
     record.body.wakeUp();
     record.kind = 'raft';
     record.parent = group;
     record.obj = obj;
-    record.constraint = new CANNON.LockConstraint(this.raftRoot, record.body, { maxForce: 1e7 });
-    this.world.addConstraint(record.constraint);
+    record.constraint = null;
     this.records.delete(obj.id);
     this.records.set(`raft:${piece.id}`, record);
     this.raftPieces.set(piece.id, record);
@@ -318,7 +324,12 @@ export class Physics {
   detachWeldedObject(obj, pieceId, position, quaternion) {
     const record = this.raftPieces.get(pieceId);
     if (!record) return;
-    this.world.removeConstraint(record.constraint);
+    if (record.constraint) this.world.removeConstraint(record.constraint);
+    if (record.kinematic && record.dynMass) { // volta a ser um objeto físico comum
+      record.body.type = CANNON.Body.DYNAMIC;
+      record.body.mass = record.dynMass; record.body.updateMassProperties();
+      record.kinematic = false;
+    }
     this.raftPieces.delete(pieceId);
     this.records.delete(`raft:${pieceId}`);
 
