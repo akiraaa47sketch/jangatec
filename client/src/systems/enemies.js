@@ -7,6 +7,7 @@ import { waveHeight } from '../world/ocean.js';
 import { woodTexture, woodBump, repeated, scaleBoxUVs } from '../world/textures.js';
 import { CFG } from '../config.js';
 import { makeEnemyPill, animateEnemy } from './evilpills.js';
+import { inRoom } from '../world/camp.js';
 
 export const ENEMY_TYPES = {
   melee:    { nome: 'Saqueador', hp: 60,  speed: 3.2, dmg: 10, range: 1.8, cd: 1.0, cor: 0xa83a32, scale: 1 },
@@ -37,11 +38,21 @@ export class Enemies {
     const pool = BY_DIFF[isl.diff];
     const baseCount = isl.diff === 0 ? (r() < 0.5 ? 1 : 0) : 1 + isl.diff + ((r() * 2) | 0);
     const n = Math.max(isl.siteType === 'fort' ? 3 : 2, baseCount);
+    // não nasce dentro de parede/móvel (tenta alguns pontos em volta do pátio)
+    const blocked = (lx, lz) => isl.set.items.some((c) => c.type === 'box' && c.hy > 0.15 && c.y - c.hy < 1.5 && (() => {
+      let [x, z] = [lx - c.x, lz - c.z]; if (c.yaw) [x, z] = rot(x, z, -c.yaw);
+      return Math.abs(x) < c.hx + 0.5 && Math.abs(z) < c.hz + 0.5;
+    })());
     for (let i = 0; i < n; i++) {
       const id = `${isl.id}e${i}`, type = pool[(r() * pool.length) | 0];
-      const a = r() * 6.28, d = r() * (isl.siteType === 'fort' ? 3.2 : 2.1);
+      let lx = isl.siteCenter[0], lz = isl.siteCenter[1];
+      for (let k = 0; k < 12; k++) {
+        const a = r() * 6.28, d = 0.9 + r() * (isl.siteType === 'fort' ? 2.6 : 1.8);
+        const cx = isl.siteCenter[0] + Math.cos(a) * d, cz = isl.siteCenter[1] + Math.sin(a) * d;
+        if (!blocked(cx, cz)) { lx = cx; lz = cz; break; }
+      }
       if (G.world.collected.has(id)) continue;
-      this.spawn(id, type, isl, isl.x + isl.siteCenter[0] + Math.cos(a) * d, isl.z + isl.siteCenter[1] + Math.sin(a) * d);
+      this.spawn(id, type, isl, isl.x + lx, isl.z + lz);
     }
   }
   spawn(id, type, isl, x, z) {
@@ -459,11 +470,33 @@ export class Enemies {
     if (e.swing > 0) e.swing = Math.max(0, e.swing - dt);
   }
 
+  // Linha de visão do olho do inimigo até o peito do jogador (paredes, troncos, terreno bloqueiam)
+  hasLos(e, h = 1.35) {
+    const p = e.body.pos, pp = this.G.player.body.pos;
+    return !this.G.colliders.segmentBlocked(p.x, p.y + h * e.def.scale, p.z, pp.x, pp.y + 1.15, pp.z);
+  }
+
+  // Próximo ponto do caminho até (tx, tz): sai pelos cômodos onde está (do menor para o maior) e
+  // entra pelos cômodos do alvo (do maior para o menor), sempre pela porta/portão.
+  route(e, tx, tz) {
+    const isl = e.isl, p = e.body.pos;
+    if (!isl || !isl.rooms || !isl.rooms.length) return [tx, tz];
+    const W = (pt) => [pt[0] + isl.x, pt[1] + isl.z];
+    const rooms = isl.rooms.map((rm) => ({ rm, w: { ...rm, x: rm.x + isl.x, z: rm.z + isl.z }, size: rm.hw * rm.hd }));
+    const exits = rooms.filter((o) => inRoom(o.w, p.x, p.z) && !inRoom(o.w, tx, tz)).sort((a, b) => a.size - b.size);
+    const entries = rooms.filter((o) => !inRoom(o.w, p.x, p.z) && inRoom(o.w, tx, tz)).sort((a, b) => b.size - a.size);
+    const go = exits[0] ? { o: exits[0], out: true } : entries[0] ? { o: entries[0], out: false } : null;
+    if (!go) return [tx, tz];
+    const [inner, outer] = go.o.rm.door.map(W), near = go.out ? inner : outer, far = go.out ? outer : inner;
+    return Math.hypot(p.x - near[0], p.z - near[1]) < 1.0 ? far : near;
+  }
+
   think(e, dist, pdx, pdz) {
     const def = e.def, alive = !this.G.player.dead && !this.G.player.downed; // caído: inimigos perdem o interesse
+    e.los = dist < SIGHT + 4 ? this.hasLos(e) : false;
     switch (e.state) {
       case 'idle': case 'patrol': case 'search':
-        if (alive && dist < SIGHT) { e.state = 'chase'; break; }
+        if (alive && dist < SIGHT && (e.los || dist < 5)) { e.state = 'chase'; break; }
         if (e.state === 'patrol') { if (!e.goal || Math.hypot(e.goal[0] - e.body.pos.x, e.goal[1] - e.body.pos.z) < 1) { e.state = 'idle'; e.timer = 2 + Math.random() * 3; } }
         else if (e.timer <= 0) {
           const a = Math.random() * 6.28, d = Math.random() * (e.isl.R - 2);
@@ -472,9 +505,9 @@ export class Enemies {
         break;
       case 'chase': case 'attack': case 'retreat':
         if (!alive || dist > LOSE) { e.state = 'search'; e.timer = 3; e.goal = null; break; }
-        if (def.ranged && dist < 6) { e.state = 'retreat'; e.goal = [e.body.pos.x - pdx * 6, e.body.pos.z - pdz * 6]; }
-        else if (dist < def.range) e.state = 'attack';
-        else { e.state = 'chase'; e.goal = [this.G.player.body.pos.x, this.G.player.body.pos.z]; }
+        if (def.ranged && dist < 6 && e.los) { e.state = 'retreat'; e.goal = [e.body.pos.x - pdx * 6, e.body.pos.z - pdz * 6]; }
+        else if (dist < def.range && e.los) e.state = 'attack';
+        else { e.state = 'chase'; e.goal = this.route(e, this.G.player.body.pos.x, this.G.player.body.pos.z); }
         break;
     }
   }
@@ -514,15 +547,16 @@ export class Enemies {
       // corpo a corpo: aviso -> golpe -> recuperação, guarda, atordoamento (sistema Melee)
       let mres = null;
       if (!e.def.ranged && dist < 7 && G.melee) mres = G.melee.enemyTick(e, dt, dist);
+      if (e.state === 'chase' && e.goal && e.los === false && thinkNow) e.goal = this.route(e, pp.x, pp.z);
       if (mres && mres.hold) { mx = 0; mz = 0; }
-      else if (!e.def.ranged && dist < 3.6 && (e.state === 'chase' || e.state === 'attack')) {
+      else if (!e.def.ranged && dist < 3.6 && e.los !== false && (e.state === 'chase' || e.state === 'attack')) {
         // esperando a vez: rodeia o jogador mantendo distância
         e.strafeDir = e.strafeDir || (Math.random() < 0.5 ? 1 : -1);
         if (thinkNow && Math.random() < 0.08) e.strafeDir *= -1;
         const sp = e.def.speed * 0.42, radial = (dist - 2.0) * 1.6;
         mx = -pdz * e.strafeDir * sp + pdx * radial; mz = pdx * e.strafeDir * sp + pdz * radial;
       }
-      if (e.state === 'attack' && e.cd <= 0 && e.def.ranged) {
+      if (e.state === 'attack' && e.cd <= 0 && e.def.ranged && e.los) {
         e.cd = e.def.cd;
         const hit = Math.random() < 0.6 - dist * 0.015;
         G.combat.tracer(new THREE.Vector3(p.x, p.y + 1.3, p.z), new THREE.Vector3(pp.x + (hit ? 0 : 1.2), pp.y + 1.2, pp.z), 0xffb060);

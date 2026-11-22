@@ -201,6 +201,7 @@ export class Melee {
       if (e.state === 'dead') continue;
       const dx = e.body.pos.x - p.x, dz = e.body.pos.z - p.z, d = Math.hypot(dx, dz) || 1;
       if (d > range + 0.3 || Math.abs(e.body.pos.y - p.y) > 2 || (d > 0.8 && (dx * fx + dz * fz) / d < arc)) continue;
+      if (G.colliders.segmentBlocked(p.x, p.y + 1.0, p.z, e.body.pos.x, e.body.pos.y + 1.0, e.body.pos.z)) continue; // não bate através da parede
       const front = ((p.x - e.body.pos.x) * Math.sin(e.yaw) + (p.z - e.body.pos.z) * Math.cos(e.yaw)) / d > 0.3;
       out.push({ e, dx, dz, d, front, ms: e.m || (e.m = { state: 'idle', t: 0 }) });
     }
@@ -391,7 +392,7 @@ export class Melee {
     }
     if (!this.pending) ms.evadeTried = false;
     // começa um ataque se estiver perto, sem recarga e com "vaga" (no máximo N atacando juntos)
-    if (!pl.dead && !pl.downed && dist < def.range + 0.4 && e.cd <= 0 && (this.tokens.size < MELEE.tokens || ms.token)) {
+    if (!pl.dead && !pl.downed && dist < def.range + 0.4 && e.cd <= 0 && e.los !== false && (this.tokens.size < MELEE.tokens || ms.token)) {
       // contra quem fica só defendendo, o chute fica bem mais provável
       const moves = MOVES[e.type] || MOVES.melee, wOf = (m) => m.w * (m.kick && this.blocking ? 4 : 1), total = moves.reduce((s, m) => s + wOf(m), 0);
       let r = Math.random() * total, move = moves[0];
@@ -407,6 +408,7 @@ export class Melee {
     const d = Math.hypot(pp.x - p.x, pp.z - p.z);
     const reach = move.aoe || e.def.range + 0.5;
     if (pl.dead || pl.downed || d > reach || Math.abs(pp.y - p.y) > 1.8) { this.say(e.body.pos, 'ERROU', '#c8d2da'); return; }
+    if (G.colliders.segmentBlocked(p.x, p.y + 1.0, p.z, pp.x, pp.y + 1.0, pp.z)) { this.say(e.body.pos, 'ERROU', '#c8d2da'); return; } // parede no meio
     // golpe direcional: só acerta quem está na frente (exceto a pancada em área)
     if (!move.aoe && d > 0.6 && ((pp.x - p.x) * Math.sin(e.yaw) + (pp.z - p.z) * Math.cos(e.yaw)) / d < 0.25) { this.say(e.body.pos, 'ERROU', '#c8d2da'); return; }
     if (move.kick) { this.incomingKick(e, e.def.dmg * move.mult); return; }

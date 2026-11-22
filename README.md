@@ -37,6 +37,11 @@ esquerda (empurre até o fim para correr), arraste a metade direita para girar a
 atacar/pegar, pular, interagir (E), mirar e recarregar, e no topo trocar arma, curar, câmera e tela cheia.
 Durante a construção aparecem Soltar/Soldar/Mover/Cancelar e, no mastro, ◀ Vela ▶.
 
+Teclas padrão abaixo — **todas podem ser trocadas** em Menu → Controles ou no painel de opções (⌨ Teclas),
+com teclado ou mouse. A tabela de ações fica em `client/src/core/keybinds.js`: cada ação tem um contexto
+(andando, construindo ou sempre) e nunca há tecla repetida no mesmo contexto (trocar para uma tecla em
+uso troca as duas de lugar).
+
 | Tecla | Ação |
 |---|---|
 | W A S D / Shift | andar / correr |
@@ -47,13 +52,19 @@ Durante a construção aparecem Soltar/Soldar/Mover/Cancelar e, no mastro, ◀ V
 | Botão esquerdo | pegar a peça contornada de verde |
 | Q | soltar a peça carregada |
 | Mouse + WASD | virar câmera, arrastar a peça e andar |
-| V | teletransportar a peça para o ponto indicado pela mira |
+| G (construindo) | teletransportar a peça para o ponto indicado pela mira |
+| B (construindo) | build assistida: pontos de encaixe e alinhamento automático |
 | R | liberar o cursor e abrir o gizmo de rotação |
 | Shift durante o arraste | encaixar a rotação em incrementos |
 | Botão direito no gizmo | mover a câmera sem sair da rotação |
 | Botão direito fora do gizmo / Esc | cancelar e restaurar a peça |
 | X | dessoldar peça fixada próxima |
-| Clique / botão direito | atacar ou atirar / mirar fora do build mode |
+| Clique / botão direito | atacar ou atirar / bloquear ou mirar fora do build mode |
+| Segurar clique | carregar golpe pesado (depois do golpe leve) |
+| Botão do meio | chute que quebra a guarda |
+| Q | esquivar (fora do build) |
+| V (segurar) | falar no chat de voz |
+| G · F3 | opções gráficas · contador de FPS |
 | 1 2 3 / roda do mouse | trocar entre armas do hotbar / inventário |
 | 4 / 5 | usar bandagem / kit médico |
 | F | alternar 1ª / 3ª pessoa (1ª é o padrão) |
@@ -68,7 +79,21 @@ continuam disponíveis fora do modo de rotação. [R] libera o cursor e mostra o
 para girar a peça. Segure o botão direito para mover a câmera sem sair do modo de rotação e pressione
 [R] novamente para voltar à mira. [Z] solda a peça somente quando ela estiver fisicamente encostada
 na jangada, inclusive pela lateral; a posição do cursor não define o ponto de solda. Se a peça ficar presa,
-pressione [V] para reposicioná-la no ponto indicado pela mira.
+pressione [G] para reposicioná-la no ponto indicado pela mira.
+
+**Build assistida [B]** (`client/src/build/snap.js`): mostra bolinhas nos centros, meios das bordas e cantos
+das peças da jangada (e no encaixe vazio do convés) e da peça carregada; a peça gira para alinhar com a
+vizinha (múltiplos de 90°) e gruda no ponto mais próximo, em cima ou encostada do lado. A solda usa a
+posição exata do encaixe.
+
+**Combate corpo a corpo** (`client/src/systems/melee.js`): golpe leve sai no clique, cliques guardados
+emendam o combo, segurar carrega o pesado, bloquear antes do impacto é finta, chute quebra a guarda,
+golpes simultâneos fazem as espadas se chocarem (CLANG). Inimigos defendem, revidam e chutam quem só
+bloqueia. Sons sintetizados em `client/src/core/sfx.js`. Inimigos usam linha de visão
+(`Colliders.segmentBlocked`): não veem, atiram nem batem através de paredes e saem/entram pelas portas.
+
+**Acampamentos** (`client/src/world/camp.js`): cabana de tábuas (porta, janelas, telhado de palha em A,
+varanda com barris) ou forte com paliçada pontuda, portão, torres de vigia e cabana no fundo.
 
 Todos os jogadores começam em terra firme, com uma arma improvisada sorteada; ninguém nasce com
 pistola. A jangada inicial tem uma plataforma central indestrutível e um encaixe para uma única
@@ -144,7 +169,7 @@ cada um sai diferente (força, velocidade, tamanho, lado e sentido de giro sorte
   `create/password/max` (senha guardada como hash SHA-256) e `join-error`.
 - **Chat de voz** (`client/src/net/voice.js`): WebRTC P2P entre os jogadores da sala (sinalização pela
   mensagem `rtc` do servidor, STUN público), voz **por proximidade em 3D** ou "rádio", aperte-para-falar
-  [V] ou voz aberta com detecção de fala, volume/ganho e indicador de quem está falando no HUD.
+  (tecla configurável, padrão V) ou voz aberta com detecção de fala, volume/ganho e indicador de quem está falando no HUD.
   Sem servidor TURN: em algumas redes muito restritas a voz pode não conectar.
 - **Desempenho**: malhas paradas de ilhas, fundo do mar, naufrágios e destroços são "assadas" numa malha por
   material (`client/src/core/bake.js`, ~63% menos draw calls); destroços a mais de 70 m dormem na física; o
