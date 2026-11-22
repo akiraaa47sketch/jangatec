@@ -4,6 +4,7 @@
 import * as THREE from '../three.js';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import { MeshoptDecoder } from 'three/addons/libs/meshopt_decoder.module.js';
+import { clone as cloneSkinned } from 'three/addons/utils/SkeletonUtils.js';
 
 const cache = {};
 let material = null;
@@ -45,4 +46,38 @@ export function gunModel(id) {
   const group = e.scene.clone(true), parts = {};
   group.traverse((o) => { if (o.name) parts[o.name] = o; });
   return { group, parts };
+}
+
+// ---------- mãos realistas (GLB com esqueleto) ----------
+// Mesma API das mãos procedurais: { root, setPose(c[4] = dobra de cada dedo, t[3] = polegar) }.
+// Origem no punho, dedos para -Z, palma para -Y, polegar em -X; a esquerda é a direita espelhada.
+let handScene = null;
+export function preloadHand(url) {
+  const loader = new GLTFLoader(); loader.setMeshoptDecoder(MeshoptDecoder);
+  return loader.loadAsync(url).then((gltf) => { handScene = gltf.scene; return true; })
+    .catch((e) => { console.warn('Mãos 3D não carregaram:', e); return false; });
+}
+const _q = new THREE.Quaternion(), _e = new THREE.Euler(), X = new THREE.Vector3(1, 0, 0);
+export function buildRealHand(mirror = false) {
+  if (!handScene) return null;
+  const root = new THREE.Group(), inner = cloneSkinned(handScene);
+  if (mirror) inner.scale.x = -1;
+  root.add(inner);
+  const bones = {};
+  inner.traverse((o) => {
+    if (o.isBone) { bones[o.name] = o; o.userData.q0 = o.quaternion.clone(); }
+    if (o.isMesh) { o.frustumCulled = false; o.castShadow = false; }
+  });
+  const fingers = [0, 1, 2, 3].map((f) => [0, 1, 2].map((j) => bones[`d${f}_${j}`]));
+  const BEND = [1.2, 1.4, 0.9];
+  const setPose = (c, t) => {
+    fingers.forEach((chain, f) => chain.forEach((b, j) => {
+      if (b) b.quaternion.copy(b.userData.q0).multiply(_q.setFromAxisAngle(X, -c[f] * BEND[j]));
+    }));
+    const t0 = bones.pol_0, t1 = bones.pol_1;
+    if (t0) t0.quaternion.copy(t0.userData.q0).multiply(_q.setFromEuler(_e.set(t[1] * 0.8, t[0] * 0.8, 0)));
+    if (t1) t1.quaternion.copy(t1.userData.q0).multiply(_q.setFromAxisAngle(X, -t[2]));
+  };
+  setPose([0.3, 0.3, 0.3, 0.3], [0.5, -0.2, 0.3]);
+  return { root, setPose, real: true };
 }

@@ -156,6 +156,11 @@ cada um sai diferente (força, velocidade, tamanho, lado e sentido de giro sorte
   (recua no tiro) e "pintado" por vértice (gunmetal, aço, polímero, painéis areia, quinas gastas e oclusão
   de ambiente). Scripts em `tools/` (`simplify-model.mjs`, `process-pistol.mjs`, rodam com Node +
   glTF-Transform). Enquanto o GLB carrega, a pistola procedural aparece no lugar.
+- **Mãos 3D em 1ª pessoa** (`client/public/models/mao.glb`): modelo do Tripo com textura PBR (pele, normal e
+  metal/aspereza), reduzido de ~1,9 mi para ~15 mil triângulos e com **rig automático** (`tools/rig-hand.mjs`):
+  detecta a mão direita, a orientação, os 4 dedos e o polegar, cria 15 ossos e os pesos de pele. Usa a mesma
+  API das mãos procedurais (`setPose`), então as armas continuam fechando os dedos no cabo/gatilho. A mão
+  esquerda é a direita espelhada. Até carregar, aparecem as luvas.
 - **Personagem**: pílula mais baixa (1,45 m, cápsula mais curta) e **rosto animado** — pisca sozinho e a boca
   mexe com o volume da voz no chat (6 quadros prontos por estilo de rosto, só troca a textura).
 - **Imersão** (menu Gráficos → Imersão, tudo opcional e salvo no navegador, fora das predefinições;

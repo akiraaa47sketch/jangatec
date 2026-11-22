@@ -742,6 +742,17 @@ export class ViewModel {
   }
 
   // Luvas da 1ª pessoa com a cor escolhida para a pílula.
+  // Troca as mãos de luva pelas mãos 3D realistas (quando o GLB termina de carregar).
+  upgradeHands(build) {
+    for (let i = 0; i < 2; i++) {
+      const old = this.hands[i], nh = build(i === 1);
+      if (!nh) return;
+      for (const item of this.heldItems) if (item.parent === old.root) nh.root.add(item);
+      nh.root.position.copy(old.root.position); nh.root.quaternion.copy(old.root.quaternion);
+      this.group.remove(old.root); this.group.add(nh.root);
+      this.hands[i] = nh;
+    }
+  }
   setGloveColor(pill) {
     setGloveColor(PILL_COLORS[sanitizePill(pill).gloves].hex);
   }

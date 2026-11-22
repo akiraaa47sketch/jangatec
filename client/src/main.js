@@ -28,7 +28,7 @@ import { Benchmark } from './systems/benchmark.js';
 import { Melee } from './systems/melee.js';
 import { Voice } from './net/voice.js';
 import { MainMenu } from './ui/mainmenu.js';
-import { preloadGun } from './player/gunmodels.js';
+import { preloadGun, preloadHand, buildRealHand } from './player/gunmodels.js';
 import { Naval } from './systems/naval.js';
 import { Tools } from './systems/tools.js';
 
@@ -200,6 +200,8 @@ function start(seed, welcome) {
 }
 // Benchmark: mundo fixo (seed 4242), câmera roteirizada e relatório de FPS no fim.
 const startBenchmark = () => { start(4242); G.bench = new Benchmark(G); };
+// mãos 3D realistas da 1ª pessoa (com esqueleto): trocam as luvas quando carregam
+preloadHand('./models/mao.glb').then((ok) => { if (ok) G.viewmodel.upgradeHands(buildRealHand); });
 // modelo 3D da pistola: carrega em segundo plano e troca o procedural quando ficar pronto
 preloadGun('pistola', './models/pistola.glb').then((ok) => {
   if (ok && G.started && G.combat.weaponId === 'pistola') { G.combat.equip('pistola'); if (G.viewmodel.shownId === 'pistola') G.viewmodel.showWeapon('pistola'); }
