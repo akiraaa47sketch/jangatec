@@ -74,7 +74,7 @@ export class Melee {
   }
 
   get weapon() { const w = this.G.combat.weapon; return w && w.melee ? w : null; }
-  spend(n) { this.stamina = Math.max(0, this.stamina - n); this.stamDelay = MELEE.stamina.delay; }
+  spend(n) { this.stamina = Math.max(0, this.stamina - n * (this.G.survival ? this.G.survival.staminaMul : 1)); this.stamDelay = MELEE.stamina.delay; }
 
   // ---------- jogador ----------
   update(dt) {
@@ -242,7 +242,7 @@ export class Melee {
         this.clashEnemy(e, dx / d, dz / d);
         continue;
       }
-      let dmg = w.dmg * mult, label = null, color = '#ffffff', sound = 'hit';
+      let dmg = w.dmg * mult * G.survival.dmgMul, label = null, color = '#ffffff', sound = 'hit';
       if (ms.state === 'stagger') { dmg *= MELEE.crit; label = 'CRÍTICO'; color = '#ffb347'; }
       else if (ms.state === 'clashed') { dmg *= 1.4; label = 'ABERTO'; color = '#ffe9a8'; }
       else if (ms.state === 'guard' && front) {

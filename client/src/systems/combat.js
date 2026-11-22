@@ -188,7 +188,7 @@ export class Combat {
       this.ray.far = w.range + G.player.camDist;
       const hit = this.ray.intersectObjects(targets, false)[0];
       const end = hit ? hit.point.clone() : _o.clone().addScaledVector(_dir, w.range);
-      if (hit && hit.object.userData.enemy) G.enemies.damage(hit.object.userData.enemy, w.dmg);
+      if (hit && hit.object.userData.enemy) G.enemies.damage(hit.object.userData.enemy, Math.round(w.dmg * G.survival.dmgMul));
       this.tracer(origin.clone(), end);
     }
     this._useDurability(w);

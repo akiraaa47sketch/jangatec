@@ -42,6 +42,9 @@ export const ACTIONS = [
   { id: 'slot6', label: 'Slot 6 (ferramentas)', cat: 'itens', ctx: 'pe', def: 'Digit8' },
   { id: 'bandage', label: 'Usar bandagem', cat: 'itens', ctx: 'pe', def: 'Digit4' },
   { id: 'medkit', label: 'Usar kit médico', cat: 'itens', ctx: 'pe', def: 'Digit5' },
+  { id: 'food1', label: 'Comer barra de proteína (+dano)', cat: 'itens', ctx: 'pe', def: 'Digit9' },
+  { id: 'food2', label: 'Tomar energético (estamina)', cat: 'itens', ctx: 'pe', def: 'Digit0' },
+  { id: 'food3', label: 'Comer chocolate (regenera vida)', cat: 'itens', ctx: 'pe', def: 'Minus' },
   { id: 'banjoMenu', label: 'Painel de notas do banjo', cat: 'itens', ctx: 'pe', def: 'KeyB' },
 
   { id: 'interact', label: 'Interagir / abrir / vela', cat: 'interagir', ctx: 'pe', def: 'KeyE' },

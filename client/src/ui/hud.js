@@ -1,5 +1,5 @@
 // HUD em DOM, enxuto: vitais, arma, hotbar, objetivo curto, avisos e prompts.
-import { ITEM_NAMES } from '../systems/survival.js';
+import { ITEM_NAMES, BUFFS } from '../systems/survival.js';
 import { WEAPONS } from '../systems/combat.js';
 import { keyOf } from '../core/keybinds.js';
 
@@ -115,9 +115,18 @@ export class Hud {
     const chip = (icon, label, n) => n ? `<span class="chip" title="${label}"><i>${icon}</i>${n}</span>` : '';
     const invHtml = chip('✚', 'Bandagens [4]', inv.bandagem) + chip('♥', 'Kits médicos [5]', inv.kit) +
       chip('•', 'Munição', inv.municao) + chip('▮', 'Cartuchos', inv.cartucho || 0) +
+      chip('🥜', `Barra de proteína [${keyOf('food1')}] — +25% de dano por 4 min`, inv.barra_proteina || 0) +
+      chip('🥤', `Energético [${keyOf('food2')}] — estamina gasta pela metade por 4 min`, inv.energetico || 0) +
+      chip('🍫', `Chocolate [${keyOf('food3')}] — regenera vida por 4 min`, inv.chocolate || 0) +
       chip('⊛', 'Canhão improvisado (instale a bordo)', inv.canhao || 0) +
       chip('⚓', 'Torreta-gancho (instale a bordo)', inv.gancho || 0);
     if (invHtml !== this._inv) { $('inv').innerHTML = invHtml; this._inv = invHtml; }
+    // buffs ativos com o tempo que falta
+    const bf = G.survival.buffs, buffHtml = Object.keys(bf).map((k) => {
+      const t = Math.ceil(bf[k]), b = BUFFS[k];
+      return `<span class="buff${t <= 20 ? ' low' : ''}" title="${b.nome}: ${b.desc}"><i>${b.icon}</i>${Math.floor(t / 60)}:${String(t % 60).padStart(2, '0')}</span>`;
+    }).join('');
+    if (buffHtml !== this._buffs) { $('buffs').innerHTML = buffHtml; this._buffs = buffHtml; }
     // Arma equipada
     const weaponHtml = w
       ? `<div class="wname">${w.nome}</div><div class="stars">${'★'.repeat(w.stars)}${'☆'.repeat(5 - w.stars)}</div>` +

@@ -98,6 +98,22 @@ export class Player {
     this.weaponMesh.scale.setScalar(1.5 / PILL_SCALE); // arma "de desenho": um pouco maior
   }
 
+  // Escada de mão soldada na jangada perto de p (encostado nela, de frente)? → { top, fx, fz } (mundo)
+  ladderAt(p) {
+    const boat = this.G.boat; if (!boat) return null;
+    const [bx, bz] = boat.toLocal(p.x, p.z), by = p.y - boat.set.y;
+    for (const piece of boat.pieces.values()) {
+      const def = piece.physObj && piece.physObj.def; if (!def || !def.ladder || !piece.col) continue;
+      const c = piece.col, [lx, lz] = rot(bx - c.x, bz - c.z, -(c.yaw || 0));
+      if (Math.abs(lx) > c.hx + 0.15 || Math.abs(lz) > c.hz + 0.55) continue;
+      if (by < c.y - c.hy - 0.3 || by > c.y + c.hy + 0.1) continue;
+      // direção "para dentro" da escada (do lado em que o jogador está para o outro lado), no mundo
+      const s = lz > 0 ? -1 : 1, [dx, dz] = rot(0, s, (c.yaw || 0) + boat.yaw);
+      return { top: boat.set.y + c.y + c.hy, fx: dx, fz: dz };
+    }
+    return null;
+  }
+
   // Tiro em 3ª pessoa: tranco nos braços, clarão na boca do cano e pose de mira por um instante.
   onShot() { this.aimHold = 0.8; this.kick = 1; this.flashT = 0.06; }
   // ganchos de animação em 3ª pessoa
@@ -164,7 +180,17 @@ export class Player {
 
     const prevY = p.y;
     const wh = waveHeight(p.x, p.z, t);
-    if (this.swimming) { b.vel.y = 0; p.y += (wh - 1.15 - p.y) * Math.min(1, 6 * dt); }
+    // escada de mão soldada na jangada: frente sobe, trás desce, solta = fica parado agarrado
+    const lad = !this.swimming && !this.downed && !this.mantle ? this.ladderAt(p) : null;
+    this.onLadder = !!lad;
+    if (lad) {
+      const climb = (inp.held('forward') ? 1 : 0) - (inp.held('back') ? 1 : 0);
+      b.vel.y = climb * 2.6; p.y += b.vel.y * dt;
+      if (p.y > lad.top - 0.05 && climb > 0) { // chegou ao topo: passa por cima da escada
+        p.y = lad.top + 0.05; b.vel.x += lad.fx * 2.5; b.vel.z += lad.fz * 2.5;
+      }
+      if (inp.act('jump')) { b.vel.y = 3; b.vel.x -= lad.fx * 3; b.vel.z -= lad.fz * 3; } // pula para trás
+    } else if (this.swimming) { b.vel.y = 0; p.y += (wh - 1.15 - p.y) * Math.min(1, 6 * dt); }
     else { b.vel.y = Math.max(b.vel.y - CFG.gravity * dt, -20); p.y += b.vel.y * dt; }
     p.x += b.vel.x * dt; p.z += b.vel.z * dt;
     if (this.drift && !this.mantle) { const f = 1 - (this.bracing || 0); p.x += this.drift.x * dt * f; p.z += this.drift.z * dt * f; } // vento/giro do furacão
@@ -262,6 +288,9 @@ export class Player {
     if (this.mantle) {
       pose = this.mantle.vault ? 'vault' : 'climb';
       progress = this.mantle.t;
+    } else if (this.onLadder) { // subindo a escada: alterna os braços (puxa / estica)
+      this.ladderPh = (this.ladderPh || 0) + Math.abs(b.vel.y) * dt * 1.6;
+      pose = 'climb'; progress = 0.12 + 0.3 * (0.5 + 0.5 * Math.sin(this.ladderPh * Math.PI));
     } else if (G.combat.swing > 0) {
       pose = 'attack';
       progress = 1 - G.combat.swing / G.combat.swingDuration;

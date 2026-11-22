@@ -72,8 +72,8 @@ function canReachMast(room, ws) {
 }
 
 function validCrateId(id, seed, message) {
-  const match = typeof id === 'string' && /^[ib](-?\d+),(-?\d+)c(\d+)$/.exec(id);
-  if (!match || Number(match[3]) > 2 || !isGeneratedCrate(seed, id)) return false;
+  const match = typeof id === 'string' && /^[ibs](-?\d+),(-?\d+)c(\d+)$/.exec(id);
+  if (!match || Number(match[3]) > 6 || !isGeneratedCrate(seed, id)) return false;
   const cx = Number(match[1]), cz = Number(match[2]);
   return Number.isFinite(message.x) && Number.isFinite(message.z) &&
     Math.abs(message.x - cx * WORLD_LOOT_PARAMS.chunkSize) <= 32 &&
@@ -203,7 +203,7 @@ function handle(ws, m) {
       const crate = room.crates.get(m.id);
       if (!validCrateId(m.id, room.seed, m) || !ws.openedCrates.has(m.id) || !crate ||
           !canReachCrate(room, ws, m) || typeof m.item !== 'string' ||
-          !/^(madeira|metal|pano|bandagem|kit|municao|cartucho|canhao|bala_canhao|arma_[a-z0-9_]+)$/.test(m.item)) {
+          !/^(metal|bandagem|kit|municao|cartucho|canhao|gancho|bala_canhao|barra_proteina|energetico|chocolate|arma_[a-z0-9_]+)$/.test(m.item)) {
         send(ws, { t: 'crate:error', id: m.id });
         break;
       }

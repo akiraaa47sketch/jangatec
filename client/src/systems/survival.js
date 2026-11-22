@@ -4,21 +4,33 @@ import { WEAPONS } from './combat.js';
 import { sfx } from '../core/sfx.js';
 
 export const ITEM_NAMES = {
-  madeira: 'Madeira', metal: 'Metal', pano: 'Pano', bandagem: 'Bandagem',
+  metal: 'Metal', bandagem: 'Bandagem', barra_proteina: 'Barra de proteína', energetico: 'Energético', chocolate: 'Chocolate',
   kit: 'Kit médico', municao: 'Munição', cartucho: 'Cartuchos',
   canhao: 'Canhão improvisado', gancho: 'Torreta-gancho', bala_canhao: 'Balas de canhão',
 };
+// Comidas: buffs temporários (4 min). Comer de novo renova o tempo.
+export const BUFFS = {
+  forca:   { nome: 'Força', icon: '💪', food: 'barra_proteina', dur: 240, desc: '+25% de dano' },
+  energia: { nome: 'Energia', icon: '⚡', food: 'energetico', dur: 240, desc: 'gasta metade da estamina' },
+  regen:   { nome: 'Regeneração', icon: '🍫', food: 'chocolate', dur: 240, desc: 'recupera vida aos poucos' },
+};
+const eat = (s, buff, msg) => { s.buffs[buff] = BUFFS[buff].dur; sfx.pickup(); return msg; };
 const USE = {
   bandagem: (s) => { s.vida = clamp(s.vida + 30, 0, 100); return 'Bandagem aplicada'; },
   kit:      (s) => { s.vida = 100; return 'Kit médico usado'; },
+  barra_proteina: (s) => eat(s, 'forca', 'Barra de proteína: +25% de dano por 4 min'),
+  energetico: (s) => eat(s, 'energia', 'Energético: estamina gasta pela metade por 4 min'),
+  chocolate: (s) => eat(s, 'regen', 'Chocolate: vida regenerando por 4 min'),
 };
+const FOODS = ['barra_proteina', 'energetico', 'chocolate'];
 
 export class Survival {
   static BLEED = 45; // segundos caído até morrer sem ajuda
   constructor(G) {
     this.G = G;
     this.vida = 100;
-    this.inv = { madeira: 0, metal: 0, pano: 0, bandagem: 0, kit: 0, municao: 0, cartucho: 0, canhao: 0, gancho: 0, bala_canhao: 0 };
+    this.inv = { metal: 0, bandagem: 0, kit: 0, municao: 0, cartucho: 0, canhao: 0, gancho: 0, bala_canhao: 0, barra_proteina: 0, energetico: 0, chocolate: 0 };
+    this.buffs = {}; // nome → segundos restantes
     this.deadTimer = 0;
   }
   add(loot) {
@@ -26,6 +38,7 @@ export class Survival {
     if (Object.keys(loot).length) sfx.pickup();
     if (loot.arma_gancho) { loot = { ...loot, gancho: (loot.gancho || 0) + loot.arma_gancho }; delete loot.arma_gancho; } // o gancho virou torreta
     for (const k in loot) {
+      if (k === 'madeira' || k === 'pano') continue; // não existem mais (saves/caixotes antigos)
       if (k.startsWith('arma_')) {
         const id = k.slice(5);
         const result = this.G.combat.unlockWeapon(id);
@@ -45,7 +58,7 @@ export class Survival {
     if (this.G.player.downed) { this.G.hud.msg('Caído você não consegue se curar — espere um aliado'); return; }
     this.inv[item]--;
     if (this.G.viewmodel) this.G.viewmodel.onUse(item);
-    this.G.player.onUse(item);
+    if (!FOODS.includes(item)) this.G.player.onUse(item);
     this.G.hud.msg(USE[item](this));
     this.G.hud.flash('heal');
   }
@@ -78,8 +91,13 @@ export class Survival {
     this.G.hud.msg(`${by || 'Um aliado'} te reanimou!`);
     this.G.hud.flash('heal');
   }
+  // multiplicadores dos buffs (usados no combate)
+  get dmgMul() { return this.buffs.forca > 0 ? 1.25 : 1; }
+  get staminaMul() { return this.buffs.energia > 0 ? 0.5 : 1; }
   update(dt) {
     const pl = this.G.player;
+    for (const k in this.buffs) { this.buffs[k] -= dt; if (this.buffs[k] <= 0) { delete this.buffs[k]; this.G.hud.msg(`${BUFFS[k].nome} acabou`); } }
+    if (this.buffs.regen > 0 && !pl.dead && !pl.downed && this.vida < 100) this.vida = Math.min(100, this.vida + 0.4 * dt); // ~96 de vida em 4 min
     if (pl.downed) {
       this.bleed -= dt;
       // ninguém sobrou de pé para ajudar (ou o tempo acabou): morre e volta ao barco

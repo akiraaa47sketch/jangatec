@@ -31,7 +31,7 @@ export const NAVAL = {
   maxDuration: 330,           // depois disso os navios restantes fogem
 };
 export const HOOK_TURRET = { speed: 34, range: 34 };
-export const PIECE_HP = { piso: 240, plataforma: 240, tabua: 70, bloco: 130, rampa: 110, escada: 100, parede: 120, suporte: 60, chapa: 230, canhao: 160, gancho: 140 };
+export const PIECE_HP = { piso: 240, plataforma: 240, tabua: 70, bloco: 130, rampa: 110, escada: 100, parede: 120, suporte: 60, chapa: 230, canhao: 160, gancho: 140, parede_plastico: 35, parede_ferro: 330 };
 const between = ([a, b]) => a + Math.random() * (b - a);
 const CHAR = new THREE.Color(0x2a1d14);
 const _v = new THREE.Vector3(), _w = new THREE.Vector3(), _q = new THREE.Quaternion();
@@ -111,7 +111,8 @@ export class Naval {
     if (piece.type === 'canhao') return PIECE_HP.canhao;
     const size = piece.physSize || (PIECES[piece.type] && PIECES[piece.type].size) || [1, 1, 1];
     const base = PIECE_HP[piece.type] || 90;
-    return Math.round(base * clamp(Math.sqrt(size[0] * size[2]) / 1.6, 0.6, 1.6)); // peça maior aguenta mais
+    const wall = String(piece.type).startsWith('parede') || piece.type === 'escada'; // paredes: conta a face (largura × altura)
+    return Math.round(base * clamp(Math.sqrt(size[0] * (wall ? size[1] : size[2])) / 1.6, 0.6, 1.6)); // peça maior aguenta mais
   }
   hpOf(piece) { return this.pieceHp.has(piece.id) ? this.pieceHp.get(piece.id) : this.maxHp(piece); }
   destructible(piece) { return !(piece.indestructible || piece.id === 'starter-platform' || piece.id === 'mastro' || piece.type === 'mastro'); }
@@ -593,7 +594,7 @@ export class Naval {
       const a = Math.random() * 6.28, d = 3 + Math.random() * 5;
       const loot = i === 0
         ? { metal: 2 + ((Math.random() * 3) | 0), municao: 8 + diff * 2, bandagem: 1 }
-        : Math.random() < 0.5 ? { madeira: 3 + ((Math.random() * 3) | 0), pano: 2, cartucho: 4 } : { kit: 1, municao: 6, metal: 2 };
+        : Math.random() < 0.5 ? { cartucho: 4, barra_proteina: 1, chocolate: 1 } : { kit: 1, municao: 6, energetico: 1 };
       this._spawnCrate({ id: `crate-${s.id}-${i}`, x: s.x + Math.cos(a) * d, z: s.z + Math.sin(a) * d, vx: Math.cos(a) * 1.5, vz: Math.sin(a) * 1.5, loot });
     }
     this._sendCrates();

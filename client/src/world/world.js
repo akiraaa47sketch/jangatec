@@ -4,7 +4,7 @@
 import * as THREE from '../three.js';
 import { mulberry32, hash2, rot } from '../core/util.js';
 import { CFG } from '../config.js';
-import { LOOT_CONFIG, generateCrateLoot, wreckFor } from '../systems/loot.js';
+import { LOOT_CONFIG, generateCrateLoot, wreckFor, seabedCratesFor } from '../systems/loot.js';
 import { seabedHeight, makeSeabedChunk, makeFarSeabed } from './seabed.js';
 import { bakeStatic } from '../core/bake.js';
 import { buildCamp } from './camp.js';
@@ -46,35 +46,60 @@ function inStarterBuildClearance(x, z, padding = 0) {
 // sinks: pesado demais para boiar — fica no fundo do mar (aparece quando o mar seca).
 // size: [w, h, l] — usado para colisor quando soldado.
 // pieceType: o tipo de peça mais próximo (para fallback de colisão).
+// Peças de construção reais (tamanho final, sem a escala 1,4 dos destroços antigos): paredes de
+// madeira, de plástico (finas e frágeis) e de ferro (afundam — aparecem na seca), chão, rampa,
+// escada de mão, vigas, guarda-corpo e flutuadores. hp = resistência a balas de canhão.
+const _pm = new Map();
+const plankMat = (c) => _pm.get(c) || _pm.set(c, M(c, { map: repeated(woodTexture(), 0.7, 0.7), bumpMap: repeated(woodBump(), 0.7, 0.7), bumpScale: 1.3 })).get(c);
+let _iron = null;
+const ironMat = () => _iron || (_iron = M(0x7d858b, { map: metalTexture(), metalness: 0.65, roughness: 0.45 }));
+function plankWall(w, h, d, color, r) { // tábuas verticais com duas travessas atrás
+  const g = new THREE.Group(), n = Math.max(2, Math.round(w / 0.25)), pw = w / n;
+  for (let i = 0; i < n; i++) { const b = box(pw - 0.012, h - (r() < 0.25 ? 0.04 : 0), d * 0.7, plankMat(WOOD[(i + ((r() * 4) | 0)) % 4] ?? color)); b.position.x = -w / 2 + pw * (i + 0.5); g.add(b); }
+  for (const y of [-h * 0.3, h * 0.3]) { const t = box(w, 0.12, d * 0.3, plankMat(WOOD[3])); t.position.set(0, y, -d * 0.35); g.add(t); }
+  return g;
+}
+function plankFloor(w, l, r) {
+  const g = new THREE.Group(), n = Math.max(2, Math.round(w / 0.25)), pw = w / n;
+  for (let i = 0; i < n; i++) { const b = box(pw - 0.012, 0.08, l, plankMat(WOOD[(i + ((r() * 4) | 0)) % 4])); b.position.set(-w / 2 + pw * (i + 0.5), 0.035, 0); g.add(b); }
+  for (const z of [-l * 0.38, 0, l * 0.38]) { const t = box(w, 0.07, 0.14, plankMat(WOOD[3])); t.position.set(0, -0.04, z); g.add(t); }
+  return g;
+}
 export const DEBRIS = [
-  { nome: 'Tábua',           w: 5, size: [0.4, 0.1, 1.8],  pieceType: 'tabua',      make: (r) => box(0.4, 0.08, 1.6 + r() * 1.2, M(WOOD[(r() * 4) | 0])), loot: () => ({ madeira: 1 }) },
-  { nome: 'Pedaço de madeira',w:4, size: [0.6, 0.15, 1.0], pieceType: 'tabua',      make: (r) => { const g = new THREE.Group(); const a = box(0.3, 0.12, 0.9, M(WOOD[1])); const b = box(0.25, 0.1, 0.6, M(WOOD[3])); b.position.set(0.2, 0.05, 0.3); b.rotation.y = 0.7; g.add(a, b); return g; }, loot: () => ({ madeira: 1 }) },
-  { nome: 'Viga',             w: 3, size: [0.3, 0.3, 2.8],  pieceType: 'tabua',      make: (r) => box(0.25, 0.25, 2.6 + r(), M(WOOD[3])), loot: () => ({ madeira: 2 }) },
-  { nome: 'Placa metálica',   w: 3, sinks: true, size: [1.4, 0.1, 1.2],  pieceType: 'chapa',      make: (r) => { const m = box(1.2 + r() * 0.6, 0.05, 1 + r() * 0.5, M(0x8f979c, { metalness: 0.6, roughness: 0.5 })); m.rotation.z = 0.08; return m; }, loot: () => ({ metal: 2 }) },
-  { nome: 'Calha',            w: 2, sinks: true, size: [2.4, 0.4, 0.4],  pieceType: 'tabua',      make: () => { const m = new THREE.Mesh(new THREE.CylinderGeometry(0.2, 0.2, 2.4, 8, 1, true, 0, Math.PI), M(0x7b858b, { metalness: 0.5, side: THREE.DoubleSide })); m.rotation.z = Math.PI / 2; m.rotation.y = Math.PI / 2; return m; }, loot: () => ({ metal: 1 }) },
-  { nome: 'Pedaço triangular',w: 2, size: [1.8, 0.1, 1.8],  pieceType: 'piso',       make: () => { const m = new THREE.Mesh(new THREE.CylinderGeometry(0.9, 0.9, 0.1, 3), M(WOOD[0])); return m; }, loot: () => ({ madeira: 2 }) },
-  { nome: 'Porta',            w: 2, size: [0.9, 2.0, 0.1],  pieceType: 'parede',     make: () => { const g = new THREE.Group(); g.add(box(0.9, 0.08, 2, M(0x6e4b2a))); const k = box(0.08, 0.1, 0.08, M(0xd4b24a, { metalness: 0.8 })); k.position.set(0.32, 0.08, 0); g.add(k); return g; }, loot: () => ({ madeira: 3 }) },
-  { nome: 'Escada quebrada',  w: 1, size: [0.6, 2.2, 0.1],  pieceType: 'escada',     make: () => { const g = new THREE.Group(); const m = M(WOOD[2]); const a = box(0.08, 0.08, 2.2, m), b = box(0.08, 0.08, 2.2, m); a.position.x = -0.25; b.position.x = 0.25; g.add(a, b); for (let i = -2; i <= 2; i++) { const s = box(0.5, 0.06, 0.08, m); s.position.z = i * 0.45; g.add(s); } return g; }, loot: () => ({ madeira: 2 }) },
-  { nome: 'Pedaço de telhado',w: 2, size: [2.6, 0.1, 1.8],  pieceType: 'piso',       make: () => { const g = new THREE.Group(); const m = M(0xa3432f); const a = box(1.3, 0.08, 1.8, m), b = box(1.3, 0.08, 1.8, m); a.rotation.z = 0.5; a.position.x = -0.55; b.rotation.z = -0.5; b.position.x = 0.55; g.add(a, b); g.position.y = 0.2; const w = new THREE.Group(); w.add(g); return w; }, loot: () => ({ madeira: 3, metal: 1 }) },
-  { nome: 'Pedaço de casa',   w: 2, sinks: true, size: [2.2, 0.15, 1.6], pieceType: 'piso',       make: () => { const g = new THREE.Group(); const m = M(0xc9b89a); const a = box(2.2, 0.15, 0.6, m), b = box(0.6, 0.15, 1.4, m), c = box(0.6, 0.15, 1.4, m); a.position.z = -0.7; b.position.set(-0.8, 0, 0.3); c.position.set(0.8, 0, 0.3); g.add(a, b, c); return g; }, loot: () => ({ madeira: 5 }) },
-  { nome: 'Parte de barco',   w: 1, size: [1.3, 0.6, 2.2],  pieceType: 'bloco',      make: () => { const m = new THREE.Mesh(new THREE.SphereGeometry(1.1, 10, 6, 0, Math.PI, 0, Math.PI / 2), M(0x4f6b7a, { side: THREE.DoubleSide })); m.scale.set(0.6, 0.5, 1.3); m.rotation.x = Math.PI; m.position.y = 0.3; const g = new THREE.Group(); g.add(m); return g; }, loot: () => ({ madeira: 4, pano: 1 }) },
-  { nome: 'Sucata',           w: 3, sinks: true, size: [0.8, 0.5, 0.8],  pieceType: 'chapa',      make: (r) => { const g = new THREE.Group(); for (let i = 0; i < 4; i++) { const s = box(0.2 + r() * 0.5, 0.1 + r() * 0.3, 0.2 + r() * 0.5, M(0x6d7479, { metalness: 0.7, roughness: 0.4 })); s.position.set(r() - 0.5, r() * 0.2, r() - 0.5); s.rotation.set(r(), r(), r()); g.add(s); } return g; }, loot: () => ({ metal: 3 }) },
-  { nome: 'Barril',           w: 2, size: [1.0, 0.8, 1.0],  pieceType: 'bloco',      make: () => { const m = new THREE.Mesh(new THREE.CylinderGeometry(0.4, 0.4, 1, 10), M(0x7a4f2a)); m.rotation.z = Math.PI / 2; return m; }, loot: () => ({ madeira: 1 }) },
-  { nome: 'Caixote',          w: 3, size: [0.8, 0.8, 0.8],  pieceType: 'bloco',      make: () => { const m = box(0.8, 0.8, 0.8, M(0xb5894e)); m.rotation.set(0.2, 0.4, 0.1); return m; }, loot: (r) => [{ municao: 8 }, { bandagem: 1 }, { municao: 5 }][(r() * 3) | 0] },
-  { nome: 'Lona',             w: 1, size: [1.4, 0.05, 1.0], pieceType: 'piso',       make: () => box(1.4, 0.03, 1, M(0xdcd3bd)), loot: () => ({ pano: 2 }) },
-  // --- mais variedade para montar a jangada ---
-  { nome: 'Palete',           w: 3, size: [1.2, 0.16, 1.0], pieceType: 'piso',       make: (r) => { const g = new THREE.Group(), m = M(WOOD[(r() * 4) | 0]); for (let i = -2; i <= 2; i++) { const s = box(1.2, 0.03, 0.15, m); s.position.set(0, 0.065, i * 0.21); g.add(s); } for (const x of [-0.5, 0, 0.5]) { const run = box(0.1, 0.1, 1.0, M(WOOD[3])); run.position.set(x, -0.03, 0); g.add(run); } return g; }, loot: () => ({ madeira: 2 }) },
-  { nome: 'Guarda-corpo',     w: 2, size: [2.0, 0.9, 0.1],  pieceType: 'parede',     make: () => { const g = new THREE.Group(), m = M(WOOD[2]); for (const x of [-0.95, 0, 0.95]) { const p = box(0.08, 0.9, 0.08, m); p.position.x = x; g.add(p); } for (const y of [0.4, 0]) { const rl = box(2.0, 0.06, 0.06, m); rl.position.y = y; g.add(rl); } return g; }, loot: () => ({ madeira: 2 }) },
-  { nome: 'Cerca',            w: 2, size: [1.8, 1.0, 0.1],  pieceType: 'parede',     make: (r) => { const g = new THREE.Group(), m = M(0xd9cbb0); for (let i = 0; i < 7; i++) { const h = 0.85 + r() * 0.15; const p = box(0.16, h, 0.04, m); p.position.set(-0.78 + i * 0.26, (h - 1) / 2, 0); g.add(p); } for (const y of [0.25, -0.25]) { const rl = box(1.8, 0.07, 0.05, M(WOOD[1])); rl.position.set(0, y, -0.045); g.add(rl); } return g; }, loot: () => ({ madeira: 2 }) },
-  { nome: 'Escotilha',        w: 2, size: [1.0, 0.12, 1.0], pieceType: 'piso',       make: () => { const g = new THREE.Group(); g.add(box(1.0, 0.08, 1.0, M(0x5d4129))); for (const [x, z, w, l] of [[0, 0.46, 1.0, 0.08], [0, -0.46, 1.0, 0.08], [0.46, 0, 0.08, 1.0], [-0.46, 0, 0.08, 1.0]]) { const f = box(w, 0.12, l, M(0x3e2b1a)); f.position.set(x, 0.01, z); g.add(f); } const h = new THREE.Mesh(new THREE.TorusGeometry(0.1, 0.02, 6, 14), M(0x9aa0a4, { metalness: 0.8, roughness: 0.4 })); h.rotation.x = Math.PI / 2; h.position.y = 0.06; g.add(h); return g; }, loot: () => ({ madeira: 2, metal: 1 }) },
-  { nome: 'Tambor de metal',  w: 2, sinks: true, size: [0.7, 1.0, 0.7], pieceType: 'bloco', make: (r) => { const g = new THREE.Group(), c = [0x2f5fa0, 0xb03a2e, 0x3e7a44][(r() * 3) | 0]; g.add(new THREE.Mesh(new THREE.CylinderGeometry(0.33, 0.33, 1.0, 16), M(c, { metalness: 0.5, roughness: 0.45 }))); for (const y of [-0.3, 0.3]) { const rb = new THREE.Mesh(new THREE.TorusGeometry(0.335, 0.02, 4, 18), M(0x5b6166, { metalness: 0.7 })); rb.rotation.x = Math.PI / 2; rb.position.y = y; g.add(rb); } return g; }, loot: () => ({ metal: 3 }) },
-  { nome: 'Boia',             w: 2, size: [0.8, 0.8, 0.8],  pieceType: 'bloco',      make: () => { const g = new THREE.Group(); const b = new THREE.Mesh(new THREE.SphereGeometry(0.4, 14, 10), M(0xf07a1e, { roughness: 0.6 })); g.add(b); const band = new THREE.Mesh(new THREE.TorusGeometry(0.4, 0.035, 6, 20), M(0xf3efe6)); band.rotation.x = Math.PI / 2; g.add(band); return g; }, loot: () => ({ pano: 1 }) },
-  { nome: 'Telha ondulada',   w: 2, sinks: true, size: [1.8, 0.1, 1.0], pieceType: 'chapa', make: () => { const geo = new THREE.PlaneGeometry(1.8, 1.0, 36, 1); geo.rotateX(-Math.PI / 2); const pa = geo.attributes.position; for (let i = 0; i < pa.count; i++) pa.setY(i, Math.sin(pa.getX(i) * 17) * 0.035); geo.computeVertexNormals(); return new THREE.Mesh(geo, M(0x9aa3a8, { metalness: 0.55, roughness: 0.5, side: THREE.DoubleSide })); }, loot: () => ({ metal: 2 }) },
-  { nome: 'Poste',            w: 2, size: [0.24, 0.24, 3.2], pieceType: 'tabua',      make: () => { const m = new THREE.Mesh(new THREE.CylinderGeometry(0.11, 0.13, 3.2, 9), M(WOOD[3])); m.rotation.x = Math.PI / 2; return m; }, loot: () => ({ madeira: 2 }) },
-  { nome: 'Remo',             w: 1, size: [0.26, 0.06, 2.0], pieceType: 'tabua',      make: () => { const g = new THREE.Group(), m = M(WOOD[0]); const sh = new THREE.Mesh(new THREE.CylinderGeometry(0.035, 0.035, 1.4, 6), m); sh.rotation.x = Math.PI / 2; sh.position.z = -0.3; const bl = box(0.26, 0.03, 0.6, m); bl.position.z = 0.7; g.add(sh, bl); return g; }, loot: () => ({ madeira: 1 }) },
-  { nome: 'Caixa térmica',    w: 1, size: [0.9, 0.55, 0.55], pieceType: 'bloco',     make: () => { const g = new THREE.Group(); const b = box(0.9, 0.45, 0.55, M(0xeeeeea, { roughness: 0.6 })); b.position.y = -0.05; const l = box(0.92, 0.1, 0.57, M(0x2f6fb0, { roughness: 0.6 })); l.position.y = 0.22; g.add(b, l); return g; }, loot: (r) => (r() < 0.5 ? { bandagem: 1 } : { pano: 1 }) },
-  { nome: 'Pneu',             w: 1, size: [0.9, 0.3, 0.9],  pieceType: 'bloco',      make: () => { const m = new THREE.Mesh(new THREE.TorusGeometry(0.33, 0.13, 8, 18), M(0x232425, { roughness: 0.95 })); m.rotation.x = Math.PI / 2; return m; }, loot: () => ({ pano: 1 }) },
-  { nome: 'Tampa de mesa',    w: 2, size: [1.6, 0.08, 0.9], pieceType: 'piso',       make: (r) => box(1.6, 0.06, 0.9, M(WOOD[(r() * 4) | 0])), loot: () => ({ madeira: 2 }) },
+  { nome: 'Parede de madeira', w: 6, real: true, pieceType: 'parede', size: [2, 2, 0.14], make: (r) => plankWall(2, 2, 0.14, WOOD[0], r) },
+  { nome: 'Meia parede de madeira', w: 3, real: true, pieceType: 'parede', size: [2, 1, 0.14], make: (r) => plankWall(2, 1, 0.14, WOOD[1], r) },
+  { nome: 'Parede de plástico', w: 4, real: true, pieceType: 'parede_plastico', size: [1, 2, 0.06], make: (r) => {
+    const g = new THREE.Group(), c = [0x3c8fd6, 0xe8e6df, 0x3ca35a, 0xe2a23a][(r() * 4) | 0];
+    const panel = box(1, 2, 0.04, new THREE.MeshPhysicalMaterial({ color: c, roughness: 0.35, clearcoat: 0.4, transparent: true, opacity: 0.92 })); g.add(panel);
+    for (let i = -3; i <= 3; i++) { const rib = box(0.04, 2, 0.06, new THREE.MeshPhysicalMaterial({ color: c, roughness: 0.4 })); rib.position.x = i * 0.14; g.add(rib); } // nervuras
+    return g; } },
+  { nome: 'Parede de ferro', w: 2, real: true, sinks: true, pieceType: 'parede_ferro', size: [2, 2, 0.08], make: () => {
+    const g = new THREE.Group(); g.add(box(2, 2, 0.06, ironMat()));
+    for (const [x, y, w, h] of [[0, 0.97, 2, 0.06], [0, -0.97, 2, 0.06], [-0.97, 0, 0.06, 2], [0.97, 0, 0.06, 2], [0, 0, 2, 0.06]]) { const f = box(w, h, 0.08, ironMat()); f.position.set(x, y, 0); g.add(f); }
+    for (const x of [-0.85, 0.85]) for (const y of [-0.85, 0, 0.85]) { const rv = new THREE.Mesh(new THREE.SphereGeometry(0.03, 6, 4), M(0x55595c, { metalness: 0.8 })); rv.position.set(x, y, 0.045); g.add(rv); }
+    return g; } },
+  { nome: 'Chão de madeira', w: 6, real: true, pieceType: 'piso', size: [2, 0.15, 2], make: (r) => plankFloor(2, 2, r) },
+  { nome: 'Chão grande de madeira', w: 2, real: true, pieceType: 'piso', size: [3, 0.15, 3], make: (r) => plankFloor(3, 3, r) },
+  { nome: 'Chão de metal', w: 2, real: true, sinks: true, pieceType: 'chapa', size: [2, 0.08, 2], make: () => {
+    const geo = new THREE.BoxGeometry(2, 0.06, 2); const m = new THREE.Mesh(scaleBoxUVs(geo, 2, 0.06, 2), ironMat());
+    const g = new THREE.Group(); g.add(m); for (let i = -4; i <= 4; i++) { const ridge = box(0.04, 0.02, 1.9, ironMat()); ridge.position.set(i * 0.22, 0.04, 0); g.add(ridge); } return g; } },
+  { nome: 'Rampa de madeira', w: 3, real: true, pieceType: 'rampa', col: 'ramp', size: [1.6, 1, 2.4], make: () => {
+    const g = new THREE.Group(), ang = Math.atan2(1, 2.4), len = Math.hypot(1, 2.4);
+    const deck = new THREE.Group(); deck.rotation.x = -ang; g.add(deck); // sobe para +Z
+    for (let i = 0; i < 6; i++) { const b = box(1.6, 0.06, len / 6 - 0.02, plankMat(WOOD[i % 4])); b.position.z = -len / 2 + (i + 0.5) * len / 6; deck.add(b); }
+    for (const x of [-0.72, 0.72]) { const side = new THREE.Mesh(new THREE.ExtrudeGeometry(new THREE.Shape([new THREE.Vector2(-1.2, -0.5), new THREE.Vector2(1.2, -0.5), new THREE.Vector2(1.2, 0.5)]), { depth: 0.1, bevelEnabled: false }), plankMat(WOOD[3])); side.rotation.y = -Math.PI / 2; side.position.x = x + 0.05; g.add(side); }
+    return g; } },
+  { nome: 'Escada de mão', w: 3, real: true, pieceType: 'escada', ladder: true, size: [0.7, 2.6, 0.12], make: () => {
+    const g = new THREE.Group(), m = plankMat(WOOD[2]);
+    for (const x of [-0.3, 0.3]) { const rail = box(0.08, 2.6, 0.08, m); rail.position.x = x; g.add(rail); }
+    for (let i = 0; i < 8; i++) { const s = box(0.56, 0.06, 0.06, plankMat(WOOD[3])); s.position.y = -1.1 + i * 0.32; g.add(s); }
+    return g; } },
+  { nome: 'Viga', w: 2, real: true, pieceType: 'suporte', size: [0.24, 2.4, 0.24], make: () => box(0.24, 2.4, 0.24, plankMat(WOOD[3])) },
+  { nome: 'Guarda-corpo', w: 2, real: true, pieceType: 'parede', size: [2.0, 0.9, 0.1], make: () => { const g = new THREE.Group(), m = plankMat(WOOD[2]); for (const x of [-0.95, 0, 0.95]) { const p = box(0.08, 0.9, 0.08, m); p.position.x = x; g.add(p); } for (const y of [0.4, 0]) { const rl = box(2.0, 0.06, 0.06, m); rl.position.y = y; g.add(rl); } return g; } },
+  // flutuadores: ajudam a jangada a boiar (embaixo do convés)
+  { nome: 'Barril', w: 2, real: true, pieceType: 'bloco', size: [1.3, 1.3, 1.3], make: () => { const g = new THREE.Group(); const m = new THREE.Mesh(new THREE.CylinderGeometry(0.55, 0.55, 1.3, 14), plankMat(0x7a4f2a)); m.rotation.z = Math.PI / 2; g.add(m); for (const x of [-0.45, 0.45]) { const hoop = new THREE.Mesh(new THREE.TorusGeometry(0.555, 0.03, 4, 18), M(0x4b4f55, { metalness: 0.7 })); hoop.rotation.y = Math.PI / 2; hoop.position.x = x; g.add(hoop); } return g; } },
+  { nome: 'Boia', w: 1, real: true, pieceType: 'bloco', size: [1.1, 1.1, 1.1], make: () => { const g = new THREE.Group(); const b = new THREE.Mesh(new THREE.SphereGeometry(0.55, 16, 12), M(0xf07a1e, { roughness: 0.6 })); g.add(b); const band = new THREE.Mesh(new THREE.TorusGeometry(0.55, 0.045, 6, 20), M(0xf3efe6)); band.rotation.x = Math.PI / 2; g.add(band); return g; } },
+  { nome: 'Palete', w: 2, real: true, pieceType: 'piso', size: [1.6, 0.2, 1.3], make: (r) => { const g = new THREE.Group(), m = plankMat(WOOD[(r() * 4) | 0]); for (let i = -2; i <= 2; i++) { const s = box(1.6, 0.04, 0.2, m); s.position.set(0, 0.08, i * 0.27); g.add(s); } for (const x of [-0.7, 0, 0.7]) { const run = box(0.14, 0.13, 1.3, plankMat(WOOD[3])); run.position.set(x, -0.03, 0); g.add(run); } return g; } },
 ];
 const DEBRIS_W = DEBRIS.reduce((s, d) => s + d.w, 0);
 
@@ -96,6 +121,7 @@ export class World {
   updateFloodLevel(level) {
     // Baús dos naufrágios só abrem fora d'água.
     for (const w of this.wrecks) for (const c of w.crates) c.submerged = level > c.y + 0.3;
+    for (const c of this.crates) if (c.sea) c.submerged = level > c.y + 0.3;
     for (const island of this.islands) {
       for (const layer of island.landLayers) layer.mesh.visible = level < layer.top;
       const tier = island.allItems.filter((item) => item.floodTop == null || item.floodTop > level);
@@ -184,6 +210,7 @@ export class World {
     G.scene.add(ch.seabed);
     const wreck = wreckFor(this.seed, cx, cz);
     if (wreck) ch.wreck = this.makeWreck(ch, wreck);
+    ch.seaCrates = this.makeSeaCrates(cx, cz);
     for (let i = 0; i < n; i++) {
       // Sempre consome o RNG na mesma ordem para manter o determinismo.
       const x = ox + (r() - 0.5) * S, z = oz + (r() - 0.5) * S;
@@ -208,12 +235,12 @@ export class World {
       if (welded && G.boat.pieces.has(welded.id)) return;
       const mesh = def.make(lr);
       if (!mesh.isMesh) bakeStatic(mesh); // peça feita de várias caixinhas vira 1 malha por material
-      mesh.scale.setScalar(1.4);
+      if (!def.real) mesh.scale.setScalar(1.4);
       if (def.sinks && !y) y = this.seabedHeight(x, z) + 0.3; // afundados já começam no fundo
       mesh.position.set(x, y, z); mesh.rotation.y = lr() * 6.28;
       G.scene.add(mesh);
       const tilt = (lr() - 0.5) * 0.25;
-      const loot = def.loot(lr);
+      const loot = def.loot ? def.loot(lr) : {};
       // Objeto físico: pode ser pegado, carregado e soldado
       const obj = { id, def, mesh, x, z, tilt, loot, welded: false, carriedBy: null, placed: false, placedOnWater: false };
       ch.debris.push(obj); this.debris.push(obj); this.physObjects.push(obj);
@@ -540,6 +567,33 @@ export class World {
     });
   }
 
+  // Caixotes de suprimento soltos no fundo do mar (abrem só com o mar seco): curativo, munição, comida.
+  makeSeaCrates(cx, cz) {
+    const G = this.G, S = shared(), out = [];
+    seabedCratesFor(this.seed, cx, cz).forEach((sc, n) => {
+      const id = `s${cx},${cz}c${n}`;
+      if (this.collected.has(id)) return;
+      const gy = this.seabedHeight(sc.x, sc.z);
+      const m = new THREE.Group();
+      const base = box(0.8, 0.46, 0.6, S.crate); base.position.y = 0.23; m.add(base);
+      for (const x of [-0.38, 0.38]) { const band = box(0.05, 0.48, 0.62, S.iron); band.position.set(x, 0.23, 0); m.add(band); }
+      const cross = new THREE.Group(); // cruz vermelha de suprimentos
+      for (const [w, h] of [[0.22, 0.07], [0.07, 0.22]]) { const b = box(w, h, 0.01, M(0xd3202b)); b.position.set(0, 0.25, 0.305); cross.add(b); }
+      m.add(cross);
+      const lid = new THREE.Group(); lid.position.set(0, 0.46, -0.3);
+      const top = box(0.84, 0.1, 0.64, S.crateLid); top.position.set(0, 0.05, 0.3); lid.add(top); m.add(lid);
+      m.scale.setScalar(1.3); m.position.set(sc.x, gy, sc.z); m.rotation.set(0.06, sc.yaw, -0.05); // meio enterrado e torto
+      m.traverse((o) => { if (o.isMesh) { o.castShadow = true; o.receiveShadow = true; } });
+      G.scene.add(m);
+      const saved = this.crateStates.get(id);
+      const c = { id, mesh: m, lid, x: sc.x, z: sc.z, y: gy, diff: this.difficulty(sc.x, sc.z), starter: false, sea: true,
+        opened: !!(saved && saved.opened), openT: saved && saved.opened ? 1 : 0, submerged: !G.startup || G.startup.waterLevel > gy + 0.3 };
+      lid.rotation.x = -1.25 * c.openT;
+      out.push(c); this.crates.push(c);
+    });
+    return out;
+  }
+
   // Naufrágio no fundo do mar: casco tombado e meio enterrado, com 1–2 baús dentro
   // (ids b<cx>,<cz>c<n>, validados pelo servidor) e destroços para montar a jangada em volta.
   makeWreck(ch, w) {
@@ -627,6 +681,7 @@ export class World {
       ch.seabed.traverse((o) => { if (o.isMesh && !o.userData.sharedGeo) o.geometry.dispose(); });
       ch.seabed.children[0].material.dispose();
     }
+    for (const c of ch.seaCrates || []) { G.scene.remove(c.mesh); const i = this.crates.indexOf(c); if (i >= 0) this.crates.splice(i, 1); }
     if (ch.wreck) {
       const w = ch.wreck;
       G.physics.removeStaticSet(w.set); G.colliders.removeSet(w.set); G.scene.remove(w.group);
