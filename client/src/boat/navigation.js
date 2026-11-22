@@ -65,8 +65,9 @@ export class Navigation {
       // Controle total: ângulo da vela vira o barco livremente
       return null; // null = boat.js usa sua própria lógica
     }
-    // Modo linear: o barco quer ir para routeYaw; sailAngle adiciona desvio pequeno
-    const MAX_STEER = 0.18; // ~10°
+    // Modo linear: o barco quer ir para routeYaw (norte); a vela desvia até ~60° para um lado ou
+    // outro (vela no máximo = ±0,6), nunca chegando a 90° — o rumo continua sendo o norte
+    const MAX_STEER = 1.75;
     const target = this.routeYaw + sailAngle * MAX_STEER;
     return target;
   }

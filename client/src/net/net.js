@@ -105,6 +105,7 @@ export class Net {
       case 'yank': if (G.tools) G.tools.receiveYank(m); break;
       case 'rtc': if (G.voice) G.voice.signal(m); break;
       case 'revive': if (m.id === this.id) G.survival.revive(m.by); break;
+      case 'drag': G.world.applyDrag(m); break;
       case 'carry': {
         G.world.applyCarryState(m.id, m.by, m.state);
         break;
@@ -150,6 +151,7 @@ export class Net {
   update(dt) {
     if (!this.online) return;
     const G = this.G, pl = G.player, boat = G.boat, b = pl.body;
+    G.world.updateRemoteDrags(dt);
     this.acc += dt;
     this.physicsAcc += dt;
     if (this.isHost && this.physicsAcc >= 0.1) {

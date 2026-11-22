@@ -287,18 +287,43 @@ export class World {
     this.G.physics.placeObject(obj, state.p, state.q);
   }
 
+  // Outro jogador arrastando uma peça: guarda o alvo; updateRemoteDrags move a malha até ele.
+  applyDrag(m) {
+    if (typeof m.id !== 'string' || !Array.isArray(m.p) || !Array.isArray(m.q) || ![...m.p, ...m.q].every(Number.isFinite)) return;
+    const obj = this.physObjects.find((item) => item.id === m.id);
+    if (!obj || obj.welded) return;
+    if (!obj.carriedBy || obj.carriedBy === this.G.net.id) { // chegou antes do 'carry' (ou perdemos ele)
+      if (this.G.build.held === obj) return;
+      obj.carriedBy = m.from || 'remote'; this.remoteCarries.set(obj.id, obj.carriedBy); this.G.physics.suspendObject(obj);
+    }
+    obj.mesh.visible = true;
+    if (!obj.dragTarget) { obj.mesh.position.fromArray(m.p); obj.mesh.quaternion.fromArray(m.q); }
+    obj.dragTarget = { p: new THREE.Vector3().fromArray(m.p), q: new THREE.Quaternion().fromArray(m.q).normalize(), t: performance.now() };
+  }
+  updateRemoteDrags(dt) {
+    const k = 1 - Math.exp(-14 * dt);
+    for (const id of this.remoteCarries.keys()) {
+      const obj = this.physObjects.find((item) => item.id === id);
+      if (!obj || !obj.dragTarget) continue;
+      if (obj.mesh.parent !== this.G.scene) { obj.mesh.parent && obj.mesh.parent.remove(obj.mesh); this.G.scene.add(obj.mesh); }
+      obj.mesh.position.lerp(obj.dragTarget.p, k); obj.mesh.quaternion.slerp(obj.dragTarget.q, k);
+      obj.x = obj.mesh.position.x; obj.z = obj.mesh.position.z;
+    }
+  }
+
   applyCarryState(id, by, state) {
     const obj = this.physObjects.find((item) => item.id === id);
     if (by) {
       this.placedStates.delete(id);
       this.remoteCarries.set(id, by);
       if (obj) {
-        obj.carriedBy = by; obj.mesh.visible = false;
+        obj.carriedBy = by; obj.mesh.visible = true; // continua visível: a posição chega pelas mensagens 'drag'
         this.G.physics.suspendObject(obj);
       }
       return;
     }
     this.remoteCarries.delete(id);
+    if (obj) obj.dragTarget = null;
     if (state) this.applyPlacedState(id, state);
     else {
       this.placedStates.delete(id);

@@ -222,6 +222,13 @@ function handle(ws, m) {
       broadcast(room, { t: 'crate:state', id: crate.id, loot: crate.loot });
       break;
     }
+    case 'drag': { // peça sendo arrastada: posição/rotação para os outros (não guarda estado)
+      if (typeof m.id !== 'string' || m.id.length > 80 || !Array.isArray(m.p) || m.p.length !== 3 ||
+          !Array.isArray(m.q) || m.q.length !== 4 || ![...m.p, ...m.q].every(Number.isFinite)) break;
+      const now = Date.now(); if (now - (ws.lastDrag || 0) < 40) break; ws.lastDrag = now; // anti-spam
+      broadcast(room, { t: 'drag', id: m.id, p: m.p, q: m.q, from: ws.id }, ws);
+      break;
+    }
     case 'carry': {
       const by = m.by ? ws.id : null;
       const state = !by && placementState(m.id, m.state);

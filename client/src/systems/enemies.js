@@ -8,6 +8,7 @@ import { woodTexture, woodBump, repeated, scaleBoxUVs } from '../world/textures.
 import { CFG } from '../config.js';
 import { makeEnemyPill, animateEnemy } from './evilpills.js';
 import { inRoom } from '../world/camp.js';
+import { SHIP } from '../world/navalmodels.js';
 import { SIEGE } from './siege.js';
 const SIEGE_MORTAR = () => SIEGE.mortar;
 import { sfx } from '../core/sfx.js';
@@ -27,8 +28,8 @@ const FOV_COS = Math.cos(65 * Math.PI / 180); // cone de visão: 130° à frente
 const HEAR = 3.5;                              // perto assim ele percebe mesmo de costas
 // Invasões piratas: raras e anunciadas. Intervalo em segundos depois da partida.
 export const PIRATE_BALANCE = {
-  firstWave: [150, 210],   // primeira invasão
-  interval: [210, 330],    // entre invasões (conta só depois que a anterior acabou)
+  firstWave: [110, 160],   // primeira invasão
+  interval: [140, 230],    // entre invasões (conta só depois que a anterior acabou)
   spawnDistance: 42,       // as balsas aparecem longe o bastante para serem vistas
 };
 const between = ([a, b]) => a + Math.random() * (b - a);
@@ -149,6 +150,12 @@ export class Enemies {
       return;
     }
     const wave = this.pirateWave++;
+    // a partir da 2ª invasão, metade das vezes é um navio de abordagem (quem decide é o host)
+    if (wave >= 1 && Math.random() < 0.5 && G.naval && G.naval._isHost()) {
+      G.naval.startBoarding();
+      this.pirateSpawnTimer = between(PIRATE_BALANCE.interval);
+      return;
+    }
     const count = wave === 0 ? 1 : wave < 3 ? 2 : 2 + (Math.random() < 0.4 ? 1 : 0);
     const forwardX = Math.sin(G.boat.yaw), forwardZ = Math.cos(G.boat.yaw);
     const sideX = forwardZ, sideZ = -forwardX;
@@ -164,6 +171,23 @@ export class Enemies {
     G.hud.msg(count === 1 ? 'Uma balsa pirata se aproxima!' : `${count} balsas piratas se aproximam — prepare-se para o gancho!`);
     if (G.hud.banner) G.hud.banner('☠ PIRATAS', 'Balsas a ' + (flank > 0 ? 'bombordo' : 'estibordo') + ' — defenda a jangada!', 'pirate', 5);
     this.pirateSpawnTimer = between(PIRATE_BALANCE.interval);
+  }
+
+  // Tripulação do navio de abordagem: espera no convés do navio e pula de corda, um por vez.
+  spawnBoarders(s) {
+    const n = 3 + Math.min(3, Math.floor(s.diff / 1.5));
+    for (let i = 0; i < n; i++) {
+      const id = `${s.id}-b${i}`;
+      if (this.G.world.collected.has(id)) continue;
+      const e = this.spawn(id, 'pirata', null, s.x, s.z);
+      e.pirate = true; e.ship = s; e.state = 'onShip'; e.boardDelay = 0.4 + i * 0.75; e.deckZ = -5 + i * (10 / Math.max(1, n - 1));
+      this._placeOnShip(e);
+    }
+  }
+  _placeOnShip(e) {
+    const s = e.ship, [ox, oz] = rot(0, e.deckZ, s.yaw);
+    e.body.pos.set(s.x + ox, s.y + SHIP.deck + 0.1, s.z + oz);
+    e.mesh.position.copy(e.body.pos);
   }
 
   spawnPirate(id, x, z) {
@@ -433,6 +457,18 @@ export class Enemies {
     const G = this.G, boat = G.boat, b = e.body, p = b.pos, pp = G.player.body.pos;
     if (e.state === 'dead') { this._animateDeath(e, dt); return; }
     e.cd -= dt;
+    if (e.state === 'onShip') { // no navio esperando a vez de pular
+      if (!e.ship || e.ship.sinkT > 0) { this.damage(e, 9999); return; }
+      this._placeOnShip(e);
+      e.yaw = lerpAngle(e.yaw, Math.atan2(boat.x - p.x, boat.z - p.z), Math.min(1, 6 * dt));
+      e.mesh.rotation.y = e.yaw;
+      animateEnemy(e.mesh, 0, dt, 'walk', 0);
+      if ((e.boardDelay -= dt) <= 0) {
+        this._startPirateGrapple(e);
+        e.grapple.duration = Math.max(0.72, e.grapple.from.distanceTo(new THREE.Vector3(boat.x, boat.set.y, boat.z)) / 11);
+      }
+      return;
+    }
     if (e.state === 'approach') {
       const dx = boat.x - p.x, dz = boat.z - p.z, centerDistance = Math.hypot(dx, dz) || 1;
       const landing = this._findPirateLanding(p, boat);

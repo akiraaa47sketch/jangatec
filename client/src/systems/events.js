@@ -16,8 +16,8 @@ import { sea, eventHeight } from '../world/ocean.js';
 import { sfx, ambience } from '../core/sfx.js';
 
 export const EVENT_BALANCE = {
-  first: [300, 480],         // s depois da partida até o primeiro evento
-  interval: [420, 780],      // s entre o fim de um evento e o próximo (raros de propósito)
+  first: [200, 320],         // s depois da partida até o primeiro evento
+  interval: [260, 460],      // s entre o fim de um evento e o próximo
   tsunami: { speed: [13, 18], startDist: 235, A: [3.6, 5.6], sigma: [9, 13], damage: 22, knock: 8.5 },
   // R = raio do redemoinho, depth = fundura do funil d'água, pull = puxão (m/s), swirl = giro (m/s)
   tempestade: { dur: [75, 100], waves: [5, 8], A: [2.6, 4.3], speed: [12, 16], sigma: [7, 10], start: 120, knock: 6 },

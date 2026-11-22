@@ -776,6 +776,14 @@ export class Build {
   }
 
   update() {
+    if (this.active && this.held && this.held.body) { // multiplayer: posição da peça carregada (~12×/s)
+      const now = performance.now();
+      if (now - (this._dragSent || 0) > 80) {
+        this._dragSent = now;
+        const b = this.held.body, r = (v) => Math.round(v * 100) / 100, rq = (v) => Math.round(v * 1000) / 1000;
+        this.G.net.send({ t: 'drag', id: this.held.id, p: [r(b.position.x), r(b.position.y), r(b.position.z)], q: [rq(b.quaternion.x), rq(b.quaternion.y), rq(b.quaternion.z), rq(b.quaternion.w)] });
+      }
+    }
     if (this.active) {
       if (this.G.input.hit('Escape')) { this.cancel(); return; }
       if (this.G.input.act('place')) { this.place(); return; }
