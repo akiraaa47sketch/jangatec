@@ -17,7 +17,21 @@ export class Net {
   nextId() { return `${this.id}-${Date.now().toString(36)}-${this.n++}`; }
   send(m) { if (this.online && this.ws.readyState === 1) this.ws.send(JSON.stringify(m)); }
 
-  connect(url, name, room) {
+  // Consulta rápida da lista de salas (navegador de servidores do menu). Resolve com { rooms, online }.
+  static listRooms(url, timeout = 45000) {
+    return new Promise((resolve, reject) => {
+      let ws, done = false;
+      const end = (fn, v) => { if (done) return; done = true; clearTimeout(t); try { ws.close(); } catch { /* ok */ } fn(v); };
+      const t = setTimeout(() => end(reject, new Error('Tempo esgotado')), timeout);
+      try { ws = new WebSocket(url); } catch { end(reject, new Error('URL inválida')); return; }
+      ws.onopen = () => ws.send(JSON.stringify({ t: 'list' }));
+      ws.onerror = () => end(reject, new Error('Servidor fora do ar'));
+      ws.onmessage = (ev) => { let m; try { m = JSON.parse(ev.data); } catch { return; } if (m.t === 'rooms') end(resolve, m); };
+    });
+  }
+
+  // opts: { password, create, title, max, seed, mustExist }
+  connect(url, name, room, opts = {}) {
     return new Promise((resolve, reject) => {
       let done = false;
       const fail = (why) => { if (!done) { done = true; reject(new Error(why)); } };
@@ -25,7 +39,7 @@ export class Net {
       try { ws = new WebSocket(url); } catch { fail('URL inválida ou conexão bloqueada'); return; }
       this.ws = ws;
       const timer = setTimeout(() => { fail('Tempo esgotado'); ws.close(); }, 60000);
-      ws.onopen = () => ws.send(JSON.stringify({ t: 'join', name, room }));
+      ws.onopen = () => ws.send(JSON.stringify({ t: 'join', name, room, ...opts }));
       ws.onerror = () => fail('Não foi possível conectar');
       ws.onclose = () => {
         clearTimeout(timer); fail('Conexão fechada');
@@ -39,7 +53,8 @@ export class Net {
       ws.onmessage = (ev) => {
         let m; try { m = JSON.parse(ev.data); } catch { return; }
         if (m.t === 'welcome') { clearTimeout(timer); done = true; this.id = m.id; this.isHost = m.host === m.id; this.online = true; resolve(m); }
-        else if (m.t === 'full') fail('Sala cheia (máx. 4)');
+        else if (m.t === 'full') fail('Sala cheia');
+        else if (m.t === 'join-error') { const e = new Error(m.reason || 'Não foi possível entrar'); e.needPassword = !!m.needPassword; if (!done) { done = true; reject(e); } ws.close(); }
         else if (this.G.started) this.handle(m);
       };
     });
@@ -66,7 +81,7 @@ export class Net {
           const ap = typeof r.s.ap === 'string' ? r.s.ap.slice(0, 40) : '';
           if (ap !== (r.ap || '')) this.setRemoteLook(r, ap);
         }
-        for (const [id, r] of this.remotes) if (!(id in m.players)) { r.mesh.parent && r.mesh.parent.remove(r.mesh); this.remotes.delete(id); }
+        for (const [id, r] of this.remotes) if (!(id in m.players)) { r.mesh.parent && r.mesh.parent.remove(r.mesh); this.remotes.delete(id); if (G.voice) G.voice.drop(id); }
         break;
       }
       case 'add': G.boat.addPiece(m.piece); break;
@@ -85,6 +100,11 @@ export class Net {
       case 'start': G.startup.applyState(m.state); break;
       case 'msg': G.hud.msg(m.text); break;
       case 'event': G.events.receive(m.e); break;
+      case 'naval': if (G.naval) G.naval.receive(m); break;
+      case 'music': if (G.tools) G.tools.receiveNote(m); break;
+      case 'yank': if (G.tools) G.tools.receiveYank(m); break;
+      case 'rtc': if (G.voice) G.voice.signal(m); break;
+      case 'revive': if (m.id === this.id) G.survival.revive(m.by); break;
       case 'carry': {
         G.world.applyCarryState(m.id, m.by, m.state);
         break;
@@ -141,7 +161,7 @@ export class Net {
       let x = b.pos.x, y = b.pos.y, z = b.pos.z, yaw = pl.yaw;
       if (pl.aboard) { [x, z] = boat.toLocal(x, z); y -= boat.set.y; yaw -= boat.yaw; }
       const r2 = (v) => Math.round(v * 100) / 100;
-      this.send({ t: 'state', s: { p: [r2(x), r2(y), r2(z)], yaw: r2(yaw), ab: pl.aboard ? 1 : 0, sw: pl.swimming ? 1 : 0, sp: r2(Math.hypot(b.vel.x, b.vel.z)), dead: pl.dead ? 1 : 0, ap: this.localLook() } });
+      this.send({ t: 'state', s: { p: [r2(x), r2(y), r2(z)], yaw: r2(yaw), ab: pl.aboard ? 1 : 0, sw: pl.swimming ? 1 : 0, sp: r2(Math.hypot(b.vel.x, b.vel.z)), dead: pl.dead ? 1 : 0, dn: pl.downed ? 1 : 0, mu: G.tools && G.tools.playT > 0 ? 1 : 0, vc: G.voice && G.voice.on ? 1 : 0, tk: G.voice && G.voice.talking ? 1 : 0, ap: this.localLook() } });
       if (this.isHost) this.send({ t: 'boat', b: { x: r2(boat.x), z: r2(boat.z), yaw: Math.round(boat.yaw * 1000) / 1000, speed: r2(boat.speed), up: boat.sailUp, angle: boat.sailAngle } });
     }
     // Interpola os aliados.
@@ -159,7 +179,7 @@ export class Net {
       mesh.rotation.x = s.dead ? -Math.PI / 2 : s.sw ? 0.9 : 0;
       if (r.pill) {
         mesh.rotation.x = s.dead ? -Math.PI / 2 : 0;
-        animatePill(r.pill.children[0], s.sp, dt, s.sw ? 'swim' : 'walk');
+        animatePill(r.pill.children[0], s.sp, dt, s.sw ? 'swim' : s.dn ? 'crawl' : 'walk'); // caído: se arrastando
       } else animateHumanoid(mesh, s.sp, dt, s.sw ? 'swim' : 'walk');
     }
   }

@@ -1,4 +1,4 @@
-// Armas com raridade, atributos, munição e durabilidade usados pelo combate.
+// Armas com raridade, atributos e munição (não quebram) + ferramentas (martelo, banjo, gancho).
 import { buildWeapon } from '../player/viewmodel-parts.js';
 import * as THREE from '../three.js';
 
@@ -12,6 +12,11 @@ export const WEAPONS = [
   { id: 'pistola', nome: 'Pistola', stars: 3, dmg: 30, mag: 12, rate: 0.24, spread: 0.009, range: 100, reload: 1.1, recoil: 0.01, pellets: 1, ammo: 'municao', durability: 140, color: 0x33383c, scale: [0.9, 0.85, 0.9], automatic: true },
   { id: 'escopeta', nome: 'Escopeta', stars: 4, dmg: 12, mag: 5, rate: 0.8, spread: 0.07, range: 32, reload: 1.9, recoil: 0.04, pellets: 8, ammo: 'cartucho', durability: 110, color: 0x4c3525, scale: [1, 1, 1.7] },
   { id: 'rifle', nome: 'Rifle', stars: 4, dmg: 38, mag: 20, rate: 0.12, spread: 0.006, range: 140, reload: 2, recoil: 0.018, pellets: 1, ammo: 'municao', durability: 190, color: 0x454239, scale: [0.8, 0.8, 1.8], automatic: true },
+  // ferramentas: martelo conserta peças da jangada (e ainda bate), banjo toca e cura aliados,
+  // gancho puxa caixotes boiando e jogadores
+  { id: 'martelo', nome: 'Martelo', stars: 2, melee: true, tool: 'martelo', dmg: 14, range: 2.2, rate: 0.5, color: 0x6b4a2e, scale: [0.6, 0.6, 1.2] },
+  { id: 'banjo', nome: 'Banjo', stars: 3, tool: 'banjo', rate: 0.2, color: 0xc49a5a, scale: [1, 1, 1] },
+  { id: 'gancho', nome: 'Gancho', stars: 3, tool: 'gancho', rate: 0.6, color: 0x6d7479, scale: [1, 1, 1] },
   { id: 'rifle_precisao', nome: 'Rifle de precisão', stars: 5, dmg: 70, mag: 5, rate: 0.9, spread: 0.001, range: 240, reload: 2.6, recoil: 0.07, pellets: 1, ammo: 'municao', durability: 240, color: 0x292f33, scale: [0.75, 0.8, 2] },
 ];
 
@@ -23,7 +28,7 @@ export class Combat {
   constructor(G) {
     this.G = G;
     this.weaponId = null;
-    this.hotbar = [null, null, null];
+    this.hotbar = [null, null, null, null, null, null];
     this.owned = new Set();
     this.durability = {};
     this.cooldown = 0;
@@ -55,12 +60,8 @@ export class Combat {
   unlockWeapon(id) {
     const weapon = WEAPONS.find((w) => w.id === id);
     if (!weapon) return false;
-    if (this.owned.has(id)) {
-      this.durability[id] = Math.min(weapon.durability, this.durability[id] + Math.ceil(weapon.durability * 0.3));
-      return 'repaired';
-    }
+    if (this.owned.has(id)) return 'owned';
     this.owned.add(id);
-    this.durability[id] = weapon.durability;
     const slot = this.hotbar.indexOf(null);
     if (slot >= 0) this.hotbar[slot] = id;
     if (!this.weaponId) this.equip(id);
@@ -118,10 +119,7 @@ export class Combat {
     this.tracers.push({ line, life: 0.09 });
   }
 
-  _useDurability(weapon) {
-    this.durability[weapon.id] = Math.max(0, this.durability[weapon.id] - 1);
-    if (this.durability[weapon.id] === 0) this.G.hud.msg(`${weapon.nome} quebrou`);
-  }
+  _useDurability() { /* armas não quebram mais */ }
 
   // Aplica o dano do golpe nos inimigos à frente. Retorna quantos foram atingidos.
   meleeStrike(w) {
@@ -143,12 +141,7 @@ export class Combat {
     const G = this.G, w = this.weapon, cam = G.camera;
     if (!w) return;
     const vm = G.player.firstPerson ? G.viewmodel : null;
-    if (this.durability[w.id] <= 0) {
-      this.cooldown = 0.35;
-      G.hud.msg(`${w.nome} está quebrada`);
-      if (vm) vm.onDry();
-      return;
-    }
+    if (w.tool && !w.melee) { this.cooldown = w.rate; if (G.tools) G.tools.use(w); return; }
     this.cooldown = w.rate;
     G.player.mesh.getWorldPosition(_m); _m.y += 1.3;
     if (w.melee) {
@@ -194,10 +187,10 @@ export class Combat {
 
   update(dt) {
     const G = this.G, inp = G.input, w = this.weapon;
-    const building = G.build.active, looting = G.interact.lootOpen;
+    const building = G.build.active || !!(G.naval && G.naval.manning) || !!(G.tools && G.tools.menuOpen), looting = G.interact.lootOpen;
     this.cooldown -= dt;
     this.bloom = Math.max(0, (this.bloom || 0) - dt * 2.5);
-    this.aiming = !!w && !building && !looting && !!w.ammo && inp.mouse.right && !G.player.dead && !G.player.swimming;
+    this.aiming = !!w && !building && !looting && !!w.ammo && inp.mouse.right && !G.player.dead && !G.player.downed && !G.player.swimming;
     if (this.reloading > 0 && w) {
       this.reloading -= dt;
       if (this.reloading <= 0) {
@@ -205,11 +198,12 @@ export class Combat {
         this.mags[w.id] += count; inv[w.ammo] -= count;
       }
     }
-    if (!building && !looting && !G.player.dead && !G.player.mantle && !this.buildMode && w) {
+    if (!building && !looting && !G.player.dead && !G.player.downed && !G.player.mantle && !this.buildMode && w) {
       if (inp.hit('KeyR')) this.startReload();
       const trigger = inp.mouse.leftPressed || (w.automatic && inp.mouse.left);
       const drawing = G.player.firstPerson && G.viewmodel && G.viewmodel.lowerEquip > 0.35; // arma ainda sendo sacada
-      if (trigger && this.cooldown <= 0 && this.reloading <= 0 && !G.player.swimming && !drawing) this.fire();
+      // corpo a corpo (leve/pesado/bloqueio/esquiva) fica no sistema Melee
+      if (trigger && !w.melee && this.cooldown <= 0 && this.reloading <= 0 && !G.player.swimming && !drawing) this.fire();
     }
     if (this.pendingStrike) {
       const s = this.pendingStrike;

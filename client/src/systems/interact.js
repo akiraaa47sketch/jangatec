@@ -1,4 +1,5 @@
-// Interação com [E]: caixas de loot e mastro; [X]: peças soldadas.
+// Interação com [E]: caixas de loot, mastro e reanimar aliados caídos; [X]: peças soldadas.
+const REVIVE_TIME = 2.5;
 export class Interact {
   constructor(G) {
     this.G = G;
@@ -12,6 +13,16 @@ export class Interact {
     if (G.build.active) return null;
     let best = null, bd = Infinity;
     const consider = (d, o) => { if (d < bd) { bd = d; best = o; } };
+    const naval = G.naval;
+    if (naval && naval.manning) return { cannon: true, label: 'Sair do canhão · clique dispara · mouse mira', run: () => naval.leave() };
+
+    // Aliado caído por perto: segurar E reanima
+    for (const [id, r] of G.net.remotes) {
+      if (!r.s || !r.s.dn) continue;
+      const wp = r.mesh.getWorldPosition(this._v || (this._v = p.clone()));
+      const d = Math.hypot(wp.x - p.x, wp.z - p.z);
+      if (d < 2.4 && Math.abs(wp.y - p.y) < 2) consider(d - 1, { revive: id, name: r.s.n || 'aliado', label: `Reanimar ${r.s.n || 'aliado'} (segure)` });
+    }
 
     // Caixas de loot
     for (const c of G.world.crates) {
@@ -31,6 +42,32 @@ export class Interact {
     } else if (G.startup.departed && G.player.aboard) {
       const [mx, mz] = G.boat.mastWorld(), dist = Math.hypot(mx - p.x, mz - p.z);
       if (dist < 2.6) consider(dist + 0.5, { mast: true, label: (G.boat.sailUp ? 'Baixar vela' : 'Levantar vela') + '   [Z] [C] girar vela', run: () => G.boat.setSail(!G.boat.sailUp, G.boat.sailAngle) });
+    }
+
+    // Canhões: usar, instalar (com o item no inventário) e consertar peças danificadas
+    if (naval && G.player.aboard) {
+      const boat = G.boat, [plx, plz] = boat.toLocal(p.x, p.z);
+      for (const c of naval.cannons) {
+        const d = Math.hypot(c.x - plx, c.z - plz);
+        if (d < 1.9) consider(d + 0.2, { label: 'Usar canhão', run: () => naval.man(c) });
+      }
+      if (G.survival.inv.canhao > 0 && naval.canInstallHere()) consider(1.6, { label: 'Instalar canhão aqui', run: () => naval.install() });
+      let dmg = null, dd = 2.2;
+      for (const piece of boat.pieces.values()) {
+        if (!naval.destructible(piece)) continue;
+        const max = naval.maxHp(piece), hp = naval.hpOf(piece), d = Math.hypot(piece.x - plx, piece.z - plz);
+        if (hp < max - 0.5 && d < dd) { dd = d; dmg = { piece, pct: Math.round(100 * hp / max) }; }
+      }
+      if (dmg) { // dica: o conserto é com o martelo
+        const nome = dmg.piece.physObj ? dmg.piece.physObj.def.nome : (dmg.piece.type === 'canhao' ? 'canhão' : 'peça');
+        const hammer = G.combat.weaponId === 'martelo';
+        consider(dd + 0.6, { label: `${nome} ${dmg.pct}% — ${hammer ? 'martele para consertar' : 'use o martelo para consertar'}` });
+      }
+    }
+    // caixotes de loot boiando (navios afundados)
+    if (naval) {
+      const crate = naval.nearestCrate();
+      if (crate) consider(0.5, { label: 'Abrir caixote boiando', run: () => naval.takeCrate(crate) });
     }
 
     // Peças soldadas próximas que podem ser removidas
@@ -111,16 +148,29 @@ export class Interact {
 
   update(dt) {
     const G = this.G, inp = G.input;
-    if (this.lootOpen) { this.current = null; return; }
+    if (this.lootOpen || (G.tools && G.tools.menuOpen)) { this.current = null; return; }
     if (G.build.active) { this.current = null; return; }
     if (G.build.consumeInteraction) {
       G.build.consumeInteraction = false;
       this.current = null;
       return;
     }
-    this.current = G.player.dead ? null : this.find();
+    this.current = G.player.dead || G.player.downed ? null : this.find();
     const c = this.current;
+    if (!c || !c.revive) this.reviveT = 0;
     if (!c) return;
+    if (c.revive) { // segurar E por REVIVE_TIME segundos
+      if (inp.down('KeyE')) {
+        this.reviveT = (this.reviveT || 0) + dt;
+        c.label = `Reanimando ${c.name}… ${Math.min(100, Math.round(this.reviveT / REVIVE_TIME * 100))}%`;
+        if (this.reviveT >= REVIVE_TIME) {
+          this.reviveT = 0;
+          G.net.send({ t: 'revive', id: c.revive });
+          G.hud.msg(`Você reanimou ${c.name}!`);
+        }
+      } else this.reviveT = 0;
+      return;
+    }
     if (c.remove && inp.hit('KeyX')) G.build.tryRemoveWelded(c.remove);
     else if (inp.hit('KeyE') && c.run) { c.run(); if (G.viewmodel) G.viewmodel.onInteract(); }
     if (c.mast && !c.installSail) {

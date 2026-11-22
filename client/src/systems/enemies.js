@@ -64,6 +64,7 @@ export class Enemies {
     return e;
   }
   remove(e) {
+    if (this.G.melee) this.G.melee.tokens.delete(e);
     this.G.scene.remove(e.mesh);
     this._removeHook(e);
     this._removeRaft(e);
@@ -83,6 +84,7 @@ export class Enemies {
     if (!e.pirate && e.state !== 'chase' && e.state !== 'attack') e.state = 'chase'; // levou tiro: percebe o jogador
     if (e.hp <= 0) {
       e.state = 'dead'; e.timer = 5; e.deathT = 0;
+      if (this.G.melee) { this.G.melee.tokens.delete(e); this.G.melee.setTell(e, null); this.G.melee.updateStars(e, 0, false); }
       this.G.world.collected.add(e.id);
       const r = Math.random();
       const loot = r < 0.4 ? { municao: 6 } : r < 0.75 ? { bandagem: 1 } : r < 0.85 ? { cartucho: 4 } : null;
@@ -97,7 +99,7 @@ export class Enemies {
     if (this.pirateSpawnTimer > 0) return;
     if (G.startup.waterLevel < 0.5) { this.pirateSpawnTimer = 20; return; } // oceano seco: sem balsas
     // Nunca junto com uma onda gigante/furacão, nem com outra invasão em andamento.
-    if ((G.events && G.events.active) || this.list.some((e) => e.pirate && e.state !== 'dead')) {
+    if ((G.events && G.events.active) || (G.naval && G.naval.active) || this.list.some((e) => e.pirate && e.state !== 'dead')) {
       this.pirateSpawnTimer = 20;
       return;
     }
@@ -412,7 +414,9 @@ export class Enemies {
     const [playerX, playerZ] = boat.toLocal(pp.x, pp.z);
     const dx = playerX - e.local.x, dz = playerZ - e.local.z, distance = Math.hypot(dx, dz);
     let moved = 0;
-    if (!G.player.dead && distance > e.def.range * 0.7) {
+    const mres = G.melee ? G.melee.enemyTick(e, dt, Math.hypot(pp.x - p.x, pp.z - p.z)) : null; // aviso/golpe/guarda
+    if (e.knock) [e.local.x, e.local.z] = boat.toLocal(p.x, p.z);
+    if (!G.player.dead && !G.player.downed && distance > e.def.range * 0.7 && !(mres && mres.hold)) {
       moved = Math.min(distance - e.def.range * 0.7, e.def.speed * dt);
       e.local.x += dx / distance * moved;
       e.local.z += dz / distance * moved;
@@ -444,21 +448,16 @@ export class Enemies {
     }
     const pdx = pp.x - p.x, pdz = pp.z - p.z, playerDistance = Math.hypot(pdx, pdz);
     e.yaw = lerpAngle(e.yaw, Math.atan2(pdx, pdz), Math.min(1, 8 * dt));
-    if (!G.player.dead && playerDistance <= e.def.range && Math.abs(pp.y - p.y) < 1.8 && e.cd <= 0) {
-      e.cd = e.def.cd;
-      G.survival.damage(e.def.dmg, e.def.nome);
-      e.swing = 0.25;
-    }
+    void playerDistance;
     e.mesh.position.copy(p);
     e.mesh.rotation.y = e.yaw;
-    const pose = e.swing > 0 ? 'attack' : 'walk';
-    animateEnemy(e.mesh, dt > 0 ? moved / dt : 0, dt, pose, e.swing > 0 ? 1 - e.swing / 0.25 : 0);
+    animateEnemy(e.mesh, dt > 0 ? moved / dt : 0, dt, mres ? mres.pose : 'walk', mres ? mres.progress || 0 : 0);
     this._animateHit(e, dt);
     if (e.swing > 0) e.swing = Math.max(0, e.swing - dt);
   }
 
   think(e, dist, pdx, pdz) {
-    const def = e.def, alive = !this.G.player.dead;
+    const def = e.def, alive = !this.G.player.dead && !this.G.player.downed; // caído: inimigos perdem o interesse
     switch (e.state) {
       case 'idle': case 'patrol': case 'search':
         if (alive && dist < SIGHT) { e.state = 'chase'; break; }
@@ -509,13 +508,22 @@ export class Enemies {
         }
         if (e.sideT > 0) { e.sideT -= dt; const t2 = mx; mx = -mz * e.sideDir; mz = t2 * e.sideDir; }
       }
-      if (e.state === 'attack' && e.cd <= 0) {
+      // corpo a corpo: aviso -> golpe -> recuperação, guarda, atordoamento (sistema Melee)
+      let mres = null;
+      if (!e.def.ranged && dist < 7 && G.melee) mres = G.melee.enemyTick(e, dt, dist);
+      if (mres && mres.hold) { mx = 0; mz = 0; }
+      else if (!e.def.ranged && dist < 3.6 && (e.state === 'chase' || e.state === 'attack')) {
+        // esperando a vez: rodeia o jogador mantendo distância
+        e.strafeDir = e.strafeDir || (Math.random() < 0.5 ? 1 : -1);
+        if (thinkNow && Math.random() < 0.08) e.strafeDir *= -1;
+        const sp = e.def.speed * 0.42, radial = (dist - 2.0) * 1.6;
+        mx = -pdz * e.strafeDir * sp + pdx * radial; mz = pdx * e.strafeDir * sp + pdz * radial;
+      }
+      if (e.state === 'attack' && e.cd <= 0 && e.def.ranged) {
         e.cd = e.def.cd;
-        if (e.def.ranged) {
-          const hit = Math.random() < 0.6 - dist * 0.015;
-          G.combat.tracer(new THREE.Vector3(p.x, p.y + 1.3, p.z), new THREE.Vector3(pp.x + (hit ? 0 : 1.2), pp.y + 1.2, pp.z), 0xffb060);
-          if (hit) G.survival.damage(e.def.dmg, e.def.nome);
-        } else if (Math.abs(pp.y - p.y) < 1.8) G.survival.damage(e.def.dmg, e.def.nome);
+        const hit = Math.random() < 0.6 - dist * 0.015;
+        G.combat.tracer(new THREE.Vector3(p.x, p.y + 1.3, p.z), new THREE.Vector3(pp.x + (hit ? 0 : 1.2), pp.y + 1.2, pp.z), 0xffb060);
+        if (hit) G.survival.damage(e.def.dmg, e.def.nome);
         e.swing = 0.25;
       }
       // Movimento + colisão (o mesmo resolvedor do jogador). Não saem da ilha.
@@ -532,8 +540,8 @@ export class Enemies {
       else if (mx || mz) e.yaw = lerpAngle(e.yaw, Math.atan2(mx, mz), Math.min(1, 8 * dt));
       e.mesh.position.copy(p);
       e.mesh.rotation.y = e.yaw;
-      const pose = e.swing > 0 ? 'attack' : e.def.ranged && facePlayer ? 'aim' : 'walk';
-      const swingProgress = e.swing > 0 ? 1 - e.swing / 0.25 : 0;
+      const pose = mres ? mres.pose : e.swing > 0 ? 'attack' : e.def.ranged && facePlayer ? 'aim' : 'walk';
+      const swingProgress = mres ? mres.progress || 0 : e.swing > 0 ? 1 - e.swing / 0.25 : 0;
       animateEnemy(e.mesh, Math.hypot(mx, mz), dt, pose, swingProgress);
       this._animateHit(e, dt);
       if (e.swing > 0) e.swing = Math.max(0, e.swing - dt);

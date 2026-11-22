@@ -1,6 +1,7 @@
 // Ciclo do mar depois da partida: só dois estados, MAR CHEIO e MAR SECO.
 // A troca é uma transição rápida (o mar seca / volta a encher); não há marés intermediárias.
 // Deriva só do relógio comum, então todos os jogadores veem o mesmo sem tráfego de rede.
+// Durante uma batalha naval a maré é segurada no cheio (Naval.holdK).
 // Na seca a água desce abaixo do fundo do mar (world/seabed.js) e dá para andar por ele.
 import { clamp } from '../core/util.js';
 
@@ -36,8 +37,8 @@ export function tideAt(t) {
 }
 
 const MESSAGES = {
-  seco: 'O MAR ESTÁ SECANDO! Em instantes dá para andar pelo fundo: destroços e naufrágios com loot.',
-  cheio: 'O MAR ESTÁ VOLTANDO — corra para a jangada!',
+  seco: 'A água está baixando…',
+  cheio: 'O mar está voltando — volte para a jangada!',
 };
 
 export class Tide {
@@ -46,6 +47,12 @@ export class Tide {
   level(t, dt, floodLevel) {
     this.departT += dt;
     this.state = tideAt(t);
+    // batalha naval: o mar fica segurado no CHEIO (a seca só acontece fora de combate)
+    const hold = this.G.naval ? this.G.naval.holdK : 0;
+    if (hold > 0) {
+      const st = this.state, lvl = st.level + (TIDE.full - st.level) * hold;
+      this.state = { ...st, level: lvl, norm: (lvl - TIDE.dry) / (TIDE.full - TIDE.dry), ...(hold > 0.5 ? { phase: TIDE_STATES.cheio, changing: false } : {}) };
+    }
     const id = this.state.phase.id;
     if (this.lastPhase !== id) {
       if (this.lastPhase !== null) this.G.hud.msg(MESSAGES[id]);

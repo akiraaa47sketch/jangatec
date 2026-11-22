@@ -413,7 +413,7 @@ export function makePill(options = {}) {
   seam.rotation.x = Math.PI / 2; seam.position.y = SEAM_Y; body.add(seam);
 
   const limbMat = matte(0x2b2220, 0.6), gloveMat = plastic(o.gloveHex ?? PILL_COLORS[o.gloves].hex), bootMat = plastic(o.bootHex ?? PILL_COLORS[o.bootColor].hex);
-  const parts = { body };
+  const parts = { body, gloveMat }; // gloveMat: usado no brilho de aviso dos inimigos
   for (const side of [-1, 1]) {
     const shoulder = new THREE.Group(); shoulder.position.set(side * (R - 0.03), SEAM_Y - 0.12, 0); body.add(shoulder);
     shoulder.add(limb([new THREE.Vector3(0, 0, 0), new THREE.Vector3(side * 0.12, -0.15, 0), new THREE.Vector3(side * 0.16, -0.42, 0.02), new THREE.Vector3(side * 0.15, -0.62, 0.04)], limbMat));
@@ -459,8 +459,34 @@ export function disposePill(pill) {
   });
 }
 
-// pose: walk | attack | aim | swim | jump (progress 0..1 para o ataque)
+// poses: walk | attack | aim | swim | jump | row | leap | windup | heavyWindup | slam | guard | stagger | dodge
+//        | slashR | slashL | thrust | uppercut | spin | parry | roll | sidestep | crawl
+const smooth01 = (x) => { x = Math.max(0, Math.min(1, x)); return x * x * (3 - 2 * x); };
+// Partes animadas: a pose calcula o ALVO e animatePill mistura suavemente do quadro anterior para
+// ele (sem "estalos" ao trocar de pose). Ângulos misturados pelo caminho mais curto (giros de 360°).
+const BLEND_PARTS = ['body', 'armL', 'armR', 'legL', 'legR'];
+const _snap = new Float32Array(BLEND_PARTS.length * 3 + 2);
+const wrapPi = (a) => { a = (a + Math.PI) % (Math.PI * 2); return (a < 0 ? a + Math.PI * 2 : a) - Math.PI; };
 export function animatePill(pill, speed, dt, pose = 'walk', progress = 0) {
+  const p = pill.userData.parts;
+  const first = !pill.userData.blended; pill.userData.blended = true;
+  BLEND_PARTS.forEach((n, i) => { const r = p[n].rotation; _snap[i * 3] = r.x; _snap[i * 3 + 1] = r.y; _snap[i * 3 + 2] = r.z; });
+  _snap[15] = p.body.position.y; _snap[16] = p.body.position.z;
+  poseTargets(pill, speed, dt, pose, progress);
+  if (first) return;
+  // poses de ação (golpes/esquiva) respondem mais rápido que andar/parar
+  const rate = ['walk', 'swim', 'row', 'aim'].includes(pose) ? 16 : 30, k = 1 - Math.exp(-rate * dt);
+  BLEND_PARTS.forEach((n, i) => {
+    const r = p[n].rotation;
+    r.x = _snap[i * 3] + wrapPi(r.x - _snap[i * 3]) * k;
+    r.y = _snap[i * 3 + 1] + wrapPi(r.y - _snap[i * 3 + 1]) * k;
+    r.z = _snap[i * 3 + 2] + wrapPi(r.z - _snap[i * 3 + 2]) * k;
+  });
+  p.body.position.y = _snap[15] + (p.body.position.y - _snap[15]) * k;
+  p.body.position.z = _snap[16] + (p.body.position.z - _snap[16]) * k;
+}
+
+function poseTargets(pill, speed, dt, pose, progress) {
   const p = pill.userData.parts, k = Math.min(1, speed / 4);
   pill.userData.phase += dt * (pose === 'swim' ? 5 : 2 + speed * 2.2);
   const ph = pill.userData.phase, c = Math.sin(ph);
@@ -482,6 +508,73 @@ export function animatePill(pill, speed, dt, pose = 'walk', progress = 0) {
     const ap = pill.userData.aimPitch || 0, kk = pill.userData.kick || 0;
     p.armR.rotation.set(-1.5 - ap - kk * 0.55, 0.12, -0.12); p.armL.rotation.set(-1.32 - ap - kk * 0.45, -0.25, 0.42);
     p.body.rotation.set(0.04 - kk * 0.09, -0.12, 0);
+  } else if (pose === 'windup') { // puxa o braço para trás (aviso do golpe / carga do pesado)
+    const k = smooth01(progress);
+    p.armR.rotation.set(0.9 * k, 0, -0.35 - 0.4 * k); p.armL.rotation.set(-0.9 * k, 0, 0.35);
+    p.body.rotation.set(-0.1 * k, 0.45 * k, 0.04 * k);
+    p.legL.rotation.set(-0.35 * k, 0, 0); p.legR.rotation.set(0.25 * k, 0, 0);
+  } else if (pose === 'heavyWindup') { // os dois braços para o alto
+    const k = smooth01(progress);
+    p.armR.rotation.set(-2.9 * k, 0, -0.25 * k); p.armL.rotation.set(-2.9 * k, 0, 0.25 * k);
+    p.body.rotation.set(-0.22 * k, 0, 0); p.body.position.y = BODY_Y + 0.12 * k;
+  } else if (pose === 'slam') { // pancada de cima para baixo
+    const k = Math.sin(Math.min(1, progress) * Math.PI * 0.5);
+    p.armR.rotation.set(-2.9 + 2.2 * k, 0, -0.25); p.armL.rotation.set(-2.9 + 2.2 * k, 0, 0.25);
+    p.body.rotation.set(-0.22 + 0.5 * k, 0, 0); p.body.position.y = BODY_Y - 0.1 * k;
+  } else if (pose === 'guard') { // guarda: luvas na frente do rosto
+    p.armR.rotation.set(-1.9, 0.5, -0.9); p.armL.rotation.set(-1.9, -0.5, 0.9);
+    p.body.rotation.set(0.12, 0, 0); p.body.position.y = BODY_Y - 0.06;
+    p.legL.rotation.set(-0.25, 0, 0.08); p.legR.rotation.set(0.2, 0, -0.08);
+  } else if (pose === 'stagger') { // atordoado: cambaleia
+    const ph2 = pill.userData.phase * 2.2;
+    p.body.rotation.set(-0.18 + Math.sin(ph2) * 0.12, Math.sin(ph2 * 0.7) * 0.3, Math.sin(ph2) * 0.22);
+    p.armR.rotation.set(0.3, 0, -0.9 + Math.sin(ph2) * 0.3); p.armL.rotation.set(0.3, 0, 0.9 + Math.cos(ph2) * 0.3);
+  } else if (pose === 'dodge') { // esquiva: abaixa e inclina
+    const k = Math.sin(Math.min(1, progress) * Math.PI);
+    p.body.position.y = BODY_Y - 0.5 * k; p.body.rotation.set(0.5 * k, 0, 0);
+    p.armR.rotation.set(-0.6 * k, 0, -0.6 * k); p.armL.rotation.set(-0.6 * k, 0, 0.6 * k);
+    p.legL.rotation.set(-1.0 * k, 0, 0); p.legR.rotation.set(0.6 * k, 0, 0);
+  } else if (pose === 'slashR') { // corte horizontal da direita para a esquerda
+    const a = smooth01(progress), sw = Math.sin(Math.min(1, progress) * Math.PI);
+    p.armR.rotation.set(-1.45, -1.3 + 2.4 * a, -0.4 + 0.3 * sw); p.armL.rotation.set(-0.6, 0, 0.5);
+    p.body.rotation.set(0.08, 0.55 - 1.2 * a, 0); p.legL.rotation.set(-0.35, 0, 0); p.legR.rotation.set(0.3, 0, 0);
+  } else if (pose === 'slashL') { // revés da esquerda para a direita
+    const a = smooth01(progress);
+    p.armR.rotation.set(-1.35, 1.1 - 2.3 * a, -0.2); p.armL.rotation.set(-0.4, 0, 0.45);
+    p.body.rotation.set(0.08, -0.6 + 1.2 * a, 0); p.legL.rotation.set(0.3, 0, 0); p.legR.rotation.set(-0.35, 0, 0);
+  } else if (pose === 'thrust') { // estocada com avanço
+    const a = Math.sin(Math.min(1, progress) * Math.PI);
+    p.armR.rotation.set(-1.6, 0, -0.1); p.armL.rotation.set(0.5 * a, 0, 0.3);
+    p.body.position.z = 0.35 * a; p.body.rotation.set(0.35 * a, -0.25 * a, 0);
+    p.legL.rotation.set(-0.7 * a, 0, 0); p.legR.rotation.set(0.5 * a, 0, 0);
+  } else if (pose === 'uppercut') { // golpe de baixo para cima
+    const a = smooth01(progress);
+    p.armR.rotation.set(0.6 - 3.0 * a, 0, -0.25); p.armL.rotation.set(-0.5, 0, 0.4);
+    p.body.position.y = BODY_Y - 0.15 + 0.3 * a; p.body.rotation.set(0.3 - 0.5 * a, -0.2, 0);
+  } else if (pose === 'spin') { // giro de 360° (golpe final)
+    const a = smooth01(progress);
+    p.armR.rotation.set(-1.5, 0, -1.2); p.armL.rotation.set(-1.5, 0, 1.2);
+    p.body.rotation.set(0.1, -a * Math.PI * 2, 0); p.body.position.y = BODY_Y + Math.sin(a * Math.PI) * 0.15;
+  } else if (pose === 'parry') { // desvia o golpe com um tapa da arma para fora
+    const a = Math.sin(Math.min(1, progress) * Math.PI);
+    p.armR.rotation.set(-2.0, -0.9 * a, -0.4 - 0.8 * a); p.armL.rotation.set(-1.0, 0.4, 0.6);
+    p.body.rotation.set(-0.15 * a, 0.5 * a, 0.08 * a); p.body.position.z = -0.2 * a;
+  } else if (pose === 'roll') { // cambalhota (esquiva para frente/trás)
+    const a = smooth01(progress), dir = pill.userData.rollDir || 1;
+    p.body.rotation.set(dir * a * Math.PI * 2, 0, 0);
+    p.body.position.y = BODY_Y - 0.75 * Math.sin(a * Math.PI);
+    p.armR.rotation.set(-2.2, 0, -0.5); p.armL.rotation.set(-2.2, 0, 0.5);
+    p.legL.rotation.set(-1.4, 0, 0); p.legR.rotation.set(-1.4, 0, 0);
+  } else if (pose === 'sidestep') { // esquiva lateral: inclina e abre as pernas
+    const a = Math.sin(Math.min(1, progress) * Math.PI), sd = pill.userData.rollDir || 1;
+    p.body.rotation.set(0.15 * a, 0, -0.55 * a * sd); p.body.position.y = BODY_Y - 0.35 * a;
+    p.legL.rotation.set(0, 0, 0.5 * a); p.legR.rotation.set(0, 0, -0.5 * a);
+    p.armR.rotation.set(-0.8, 0, -1.0 * a); p.armL.rotation.set(-0.8, 0, 1.0 * a);
+  } else if (pose === 'crawl') { // caído: deitado de bruços, se arrastando
+    const cw = Math.sin(pill.userData.phase * 1.6), mv = Math.min(1, speed / 0.8);
+    p.body.rotation.set(1.45, 0, cw * 0.08 * mv); p.body.position.y = 0.55; p.body.position.z = -0.6;
+    p.armR.rotation.set(-2.6 + cw * 0.6 * mv, 0, -0.5); p.armL.rotation.set(-2.6 - cw * 0.6 * mv, 0, 0.5);
+    p.legL.rotation.set(0.2 + cw * 0.3 * mv, 0, 0.15); p.legR.rotation.set(0.2 - cw * 0.3 * mv, 0, -0.15);
   } else if (pose === 'jump') {
     p.armL.rotation.set(-2.4, 0, 0.5); p.armR.rotation.set(-2.4, 0, -0.5);
     p.legL.rotation.set(-0.7, 0, 0); p.legR.rotation.set(0.3, 0, 0);

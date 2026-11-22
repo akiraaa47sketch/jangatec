@@ -1,6 +1,7 @@
 // Servidor multiplayer (Render). Guarda o estado compartilhado de cada sala:
 // seed, host, peças construídas, detritos coletados, barco e posições dos jogadores.
 import http from 'http';
+import crypto from 'crypto';
 import { WebSocketServer } from 'ws';
 import { difficultyForCrateId, generateCrateLoot, isGeneratedCrate, WORLD_LOOT_PARAMS } from '../client/src/systems/loot.js';
 
@@ -16,11 +17,29 @@ const server = http.createServer((req, res) => {
 });
 const wss = new WebSocketServer({ server, maxPayload: 16 * 1024 });
 
-function getRoom(name) {
+const hashPw = (room, pw) => crypto.createHash('sha256').update(room + '|' + String(pw)).digest('hex');
+const roomId = (title) => String(title || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase()
+  .replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '').slice(0, 24);
+
+// Lista de salas para o navegador de servidores do menu.
+function roomList() {
+  return [...rooms.values()].filter((r) => r.players.size > 0).map((r) => {
+    const host = r.players.get(r.hostId);
+    return {
+      id: r.name, title: r.title || r.name, players: r.players.size, max: r.max || MAX_PLAYERS,
+      locked: !!r.passHash, host: host ? host.name : '', phase: r.start ? r.start.phase : 'build',
+      dist: r.boat ? Math.round(Math.hypot(r.boat.x || 0, r.boat.z || 0)) : 0, age: Math.round((Date.now() - (r.created || Date.now())) / 1000),
+    };
+  }).sort((a, b) => b.players - a.players || a.age - b.age).slice(0, 60);
+}
+
+function getRoom(name, meta = {}) {
   let r = rooms.get(name);
   if (!r) {
     r = {
-      name, seed: Math.floor(Math.random() * 1e9), players: new Map(), hostId: null,
+      name, title: meta.title || name, passHash: meta.password ? hashPw(name, meta.password) : null,
+      max: meta.max || MAX_PLAYERS, created: Date.now(),
+      seed: Number.isFinite(meta.seed) ? Math.floor(Math.abs(meta.seed)) % 1e9 : Math.floor(Math.random() * 1e9), players: new Map(), hostId: null,
       added: [], removed: [], collected: [], placed: new Map(), welded: new Map(),
       crates: new Map(), boat: null, start: null,
     };
@@ -88,16 +107,27 @@ function leave(ws) {
 }
 
 function handle(ws, m) {
+  if (m.t === 'list') { send(ws, { t: 'rooms', rooms: roomList(), online: wss.clients.size }); return; }
   if (m.t === 'join') {
     if (ws.room) return;
-    const room = getRoom(String(m.room || 'publica').slice(0, 24));
-    if (room.players.size >= MAX_PLAYERS) { send(ws, { t: 'full' }); ws.close(); return; }
+    const id = roomId(m.room) || 'publica';
+    const exists = rooms.has(id) && rooms.get(id).players.size > 0;
+    if (m.create && exists) { send(ws, { t: 'join-error', reason: 'Já existe uma sala com esse nome' }); return; }
+    if (!m.create && !exists && m.mustExist) { send(ws, { t: 'join-error', reason: 'Essa sala não existe mais' }); return; }
+    if (!exists) rooms.delete(id); // sala vazia antiga: recria com as opções novas
+    const max = Math.max(1, Math.min(MAX_PLAYERS, m.max | 0 || MAX_PLAYERS));
+    const room = getRoom(id, m.create ? {
+      title: String(m.title || m.room).slice(0, 28), password: m.password ? String(m.password).slice(0, 32) : '', max,
+      seed: Number(m.seed),
+    } : { title: String(m.room || 'Pública').slice(0, 28) });
+    if (room.passHash && hashPw(id, m.password || '') !== room.passHash) { send(ws, { t: 'join-error', reason: 'Senha incorreta', needPassword: true }); return; }
+    if (room.players.size >= (room.max || MAX_PLAYERS)) { send(ws, { t: 'full' }); ws.close(); return; }
     ws.name = String(m.name || 'Náufrago').slice(0, 16);
     ws.room = room;
     room.players.set(ws.id, { ws, name: ws.name, state: null });
     if (!room.hostId) room.hostId = ws.id;
     send(ws, {
-      t: 'welcome', id: ws.id, seed: room.seed, host: room.hostId,
+      t: 'welcome', id: ws.id, seed: room.seed, host: room.hostId, room: { id: room.name, title: room.title, locked: !!room.passHash, max: room.max },
       added: room.added, removed: room.removed, collected: room.collected,
       placed: [...room.placed.values()], welded: [...room.welded.values()],
       crates: [...room.crates.values()], boat: room.boat, start: room.start, event: room.event || null,
@@ -173,7 +203,7 @@ function handle(ws, m) {
       const crate = room.crates.get(m.id);
       if (!validCrateId(m.id, room.seed, m) || !ws.openedCrates.has(m.id) || !crate ||
           !canReachCrate(room, ws, m) || typeof m.item !== 'string' ||
-          !/^(madeira|metal|pano|bandagem|kit|municao|cartucho|arma_[a-z0-9_]+)$/.test(m.item)) {
+          !/^(madeira|metal|pano|bandagem|kit|municao|cartucho|canhao|bala_canhao|arma_[a-z0-9_]+)$/.test(m.item)) {
         send(ws, { t: 'crate:error', id: m.id });
         break;
       }
@@ -236,12 +266,18 @@ function handle(ws, m) {
       broadcast(room, m, ws);
       break;
     }
+    case 'revive': {
+      // um jogador reanimou um aliado caído: avisa a sala (o alvo se levanta)
+      if (typeof m.id !== 'string' || m.id.length > 20 || !room.players.has(m.id) || m.id === ws.id) break;
+      broadcast(room, { t: 'revive', id: m.id, by: ws.name });
+      break;
+    }
     case 'event': {
       // Onda gigante / furacão sorteados pelo host: valida e repassa a todos.
       const e = m.e;
       if (room.hostId !== ws.id || !e || !['tsunami', 'furacao'].includes(e.kind) ||
           typeof e.id !== 'string' || e.id.length > 40) break;
-      const keys = ['t0', 'dur', 'ox', 'oz', 'dx', 'dz', 'speed', 'A', 'sigma', 'cx', 'cz', 'fx', 'fz', 'lat', 'latV', 'ahead'];
+      const keys = ['t0', 'dur', 'ox', 'oz', 'dx', 'dz', 'speed', 'A', 'sigma', 'cx', 'cz', 'fx', 'fz', 'lat', 'latV', 'ahead', 'R', 'depth', 'spin'];
       const clean = { id: e.id, kind: e.kind, end: !!e.end };
       for (const key of keys) {
         if (e[key] === undefined) continue;
@@ -251,6 +287,38 @@ function handle(ws, m) {
       if (!Number.isFinite(clean.t0) || !Number.isFinite(clean.dur) || clean.dur > 120) break;
       room.event = clean.end ? null : clean;
       broadcast(room, { t: 'event', e: clean }, ws);
+      break;
+    }
+    case 'naval': {
+      // Batalha naval: o host manda navios/dano/estado; qualquer um pode disparar, mirar e consertar.
+      const HOST = ['ships', 'php', 'sunk', 'boom', 'crates', 'took'], ANY = ['fire', 'aim', 'repair', 'take', 'pull'];
+      if (typeof m.k !== 'string' || !(HOST.includes(m.k) || ANY.includes(m.k))) break;
+      if (HOST.includes(m.k) && room.hostId !== ws.id) break;
+      if (JSON.stringify(m).length > 6000) break;
+      m.from = ws.id; // quem mandou (pegar/puxar caixote)
+      broadcast(room, m, ws);
+      break;
+    }
+    case 'music': {
+      // nota do banjo: repassa para a sala (todos ouvem, mais baixo de longe)
+      if (!Number.isFinite(m.n)) break;
+      const now = Date.now();
+      if (now - (ws.lastNote || 0) < 40) break; // anti-spam
+      ws.lastNote = now;
+      broadcast(room, { t: 'music', id: ws.id, n: Math.max(30, Math.min(100, m.n | 0)) }, ws);
+      break;
+    }
+    case 'yank': {
+      // gancho fisgou um jogador: avisa a sala (só o alvo reage)
+      if (typeof m.id !== 'string' || !room.players.has(m.id) || m.id === ws.id || ![m.x, m.y, m.z].every(Number.isFinite)) break;
+      broadcast(room, { t: 'yank', id: m.id, x: m.x, y: m.y, z: m.z, by: ws.name });
+      break;
+    }
+    case 'rtc': {
+      // sinalização do chat de voz (WebRTC): repassa oferta/resposta/ICE só para o destinatário
+      const to = typeof m.to === 'string' && room.players.get(m.to);
+      if (!to || m.to === ws.id || JSON.stringify(m).length > 12000) break;
+      send(to.ws, { t: 'rtc', from: ws.id, sdp: m.sdp || null, ice: m.ice || null, bye: !!m.bye });
       break;
     }
     case 'physics': {

@@ -38,6 +38,12 @@ class Spring {
 
 // Keyframes [tempo, [px, py, pz, rx, ry, rz]] relativos à pose de empunhadura.
 const SWINGS = {
+  parry: [ // tapa a arma para fora, desviando o golpe
+    [0, [0, 0, 0, 0, 0, 0]],
+    [0.25, [-0.18, 0.14, 0.04, 0.5, 0.9, 1.2]],
+    [0.55, [0.12, 0.1, -0.06, 0.3, -0.5, -0.4]],
+    [1, [0, 0, 0, 0, 0, 0]],
+  ],
   slashA: [ // do alto-direita para baixo-esquerda
     [0, [0, 0, 0, 0, 0, 0]],
     [0.26, [0.1, 0.1, 0.06, 0.4, -0.3, -0.6]],
@@ -164,10 +170,10 @@ export class ViewModel {
   // ---------- ganchos chamados pelos outros sistemas ----------
   strikeFraction() { return 0.42; }
 
-  onSwing(w) {
+  onSwing(w, style = null, dur = null) {
     const styles = (this.spec && this.spec.swing) || ['slashA', 'slashB'];
-    this.swingStyle = styles[this.combo++ % styles.length];
-    this.swingDur = clamp(w.rate * 0.88, 0.3, 0.55);
+    this.swingStyle = style || styles[this.combo++ % styles.length];
+    this.swingDur = dur || clamp(w.rate * 0.88, 0.3, 0.55);
     this.swingT = 0;
     return this.swingDur;
   }
@@ -280,7 +286,7 @@ export class ViewModel {
   update(dt, t) {
     const G = this.G, pl = G.player, cb = G.combat, inp = G.input, b = pl.body;
     this.active = !!(pl.firstPerson && G.started);
-    this.group.visible = this.active && !pl.dead;
+    this.group.visible = this.active && !pl.dead && !pl.downed;
     if (!this.active) { this.scopeEl.hidden = true; this.fovTarget = 68; return; }
     this.time += dt;
     const S = this.springs;
@@ -409,6 +415,16 @@ export class ViewModel {
       for (let i = 0; i < 6; i++) { if (i < 3) P[i] += swingOff[i]; else R[i - 3] += swingOff[i]; }
     }
 
+    // corpo a corpo: guarda (arma atravessada na frente) e carga do golpe pesado (puxa para trás)
+    const mel = this.G.melee;
+    this.blockW = approach(this.blockW || 0, mel && mel.blocking ? 1 : 0, dt * 12);
+    this.chargeW = approach(this.chargeW || 0, mel && mel.charging ? Math.min(1, mel.holdT / 0.6) : 0, dt * 8);
+    if (spec && spec.type === 'melee') {
+      const bw = this.blockW, cw = this.chargeW;
+      P[0] += -0.16 * bw; P[1] += 0.12 * bw; P[2] += 0.05 * bw; R[0] += 0.25 * bw; R[1] += 0.85 * bw; R[2] += 1.3 * bw;
+      P[0] += 0.04 * cw; P[1] += 0.08 * cw; P[2] += 0.14 * cw; R[0] += 0.75 * cw; R[2] -= 0.35 * cw;
+      if (cw > 0.95) { P[0] += (Math.random() - 0.5) * 0.004; P[1] += (Math.random() - 0.5) * 0.004; } // tremor de força
+    }
     this.weaponRoot.position.set(P[0], P[1], P[2]);
     this.weaponRoot.rotation.set(R[0], R[1], R[2]);
 
@@ -505,9 +521,10 @@ export class ViewModel {
     }
 
     // ---- câmera: bob, tranco, FOV ----
-    this.camOff.y = -Math.abs(Math.cos(bp)) * 0.025 * this.bobAmp * (1 - adsEff * 0.8) + land * 0.06;
-    this.camOff.roll = Math.sin(bp) * 0.006 * this.bobAmp * (1 - adsEff * 0.8) + shakeR * 0.03;
-    this.camOff.pitch = shake * 0.02 + land * 0.02;
+    const gs = this.G.gfx ? this.G.gfx.settings : null, bobK = gs && !gs.bob ? 0 : 1, shk = gs ? gs.shake : 1;
+    this.camOff.y = (-Math.abs(Math.cos(bp)) * 0.025 * this.bobAmp * (1 - adsEff * 0.8) + land * 0.06) * bobK;
+    this.camOff.roll = Math.sin(bp) * 0.006 * this.bobAmp * (1 - adsEff * 0.8) * bobK + shakeR * 0.03 * shk;
+    this.camOff.pitch = shake * 0.02 * shk + land * 0.02 * bobK;
     const baseFov = this.sprint > 0.01 ? 75 + 5 * this.sprint : 75;
     this.fovTarget = spec && spec.type !== 'melee' ? lerp(baseFov, spec.adsFov, adsEff) : baseFov;
 
@@ -731,7 +748,7 @@ export class ViewModel {
 
   // ---------- desenho ----------
   render(renderer) {
-    if (!this.active || this.G.player.dead) return;
+    if (!this.active || this.G.player.dead || (this.G.naval && this.G.naval.manning)) return;
     const r = renderer;
     r.autoClear = false;
     r.clearDepth();

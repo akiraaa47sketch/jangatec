@@ -1,3 +1,5 @@
+<p align="center"><img src="client/public/jangatec-logo.png" alt="Jangatec" width="560"></p>
+
 # Maré Alta — protótipo
 
 Jogo 3D de sobrevivência, exploração e construção em alto-mar, no navegador.
@@ -88,6 +90,23 @@ olha, dá tranco no disparo e mostra o clarão na boca do cano. Revólver, pisto
 têm **mira red dot** (o ponto fica no centro da tela ao mirar). As mãos em 1ª pessoa são luvas
 arredondadas com dedos, na cor escolhida para a pílula. Opções gráficas: tecla **G**.
 
+**Caído no multiplayer**: com aliados na sala, ao zerar a vida o jogador fica **caído** — não ataca
+nem se cura, se arrasta devagar e sangra por 45 s (golpes encurtam o tempo). Um aliado reanima
+**segurando E perto dele por 2,5 s** (volta com 35 de vida). Sem ajuda, ou se todos caírem, ele morre e
+renasce no barco. Jogando solo, morrer continua levando direto ao barco.
+
+**Corpo a corpo** (`client/src/systems/melee.js`, constantes em `MELEE`): com arma branca, clique =
+golpe leve rápido (combo de 3 com animações variadas: corte, revés e um final aleatório — estocada,
+uppercut ou giro de 360°), segurar o clique = golpe pesado carregado (pancada ou giro; quebra a
+guarda e interrompe ataques), botão direito = bloquear (no instante do golpe vira **parry**: o inimigo
+fica atordoado e o próximo golpe é crítico), **[Q] = esquiva** com invencibilidade. Golpes, bloqueios e
+esquivas gastam **estamina** (barra dourada sob a vida); sem estamina a guarda quebra. A esquiva é
+cambalhota (frente/trás) ou passo lateral, e o parry tem animação própria com faíscas. Os inimigos
+avisam antes de bater (luva brilhando + "!" vermelho = leve, "!!" amarelo = pesado), têm golpes por
+tipo (golpes variados, combos de 2–3, pancada em área), avançam no golpe, às vezes **desviam** ou
+defendem, ficam atordoados com estrelas, rodeiam o
+jogador e no máximo 2 atacam ao mesmo tempo. Impactos têm hit-stop, empurrão e números de dano.
+
 As **armas** usam o mesmo modelo detalhado em 1ª e 3ª pessoa (`client/src/player/viewmodel-parts.js`):
 madeira texturizada, cantos chanfrados, gatilho com guarda-mato e detalhes por arma (fita, pregos
 tortos, estrias do tambor, trilho, cartuchos na coronha, bipé…).
@@ -104,22 +123,56 @@ balsas, lançar ganchos, voar até o convés e atacar quem estiver a bordo.
 
 ### Eventos do mar e balanceamento
 
-Depois da partida o céu abre aos poucos e, de tempos em tempos (~2–3 min), o host sorteia um evento
+Depois da partida o céu abre aos poucos. Os eventos são **raros e sem aviso** (primeiro entre 5 e 8 min,
+depois 7–13 min entre eles, às vezes o mar só fica quieto), quase nunca repetem o mesmo tipo em seguida e
+cada um sai diferente (força, velocidade, tamanho, lado e sentido de giro sorteados). O host sorteia
 (`client/src/systems/events.js`, constantes em `EVENT_BALANCE`):
 
-- **Onda gigante**: uma frente de água de ~4,5 m atravessa o mar (entra em `waveHeight` e no shader,
+- **Onda gigante**: uma frente de água de 3,6–5,6 m atravessa o mar (entra em `waveHeight` e no shader,
   então barco, detritos e nadadores sentem a onda). Baixe a vela e fique perto do mastro; com a vela
   cheia a jangada é arremessada e quem está a bordo leva dano. Quem está longe do mastro é jogado
   pelo convés.
-- **Furacão**: um funil com nuvem em espiral, spray e destroços passa ao lado da rota e puxa a jangada
-  para o olho (o mar afunda e gira em espiral ali). Levante a vela e gire-a para o lado oposto ao olho;
-  se a jangada chegar ao olho, ela é sugada, gira e é cuspida com dano.
+- **Furacão / redemoinho**: o mar se abre num **redemoinho gigante** (60–85 m de raio, funil d'água de
+  7–11 m com garganta funda, braços de espuma girando) ao lado da rota. Ele gira a jangada junto com a
+  água e vai puxando aos poucos (mais forte com o tempo e perto do centro). Levante a vela e gire-a para
+  o lado oposto; se a jangada chegar ao centro, ela é sugada, gira e é cuspida com dano.
+
+- **Menu e servidores** (`client/src/ui/mainmenu.js`): menu em abas (Jogar · Servidores · Personagem ·
+  Opções · Controles) sobre a cena 3D. A aba Servidores lista as salas **ao vivo** (atualiza a cada 4 s,
+  busca, jogadores, capitão, fase/distância), cria sala com **nome, senha opcional, limite de jogadores e
+  seed**, e pede a senha ao entrar em sala trancada. No servidor: mensagens `list`/`rooms`, `join` com
+  `create/password/max` (senha guardada como hash SHA-256) e `join-error`.
+- **Chat de voz** (`client/src/net/voice.js`): WebRTC P2P entre os jogadores da sala (sinalização pela
+  mensagem `rtc` do servidor, STUN público), voz **por proximidade em 3D** ou "rádio", aperte-para-falar
+  [V] ou voz aberta com detecção de fala, volume/ganho e indicador de quem está falando no HUD.
+  Sem servidor TURN: em algumas redes muito restritas a voz pode não conectar.
+- **Imersão** (menu Gráficos → Imersão, tudo opcional e salvo no navegador, fora das predefinições;
+  `client/src/core/graphics.js`): tremor da câmera (0–100%, suave e com rotação), profundidade de campo
+  (foco automático — no personagem em 3ª pessoa, no centro ao mirar/1ª pessoa), desfoque de movimento
+  da rotação da câmera, balanço ao andar, água na lente (sair do mar, respingos, onda/redemoinho),
+  efeito de vida baixa (dessatura + bordas vermelhas no ritmo do coração) e granulado + aberração
+  cromática. A cena agora é renderizada com textura de profundidade para isso.
+- **Ferramentas** (`client/src/systems/tools.js`, modelos em `viewmodel-parts.js`): **martelo** (caixa
+  inicial) conserta a jangada; **gancho** (naufrágios/destroços) arremessado com física, puxa caixotes
+  boiando e jogadores (mensagem `yank`); **banjo** com som sintetizado (Karplus–Strong), músicas de
+  domínio público no clique e painel nota por nota ([B]); quem ouve por perto recupera vida (flag `mu` no
+  estado do jogador, notas pela mensagem `music`). As armas **não quebram** mais.
+- **Batalha naval** (`client/src/systems/naval.js`, constantes em `NAVAL`/`PIECE_HP`; modelos em
+  `client/src/world/navalmodels.js`): o **canhão improvisado** (galão d'água + cano) só sai em
+  caixas/naufrágios a partir da região 3 (~640 m da rota); as balas são infinitas, com recarga longa (7 s). Instalado no convés, vira uma peça da jangada;
+  sentado nele, a mira mostra a trajetória balística e uma retícula em círculo no ponto de impacto. As
+  balas têm física (gravidade + velocidade da jangada) e são simuladas em todos os clientes; o host decide o
+  dano. Com um canhão instalado, o host sorteia batalhas (raras): 1–2 **navios piratas grandes** emparelham
+  e disparam bordadas; têm vida, pegam fogo, inclinam e **afundam**, soltando **caixotes de loot que boiam**. **Cada peça da jangada tem
+  vida** (maior para peças grandes/de metal); destruída, solta-se. Só a plataforma do mastro é
+  indestrutível. O **martelo** conserta peças (martelando, sem gastar material). Durante a batalha a maré é segurada no cheio (`Naval.holdK` em
+  `tide.js`) e nenhum outro evento/invasão começa.
 
 - **Oceano que seca** (`client/src/systems/tide.js`, constantes em `TIDE`): só dois estados — **mar cheio**
   e **mar seco** — num ciclo de 6 min (seco ≈ 2 min 24 s), com uma transição rápida (16 s) entre eles,
   calculado do relógio comum. Seco, a água desce abaixo do **fundo do mar** (`client/src/world/seabed.js`)
   e dá para andar livremente por ele. A jangada encalha até a água voltar. **Itens pesados afundam**
-  (placa metálica, calha, sucata e pedaço de casa, `sinks: true` em `DEBRIS`): ficam no fundo e só são
+  (placa metálica, calha, sucata, pedaço de casa, tambor de metal e telha ondulada, `sinks: true` em `DEBRIS`): ficam no fundo e só são
   alcançáveis com o mar seco. **Naufrágios** (30% dos chunks sem ilha) têm 1–2 baús e destroços em volta.
 
 Eventos são anunciados pela rede (`t: 'event'`) e derivados do relógio comum, então todos os

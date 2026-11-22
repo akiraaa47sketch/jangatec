@@ -325,11 +325,11 @@ export class Startup {
     switch (this.phase) {
       case 'build': return `Monte o barco — ${G.boat.buildProgress}/${G.boat.deckSlots.length} encaixes`;
       case 'install': return 'Instale a vela — aproxime-se do mastro e pressione E';
-      case 'calm': return `Calmaria — ${Math.max(0, Math.ceil(CALM_DURATION - this.elapsed))} s`;
+      case 'calm': return 'Calmaria — prepare-se para zarpar';
       case 'storm': return 'A tempestade se aproxima';
       case 'flood': return 'Inundação — embarque na jangada';
       case 'board': return 'A terra foi inundada — todos a bordo';
-      default: return 'Aventura iniciada — explore o oceano';
+      default: return '';
     }
   }
 }

@@ -17,9 +17,15 @@ export const MAT = {
   glove: new THREE.MeshPhysicalMaterial({ color: 0xd3202b, roughness: 0.38, clearcoat: 0.6, clearcoatRoughness: 0.35 }),
   tube: new THREE.MeshStandardMaterial({ color: 0x2b2220, roughness: 0.6 }),
   gloveSeam: new THREE.MeshStandardMaterial({ color: 0x821319, roughness: 0.7 }),
-  rdGlass: new THREE.MeshStandardMaterial({ color: 0x9fd8c8, roughness: 0.05, metalness: 0.3, transparent: true, opacity: 0.16, depthWrite: false, side: THREE.DoubleSide }),
-  rdDot: new THREE.MeshBasicMaterial({ color: 0xff2a1a, toneMapped: false }),
-  rdGlow: new THREE.MeshBasicMaterial({ color: 0xff3a20, transparent: true, opacity: 0.35, blending: THREE.AdditiveBlending, depthWrite: false, toneMapped: false }),
+  rdGlass: new THREE.MeshStandardMaterial({ color: 0xbfe8ff, roughness: 0.02, metalness: 0.5, transparent: true, opacity: 0.06, depthWrite: false, side: THREE.DoubleSide }),
+  rdCoat: new THREE.ShaderMaterial({ // tom azul/âmbar só nas bordas do vidro (como lente com tratamento)
+    transparent: true, depthWrite: false,
+    vertexShader: 'varying vec2 vUv; void main() { vUv = uv; gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); }',
+    fragmentShader: 'varying vec2 vUv; void main() { vec2 q = abs(vUv - 0.5) * 2.0; float e = smoothstep(0.72, 1.0, max(q.x, q.y)); gl_FragColor = vec4(mix(vec3(0.35, 0.75, 1.0), vec3(1.0, 0.7, 0.3), vUv.y), e * 0.22); }',
+  }),
+  rdDot: new THREE.MeshBasicMaterial({ color: 0xff2414, toneMapped: false, depthTest: false, depthWrite: false, transparent: true }),
+  rdGlow: new THREE.MeshBasicMaterial({ color: 0xff3a20, transparent: true, opacity: 0.55, blending: THREE.AdditiveBlending, depthTest: false, depthWrite: false, toneMapped: false }),
+  rdHalo: new THREE.MeshBasicMaterial({ color: 0xff4a2a, transparent: true, opacity: 0.12, blending: THREE.AdditiveBlending, depthTest: false, depthWrite: false, toneMapped: false }),
   skinDark: std(0x9c5b3e, 0.9),
   nail: std(0xd8b79c, 0.7),
   strap: std(0x583a28, 0.92),
@@ -244,19 +250,38 @@ function trigger(g, z = 0.0, y = -0.04) {
   const tr = box(0.006, 0.022, 0.006, MAT.steel, 0, y + 0.004, z + 0.004); tr.rotation.x = 0.35;
   add(g, guard, tr);
 }
-// Mira red dot: base no trilho, janela com vidro e o ponto vermelho no centro.
-// Retorna a altura do ponto (usada como sightY: na mira o ponto fica no centro da tela).
+// Mira red dot estilo "mini reflex" de FPS moderno: janela larga e baixa com moldura fina,
+// vidro quase transparente (leve tom azulado nas bordas) e um ponto nítido com brilho suave que
+// é desenhado sempre por cima — na mira o ponto fica no centro da tela e a cena aparece limpa.
+// Retorna a altura do ponto (sightY).
+const RD = { w: 0.046, h: 0.036, wall: 0.0032, depth: 0.03, riser: 0.017 };
+function roundRect(shape, w, h, r) {
+  const x = -w / 2, y = -h / 2;
+  shape.moveTo(x + r, y); shape.lineTo(x + w - r, y); shape.quadraticCurveTo(x + w, y, x + w, y + r);
+  shape.lineTo(x + w, y + h - r); shape.quadraticCurveTo(x + w, y + h, x + w - r, y + h);
+  shape.lineTo(x + r, y + h); shape.quadraticCurveTo(x, y + h, x, y + h - r);
+  shape.lineTo(x, y + r); shape.quadraticCurveTo(x, y, x + r, y);
+  return shape;
+}
 function redDot(g, y0, z) {
-  const R = 0.0145, cy = y0 + 0.011 + R;
-  add(g, box(0.026, 0.009, 0.046, MAT.black, 0, y0 + 0.0045, z + 0.004));        // base/trava
-  add(g, box(0.008, 0.006, 0.014, MAT.black, 0.014, y0 + 0.004, z + 0.012));     // parafuso lateral
-  const frame = new THREE.Mesh(new THREE.TorusGeometry(R + 0.0025, 0.0032, 8, 28), MAT.black);
-  frame.position.set(0, cy, z - 0.008); add(g, frame);
-  for (const sd of [-1, 1]) add(g, box(0.004, R * 1.4, 0.026, MAT.black, sd * (R + 0.003), y0 + 0.009 + R * 0.7, z));
-  add(g, box(0.006, 0.006, 0.012, MAT.black, R * 0.9, cy + R * 0.8, z + 0.006));  // botão de brilho
-  const glass = new THREE.Mesh(new THREE.CircleGeometry(R, 24), MAT.rdGlass); glass.position.set(0, cy, z - 0.0085); add(g, glass);
-  const dot = new THREE.Mesh(new THREE.SphereGeometry(0.0011, 8, 6), MAT.rdDot); dot.position.set(0, cy, z - 0.004); add(g, dot);
-  const glow = new THREE.Mesh(new THREE.CircleGeometry(0.0034, 14), MAT.rdGlow); glow.position.set(0, cy, z - 0.0042); add(g, glow);
+  const { w, h, wall, depth, riser } = RD, cy = y0 + riser + h / 2 + wall;
+  add(g, box(0.024, 0.008, 0.05, MAT.black, 0, y0 + 0.004, z + 0.004));                  // trava no trilho
+  add(g, box(w * 0.7, riser, depth * 0.9, MAT.black, 0, y0 + riser / 2 + 0.004, z));     // riser (sobe a mira acima do corpo)
+  add(g, box(0.007, 0.007, 0.016, MAT.black, w / 2 + 0.002, y0 + riser * 0.6, z + 0.01)); // alavanca da trava
+  const outer = roundRect(new THREE.Shape(), w + wall * 2, h + wall * 2, 0.009);
+  outer.holes.push(roundRect(new THREE.Path(), w, h, 0.007));
+  const hoodGeo = new THREE.ExtrudeGeometry(outer, { depth, bevelEnabled: false, curveSegments: 6 });
+  hoodGeo.translate(0, 0, -depth / 2);
+  const hood = new THREE.Mesh(hoodGeo, MAT.black); hood.position.set(0, cy, z); add(g, hood);
+  add(g, box(0.008, 0.006, 0.012, MAT.black, w * 0.32, cy + h / 2 + wall + 0.002, z + 0.006)); // botões de brilho
+  add(g, box(0.008, 0.006, 0.012, MAT.black, -w * 0.32, cy + h / 2 + wall + 0.002, z + 0.006));
+  const glass = new THREE.Mesh(new THREE.PlaneGeometry(w, h), MAT.rdGlass); glass.position.set(0, cy, z - depth / 2 + 0.002); add(g, glass);
+  const coat = new THREE.Mesh(new THREE.PlaneGeometry(w, h), MAT.rdCoat); coat.position.set(0, cy, z - depth / 2 + 0.0025); add(g, coat);
+  // ponto + brilho, sempre visíveis (sem teste de profundidade)
+  for (const [r, mat] of [[0.0036, MAT.rdHalo], [0.0016, MAT.rdGlow], [0.00068, MAT.rdDot]]) {
+    const m = new THREE.Mesh(new THREE.CircleGeometry(r, 20), mat);
+    m.position.set(0, cy, z - depth / 2 + 0.003); m.renderOrder = 20; add(g, m);
+  }
   return cy;
 }
 // Fita adesiva enrolada (anéis levemente tortos).
@@ -377,7 +402,7 @@ SPECS.revolver = () => {
   const rdY = redDot(g, 0.074, 0.005);
   const muzzle = new THREE.Vector3(0, 0.046, -0.255);
   return {
-    group: g, type: 'pistol', reload: 'revolver', muzzle, sightY: rdY, adsDist: 0.38, adsFov: 62, flash: 1.1,
+    group: g, type: 'pistol', reload: 'revolver', muzzle, sightY: rdY, adsDist: 0.27, adsFov: 64, flash: 1.1,
     hold: { p: [0.17, -0.11, -0.46], r: [0.08, 0.06, 0] },
     gripR: { p: [0, -0.08, 0.085], r: [0, 0, -1.55], c: 0.9, idx: 0.3, th: [-0.35, -0.2, 0.2] },
     gripL: { p: [0, -0.115, 0.085], r: [0, 0, 1.55], c: 0.85, th: [-0.2, 0.0, 0.2] },
@@ -411,7 +436,7 @@ SPECS.pistola = () => {
   g.add(mag);
   const muzzle = new THREE.Vector3(0, 0.04, -0.105);
   return {
-    group: g, type: 'pistol', reload: 'mag', muzzle, sightY: rdY, adsDist: 0.38, adsFov: 62, flash: 1.0,
+    group: g, type: 'pistol', reload: 'mag', muzzle, sightY: rdY, adsDist: 0.27, adsFov: 64, flash: 1.0,
     eject: new THREE.Vector3(0.02, 0.045, -0.02),
     hold: { p: [0.16, -0.1, -0.46], r: [0.08, 0.05, 0] },
     gripR: { p: [0, -0.065, 0.065], r: [0, 0, -1.55], c: 0.9, idx: 0.3, th: [-0.35, -0.2, 0.2] },
@@ -444,7 +469,7 @@ SPECS.escopeta = () => {
   const rdY = redDot(g, 0.062, -0.05);
   const muzzle = new THREE.Vector3(0, 0.04, -0.7);
   return {
-    group: g, type: 'long', reload: 'shotgun', muzzle, sightY: rdY, adsDist: 0.42, adsFov: 60, flash: 1.6,
+    group: g, type: 'long', reload: 'shotgun', muzzle, sightY: rdY, adsDist: 0.2, adsFov: 62, flash: 1.6,
     eject: new THREE.Vector3(0.026, 0.03, -0.02),
     hold: { p: [0.15, -0.12, -0.46], r: [0.03, 0.09, 0] },
     gripR: { p: [0, -0.075, 0.07], r: [0, 0, -1.55], c: 0.9, idx: 0.3, th: [-0.35, -0.2, 0.2] },
@@ -480,7 +505,7 @@ SPECS.rifle = () => {
   g.add(bolt);
   const muzzle = new THREE.Vector3(0, 0.034, -0.9);
   return {
-    group: g, type: 'long', reload: 'mag', muzzle, sightY: rdY, adsDist: 0.42, adsFov: 54, flash: 1.3,
+    group: g, type: 'long', reload: 'mag', muzzle, sightY: rdY, adsDist: 0.1, adsFov: 58, flash: 1.3,
     eject: new THREE.Vector3(0.03, 0.045, -0.06),
     hold: { p: [0.15, -0.12, -0.46], r: [0.03, 0.09, 0] },
     gripR: { p: [0, -0.07, 0.075], r: [0, 0, -1.55], c: 0.9, idx: 0.3, th: [-0.35, -0.2, 0.2] },
@@ -527,6 +552,78 @@ SPECS.rifle_precisao = () => {
     gripL: { p: [0, -0.002, -0.42], r: [0, -1.5708, 3.1416], c: 0.8, th: [0.3, -0.3, 0.2] },
     magPoint: [0, -0.08, -0.06],
     parts: { mag, bolt },
+  };
+};
+
+// ----- ferramentas -----
+SPECS.martelo = () => {
+  const g = new THREE.Group();
+  add(g, cylZ(0.016, 0.02, 0.36, MAT.woodLight, 0, 0, -0.12, 12));   // cabo
+  tape(g, 0.05, 0.021, 3, 0.022);                                       // empunhadura
+  add(g, box(0.042, 0.05, 0.046, MAT.iron, 0, 0, -0.32));              // cabeça
+  add(g, cylY(0.024, 0.05, MAT.steel, 0, 0.045, -0.32, 14));           // face de bater
+  add(g, cylY(0.027, 0.008, MAT.steel, 0, 0.072, -0.32, 14));
+  for (const x of [-0.009, 0.009]) {                                    // unha (tira prego)
+    const c = box(0.011, 0.075, 0.02, MAT.iron, x, -0.055, -0.312); c.rotation.x = 0.45; add(g, c);
+  }
+  add(g, box(0.003, 0.03, 0.02, MAT.black, 0, -0.07, -0.3));           // fenda da unha
+  return {
+    group: g, type: 'melee', muzzle: null, swing: ['overhead', 'overhead'],
+    hold: { p: [0.22, -0.1, -0.4], r: [0.8, 0.25, -0.1] },
+    gripR: { p: [0, 0, 0.04], r: [0, 1.55, -0.55], c: 0.95 },
+  };
+};
+
+SPECS.banjo = () => {
+  const g = new THREE.Group(), b = new THREE.Group();
+  add(b, cylZ(0.13, 0.13, 0.05, MAT.woodDark, 0, 0, 0, 28));           // aro
+  add(b, cylZ(0.137, 0.137, 0.02, MAT.wood, 0, 0, -0.034, 28));        // ressonador
+  const head = new THREE.Mesh(new THREE.CircleGeometry(0.122, 32), MAT.white); head.position.z = 0.026; add(b, head);
+  const ring = new THREE.Mesh(new THREE.TorusGeometry(0.125, 0.006, 6, 32), MAT.brass); ring.position.z = 0.027; add(b, ring);
+  for (let i = 0; i < 16; i++) {                                         // ganchos de tensão
+    const a = (i / 16) * Math.PI * 2;
+    add(b, box(0.008, 0.008, 0.05, MAT.steel, Math.cos(a) * 0.134, Math.sin(a) * 0.134, 0.004));
+  }
+  add(b, box(0.5, 0.026, 0.022, MAT.wood, -0.37, 0, 0.02));            // braço
+  add(b, box(0.5, 0.024, 0.005, MAT.woodDark, -0.37, 0, 0.033));       // escala
+  for (let i = 1; i < 12; i++) add(b, box(0.002, 0.026, 0.002, MAT.steel, -0.13 - i * 0.04 + i * i * 0.0006, 0, 0.037)); // trastes
+  add(b, box(0.1, 0.045, 0.016, MAT.woodDark, -0.67, 0.004, 0.02));    // mão (cabeça) do banjo
+  for (const [x, y] of [[-0.64, 0.028], [-0.69, 0.028], [-0.64, -0.022], [-0.69, -0.022], [-0.36, -0.02]]) add(b, cylY(0.006, 0.022, MAT.steel, x, y, 0.02, 8)); // tarraxas
+  for (let i = 0; i < 5; i++) {                                         // 5 cordas
+    const len = i === 4 ? 0.48 : 0.76, x0 = 0.1, cx = x0 - len / 2;
+    add(b, box(len, 0.0012, 0.0012, MAT.steel, cx, -0.01 + i * 0.005, 0.04));
+  }
+  add(b, box(0.008, 0.03, 0.01, MAT.woodLight, 0.04, 0.0, 0.034));     // cavalete
+  add(b, box(0.05, 0.02, 0.006, MAT.brass, 0.11, 0, 0.03));            // estandarte
+  b.rotation.z = -0.7; b.scale.setScalar(0.8);                         // braço subindo para a esquerda
+  add(g, b);
+  return {
+    group: g, type: 'melee', muzzle: null, swing: ['slashShort', 'slashShort'],
+    hold: { p: [0.12, -0.27, -0.56], r: [0.55, 0.3, 0.05] },
+    gripR: { p: [0.05, -0.03, 0.05], r: [0.2, 1.4, -0.9], c: 0.6 },
+    gripL: { p: [-0.22, 0.19, 0.03], r: [0, -1.4, 2.6], c: 0.7, th: [0.3, -0.3, 0.2] },
+  };
+};
+
+SPECS.gancho = () => {
+  const g = new THREE.Group();
+  add(g, cylZ(0.011, 0.012, 0.28, MAT.iron, 0, 0, -0.12, 10));          // haste
+  const eye = new THREE.Mesh(new THREE.TorusGeometry(0.018, 0.005, 6, 14), MAT.iron); eye.position.z = 0.035; eye.rotation.y = Math.PI / 2; add(g, eye);
+  for (let i = 0; i < 3; i++) {                                         // três garras curvas
+    const arm = new THREE.Group(); arm.rotation.z = (i / 3) * Math.PI * 2; arm.position.z = -0.25;
+    // garra curva: sai da ponta da haste, abre para fora e volta para trás (+Z)
+    const curve = new THREE.CatmullRomCurve3([new THREE.Vector3(0, 0, 0.01), new THREE.Vector3(0, 0.03, -0.025), new THREE.Vector3(0, 0.068, -0.01), new THREE.Vector3(0, 0.082, 0.035)]);
+    arm.add(new THREE.Mesh(new THREE.TubeGeometry(curve, 14, 0.0075, 6), MAT.steel));
+    const tip = new THREE.Mesh(new THREE.ConeGeometry(0.0095, 0.028, 6), MAT.steel);
+    tip.position.set(0, 0.08, 0.052); tip.rotation.x = Math.PI / 2 + 0.25; arm.add(tip);
+    g.add(arm);
+  }
+  add(g, cylZ(0.016, 0.016, 0.02, MAT.iron, 0, 0, -0.26, 10));
+  const coil = new THREE.Mesh(new THREE.TorusGeometry(0.05, 0.012, 6, 18), MAT.wrap); coil.position.set(0.03, -0.03, 0.06); coil.rotation.y = 0.4; add(g, coil);
+  return {
+    group: g, type: 'melee', muzzle: null, swing: ['slashShort', 'slashShort'],
+    hold: { p: [0.2, -0.12, -0.38], r: [0.5, 0.25, -0.1] },
+    gripR: { p: [0, 0, 0.0], r: [0, 1.55, -0.55], c: 0.95 },
   };
 };
 

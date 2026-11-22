@@ -5,6 +5,7 @@ import { WEAPONS } from './combat.js';
 export const ITEM_NAMES = {
   madeira: 'Madeira', metal: 'Metal', pano: 'Pano', bandagem: 'Bandagem',
   kit: 'Kit médico', municao: 'Munição', cartucho: 'Cartuchos',
+  canhao: 'Canhão improvisado', bala_canhao: 'Balas de canhão',
 };
 const USE = {
   bandagem: (s) => { s.vida = clamp(s.vida + 30, 0, 100); return 'Bandagem aplicada'; },
@@ -12,10 +13,11 @@ const USE = {
 };
 
 export class Survival {
+  static BLEED = 45; // segundos caído até morrer sem ajuda
   constructor(G) {
     this.G = G;
     this.vida = 100;
-    this.inv = { madeira: 0, metal: 0, pano: 0, bandagem: 0, kit: 0, municao: 0, cartucho: 0 };
+    this.inv = { madeira: 0, metal: 0, pano: 0, bandagem: 0, kit: 0, municao: 0, cartucho: 0, canhao: 0, bala_canhao: 0 };
     this.deadTimer = 0;
   }
   add(loot) {
@@ -27,9 +29,6 @@ export class Survival {
         if (result === true) {
           const weapon = WEAPONS.find((entry) => entry.id === id);
           parts.push(weapon ? `${weapon.nome} ${'★'.repeat(weapon.stars)} adquirido` : 'Arma adquirida');
-        } else if (result === 'repaired') {
-          const weapon = WEAPONS.find((entry) => entry.id === id);
-          parts.push(`${weapon ? weapon.nome : id} reparado`);
         }
         continue;
       }
@@ -40,6 +39,7 @@ export class Survival {
   }
   use(item) {
     if (!USE[item] || !this.inv[item] || this.G.player.dead) return;
+    if (this.G.player.downed) { this.G.hud.msg('Caído você não consegue se curar — espere um aliado'); return; }
     this.inv[item]--;
     if (this.G.viewmodel) this.G.viewmodel.onUse(item);
     this.G.hud.msg(USE[item](this));
@@ -47,15 +47,42 @@ export class Survival {
   }
   damage(n, source) {
     if (this.G.player.dead) return;
+    if (this.G.player.downed) { this.bleed -= n * 0.15; return; } // apanhar caído encurta o tempo
     this.vida -= n;
     if (this.G.viewmodel) this.G.viewmodel.onHurt(n);
+    if (this.G.events) this.G.events.shake = Math.max(this.G.events.shake, Math.min(0.55, n / 50)); // tranco ao levar dano
     this.G.hud.flash('hurt');
     if (this.vida <= 0) {
-      this.vida = 0; this.G.player.dead = true; this.deadTimer = 4;
+      this.vida = 0;
+      const net = this.G.net;
+      if (net.online && net.remotes.size > 0) {
+        // multiplayer: fica CAÍDO, se arrastando, até um aliado reanimar (ou sangrar até o fim)
+        this.G.player.downed = true; this.bleed = Survival.BLEED;
+        this.G.hud.msg(`Você caiu (${source})! Um aliado pode te reanimar: segure E perto de você.`);
+        return;
+      }
+      this.G.player.dead = true; this.deadTimer = 4;
       this.G.hud.msg(`Você caiu (${source}). Voltando ao barco...`);
     }
   }
+  revive(by) {
+    const pl = this.G.player;
+    if (!pl.downed) return;
+    pl.downed = false; this.vida = 35;
+    this.G.hud.msg(`${by || 'Um aliado'} te reanimou!`);
+    this.G.hud.flash('heal');
+  }
   update(dt) {
+    const pl = this.G.player;
+    if (pl.downed) {
+      this.bleed -= dt;
+      // ninguém sobrou de pé para ajudar (ou o tempo acabou): morre e volta ao barco
+      if (this.bleed <= 0 || !this.G.net.online || this.G.net.remotes.size === 0) {
+        pl.downed = false; pl.dead = true; this.deadTimer = 4;
+        this.G.hud.msg('Você não resistiu. Voltando ao barco...');
+      }
+      return;
+    }
     if (this.G.player.dead) {
       this.deadTimer -= dt;
       if (this.deadTimer <= 0) { this.vida = 60; this.G.player.respawn(); }

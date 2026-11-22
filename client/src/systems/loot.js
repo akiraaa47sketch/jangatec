@@ -102,6 +102,7 @@ export function generateCrateLoot(seed, id, difficulty, playerCount = 1) {
   if (id === LOOT_CONFIG.starterCache.id) {
     return {
       arma_pistola: 1,
+      arma_martelo: 1, // conserta a jangada (única forma de reparo)
       bandagem: LOOT_CONFIG.starterCache.bandageBase +
         Math.max(1, playerCount) * LOOT_CONFIG.starterCache.bandagesPerPlayer,
       municao: LOOT_CONFIG.starterCache.pistolAmmo,
@@ -139,6 +140,15 @@ export function generateCrateLoot(seed, id, difficulty, playerCount = 1) {
     else if (weapon === 'rifle') add('municao', 10 + Math.floor(random() * 11));
     else if (weapon === 'rifle_precisao') add('municao', 5 + Math.floor(random() * 6));
   }
+
+  const wreck = id.startsWith('b');
+  // Canhão improvisado (galão d'água) só aparece longe na rota (região 3+, ~640 m) — e naufrágios
+  // escondem mais. As balas são infinitas (o canhão só tem recarga longa).
+  if (regionIndex >= 2 && random() < (wreck ? 0.3 : 0.14) + (regionIndex - 2) * 0.05) add('canhao', 1);
+  // Ferramentas: o GANCHO sai principalmente de destroços/naufrágios; BANJO e martelo extra em caixas.
+  if (random() < (wreck ? 0.4 : regionIndex >= 1 ? 0.07 : 0)) add('arma_gancho', 1);
+  if (random() < (wreck ? 0.15 : regionIndex >= 1 ? 0.08 : 0.03)) add('arma_banjo', 1);
+  if (regionIndex >= 1 && random() < 0.05) add('arma_martelo', 1);
 
   if (random() < 0.25 + regionIndex * 0.08) {
     add(regionIndex >= 2 && random() < 0.16 ? 'kit' : 'bandagem', 1 + (random() < 0.35 ? 1 : 0));

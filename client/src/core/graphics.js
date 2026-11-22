@@ -4,6 +4,9 @@
 //      + tone mapping (Neutral) + gradação de cor + vinheta, na resolução da tela
 //   → RCAS (o afiador adaptativo do FSR 1) direto na tela.
 // O viewmodel (braços/arma) é desenhado depois, em resolução cheia.
+// IMERSÃO (opcional, menu Gráficos → Imersão): profundidade de campo com foco automático no centro
+// da tela, desfoque de movimento da câmera (só rotação), granulado + aberração cromática, efeitos de
+// vida baixa, água na lente e tremor/balanço da câmera. Ficam fora das predefinições.
 import * as THREE from '../three.js';
 import { EffectComposer } from 'three/addons/postprocessing/EffectComposer.js';
 import { RenderPass } from 'three/addons/postprocessing/RenderPass.js';
@@ -25,13 +28,41 @@ export const GFX_LABELS = {
   water: { baixa: 'Baixa', media: 'Média', alta: 'Alta', ultra: 'Ultra' },
   pixelCap: { 1: '1x', 1.5: '1,5x', 2: '2x (retina)' },
 };
+export const IMMERSION_DEFAULTS = (mobile) => ({ shake: 1, bob: true, dof: mobile ? 'off' : 'suave', motion: !mobile, grain: false, lowHp: true, wet: true });
+export const IMMERSION_KEYS = ['shake', 'bob', 'dof', 'motion', 'grain', 'lowHp', 'wet'];
+GFX_LABELS.dof = { off: 'Desligada', suave: 'Suave', forte: 'Forte (cinema)' };
 const SHADOW = { off: null, baixa: [1024, 52, false], media: [2048, 52, false], alta: [2048, 60, true], ultra: [4096, 85, true] };
 const KEY = 'mare-alta-graficos';
 
 // Tone mapping Neutral (Khronos) + gradação + vinheta; upscale Catmull-Rom com anti-ringing.
 const EASU_FRAG = /* glsl */`
 uniform sampler2D tInput; uniform vec2 uInSize; uniform float uExposure; uniform float uGrade; uniform float uBicubic;
+uniform float uGrain; uniform float uTime; uniform float uLowHp; uniform float uPulse; uniform float uWet; uniform float uAspect;
 varying vec2 vUv;
+float h21(vec2 p) { vec3 q = fract(vec3(p.xyx) * 0.1031); q += dot(q, q.yzx + 33.33); return fract((q.x + q.y) * q.z); }
+// gotas d'água na lente: células com uma gota cada, que escorrem e somem (deslocam a imagem)
+vec2 wetOffset(vec2 uv, out float mask) {
+  mask = 0.0;
+  if (uWet <= 0.001) return vec2(0.0);
+  vec2 off = vec2(0.0);
+  for (int l = 0; l < 2; l++) {
+    float sc = l == 0 ? 9.0 : 15.0;
+    vec2 g = vec2(uv.x * uAspect, uv.y) * sc;
+    vec2 id = floor(g), f = fract(g) - 0.5;
+    float r = h21(id + float(l) * 17.0);
+    if (r > 0.35 + 0.5 * (1.0 - uWet)) continue;
+    float slide = fract(uTime * (0.05 + r * 0.12) + r);
+    vec2 c = vec2((h21(id + 3.1) - 0.5) * 0.6, 0.35 - slide * 0.9);
+    float rad = 0.12 + 0.16 * h21(id + 7.7);
+    vec2 d = f - c; d.y *= 1.0 + 0.6 * slide;
+    float dd = length(d);
+    float drop = smoothstep(rad, rad * 0.6, dd) * uWet;
+    float trail = smoothstep(0.05, 0.0, abs(f.x - c.x)) * step(c.y, f.y) * smoothstep(0.5, c.y, f.y) * 0.35 * uWet;
+    off += d * drop * 0.09 / sc * 9.0 - vec2(0.0, trail * 0.004);
+    mask = max(mask, drop);
+  }
+  return off;
+}
 vec3 neutral(vec3 c) {
   c *= uExposure;
   float x = min(c.r, min(c.g, c.b)), off = x < 0.08 ? x - 6.25 * x * x : 0.04;
@@ -59,14 +90,20 @@ vec3 catmullRom(vec2 uv) {
 }
 void main() {
   vec3 c;
+  float wetMask; vec2 uv = vUv + wetOffset(vUv, wetMask);
   if (uBicubic > 0.5) {
-    c = catmullRom(vUv);
+    c = catmullRom(uv);
     // anti-ringing (como no EASU): limita ao intervalo dos 4 texels mais próximos
-    vec2 px = 1.0 / uInSize, b = (floor(vUv * uInSize - 0.5) + 0.5) * px;
+    vec2 px = 1.0 / uInSize, b = (floor(uv * uInSize - 0.5) + 0.5) * px;
     vec3 a0 = tap(b), a1 = tap(b + vec2(px.x, 0.0)), a2 = tap(b + vec2(0.0, px.y)), a3 = tap(b + px);
     c = clamp(c, min(min(a0, a1), min(a2, a3)), max(max(a0, a1), max(a2, a3)));
-  } else c = tap(vUv);
+  } else c = tap(uv);
+  if (uGrain > 0.5) { // aberração cromática leve nas bordas
+    vec2 q = uv - 0.5, ca = q * dot(q, q) * 0.012;
+    c.r = mix(c.r, tap(uv + ca).r, 0.85); c.b = mix(c.b, tap(uv - ca).b, 0.85);
+  }
   c = neutral(max(c, 0.0));
+  c += wetMask * 0.04; // brilho da gota
   if (uGrade > 0.5) {
     float l = dot(c, vec3(0.2126, 0.7152, 0.0722));
     float sat = max(c.r, max(c.g, c.b)) - min(c.r, min(c.g, c.b));
@@ -75,7 +112,72 @@ void main() {
     c *= vec3(1.02, 1.0, 0.97);                                // calor de fim de tarde
     vec2 q = vUv - 0.5; c *= 1.0 - dot(q, q) * 0.55;          // vinheta
   }
+  if (uLowHp > 0.001) { // vida baixa: some a cor, bordas vermelhas pulsando com o coração
+    float l = dot(c, vec3(0.2126, 0.7152, 0.0722));
+    c = mix(c, vec3(l), uLowHp * 0.65);
+    vec2 q = vUv - 0.5; float v = smoothstep(0.18, 0.75, length(q * vec2(uAspect, 1.0)) / max(1.0, uAspect * 0.8));
+    c = mix(c, vec3(0.35, 0.02, 0.02), v * uLowHp * (0.45 + 0.35 * uPulse));
+  }
+  if (uGrain > 0.5) c += (h21(vUv * uInSize * 1.7 + fract(uTime * 13.0) * 300.0) - 0.5) * 0.045;
   gl_FragColor = vec4(clamp(c, 0.0, 1.0), 1.0);
+}`;
+
+// Profundidade de campo (foco automático) + desfoque de movimento da câmera, na resolução da cena.
+const FX_FRAG = /* glsl */`
+uniform sampler2D tColor; uniform sampler2D tDepth; uniform sampler2D tFocus;
+uniform vec2 uSize; uniform float uNear; uniform float uFar; uniform float uDof; uniform float uMaxR; uniform float uAperture;
+uniform float uMotion; uniform mat4 uInvProj; uniform mat4 uInvView; uniform mat4 uPrevViewProj;
+varying vec2 vUv;
+float lin(float d) { float z = d * 2.0 - 1.0; return 2.0 * uNear * uFar / (uFar + uNear - z * (uFar - uNear)); }
+float coc(float depth, float focus) { return clamp(uAperture * abs(1.0 - focus / max(depth, 0.01)), 0.0, 1.0); }
+void main() {
+  vec3 col = texture2D(tColor, vUv).rgb;
+  float d = texture2D(tDepth, vUv).r, depth = lin(d);
+  if (uDof > 0.5) {
+    float focus = texture2D(tFocus, vec2(0.5)).r;
+    float c0 = coc(depth, focus), r0 = c0 * uMaxR;
+    if (r0 > 0.5) {
+      vec3 acc = col; float wsum = 1.0;
+      const float GA = 2.39996323;
+      for (int i = 1; i < 30; i++) {
+        float fi = float(i), rr = sqrt(fi / 30.0) * r0, a = fi * GA;
+        vec2 o = vec2(cos(a), sin(a)) * rr / uSize;
+        float ds = lin(texture2D(tDepth, vUv + o).r);
+        float cs = coc(ds, focus) * uMaxR;
+        // amostra só conta se o círculo dela cobre este pixel (evita o fundo borrar o que está em foco)
+        float w = clamp(cs - rr + 1.0, 0.0, 1.0) * (ds > depth ? 1.0 : clamp(cs / max(r0, 0.001), 0.0, 1.0));
+        acc += texture2D(tColor, vUv + o).rgb * w; wsum += w;
+      }
+      col = acc / wsum;
+    }
+  }
+  if (uMotion > 0.001) {
+    vec4 ndc = vec4(vUv * 2.0 - 1.0, d * 2.0 - 1.0, 1.0);
+    vec4 vp = uInvProj * ndc; vp /= vp.w;
+    vec4 wp = uInvView * vp;
+    vec4 pc = uPrevViewProj * wp; vec2 puv = pc.xy / pc.w * 0.5 + 0.5;
+    vec2 vel = (vUv - puv) * uMotion;
+    float L = length(vel);
+    if (L > 0.0008) {
+      vel *= min(1.0, 0.05 / L);
+      vec3 acc = col;
+      for (int i = 1; i < 9; i++) acc += texture2D(tColor, vUv - vel * (float(i) / 8.0 - 0.5)).rgb;
+      col = acc / 9.0;
+    }
+  }
+  gl_FragColor = vec4(col, 1.0);
+}`;
+// Foco automático: média da profundidade no centro, suavizada no tempo (1×1 em ping-pong).
+const FOCUS_FRAG = /* glsl */`
+uniform sampler2D tDepth; uniform sampler2D tPrev; uniform float uNear; uniform float uFar; uniform float uRate; uniform float uMin; uniform float uFixed;
+varying vec2 vUv;
+float lin(float d) { float z = d * 2.0 - 1.0; return 2.0 * uNear * uFar / (uFar + uNear - z * (uFar - uNear)); }
+void main() {
+  float f = 0.0;
+  for (int x = -2; x <= 2; x++) for (int y = -2; y <= 2; y++) f += min(lin(texture2D(tDepth, vec2(0.5) + vec2(float(x), float(y)) * 0.012).r), 120.0);
+  f = uFixed > 0.0 ? uFixed : max(f / 25.0, uMin); // 3ª pessoa: foco no personagem
+  float prev = texture2D(tPrev, vec2(0.5)).r;
+  gl_FragColor = vec4(prev < 0.001 ? f : mix(prev, f, uRate), 0.0, 0.0, 1.0);
 }`;
 
 // RCAS — Robust Contrast Adaptive Sharpening (FSR 1). sharpness: 0 = máximo, 2 = suave (em stops).
@@ -99,6 +201,8 @@ void main() {
 }`;
 const VERT = 'varying vec2 vUv; void main() { vUv = uv; gl_Position = vec4(position.xy, 0.0, 1.0); }';
 
+const clamp01 = (x) => Math.min(1, Math.max(0, x));
+
 export class Graphics {
   constructor(G, { renderer, scene, camera, sun, mobile }) {
     Object.assign(this, { G, renderer, scene, camera, sun, mobile });
@@ -106,19 +210,40 @@ export class Graphics {
     this.fps = { frames: 0, acc: 0, value: 0, ms: 0 };
     this.fullRT = new THREE.WebGLRenderTarget(1, 1, { type: THREE.HalfFloatType, depthBuffer: false });
     this.easu = new FullScreenQuad(new THREE.ShaderMaterial({
-      uniforms: { tInput: { value: null }, uInSize: { value: new THREE.Vector2() }, uExposure: { value: 1 }, uGrade: { value: 1 }, uBicubic: { value: 1 } },
+      uniforms: { tInput: { value: null }, uInSize: { value: new THREE.Vector2() }, uExposure: { value: 1 }, uGrade: { value: 1 }, uBicubic: { value: 1 },
+        uGrain: { value: 0 }, uTime: { value: 0 }, uLowHp: { value: 0 }, uPulse: { value: 0 }, uWet: { value: 0 }, uAspect: { value: 1 } },
       vertexShader: VERT, fragmentShader: EASU_FRAG, depthTest: false, depthWrite: false, toneMapped: false,
     }));
     this.rcas = new FullScreenQuad(new THREE.ShaderMaterial({
       uniforms: { tInput: { value: this.fullRT.texture }, uSize: { value: new THREE.Vector2() }, uSharp: { value: 0.3 }, uEnabled: { value: 1 } },
       vertexShader: VERT, fragmentShader: RCAS_FRAG, depthTest: false, depthWrite: false, toneMapped: false,
     }));
+    this.fxRT = new THREE.WebGLRenderTarget(1, 1, { type: THREE.HalfFloatType, depthBuffer: false });
+    const fRT = () => new THREE.WebGLRenderTarget(1, 1, { type: THREE.FloatType, depthBuffer: false, minFilter: THREE.NearestFilter, magFilter: THREE.NearestFilter });
+    this.focusRT = [fRT(), fRT()];
+    this.fx = new FullScreenQuad(new THREE.ShaderMaterial({
+      uniforms: {
+        tColor: { value: null }, tDepth: { value: null }, tFocus: { value: null }, uSize: { value: new THREE.Vector2() },
+        uNear: { value: 0.1 }, uFar: { value: 600 }, uDof: { value: 0 }, uMaxR: { value: 4 }, uAperture: { value: 1 },
+        uMotion: { value: 0 }, uInvProj: { value: new THREE.Matrix4() }, uInvView: { value: new THREE.Matrix4() }, uPrevViewProj: { value: new THREE.Matrix4() },
+      },
+      vertexShader: VERT, fragmentShader: FX_FRAG, depthTest: false, depthWrite: false, toneMapped: false,
+    }));
+    this.focus = new FullScreenQuad(new THREE.ShaderMaterial({
+      uniforms: { tDepth: { value: null }, tPrev: { value: null }, uNear: { value: 0.1 }, uFar: { value: 600 }, uRate: { value: 0.1 }, uMin: { value: 1.5 }, uFixed: { value: 0 } },
+      vertexShader: VERT, fragmentShader: FOCUS_FRAG, depthTest: false, depthWrite: false, toneMapped: false,
+    }));
+    this.prevQuat = new THREE.Quaternion(); this.prevPos = new THREE.Vector3(); this.wet = 0; this.time = 0;
     this.buildComposer();
     this.apply();
   }
 
+  // ---------- imersão (efeitos de câmera) ----------
+  get shakeMul() { return this.settings.shake; }
+  wetLens(amount = 1) { if (this.settings.wet) this.wet = Math.max(this.wet, amount); }
+
   // ---------- configurações ----------
-  defaults() { return { preset: this.mobile ? 'medio' : 'alto', ...GFX_PRESETS[this.mobile ? 'medio' : 'alto'], showFps: false }; }
+  defaults() { return { preset: this.mobile ? 'medio' : 'alto', ...GFX_PRESETS[this.mobile ? 'medio' : 'alto'], showFps: false, ...IMMERSION_DEFAULTS(this.mobile) }; }
   load() {
     let s = null;
     try { s = JSON.parse(localStorage.getItem(KEY) || 'null'); } catch { s = null; }
@@ -138,6 +263,13 @@ export class Graphics {
       grade: pick('grade', (v) => typeof v === 'boolean'),
       pixelCap: pick('pixelCap', (v) => [1, 1.5, 2].includes(v)),
       showFps: pick('showFps', (v) => typeof v === 'boolean'),
+      shake: pick('shake', (v) => Number.isFinite(v) && v >= 0 && v <= 1),
+      bob: pick('bob', (v) => typeof v === 'boolean'),
+      dof: pick('dof', (v) => v in GFX_LABELS.dof),
+      motion: pick('motion', (v) => typeof v === 'boolean'),
+      grain: pick('grain', (v) => typeof v === 'boolean'),
+      lowHp: pick('lowHp', (v) => typeof v === 'boolean'),
+      wet: pick('wet', (v) => typeof v === 'boolean'),
     };
   }
   save() { try { localStorage.setItem(KEY, JSON.stringify(this.settings)); } catch { /* sem armazenamento */ } }
@@ -149,7 +281,7 @@ export class Graphics {
   }
   set(key, value) {
     this.settings[key] = value;
-    if (key !== 'showFps') this.settings.preset = 'custom';
+    if (key !== 'showFps' && !IMMERSION_KEYS.includes(key)) this.settings.preset = 'custom'; // imersão não mexe na predefinição
     this.apply(key); this.save();
   }
 
@@ -158,6 +290,7 @@ export class Graphics {
     if (this.composer) { this.composer.dispose(); }
     const samples = Math.min(this.settings.msaa, this.renderer.capabilities.maxSamples || 0);
     const rt = new THREE.WebGLRenderTarget(1, 1, { type: THREE.HalfFloatType, samples });
+    rt.depthTexture = new THREE.DepthTexture(1, 1); // profundidade para foco/desfoque
     this.composer = new EffectComposer(this.renderer, rt);
     this.composer.renderToScreen = false;
     this.composer.setPixelRatio(1);
@@ -208,6 +341,9 @@ export class Graphics {
     this.composer.setSize(w, h);
     this.bloom.setSize(Math.max(1, w >> 1), Math.max(1, h >> 1));
     this.fullRT.setSize(size.x, size.y);
+    this.fxRT.setSize(w, h);
+    this.fx.material.uniforms.uSize.value.set(w, h);
+    this.easu.material.uniforms.uAspect.value = size.x / Math.max(1, size.y);
     const eu = this.easu.material.uniforms, ru = this.rcas.material.uniforms;
     eu.uInSize.value.copy(this.inSize);
     eu.uBicubic.value = s.upscaler === 'fsr' && s.scale < 0.999 ? 1 : 0;
@@ -218,10 +354,49 @@ export class Graphics {
   }
 
   render(dt) {
-    const r = this.renderer;
+    const r = this.renderer, s = this.settings, cam = this.camera, G = this.G;
+    this.time += dt;
     this.composer.render(dt);
     const eu = this.easu.material.uniforms;
-    eu.tInput.value = this.composer.readBuffer.texture;
+    let src = this.composer.readBuffer.texture;
+    const playing = G.started && !G.bench;
+    const dof = playing && s.dof !== 'off', motion = playing && s.motion;
+    const depthTex = this.composer.readBuffer.depthTexture;
+    if ((dof || motion) && depthTex) {
+      const fu = this.fx.material.uniforms;
+      if (dof) { // foco automático no que está no centro da tela
+        const [a, b] = this.focusRT, qu = this.focus.material.uniforms;
+        qu.tDepth.value = depthTex; qu.tPrev.value = a.texture; qu.uNear.value = cam.near; qu.uFar.value = cam.far;
+        qu.uRate.value = 1 - Math.exp(-dt * 5);
+        const pl = G.player, tp = pl && !pl.firstPerson && !(G.combat && G.combat.aiming) && !(G.naval && G.naval.manning);
+        qu.uFixed.value = tp ? pl.camDist + 0.6 : 0; // em 3ª pessoa foca o personagem; mirando/1ª pessoa, o centro
+        r.setRenderTarget(b); this.focus.render(r);
+        this.focusRT = [b, a]; fu.tFocus.value = b.texture;
+      }
+      const k = this.inSize.y / 720;
+      fu.uDof.value = dof ? 1 : 0;
+      fu.uMaxR.value = (s.dof === 'forte' ? 7 : 3.5) * Math.max(0.6, k);
+      fu.uAperture.value = s.dof === 'forte' ? 0.55 : 0.3;
+      fu.tColor.value = src; fu.tDepth.value = depthTex; fu.uNear.value = cam.near; fu.uFar.value = cam.far;
+      // desfoque só da ROTAÇÃO da câmera (andar de barco não borra a jangada)
+      cam.updateMatrixWorld();
+      fu.uInvProj.value.copy(cam.projectionMatrixInverse); fu.uInvView.value.copy(cam.matrixWorld);
+      const prev = new THREE.Matrix4().compose(cam.position, this.prevQuat, new THREE.Vector3(1, 1, 1)).invert();
+      fu.uPrevViewProj.value.multiplyMatrices(cam.projectionMatrix, prev);
+      fu.uMotion.value = motion ? clamp01((1 / 60) / Math.max(dt, 1e-3)) * 0.55 : 0;
+      r.setRenderTarget(this.fxRT); this.fx.render(r);
+      src = this.fxRT.texture;
+    }
+    this.prevQuat.copy(cam.quaternion);
+    eu.tInput.value = src;
+    eu.uGrain.value = s.grain ? 1 : 0; eu.uTime.value = this.time;
+    // vida baixa: abaixo de 35 de vida (pulso de coração)
+    const vida = G.survival ? G.survival.vida : 100, low = playing && s.lowHp && !G.player.dead ? clamp01((35 - vida) / 30) : 0;
+    eu.uLowHp.value += (low - eu.uLowHp.value) * Math.min(1, dt * 4);
+    const beat = (this.time * (1 + low * 0.8)) % 1;
+    eu.uPulse.value = Math.exp(-beat * 9) + 0.6 * Math.exp(-Math.max(0, beat - 0.22) * 12) * (beat > 0.22 ? 1 : 0);
+    this.wet = Math.max(0, this.wet - dt / 5);
+    eu.uWet.value = s.wet ? this.wet : 0;
     eu.uExposure.value = r.toneMappingExposure;
     r.setRenderTarget(this.fullRT); this.easu.render(r);
     r.setRenderTarget(null); this.rcas.render(r);

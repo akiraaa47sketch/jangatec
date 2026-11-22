@@ -1,4 +1,4 @@
-// HUD em DOM: barras, inventário, arma, barco, bússola de ilha, avisos e status de construção física.
+// HUD em DOM, enxuto: vitais, arma, hotbar, objetivo curto, avisos e prompts.
 import { ITEM_NAMES } from '../systems/survival.js';
 import { WEAPONS } from '../systems/combat.js';
 
@@ -92,72 +92,53 @@ export class Hud {
     if (this.acc < 0.1) return; // 10 Hz basta para o HUD
     this._renderEvent();
     this.acc = 0;
-    const G = this.G, s = G.survival, inv = s.inv, boat = G.boat, c = G.combat, w = c.weapon;
+    const G = this.G, s = G.survival, inv = s.inv, c = G.combat, w = c.weapon;
+    if (!this.hintAt) this.hintAt = performance.now();
+    if (performance.now() - this.hintAt > 25000) $('hint').classList.add('gone');
     // Vida: boia salva-vidas + barra
     const vida = Math.max(0, Math.round(s.vida));
     $('vida').style.width = vida + '%';
+    const down = !!G.player.downed;
+    document.body.classList.toggle('downed', down);
+    $('downed').hidden = !down;
+    if (down) {
+      const left = Math.max(0, G.survival.bleed);
+      $('bleedFill').style.width = `${(left / 45) * 100}%`;
+      $('downedText').textContent = `Arraste-se até um aliado — ele te reanima segurando E (${Math.ceil(left)} s)`;
+    }
+    if (G.melee) { const st = G.melee.stamina; $('stamina').style.width = st + '%'; $('stamina').classList.toggle('low', st < 25); }
     $('vidaNum').textContent = vida;
     $('lifeArc').style.strokeDashoffset = String(157 * (1 - vida / 100));
     $('lifeRing').classList.toggle('low', vida <= 30);
     $('objective').textContent = G.startup.objective;
-    const chip = (icon, label, n) => `<span class="chip${n ? '' : ' zero'}" title="${label}"><i>${icon}</i>${n}</span>`;
+    const chip = (icon, label, n) => n ? `<span class="chip" title="${label}"><i>${icon}</i>${n}</span>` : '';
     const invHtml = chip('✚', 'Bandagens [4]', inv.bandagem) + chip('♥', 'Kits médicos [5]', inv.kit) +
-      chip('•', 'Munição', inv.municao) + chip('▮', 'Cartuchos', inv.cartucho || 0);
+      chip('•', 'Munição', inv.municao) + chip('▮', 'Cartuchos', inv.cartucho || 0) +
+      chip('⊛', 'Canhão improvisado (instale com E a bordo)', inv.canhao || 0);
     if (invHtml !== this._inv) { $('inv').innerHTML = invHtml; this._inv = invHtml; }
     // Arma equipada
     const weaponHtml = w
       ? `<div class="wname">${w.nome}</div><div class="stars">${'★'.repeat(w.stars)}${'☆'.repeat(5 - w.stars)}</div>` +
-        (w.ammo ? `<div class="ammo">${c.reloading > 0 ? '<small>recarregando…</small>' : c.mags[w.id]} <small>/ ${inv[w.ammo]}</small></div>` : '') +
-        `<div class="dur"><b style="width:${Math.round(100 * c.durability[w.id] / w.durability)}%"></b></div>`
+        (w.ammo ? `<div class="ammo">${c.reloading > 0 ? '<small>recarregando…</small>' : c.mags[w.id]} <small>/ ${inv[w.ammo]}</small></div>` : '')
       : '<div class="wname">Mãos vazias</div>';
     if (weaponHtml !== this._weapon) { $('weapon').innerHTML = weaponHtml; this._weapon = weaponHtml; }
     // Hotbar em tábuas
     let hot = '';
     for (let i = 0; i < c.hotbar.length; i++) {
       const id = c.hotbar[i], weapon = id && WEAPONS.find((entry) => entry.id === id);
-      hot += `<span class="hotbar-slot${id === c.weaponId ? ' active' : ''}${weapon ? '' : ' empty'}"><span class="n">${i + 1}</span>` +
+      if (i >= 3 && !id) continue; // slots extras (6–8) só aparecem quando ocupados
+      hot += `<span class="hotbar-slot${id === c.weaponId ? ' active' : ''}${weapon ? '' : ' empty'}"><span class="n">${i < 3 ? i + 1 : i + 3}</span>` +
         (weapon ? `${weapon.nome}<span class="s">${'★'.repeat(weapon.stars)}</span>` : '—') + '</span>';
     }
     if (hot !== this._hot) { $('hotbar').innerHTML = hot; this._hot = hot; }
 
-    // Maré (só depois da partida)
-    const tide = G.startup.departed && G.startup.tide.state;
-    $('tideBox').hidden = !tide;
-    if (tide) {
-      const secs = Math.ceil(tide.nextIn), mm = Math.floor(secs / 60), ss = String(secs % 60).padStart(2, '0');
-      const dry = tide.phase.id === 'seco';
-      $('tideBox').className = 'panel ' + tide.phase.id;
-      $('tideName').textContent = tide.changing ? (dry ? 'Secando…' : 'Enchendo…') : tide.phase.nome;
-      $('tideNext').textContent = `${dry ? 'Volta a encher' : 'Seca'} em ${mm}:${ss}`;
-      $('tideFill').style.height = `${Math.round(12 + tide.norm * 88)}%`;
-    }
-
-    // Info de navegação
-    const nav = boat.nav;
-
-    const near = G.world.nearestIsland(boat.x, boat.z);
-    if (near) {
-      const ang = Math.atan2(near.isl.x - G.player.body.pos.x, near.isl.z - G.player.body.pos.z) - (G.player.camYaw + Math.PI);
-      $('arrow').style.transform = `rotate(${-ang - Math.PI / 2}rad)`; // ➤ aponta para a direita
-    }
-    $('arrow').style.visibility = near ? 'visible' : 'hidden';
-    const zone = G.world.difficulty(boat.x, boat.z) + 1;
-    const sailCls = boat.stranded ? 'sail-down' : boat.sailUp ? 'sail-up' : 'sail-down';
-    const sailTxt = boat.stranded ? 'Encalhada' : boat.sailUp ? 'Vela erguida' : 'Vela baixada';
-    const boatHtml =
-      `<div class="row"><span class="v ${sailCls}">${sailTxt}</span><span class="k">${boat.speed.toFixed(1)} m/s</span></div>` +
-      `<div class="row"><span class="k">${near ? 'Ilha' : 'Ilhas'}</span><span class="v">${near ? Math.round(near.dist) + ' m' : 'nenhuma à vista'}</span>` +
-      `<span class="k">Zona</span><span class="v">${zone}/5</span></div>` +
-      `<div class="row extra"><span class="k">${nav.isFree ? 'Batalha final!' : 'Rota ' + (nav.progress(boat.z) * 100).toFixed(0) + '%'}</span>` +
-      `<span class="k">${G.net.online ? 'online · ' + (G.net.remotes.size + 1) + ' jogadores' : 'solo · seed ' + G.world.seed}</span></div>`;
-    if (boatHtml !== this._boat) { $('boatInfo').innerHTML = boatHtml; this._boat = boatHtml; }
-
     const build = G.build;
     const crosshair = $('crosshair');
     crosshair.classList.toggle('build', build.active);
+    crosshair.style.display = G.naval && G.naval.manning ? 'none' : '';
     const carryText = !build.active ? '' : build.rotating
       ? `${build.held.def.nome} · arraste anel · botão direito: câmera · [R] voltar · [Z] solda · Esc cancela`
-      : `${build.held.def.nome} · WASD anda · mouse/câmera move · [V] reposiciona · [Q] solta · [R] gizmo · [Z] solda · Esc cancela`;
+      : `${build.held.def.nome} · roda gira · [T] endireita · [V] reposiciona · [Q] solta · [R] gizmo · [Z] solda · Esc cancela`;
 
     const it = G.interact.current;
     const pickupText = build.pickupTarget

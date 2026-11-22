@@ -1,7 +1,6 @@
 // Ponto de entrada: monta a cena, cria os sistemas e roda o loop principal.
 // G é o contexto compartilhado entre os módulos (cada sistema fica no seu arquivo).
 import * as THREE from './three.js';
-import { DEFAULT_SERVER } from './config.js';
 import { Input } from './core/input.js';
 import { Colliders } from './world/colliders.js';
 import { Ocean, sea } from './world/ocean.js';
@@ -26,6 +25,11 @@ import { TouchControls, isTouchDevice } from './ui/touch.js';
 import { Graphics } from './core/graphics.js';
 import { GfxMenu } from './ui/gfxmenu.js';
 import { Benchmark } from './systems/benchmark.js';
+import { Melee } from './systems/melee.js';
+import { Voice } from './net/voice.js';
+import { MainMenu } from './ui/mainmenu.js';
+import { Naval } from './systems/naval.js';
+import { Tools } from './systems/tools.js';
 
 const $ = (id) => document.getElementById(id);
 const canvas = $('c');
@@ -62,10 +66,12 @@ G.input = new Input(canvas);
 G.colliders = new Colliders();
 G.hud = new Hud(G);
 G.net = new Net(G);
+G.voice = new Voice(G); // chat de voz (WebRTC, proximidade 3D)
 G.survival = new Survival(G);
 G.combat = new Combat(G);
 G.enemies = new Enemies(G);
 G.events = new Events(G);
+G.melee = new Melee(G); // corpo a corpo: combos, pesado, bloqueio, parry, esquiva
 G.physics = new Physics(G);
 G.world = new World(G, 1);
 G.colliders.groundFn = (x, z) => { // fundo do mar só vira chão com pouca água por cima
@@ -78,6 +84,8 @@ G.viewmodel = new ViewModel(G, { sun, hemisphere }); // braços/arma em 1ª pess
 G.startup = new Startup(G, { sun, hemisphere });
 G.build = new Build(G);     // Sistema unificado de posicionamento físico
 G.interact = new Interact(G);
+G.naval = new Naval(G);     // canhões, navios piratas e dano por peça
+G.tools = new Tools(G);     // banjo (música que cura) e gancho
 const atmo = new Atmosphere(renderer, scene, { sun, hemisphere }); // céu, IBL e sombras
 const ocean = new Ocean(scene, atmo);
 ocean.islandSource = () => G.world.islands;
@@ -92,7 +100,7 @@ if (MOBILE) G.touch = new TouchControls(G);
 
 canvas.addEventListener('mousedown', (e) => {
   if (!G.build.active) {
-    if (e.button === 0) {
+    if (e.button === 0 && !G.naval.manning) {
       const target = G.build.updatePickupTarget();
       if (target && G.build.tryPickup(target)) {
         e.preventDefault();
@@ -147,8 +155,6 @@ addEventListener('keydown', (e) => {
 });
 
 // ---------- Menu ----------
-$('server').value = DEFAULT_SERVER;
-const status = (s) => { $('menuStatus').textContent = s; };
 const charMenu = new CharacterMenu((appearance) => G.player.setAppearance(appearance));
 window.__charMenu = charMenu; // depuração
 const characterAppearance = () => charMenu.appearance;
@@ -191,20 +197,10 @@ function start(seed, welcome) {
   G.hud.msg(`${G.combat.weapon.nome} ${'★'.repeat(G.combat.weapon.stars)} equipada · complete a jangada e procure as caixas`);
   G.input.requestLock();
 }
-$('btnSolo').onclick = () => {
-  const s = parseInt($('seed').value, 10);
-  start(Number.isFinite(s) ? s : Math.floor(Math.random() * 1e9));
-};
-$('btnMulti').onclick = () => {
-  status('Conectando… (o Render grátis pode levar até 1 min para acordar)');
-  G.net.connect($('server').value.trim(), $('name').value.trim() || 'Náufrago', $('room').value.trim() || 'publica')
-    .then((m) => start(m.seed, m))
-    .catch((e) => status(`${e.message}. Confira o endereço do servidor ou jogue solo.`));
-};
-$('help').onclick = () => { $('help').hidden = true; };
 // Benchmark: mundo fixo (seed 4242), câmera roteirizada e relatório de FPS no fim.
 const startBenchmark = () => { start(4242); G.bench = new Benchmark(G); };
-$('btnBench').onclick = startBenchmark;
+G.mainMenu = new MainMenu(G, { solo: (seed) => start(seed), multi: (welcome) => start(welcome.seed, welcome), bench: startBenchmark });
+$('help').onclick = () => { $('help').hidden = true; };
 try { if (sessionStorage.getItem('mare-alta-bench')) { sessionStorage.removeItem('mare-alta-bench'); setTimeout(startBenchmark, 600); } } catch { /* ok */ }
 
 // ---------- Loop ----------
@@ -213,10 +209,13 @@ const now = () => (Date.now() / 1000) % 100000; // relógio comum: ondas parecid
 
 function hotkeys() {
   const inp = G.input;
-  if (inp.hit('KeyH')) $('help').hidden = !$('help').hidden;
-  if (inp.hit('KeyF')) G.player.setFirstPerson(!G.player.firstPerson);
-  if (G.build.active || G.interact.lootOpen || G.gfxMenu.open) return;
+  if (!G.tools.menuOpen) { // com o painel do banjo aberto as letras viram notas
+    if (inp.hit('KeyH')) $('help').hidden = !$('help').hidden;
+    if (inp.hit('KeyF')) G.player.setFirstPerson(!G.player.firstPerson);
+  }
+  if (G.build.active || G.interact.lootOpen || G.gfxMenu.open || G.naval.manning || G.tools.menuOpen) return;
   for (let i = 0; i < 3; i++) if (inp.hit('Digit' + (i + 1))) G.combat.select(i);
+  for (let i = 3; i < 6; i++) if (inp.hit('Digit' + (i + 3))) G.combat.select(i); // 6 7 8 = ferramentas/extras
   if (inp.mouse.wheel) G.combat.cycle(Math.sign(inp.mouse.wheel));
   if (inp.hit('Digit4')) G.survival.use('bandagem');
   if (inp.hit('Digit5')) G.survival.use('kit');
@@ -224,7 +223,10 @@ function hotkeys() {
 
 function frame() {
   requestAnimationFrame(frame);
-  const ms = performance.now(), dt = Math.min((ms - last) / 1000, 1 / 30), t = now();
+  const ms = performance.now(), t = now();
+  let dt = Math.min((ms - last) / 1000, 1 / 30);
+  // hit-stop: o mundo quase congela por um instante quando um golpe conecta
+  if (G.hitStop > 0) { G.hitStop -= dt; dt *= 0.08; }
   last = ms;
   const { boat, player } = G;
   if (G.started) G.startup.update(dt, t);
@@ -258,11 +260,15 @@ function frame() {
   G.physics.update(dt, t);
   G.enemies.update(dt);
   G.events.update(dt, t);
+  G.naval.update(dt, t);
+  G.tools.update(dt, t);
   if (G.bench) G.bench.update(dt);
   G.interact.update(dt);
   G.combat.update(dt);
+  G.melee.update(dt);
   G.survival.update(dt);
   G.net.update(dt);
+  G.voice.update(dt);
   atmo.update(dt, camera);
   ocean.update(t, camera.position.x, camera.position.z);
   G.hud.update(dt);

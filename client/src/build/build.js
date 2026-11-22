@@ -5,7 +5,6 @@ const PICKUP_DISTANCE = 2.8;
 const BUILD_DISTANCE = 7;
 const DEFAULT_DRAG_DISTANCE = 3.5;
 const ROTATION_STEP = Math.PI / 12;
-const ROTATION_SENSITIVITY = 1.5;
 const UP = new THREE.Vector3(0, 1, 0);
 
 export class Build {
@@ -64,7 +63,7 @@ export class Build {
   }
 
   updatePickupTarget() {
-    if (this.active || this.G.player.dead || !this.G.started) {
+    if (this.active || this.G.player.dead || this.G.player.downed || !this.G.started) {
       this._setPickupTarget(null);
       return null;
     }
@@ -95,21 +94,24 @@ export class Build {
     return target;
   }
 
+  // Anéis visíveis finos + anéis de "pegada" grossos e invisíveis (fáceis de clicar).
   _makeRotationGizmo() {
     const group = new THREE.Group();
     group.visible = false;
-    for (const [axis, color] of [
-      ['x', 0xff5555], ['y', 0x66ee88], ['z', 0x5599ff],
-    ]) {
-      const material = new THREE.MeshBasicMaterial({
-        color, transparent: true, opacity: 0.9, depthTest: false, depthWrite: false,
-      });
-      const ring = new THREE.Mesh(new THREE.TorusGeometry(1, 0.04, 8, 64), material);
-      if (axis === 'x') ring.rotation.y = Math.PI / 2;
-      if (axis === 'y') ring.rotation.x = Math.PI / 2;
-      ring.userData.rotationAxis = axis;
-      ring.renderOrder = 1000;
-      group.add(ring);
+    this.gizmoRings = [];
+    for (const [axis, color] of [['x', 0xff5a5a], ['y', 0x6ef08c], ['z', 0x5aa0ff]]) {
+      const material = new THREE.MeshBasicMaterial({ color, transparent: true, opacity: 0.6, depthTest: false, depthWrite: false });
+      const ring = new THREE.Mesh(new THREE.TorusGeometry(1, 0.035, 8, 72), material);
+      const hit = new THREE.Mesh(new THREE.TorusGeometry(1, 0.17, 6, 40),
+        new THREE.MeshBasicMaterial({ transparent: true, opacity: 0, depthTest: false, depthWrite: false, colorWrite: false }));
+      for (const m of [ring, hit]) {
+        if (axis === 'x') m.rotation.y = Math.PI / 2;
+        if (axis === 'y') m.rotation.x = Math.PI / 2;
+        m.userData.rotationAxis = axis;
+      }
+      ring.renderOrder = 1000; hit.userData.visual = ring;
+      group.add(ring, hit);
+      this.gizmoRings.push(hit);
     }
     return group;
   }
@@ -351,17 +353,27 @@ export class Build {
       this.gizmo.visible = false;
       return;
     }
-    if (this.candidate) {
-      this.gizmo.position.copy(this.candidate.position);
-      this.gizmo.quaternion.copy(this.candidate.quaternion);
-    } else {
-      this.held.mesh.updateWorldMatrix(true, false);
-      this.held.mesh.getWorldPosition(this.gizmo.position);
-      this.held.mesh.getWorldQuaternion(this.gizmo.quaternion);
-    }
+    if (this.candidate) this.gizmo.position.copy(this.candidate.position);
+    else { this.held.mesh.updateWorldMatrix(true, false); this.held.mesh.getWorldPosition(this.gizmo.position); }
+    // eixos alinhados à jangada (só o giro em Y do barco): direções previsíveis, não giram com a peça
+    this.gizmo.quaternion.setFromAxisAngle(UP, this.G.boat.yaw);
     const size = this._physicsSize(this.held);
-    this.gizmo.scale.setScalar(Math.max(0.65, Math.max(size.x, size.y, size.z) * 0.75));
+    // tamanho segue a peça, mas nunca sai da tela quando a câmera está perto
+    const camD = this.G.camera.position.distanceTo(this.gizmo.position);
+    this.gizmo.scale.setScalar(clamp(Math.max(size.x, size.y, size.z) * 0.75, 0.6, Math.max(0.6, camD * 0.32)));
     this.gizmo.visible = true;
+    // destaque do anel sob o cursor (ou do que está sendo arrastado)
+    let hover = this.rotationDrag ? this.rotationDrag.axisName : null;
+    if (!hover && !this.cameraDragging) {
+      this._setRayFromCursor(); this.gizmo.updateMatrixWorld(true);
+      const h = this.ray.intersectObjects(this.gizmoRings, false)[0];
+      hover = h ? h.object.userData.rotationAxis : null;
+    }
+    for (const r of this.gizmoRings) {
+      const on = r.userData.rotationAxis === hover;
+      r.userData.visual.material.opacity = on ? 1 : 0.55;
+      r.userData.visual.scale.setScalar(on ? 1.04 : 1);
+    }
   }
 
   toggleRotationMode() {
@@ -394,35 +406,35 @@ export class Build {
     return true;
   }
 
+  // Arrasto em espaço de TELA: gira em volta do centro do gizmo; se o anel estiver de lado para a
+  // câmera (quase uma linha), vira arrasto linear ao longo do anel — sem saltos.
+  _screen(v) {
+    const rect = this.G.renderer.domElement.getBoundingClientRect(), p = v.clone().project(this.G.camera);
+    return new THREE.Vector2(rect.left + (p.x * 0.5 + 0.5) * rect.width, rect.top + (-p.y * 0.5 + 0.5) * rect.height);
+  }
   beginGizmoDrag() {
     if (!this.rotating || !this.gizmo.visible) return false;
     this._updateRotationGizmo();
     this._setRayFromCursor();
     this.ray.far = BUILD_DISTANCE + this.G.player.camDist + 2;
     this.gizmo.updateMatrixWorld(true);
-    const hit = this.ray.intersectObjects(this.gizmo.children, false)[0];
+    const hit = this.ray.intersectObjects(this.gizmoRings, false)[0];
     if (!hit) return false;
-
     const axisName = hit.object.userData.rotationAxis;
-    const axis = new THREE.Vector3(
-      axisName === 'x' ? 1 : 0,
-      axisName === 'y' ? 1 : 0,
-      axisName === 'z' ? 1 : 0
-    ).applyQuaternion(this.gizmo.quaternion).normalize();
-    const plane = new THREE.Plane().setFromNormalAndCoplanarPoint(axis, this.gizmo.position);
-    const point = this.ray.ray.intersectPlane(plane, new THREE.Vector3());
-    if (!point) return false;
-    const vector = point.clone().sub(this.gizmo.position);
-    vector.addScaledVector(axis, -vector.dot(axis));
-    if (vector.lengthSq() < 1e-6) return false;
-
-    this.rotationDrag = {
-      axis,
-      plane,
-      previousVector: vector.normalize(),
-      accumulatedAngle: 0,
-      appliedAngle: 0,
-    };
+    const axis = new THREE.Vector3(axisName === 'x' ? 1 : 0, axisName === 'y' ? 1 : 0, axisName === 'z' ? 1 : 0)
+      .applyQuaternion(this.gizmo.quaternion).normalize();
+    const center = this.gizmo.position.clone(), cam = this.G.camera.position;
+    const toCam = cam.clone().sub(center).normalize(), facing = axis.dot(toCam);
+    const c2 = this._screen(center), cur = new THREE.Vector2(this.G.input.cursor.x, this.G.input.cursor.y);
+    const drag = { axis, axisName, center: c2, prev: cur.clone(), accumulatedAngle: 0, appliedAngle: 0 };
+    if (Math.abs(facing) > 0.3) { drag.mode = 'circle'; drag.sign = facing > 0 ? 1 : -1; drag.prevAngle = Math.atan2(cur.y - c2.y, cur.x - c2.x); }
+    else {
+      const r = hit.point.clone().sub(center); r.addScaledVector(axis, -r.dot(axis));
+      const tangent = new THREE.Vector3().crossVectors(axis, r).normalize();
+      const t2 = this._screen(center.clone().add(r).addScaledVector(tangent, 0.5)).sub(this._screen(center.clone().add(r)));
+      drag.mode = 'linear'; drag.tangent = t2.lengthSq() > 1e-6 ? t2.normalize() : new THREE.Vector2(1, 0);
+    }
+    this.rotationDrag = drag;
     return true;
   }
 
@@ -446,32 +458,38 @@ export class Build {
   _updateGizmoDrag() {
     const drag = this.rotationDrag;
     if (!drag) return;
-    if (!this.G.input.mouse.left) {
-      this.rotationDrag = null;
-      return;
+    if (!this.G.input.mouse.left) { this.rotationDrag = null; return; }
+    const cur = new THREE.Vector2(this.G.input.cursor.x, this.G.input.cursor.y);
+    let d = 0;
+    if (drag.mode === 'circle') {
+      const a = Math.atan2(cur.y - drag.center.y, cur.x - drag.center.x);
+      let da = a - drag.prevAngle;
+      if (da > Math.PI) da -= Math.PI * 2; if (da < -Math.PI) da += Math.PI * 2;
+      if (cur.distanceTo(drag.center) > 8) d = -da * drag.sign; // tela com y para baixo: anti-horário = ângulo negativo
+      drag.prevAngle = a;
+    } else {
+      d = ((cur.x - drag.prev.x) * drag.tangent.x + (cur.y - drag.prev.y) * drag.tangent.y) * 0.012;
     }
-
-    this._setRayFromCursor();
-    const point = this.ray.ray.intersectPlane(drag.plane, new THREE.Vector3());
-    if (!point) return;
-    const vector = point.clone().sub(this.gizmo.position);
-    vector.addScaledVector(drag.axis, -vector.dot(drag.axis));
-    if (vector.lengthSq() < 1e-6) return;
-    vector.normalize();
-    const cross = new THREE.Vector3().crossVectors(drag.previousVector, vector);
-    drag.accumulatedAngle +=
-      Math.atan2(drag.axis.dot(cross), drag.previousVector.dot(vector)) * ROTATION_SENSITIVITY;
+    drag.prev.copy(cur);
+    drag.accumulatedAngle += d;
     const targetAngle = this.G.input.down('ShiftLeft')
       ? Math.round(drag.accumulatedAngle / ROTATION_STEP) * ROTATION_STEP
       : drag.accumulatedAngle;
     const deltaAngle = targetAngle - drag.appliedAngle;
     if (Math.abs(deltaAngle) > 1e-6) {
-      const delta = new THREE.Quaternion().setFromAxisAngle(drag.axis, deltaAngle);
-      this.rotationQuaternion.premultiply(delta).normalize();
+      this.rotationQuaternion.premultiply(new THREE.Quaternion().setFromAxisAngle(drag.axis, deltaAngle)).normalize();
       this.rotation.setFromQuaternion(this.rotationQuaternion, 'YXZ');
       drag.appliedAngle = targetAngle;
     }
-    drag.previousVector.copy(vector);
+  }
+
+  // Giro rápido sem gizmo: roda do mouse = 15° em torno do vertical; Shift+roda = inclina.
+  _quickRotate(steps, tilt) {
+    const q = this.rotationQuaternion && this.rotationMode ? this.rotationQuaternion : new THREE.Quaternion().setFromEuler(this.rotation);
+    const axis = tilt ? new THREE.Vector3(1, 0, 0).applyAxisAngle(UP, this.G.boat.yaw) : UP.clone();
+    q.premultiply(new THREE.Quaternion().setFromAxisAngle(axis, steps * ROTATION_STEP)).normalize();
+    this.rotation.setFromQuaternion(q, 'YXZ');
+    if (this.rotationMode) this.rotationQuaternion = q;
   }
 
   _state(obj, transform) {
@@ -735,6 +753,9 @@ export class Build {
       if (this.G.input.hit('Escape')) { this.cancel(); return; }
       if (this.cameraDragging && !this.G.input.mouse.right) this.endCameraDrag();
       if (this.rotationMode) this._updateGizmoDrag();
+      const inp = this.G.input;
+      if (inp.mouse.wheel) this._quickRotate(Math.sign(inp.mouse.wheel), inp.down('ShiftLeft'));
+      if (inp.hit('KeyT')) { this.rotation.set(0, this.G.boat.yaw, 0); if (this.rotationMode) this.rotationQuaternion = new THREE.Quaternion().setFromEuler(this.rotation); }
       if (this.G.input.hit('KeyV')) this.resetHeldPosition();
       else this._updateHeldTarget();
       this._updateRotationGizmo();
