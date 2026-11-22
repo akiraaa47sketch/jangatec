@@ -26,6 +26,17 @@ const BY_DIFF = [['melee'], ['melee', 'rapido'], ['melee', 'rapido', 'atirador']
 const SIGHT = 22, LOSE = 36, ACTIVE = 75;
 const FOV_COS = Math.cos(65 * Math.PI / 180); // cone de visão: 130° à frente
 const HEAR = 3.5;                              // perto assim ele percebe mesmo de costas
+// Diretor de combate: evita que todos se atropelem em cima do jogador.
+// Só alguns corpo a corpo ficam "engajados" (perto); os outros esperam num anel mais afastado,
+// rodeando devagar, e entram aos poucos (rodízio). Atiradores também revezam as rajadas.
+export const COMBAT_DIRECTOR = {
+  engaged: 2,          // corpo a corpo perto do jogador ao mesmo tempo (só 1 golpeia por vez — ver MELEE.tokens)
+  waitRadius: 5.6,     // anel de espera dos demais
+  rotateAfter: 7,      // s engajado antes de dar a vez para quem está esperando
+  bursts: 2,           // atiradores disparando ao mesmo tempo
+  burstGap: 0.45,      // s mínimo entre o início de duas rajadas
+  reaction: [0.6, 1.3],// s entre ver o jogador e o primeiro tiro
+};
 // Invasões piratas: raras e anunciadas. Intervalo em segundos depois da partida.
 export const PIRATE_BALANCE = {
   firstWave: [110, 160],   // primeira invasão
@@ -521,8 +532,10 @@ export class Enemies {
     let moved = 0;
     const mres = G.melee ? G.melee.enemyTick(e, dt, Math.hypot(pp.x - p.x, pp.z - p.z)) : null; // aviso/golpe/guarda
     if (e.knock) [e.local.x, e.local.z] = boat.toLocal(p.x, p.z);
-    if (!G.player.dead && !G.player.downed && distance > e.def.range * 0.7 && !(mres && mres.hold)) {
-      moved = Math.min(distance - e.def.range * 0.7, e.def.speed * dt);
+    // no convés também revezam: quem não está engajado espera mais afastado
+    const stopAt = e.engaged === false ? Math.min(3.6, Math.max(2.4, boat.set.radius * 0.9)) : e.def.range * 0.7;
+    if (!G.player.dead && !G.player.downed && distance > stopAt && !(mres && mres.hold)) {
+      moved = Math.min(distance - stopAt, (e.engaged === false ? 0.45 : 1) * e.def.speed * dt);
       e.local.x += dx / distance * moved;
       e.local.z += dz / distance * moved;
       const radius = Math.max(1.5, Math.min(boat.set.radius - 0.75, 3.8));
@@ -584,11 +597,40 @@ export class Enemies {
 
   // inimigo viu o jogador: ele e os companheiros perto (mesma ilha) entram em combate
   alert(e) {
-    e.state = 'chase';
+    const react = (o) => { if (o.def.ranged) o.cd = Math.max(o.cd, between(COMBAT_DIRECTOR.reaction)); };
+    e.state = 'chase'; react(e);
     for (const o of this.list) {
       if (o === e || o.isl !== e.isl || o.state === 'dead' || o.state === 'chase' || o.state === 'attack' || o.def.mortar) continue;
-      if (Math.hypot(o.body.pos.x - e.body.pos.x, o.body.pos.z - e.body.pos.z) < 14) { o.state = 'chase'; o.timer = 0; }
+      if (Math.hypot(o.body.pos.x - e.body.pos.x, o.body.pos.z - e.body.pos.z) < 14) { o.state = 'chase'; o.timer = 0; react(o); }
     }
+  }
+
+  // Escolhe quem fica perto do jogador. Prioridade: quem está no meio de um golpe, depois o mais
+  // perto (com folga para quem já estava engajado). Quem passou muito tempo na frente dá a vez.
+  direct(dt) {
+    const pp = this.G.player.body.pos, D = COMBAT_DIRECTOR, pool = [];
+    for (const e of this.list) {
+      const melee = !e.def.ranged && !e.def.mortar && e.state !== 'dead';
+      const fighting = e.pirate ? e.state === 'boarded' : e.state === 'chase' || e.state === 'attack';
+      const d = Math.hypot(pp.x - e.body.pos.x, pp.z - e.body.pos.z);
+      if (!melee || !fighting || d > 14) { e.engaged = undefined; e.engageT = 0; continue; }
+      const busy = e.m && (e.m.token || e.m.state === 'windup' || e.m.state === 'strike' || e.m.state === 'guard');
+      if (e.restT > 0) e.restT -= dt;
+      e.engageScore = busy ? -100 : d - (e.engaged ? 1.5 : 0) + (e.engaged && e.engageT > D.rotateAfter ? 6 : 0) + (e.restT > 0 ? 6 : 0);
+      pool.push(e);
+    }
+    pool.sort((a, b) => a.engageScore - b.engageScore);
+    const rotate = pool.length > D.engaged; // só faz rodízio se tem gente esperando
+    pool.forEach((e, i) => {
+      const on = i < D.engaged;
+      if (on && e.engaged) e.engageT = rotate ? (e.engageT || 0) + dt : 0;
+      else e.engageT = 0;
+      if (!on && e.engaged) { e.restT = 4 + Math.random() * 2; e.cd = Math.max(e.cd, 0.8); } // deu a vez: respira antes de voltar
+      e.engaged = on;
+      if (!e.waitOff) e.waitOff = Math.random() * 1.4; // anel de espera com distâncias variadas
+    });
+    // rajadas dos atiradores em andamento
+    this.bursting = this.list.filter((e) => e.burstLeft > 0 && e.state !== 'dead').length;
   }
 
   think(e, dist, pdx, pdz) {
@@ -622,7 +664,8 @@ export class Enemies {
     this.updatePirateWaves(dt);
     this.tick += dt;
     const thinkNow = this.tick > 0.2;
-    if (thinkNow) this.tick = 0;
+    if (thinkNow) { this.direct(this.tick); this.tick = 0; }
+    this.burstGapT = (this.burstGapT || 0) - dt;
     for (let i = this.list.length - 1; i >= 0; i--) {
       const e = this.list[i], b = e.body, p = b.pos;
       if (e.pirate) {
@@ -655,6 +698,14 @@ export class Enemies {
       if (!e.def.ranged && dist < 7 && G.melee) mres = G.melee.enemyTick(e, dt, dist);
       if (e.state === 'chase' && e.goal && e.los === false && thinkNow) e.goal = this.route(e, pp.x, pp.z);
       if ((mres && mres.hold) || e.post) { mx = 0; mz = 0; }
+      else if (e.engaged === false && dist < COMBAT_DIRECTOR.waitRadius + 4 && e.los !== false) {
+        // esperando a vez: fica afastado, rodeando devagar e encarando o jogador
+        e.strafeDir = e.strafeDir || (Math.random() < 0.5 ? 1 : -1);
+        if (thinkNow && Math.random() < 0.05) e.strafeDir *= -1;
+        const sp = e.def.speed * 0.3, want = COMBAT_DIRECTOR.waitRadius + (e.waitOff || 0);
+        const radial = clamp((dist - want) * 1.2, -e.def.speed * 0.6, e.def.speed * 0.8);
+        mx = -pdz * e.strafeDir * sp + pdx * radial; mz = pdx * e.strafeDir * sp + pdz * radial;
+      }
       else if (!e.def.ranged && dist < 3.6 && e.los !== false && (e.state === 'chase' || e.state === 'attack')) {
         // esperando a vez: rodeia o jogador mantendo distância
         e.strafeDir = e.strafeDir || (Math.random() < 0.5 ? 1 : -1);
@@ -662,7 +713,14 @@ export class Enemies {
         const sp = e.def.speed * 0.42, radial = (dist - 2.0) * 1.6;
         mx = -pdz * e.strafeDir * sp + pdx * radial; mz = pdx * e.strafeDir * sp + pdz * radial;
       }
-      if (e.state === 'attack' && e.cd <= 0 && e.def.ranged && e.los) { e.cd = e.def.cd; e.burstLeft = e.def.burst || 1; e.burstT = 0; }
+      if (e.state === 'attack' && e.cd <= 0 && e.def.ranged && e.los) {
+        // revezamento: no máximo N rajadas juntas e um respiro entre o começo de cada uma
+        if ((this.bursting || 0) >= COMBAT_DIRECTOR.bursts || this.burstGapT > 0) e.cd = 0.25 + Math.random() * 0.45;
+        else {
+          e.cd = e.def.cd * (0.85 + Math.random() * 0.4); e.burstLeft = e.def.burst || 1; e.burstT = 0.12;
+          this.bursting = (this.bursting || 0) + 1; this.burstGapT = COMBAT_DIRECTOR.burstGap;
+        }
+      }
       if (e.burstLeft > 0 && (e.burstT -= dt) <= 0) { // rajada: tiros em sequência
         e.burstLeft--; e.burstT = 0.13;
         if (e.los && !G.player.dead) {

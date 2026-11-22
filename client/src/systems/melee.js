@@ -4,7 +4,7 @@
 // (bloquear no instante do golpe), chute que quebra a guarda, esquiva com invencibilidade.
 // Espada com espada: acertar enquanto o inimigo também está golpeando faz as lâminas se chocarem.
 // Inimigos: avisam antes de bater (luva brilhando + "!"/"!!"), golpeiam e ficam vulneráveis;
-// alguns defendem, todos podem ficar atordoados; rodeiam o jogador e no máximo 2 atacam por vez.
+// alguns defendem, todos podem ficar atordoados; rodeiam o jogador, só 1 ataca por vez e os demais esperam a vez mais afastados.
 import * as THREE from '../three.js';
 import { clamp } from '../core/util.js';
 import { sfx, setListener } from '../core/sfx.js';
@@ -19,7 +19,8 @@ export const MELEE = {
   clash: { window: 0.14, recover: 0.42 },     // espadas se chocando: janela antes do golpe dele e recuo
   enemy: { recover: 0.32, heavyRecover: 0.6, lunge: 3.6, evade: 0.16 }, // ritmo dos inimigos
   crit: 2.2,
-  tokens: 2,                                  // quantos inimigos podem atacar ao mesmo tempo
+  tokens: 1,                                  // quantos inimigos podem atacar ao mesmo tempo
+  tokenGap: [0.35, 0.8],                      // respiro (s) depois de um ataque antes do próximo inimigo começar
 };
 
 // Repertório por tipo: wind = aviso (s), hits = golpes seguidos, heavy = pancada pesada.
@@ -298,6 +299,12 @@ export class Melee {
   }
 
   // ---------- inimigos ----------
+  // devolve a vez de atacar: o próximo só começa depois de um respiro curto
+  releaseToken(e) {
+    this.tokens.delete(e); if (e.m) e.m.token = false;
+    const [a, b] = MELEE.tokenGap;
+    this.gapUntil = performance.now() + (a + Math.random() * (b - a)) * 1000;
+  }
   staggerEnemy(e, dur) {
     const ms = e.m || (e.m = {});
     if (ms.token) { this.tokens.delete(e); ms.token = false; }
@@ -367,7 +374,7 @@ export class Melee {
       case 'recover':
         if (ms.t <= 0) {
           ms.state = 'idle'; e.cd = def.cd * (0.45 + Math.random() * 0.45);
-          if (ms.token) { this.tokens.delete(e); ms.token = false; }
+          if (ms.token) { this.releaseToken(e); }
         }
         return { pose: 'walk', hold: true };
       default: break;
@@ -393,7 +400,9 @@ export class Melee {
     }
     if (!this.pending) ms.evadeTried = false;
     // começa um ataque se estiver perto, sem recarga e com "vaga" (no máximo N atacando juntos)
-    if (!pl.dead && !pl.downed && dist < def.range + 0.4 && e.cd <= 0 && e.los !== false && (this.tokens.size < MELEE.tokens || ms.token)) {
+    // e só quem o diretor de combate deixou chegar perto (os outros esperam a vez mais afastados)
+    const free = ms.token || (this.tokens.size < MELEE.tokens && performance.now() >= (this.gapUntil || 0));
+    if (!pl.dead && !pl.downed && dist < def.range + 0.4 && e.cd <= 0 && e.los !== false && e.engaged !== false && free) {
       // contra quem fica só defendendo, o chute fica bem mais provável
       const moves = MOVES[e.type] || MOVES.melee, wOf = (m) => m.w * (m.kick && this.blocking ? 4 : 1), total = moves.reduce((s, m) => s + wOf(m), 0);
       let r = Math.random() * total, move = moves[0];
