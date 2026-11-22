@@ -31,28 +31,24 @@ kbd { display: inline-block; min-width: 1.6em; padding: 1px 6px; margin: 0 2px; 
 .panel::before { content: ''; position: absolute; left: 12px; right: 12px; top: -1px; height: 2px; border-radius: 2px;
   background: linear-gradient(90deg, transparent, var(--brass), transparent); opacity: 0.8; }
 
-/* vitais: boia salva-vidas compacta no canto inferior esquerdo */
-#statsBox { left: 16px; bottom: 16px; display: flex; gap: 10px; align-items: center; padding: 8px 12px 8px 8px; width: 232px; }
-#lifeRing { position: relative; width: 50px; height: 50px; flex: 0 0 auto; }
+/* vitais: só o anel da vida (sem painel); anel de dentro = estamina */
+#vitals { position: absolute; left: 18px; bottom: 18px; display: flex; align-items: center; gap: 8px; }
+#lifeRing { position: relative; width: 62px; height: 62px; flex: 0 0 auto; filter: drop-shadow(0 1px 3px rgba(0, 0, 0, 0.55)); }
 #lifeRing svg { width: 100%; height: 100%; transform: rotate(-90deg); }
-#lifeRing circle { fill: none; stroke-width: 9; }
-.ring-bg { stroke: rgba(0, 0, 0, 0.4); }
-.ring-stripes { stroke: #f4efe4; stroke-dasharray: 19.6 19.6; opacity: 0.16; }
-.ring-fg { stroke: var(--coral); stroke-dasharray: 157 157; transition: stroke-dashoffset 0.3s, stroke 0.3s; }
+#lifeRing circle { fill: none; stroke-linecap: round; }
+.ring-track { stroke: rgba(255, 255, 255, 0.13); stroke-width: 5; }
+.ring-track.thin { stroke-width: 3; stroke: rgba(255, 255, 255, 0.08); }
+.ring-fg { stroke: var(--coral); stroke-width: 5; stroke-dasharray: 169.65 169.65; transition: stroke-dashoffset 0.3s, stroke 0.3s; }
+.ring-stam { stroke: var(--brass-2); stroke-width: 3; stroke-dasharray: 131.95 131.95; transition: stroke-dashoffset 0.1s, opacity 0.5s; }
+#lifeRing.fullStam .ring-stam, #lifeRing.fullStam .ring-track.thin { opacity: 0.35; }
+#lifeRing.tired .ring-stam { stroke: #ff7b4a; animation: beat 0.6s infinite; }
 #lifeRing.low .ring-fg { stroke: #ff3b2b; animation: beat 0.9s infinite; }
 @keyframes beat { 50% { opacity: 0.55; } }
-#vidaNum { position: absolute; inset: 0; display: grid; place-items: center; font: 400 19px/1 var(--display); }
-.stats-col { flex: 1; min-width: 0; display: grid; gap: 4px; }
-.bar i { display: block; height: 5px; background: rgba(0, 0, 0, 0.45); border-radius: 3px; overflow: hidden; }
-.bar.stam i { height: 3px; }
-.bar b { display: block; height: 100%; transition: width 0.25s; }
-.vida { background: linear-gradient(90deg, #b8322a, var(--coral)); }
-#stamina { background: linear-gradient(90deg, #d9b25e, var(--brass-2)); }
-#stamina.low { background: #ff8a5c; }
-#inv { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 3px; min-height: 0; }
+#vidaNum { position: absolute; inset: 0; display: grid; place-items: center; font: 400 21px/1 var(--display); }
+#inv { display: flex; justify-content: center; gap: 4px; }
 #inv:empty { display: none; }
 .chip { display: inline-flex; align-items: center; gap: 4px; padding: 1px 7px 1px 3px; border-radius: 999px;
-  background: rgba(0, 0, 0, 0.28); font-size: 11.5px; font-weight: 800; }
+  background: rgba(8, 24, 35, 0.45); font-size: 11.5px; font-weight: 800; }
 .chip i { width: 15px; height: 15px; border-radius: 50%; display: grid; place-items: center; font-style: normal; font-size: 9px;
   background: var(--brass); color: var(--navy); text-shadow: none; }
 
@@ -69,22 +65,33 @@ kbd { display: inline-block; min-width: 1.6em; padding: 1px 6px; margin: 0 2px; 
   font-size: 13px; box-shadow: inset 0 0 0 1px rgba(224, 172, 76, 0.3); animation: toast 4s forwards; }
 @keyframes toast { 0% { opacity: 0; transform: translateY(-6px); } 6%, 82% { opacity: 1; transform: none; } 100% { opacity: 0; } }
 
-/* arma e hotbar */
-#weapon { right: 16px; bottom: 16px; padding: 8px 14px 9px; min-width: 170px; text-align: right; }
+/* arma equipada: só texto no canto */
+#weapon { position: absolute; right: 20px; bottom: 18px; text-align: right; text-shadow: 0 1px 3px rgba(0, 0, 0, 0.75); }
 #weapon .wname { font: 400 20px/1 var(--display); letter-spacing: 0.02em; }
-#weapon .stars { color: var(--brass-2); font-size: 10px; letter-spacing: 2px; opacity: 0.85; }
-#weapon .ammo { font: 400 30px/1 var(--display); margin-top: 2px; }
-#weapon .ammo small { font: 700 12px var(--ui); color: var(--ink-dim); }
-#weapon .dur { height: 3px; margin-top: 6px; border-radius: 2px; background: rgba(0, 0, 0, 0.45); overflow: hidden; }
-#weapon .dur b { display: block; height: 100%; background: var(--brass); }
-#hotbar { position: absolute; left: 50%; bottom: 16px; transform: translateX(-50%); display: flex; gap: 5px; }
-.hotbar-slot { position: relative; min-width: 96px; padding: 6px 10px 5px; border-radius: 10px 3px 10px 3px; text-align: center; font-size: 11.5px;
-  background: rgba(8, 24, 35, 0.55); border: 1px solid rgba(224, 172, 76, 0.22); transition: transform 0.15s, border-color 0.15s; }
-.hotbar-slot .n { position: absolute; top: -7px; left: -5px; width: 16px; height: 16px; border-radius: 50%; display: grid; place-items: center;
-  font: 800 10px var(--ui); color: var(--navy); background: var(--brass); text-shadow: none; }
-.hotbar-slot .s { display: block; color: var(--brass-2); font-size: 9px; letter-spacing: 1px; }
-.hotbar-slot.empty { opacity: 0.4; }
-.hotbar-slot.active { border-color: var(--brass-2); background: rgba(60, 42, 14, 0.6); box-shadow: 0 0 12px rgba(224, 172, 76, 0.35); transform: translateY(-3px); }
+#weapon .wname::after { content: ''; display: block; height: 2px; width: 100%; margin-top: 3px; border-radius: 2px;
+  background: linear-gradient(90deg, transparent, var(--rar, transparent)); opacity: 0.8; }
+#weapon .ammo { font: 400 32px/1 var(--display); margin-top: 2px; }
+#weapon .ammo small { font: 700 13px var(--ui); color: var(--ink-dim); }
+
+/* barra de inventário: armas | consumíveis, cada slot com a tecla configurada; clicável/tocável */
+#invBar { position: absolute; left: 50%; bottom: 14px; transform: translateX(-50%); display: grid; gap: 6px; justify-items: center; }
+#hotbar { display: flex; align-items: flex-end; gap: 5px; }
+#hotbar .sep { width: 1px; height: 30px; margin: 0 4px 8px; background: rgba(255, 255, 255, 0.18); }
+.slot { position: relative; pointer-events: auto; cursor: pointer; display: grid; place-items: center; padding: 0; height: 46px;
+  border-radius: 9px; border: 1px solid rgba(255, 255, 255, 0.12); background: rgba(8, 24, 35, 0.42); color: var(--ink);
+  font: 700 11px/1.1 var(--ui); text-shadow: 0 1px 2px rgba(0, 0, 0, 0.7); transition: transform 0.12s, border-color 0.12s, background 0.12s, opacity 0.2s; }
+.slot:hover { background: rgba(20, 53, 73, 0.6); }
+.slot.wpn { min-width: 70px; max-width: 92px; padding: 0 8px; box-shadow: inset 0 -2px 0 var(--rar, transparent); }
+.slot.use { width: 46px; }
+.slot .nm { display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; text-align: center; }
+.slot .ic { font-size: 18px; line-height: 1; color: var(--brass-2); }
+.slot kbd { position: absolute; top: -7px; left: -5px; min-width: 17px; padding: 0 4px; margin: 0; font-size: 9.5px; line-height: 15px; box-shadow: none; }
+.slot em { position: absolute; right: 4px; bottom: 2px; font: 800 10.5px var(--ui); font-style: normal; color: var(--ink); }
+.slot.wpn em { color: var(--ink-dim); }
+.slot.empty { opacity: 0.35; }
+.slot.empty kbd { filter: grayscale(1); }
+.slot.active { border-color: var(--brass-2); background: rgba(60, 42, 14, 0.55); transform: translateY(-4px); box-shadow: inset 0 -2px 0 var(--rar, transparent), 0 0 12px rgba(224, 172, 76, 0.3); }
+.slot:active { transform: scale(0.94); }
 
 #prompt { position: absolute; left: 50%; top: 60%; transform: translateX(-50%); font-size: 15px; font-weight: 800; white-space: nowrap;
   padding: 4px 14px; border-radius: 999px; background: rgba(8, 24, 35, 0.5); }
@@ -360,16 +367,27 @@ body.touch #banjoPanel { bottom: 8px; padding: 8px; } body.touch #banjoPanel .ti
 .tCtx button { padding: 10px 14px; border-radius: 10px; white-space: nowrap; }
 
 body.touch #hint { display: none; }
-body.touch #hotbar { bottom: 10px; }
-body.touch .hotbar-slot { min-width: 76px; padding: 6px 6px 5px; font-size: 11px; }
-body.touch #weapon { bottom: auto; right: calc(14px + env(safe-area-inset-right)); top: 66px; padding: 6px 10px; min-width: 0; }
-body.touch #weapon .wname { font-size: 17px; } body.touch #weapon .ammo { font-size: 18px; }
-body.touch #statsBox { width: auto; max-width: 200px; left: calc(14px + env(safe-area-inset-left)); bottom: auto; top: 10px; padding: 5px 8px 5px 5px; gap: 8px; } body.touch #lifeRing { width: 40px; height: 40px; }
-body.touch #statsBox .bar { display: none; } body.touch #inv { margin-top: 0; gap: 3px; } body.touch .chip { font-size: 11px; padding: 1px 6px 1px 2px; }
+body.touch #hud { z-index: 5; } /* acima da camada de toque (o HUD não pega toques, só os slots) */
+body.touch #invBar { bottom: calc(8px + env(safe-area-inset-bottom)); max-width: calc(100vw - 470px); min-width: 200px; }
+body.touch #hotbar { flex-wrap: wrap-reverse; justify-content: center; }
+body.touch #hotbar .sep { height: 26px; margin-bottom: 6px; }
+body.touch .slot { height: 44px; }
+body.touch .slot.wpn { min-width: 58px; padding: 0 6px; font-size: 10.5px; }
+body.touch .slot.use { width: 44px; }
+body.touch .slot kbd { display: none; }
+body.touch .slot:hover { background: rgba(8, 24, 35, 0.42); }
+body.touch #weapon { bottom: auto; right: calc(16px + env(safe-area-inset-right)); top: 64px; }
+body.touch #weapon .wname { font-size: 16px; } body.touch #weapon .ammo { font-size: 22px; }
+body.touch #vitals { left: calc(14px + env(safe-area-inset-left)); bottom: auto; top: 10px; }
+body.touch #lifeRing { width: 50px; height: 50px; } body.touch #vidaNum { font-size: 17px; }
+body.touch .chip { font-size: 11px; padding: 1px 6px 1px 2px; }
 body.touch #objective { max-width: 30vw; font-size: 11px; padding: 4px 16px; top: 10px; }
 body.touch #msgs { top: 44px; } body.touch #msgs div { font-size: 12px; padding: 3px 10px; }
 body.touch #eventBox { top: 70px; min-width: 0; max-width: 46vw; padding: 6px 10px; } body.touch #eventBox b#eventTitle { font-size: 17px; }
 body.touch #prompt { top: 34%; font-size: 14px; }
+body.touch #voiceHud { top: 68px; left: calc(14px + env(safe-area-inset-left)); }
+body.touch #buildAssist kbd { display: none; }
+#invBar.dim { opacity: 0.3; } #invBar.dim .slot { pointer-events: none; }
 
 @media (max-width: 560px) {
   h1 { font-size: 48px; }
@@ -439,9 +457,6 @@ body.touch #fps { left: auto; right: calc(14px + env(safe-area-inset-right)); to
 #crosshair.tp.melee::before { display: none; }
 
 /* estamina e números de dano do corpo a corpo */
-.bar.stam { margin-top: 4px; } .bar.stam i { height: 4px; }
-#stamina { background: linear-gradient(90deg, #d9a441, #ffe08a); transition: width 0.1s; }
-#stamina.low { background: #ff7b4a; animation: beat 0.6s infinite; }
 #dmgNums { position: absolute; inset: 0; pointer-events: none; overflow: hidden; }
 .dmg { position: absolute; left: 0; top: 0; font: 800 18px var(--ui); white-space: nowrap; will-change: transform;
   text-shadow: 0 2px 0 #1a0a05, 0 0 6px rgba(0, 0, 0, 0.7); }

@@ -11,11 +11,9 @@ const key = (type, code) => dispatchEvent(new KeyboardEvent(type, { code, bubble
 const ICON = {
   jump: '<svg viewBox="0 0 24 24"><path d="M12 4l7 8h-4v8H9v-8H5z"/></svg>',
   attack: '<svg viewBox="0 0 24 24"><path d="M4 20l9-9 2 2-9 9H4zm9.5-11.5l3-3 4 1-1 4-3 3z"/></svg>',
-  use: '<span>E</span>',
+  use: '<svg viewBox="0 0 24 24"><path d="M9 11V5.5a1.5 1.5 0 0 1 3 0V10h.5V3.5a1.5 1.5 0 0 1 3 0V10h.5V5a1.5 1.5 0 0 1 3 0v9.5c0 4-2.7 7-6.5 7-2.6 0-4.3-1.2-5.6-3.3L4.2 13.6a1.4 1.4 0 0 1 2.3-1.6L9 14.8z"/></svg>',
   aim: '<svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="7" fill="none" stroke="currentColor" stroke-width="2"/><circle cx="12" cy="12" r="2"/></svg>',
   reload: '<svg viewBox="0 0 24 24"><path d="M12 5a7 7 0 1 0 7 7h-2.5A4.5 4.5 0 1 1 12 7.5V11l5-5-5-5z"/></svg>',
-  swap: '<svg viewBox="0 0 24 24"><path d="M4 8h12l-3-3 1.5-1.5L20 9l-5.5 5.5L13 13l3-3H4zm16 8H8l3 3-1.5 1.5L4 15l5.5-5.5L11 11l-3 3h12z"/></svg>',
-  heal: '<svg viewBox="0 0 24 24"><path d="M10 3h4v7h7v4h-7v7h-4v-7H3v-4h7z"/></svg>',
   cam: '<svg viewBox="0 0 24 24"><path d="M12 5C6 5 2 12 2 12s4 7 10 7 10-7 10-7-4-7-10-7zm0 11a4 4 0 1 1 0-8 4 4 0 0 1 0 8z"/></svg>',
   gear: '<svg viewBox="0 0 24 24"><path d="M19.4 13a7.6 7.6 0 0 0 0-2l2.1-1.6-2-3.5-2.5 1a7.4 7.4 0 0 0-1.7-1L15 3h-4l-.4 2.9a7.4 7.4 0 0 0-1.7 1l-2.5-1-2 3.5L6.5 11a7.6 7.6 0 0 0 0 2l-2.1 1.6 2 3.5 2.5-1a7.4 7.4 0 0 0 1.7 1L11 21h4l.4-2.9a7.4 7.4 0 0 0 1.7-1l2.5 1 2-3.5zM13 15.5A3.5 3.5 0 1 1 13 8.5a3.5 3.5 0 0 1 0 7z"/></svg>',
   full: '<svg viewBox="0 0 24 24"><path d="M4 4h6v2H6v4H4zm10 0h6v6h-2V6h-4zM4 14h2v4h4v2H4zm14 0h2v6h-6v-2h4z"/></svg>',
@@ -30,8 +28,6 @@ export class TouchControls {
       <div id="tLook"></div>
       <div id="tStick"><div id="tKnob"></div></div>
       <div class="tTop">
-        <button data-act="swap" title="Trocar arma">${ICON.swap}</button>
-        <button data-act="heal" title="Bandagem">${ICON.heal}</button>
         <button data-act="cam" title="1ª/3ª pessoa">${ICON.cam}</button>
         <button data-act="full" title="Tela cheia">${ICON.full}</button>
         <button data-act="gfx" title="Gráficos">${ICON.gear}</button>
@@ -40,9 +36,9 @@ export class TouchControls {
       <div class="tPad">
         <button class="big" data-act="attack" title="Atacar / pegar">${ICON.attack}</button>
         <button data-act="jump" title="Pular">${ICON.jump}</button>
-        <button data-act="use" title="Interagir [E]">${ICON.use}</button>
+        <button data-act="use" title="Interagir / usar">${ICON.use}</button>
         <button data-act="aim" title="Mirar / bloquear">${ICON.aim}</button>
-        <button data-act="dodge" title="Esquivar [Q]">${ICON.jump.replace('M12 4l7 8h-4v8H9v-8H5z', 'M4 12l7-7v4h9v6h-9v4z')}</button>
+        <button data-act="dodge" title="Esquivar">${ICON.jump.replace('M12 4l7 8h-4v8H9v-8H5z', 'M4 12l7-7v4h9v6h-9v4z')}</button>
         <button data-act="reload" title="Recarregar">${ICON.reload}</button>
       </div>
       <div class="tCtx" id="tBuild">
@@ -146,11 +142,6 @@ export class TouchControls {
       else if (act === 'jump') press(el, () => key('keydown', binds.jump), () => key('keyup', binds.jump));
       else if (act === 'use') press(el, () => key('keydown', binds.interact), () => key('keyup', binds.interact));
       else if (act === 'reload') press(el, () => key('keydown', binds.reload), () => key('keyup', binds.reload));
-      else if (act === 'swap') press(el, () => { inp.mouse.wheel += 1; });
-      else if (act === 'heal') press(el, () => {
-        const code = G.survival.inv.bandagem > 0 ? binds.bandage : binds.medkit;
-        key('keydown', code); key('keyup', code);
-      });
       else if (act === 'cam') press(el, () => { key('keydown', binds.camera); key('keyup', binds.camera); });
       else if (act === 'gfx') press(el, () => G.gfxMenu.toggle(!G.gfxMenu.open));
       else if (act === 'mic') press(el, () => { G.voice.touchTalk = true; }, () => { G.voice.touchTalk = false; });

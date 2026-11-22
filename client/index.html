@@ -26,25 +26,24 @@
   <div id="voiceHud"></div>
   <div id="cannonReticle" hidden><i></i></div>
   <div id="objective"></div>
-  <div id="statsBox" class="panel">
+  <div id="vitals">
     <div id="lifeRing">
       <svg viewBox="0 0 64 64" aria-hidden="true">
-        <circle cx="32" cy="32" r="25" class="ring-bg"/>
-        <circle cx="32" cy="32" r="25" class="ring-stripes"/>
-        <circle cx="32" cy="32" r="25" id="lifeArc" class="ring-fg"/>
+        <circle cx="32" cy="32" r="27" class="ring-track"/>
+        <circle cx="32" cy="32" r="27" id="lifeArc" class="ring-fg"/>
+        <circle cx="32" cy="32" r="21" class="ring-track thin"/>
+        <circle cx="32" cy="32" r="21" id="stamArc" class="ring-stam"/>
       </svg>
       <span id="vidaNum">100</span>
     </div>
-    <div class="stats-col">
-      <div class="bar"><i><b id="vida" class="vida"></b></i></div>
-      <div class="bar stam"><i><b id="stamina"></b></i></div>
-      <div id="inv"></div>
-      <div id="buffs"></div>
-    </div>
+    <div id="buffs"></div>
   </div>
-  <div id="weapon" class="panel"></div>
+  <div id="weapon"></div>
   <div id="prompt"></div>
-  <div id="hotbar"></div>
+  <div id="invBar">
+    <div id="inv"></div>
+    <div id="hotbar"></div>
+  </div>
   <div id="msgs"></div>
   <div id="eventBox" hidden>
     <span id="eventArrow">▲</span>
