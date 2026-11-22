@@ -151,6 +151,11 @@ cada um sai diferente (força, velocidade, tamanho, lado e sentido de giro sorte
   raycast de pegar peças só olha o que está ao alcance; no máximo 1 chunk novo por quadro; sombras a 30 Hz
   (Ultra: todo quadro). **Modos do FSR**: Nativo, Qualidade (67%), Equilibrado (59%), Desempenho (50%) e
   Ultra desempenho (33%); as predefinições usam Desempenho/Equilibrado/Qualidade/Nativo.
+- **Pistola em 3D** (`client/public/models/pistola.glb`, carregada por `client/src/player/gunmodels.js`):
+  modelo do Tripo reduzido de ~2 mi para ~17 mil triângulos, sem o pedaço solto, com o ferrolho separado
+  (recua no tiro) e "pintado" por vértice (gunmetal, aço, polímero, painéis areia, quinas gastas e oclusão
+  de ambiente). Scripts em `tools/` (`simplify-model.mjs`, `process-pistol.mjs`, rodam com Node +
+  glTF-Transform). Enquanto o GLB carrega, a pistola procedural aparece no lugar.
 - **Personagem**: pílula mais baixa (1,45 m, cápsula mais curta) e **rosto animado** — pisca sozinho e a boca
   mexe com o volume da voz no chat (6 quadros prontos por estilo de rosto, só troca a textura).
 - **Imersão** (menu Gráficos → Imersão, tudo opcional e salvo no navegador, fora das predefinições;

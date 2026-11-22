@@ -5,6 +5,7 @@
 // +Y para cima, +X para a direita do atirador.
 import * as THREE from '../three.js';
 import { woodTexture, woodBump, metalTexture, repeated } from '../world/textures.js';
+import { gunModel } from './gunmodels.js';
 
 const std = (color, roughness = 0.9, metalness = 0, extra = {}) =>
   new THREE.MeshStandardMaterial({ color, roughness, metalness, ...extra });
@@ -411,7 +412,7 @@ SPECS.revolver = () => {
   };
 };
 
-SPECS.pistola = () => {
+const proceduralPistola = () => {
   const g = new THREE.Group();
   add(g, profile([
     [0.09, 0.02], [-0.09, 0.02], [-0.095, -0.012], [-0.075, -0.015], [-0.095, -0.135], [-0.035, -0.135],
@@ -442,6 +443,35 @@ SPECS.pistola = () => {
     gripR: { p: [0, -0.065, 0.065], r: [0, 0, -1.55], c: 0.9, idx: 0.3, th: [-0.35, -0.2, 0.2] },
     gripL: { p: [0, -0.108, 0.065], r: [0, 0, 1.55], c: 0.85, th: [-0.2, 0.0, 0.2] },
     magPoint: [0, -0.1, -0.045],
+    parts: { slide, mag },
+  };
+};
+
+// Pistola com o modelo 3D importado (Tripo, otimizado e pintado). Enquanto o GLB não carrega,
+// usa a procedural. O ferrolho é uma malha separada (recua no tiro) e leva a red dot junto.
+SPECS.pistola = () => {
+  const m = gunModel('pistola');
+  if (!m) return proceduralPistola();
+  const g = new THREE.Group(), slide = new THREE.Group();
+  g.add(m.group);
+  // o nó do GLB vem com escala/deslocamento da quantização: o ferrolho vai dentro de um grupo
+  // "limpo", que é o que recua no tiro e onde a red dot é presa
+  const node = m.parts.ferrolho;
+  if (node) { node.parent.add(slide); slide.add(node); }
+  const rdY = redDot(slide, 0.056, 0.012);
+  trigger(g, 0.02, -0.035);
+  const mag = new THREE.Group(); // carregador escondido dentro do punho (aparece na recarga)
+  add(mag, box(0.026, 0.1, 0.045, MAT.iron, 0, -0.06, 0.06));
+  add(mag, box(0.03, 0.012, 0.05, MAT.black, 0, -0.112, 0.06));
+  g.add(mag);
+  const muzzle = new THREE.Vector3(0, 0.03, -0.25);
+  return {
+    group: g, type: 'pistol', reload: 'mag', muzzle, sightY: rdY, adsDist: 0.27, adsFov: 64, flash: 1.1,
+    eject: new THREE.Vector3(0.03, 0.04, 0.0),
+    hold: { p: [0.15, -0.1, -0.44], r: [0.08, 0.05, 0] },
+    gripR: { p: [0, -0.06, 0.075], r: [0, 0, -1.55], c: 0.9, idx: 0.3, th: [-0.35, -0.2, 0.2] },
+    gripL: { p: [0, -0.1, 0.075], r: [0, 0, 1.55], c: 0.85, th: [-0.2, 0.0, 0.2] },
+    magPoint: [0, -0.1, 0.06],
     parts: { slide, mag },
   };
 };
