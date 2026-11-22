@@ -184,6 +184,56 @@ function blush(g, cx, y, px) {
   }
 }
 
+// ---------- rosto animado ----------
+// O rosto fica numa camada própria logo à frente da cápsula, com 6 quadros prontos por estilo
+// (olhos abertos/fechados × boca fechada/meio aberta/aberta), compartilhados por todas as pílulas.
+const FACE_PX = 1024 / Math.PI, FACE_W = 256, FACE_H = 168;
+const FACE_EYES = {
+  tedio: [[-0.2, 0.085, 0.2, 0.12], [0.2, 0.085, 0.2, 0.12]], feliz: [[-0.19, 0.13, 0.12, 0.14], [0.19, 0.13, 0.12, 0.14]],
+  bravo: [[-0.19, 0.15, 0.13, 0.1], [0.19, 0.15, 0.13, 0.1]], surpreso: [[-0.19, 0.14, 0.14, 0.16], [0.19, 0.14, 0.14, 0.16]],
+  piscada: [[-0.19, 0.13, 0.12, 0.14]], malvado: [[-0.19, 0.15, 0.13, 0.1], [0.19, 0.15, 0.13, 0.1]],
+  louco: [[-0.19, 0.15, 0.15, 0.16], [0.19, 0.15, 0.1, 0.1]], pirata: [[0.19, 0.15, 0.12, 0.1]],
+};
+const FACE_MOUTH = { tedio: [0.245, 0.1], feliz: [0.27, 0.12], bravo: [0.31, 0.11], surpreso: [0.33, 0.08], sono: [0.26, 0.08], piscada: [0.24, 0.1], oculos: [0.32, 0.11] };
+const faceCache = new Map();
+function faceFrames(id) {
+  if (faceCache.has(id)) return faceCache.get(id);
+  const frames = [];
+  for (const closed of [0, 1]) for (const mouth of [0, 1, 2]) {
+    const c = document.createElement('canvas'); c.width = FACE_W; c.height = FACE_H;
+    const g = c.getContext('2d'), cx = FACE_W / 2, top = 2, px = FACE_PX;
+    FACE_DRAW[id](g, cx, top, px);
+    if (closed && FACE_EYES[id]) for (const [ex, ey, rx, ry] of FACE_EYES[id]) {
+      g.save(); g.globalCompositeOperation = 'destination-out';
+      g.beginPath(); g.ellipse(cx + ex * px, top + ey * px, rx * px, ry * px, 0, 0, Math.PI * 2); g.fill(); g.restore();
+      g.strokeStyle = '#151515'; g.lineWidth = 6; g.lineCap = 'round'; // olho fechado: arquinho com cílio
+      g.beginPath(); g.arc(cx + ex * px, top + (ey - 0.03) * px, rx * px * 0.7, 0.2 * Math.PI, 0.8 * Math.PI); g.stroke();
+    }
+    if (mouth && FACE_MOUTH[id]) {
+      const [my, mw] = FACE_MOUTH[id], x = cx, y = top + my * px, w = mw * px;
+      g.save(); g.globalCompositeOperation = 'destination-out';
+      g.fillRect(x - w * 1.25, y - 0.05 * px, w * 2.5, 0.12 * px); g.restore();
+      const hw = w * (0.55 + 0.25 * mouth), hh = (0.018 + 0.03 * mouth) * px;
+      g.fillStyle = '#2a0c0c'; g.beginPath(); g.ellipse(x, y + hh * 0.4, hw, hh, 0, 0, Math.PI * 2); g.fill();
+      g.fillStyle = '#d4505a'; g.beginPath(); g.ellipse(x, y + hh * 0.95, hw * 0.55, hh * 0.45, 0, 0, Math.PI * 2); g.fill();
+      g.strokeStyle = '#151515'; g.lineWidth = 4; g.beginPath(); g.ellipse(x, y + hh * 0.4, hw, hh, 0, 0, Math.PI * 2); g.stroke();
+    }
+    const t = new THREE.CanvasTexture(c); t.colorSpace = THREE.SRGBColorSpace; t.anisotropy = 4;
+    frames.push(t);
+  }
+  faceCache.set(id, frames);
+  return frames;
+}
+function makeFaceLayer(id) {
+  if (!id || !FACE_DRAW[id]) return null;
+  const frames = faceFrames(id);
+  const span = FACE_W / FACE_PX / R, hgt = FACE_H / FACE_PX, y1 = -L / 2 + (SPLIT - ARC), y0 = y1 - hgt;
+  const geo = new THREE.LatheGeometry([new THREE.Vector2(R + 0.004, y0), new THREE.Vector2(R + 0.004, y1)], 24, Math.PI - span / 2, span);
+  const mat = new THREE.MeshStandardMaterial({ map: frames[0], transparent: true, roughness: 0.35, depthWrite: false, polygonOffset: true, polygonOffsetFactor: -2 });
+  const mesh = new THREE.Mesh(geo, mat); mesh.renderOrder = 1;
+  return { mesh, frames, cur: 0 };
+}
+
 // Plástico com arranhões/manchas na cor dada; com rosto quando face != null.
 function bodyTexture(color, H, face, seed) {
   const W = 1024, c = document.createElement('canvas'); c.width = W; c.height = H;
@@ -394,8 +444,12 @@ const HATS = {
 };
 
 // ---------- montagem ----------
-export const PILL_HEIGHT = 3.24; // sola no chão (y = 0) até o topo da cápsula
-const R = 0.5, L = 1.55, ARC = Math.PI / 2 * R, TOTAL = 2 * ARC + L, SPLIT = ARC + L * 0.58, BODY_Y = 1.96;
+// Cápsula mais curta (antes L = 1,55: o personagem ficava comprido demais) e personagem de 1,45 m.
+const LEG = 0.785;
+const R = 0.5, L = 1.1, ARC = Math.PI / 2 * R, TOTAL = 2 * ARC + L, SPLIT = ARC + L * 0.58, BODY_Y = LEG + L / 2 + R * 0.8;
+export const PILL_HEIGHT = BODY_Y + L / 2 + R; // sola no chão (y = 0) até o topo da cápsula
+export const CHAR_HEIGHT = 1.45;                // altura do personagem no mundo (m)
+export const PILL_SCALE = CHAR_HEIGHT / PILL_HEIGHT;
 const SEAM_Y = -L / 2 + (SPLIT - ARC), TOP_Y = L / 2 + R;
 
 // options.npc (inimigos): aceita cores em hex (capHex, baseHex, gloveHex, bootHex), rostos e
@@ -406,9 +460,10 @@ export function makePill(options = {}) {
   const root = new THREE.Group();
   const body = new THREE.Group(); body.position.y = BODY_Y; root.add(body);
   const pxPerM = 1024 / (Math.PI * 2 * R);
-  const white = new THREE.Mesh(capsuleLathe(R, L, 0, SPLIT), plastic(0xffffff, bodyTexture(baseHex, Math.round(SPLIT * pxPerM), o.face, 7)));
+  const white = new THREE.Mesh(capsuleLathe(R, L, 0, SPLIT), plastic(0xffffff, bodyTexture(baseHex, Math.round(SPLIT * pxPerM), null, 7)));
   const red = new THREE.Mesh(capsuleLathe(R, L, SPLIT, TOTAL), plastic(0xffffff, bodyTexture(capHex, Math.round((TOTAL - SPLIT) * pxPerM), null, 3)));
   body.add(white, red);
+  const face = makeFaceLayer(o.face); if (face) body.add(face.mesh);
   const seam = new THREE.Mesh(new THREE.TorusGeometry(R + 0.004, 0.008, 6, 64), plastic(capHex));
   seam.rotation.x = Math.PI / 2; seam.position.y = SEAM_Y; body.add(seam);
 
@@ -445,22 +500,26 @@ export function makePill(options = {}) {
   }
   const hat = (HATS[o.hat] || HATS.nenhum)(o.hatColor);
   if (hat) { hat.scale.setScalar(1.3); hat.position.y = TOP_Y - 0.08; body.add(hat); parts.hat = hat; }
-  root.userData.parts = parts; root.userData.phase = 0; root.userData.pill = o;
+  root.userData.parts = parts; root.userData.phase = 0; root.userData.pill = o; root.userData.face = face;
+  root.userData.blinkT = 1 + Math.random() * 3;
   root.traverse((m) => { if (m.isMesh) { m.castShadow = true; m.receiveShadow = true; } });
   return root;
 }
 
 export function disposePill(pill) {
+  const face = pill.userData.face && pill.userData.face.mesh;
   pill.traverse((m) => {
     if (!m.isMesh) return;
     m.geometry.dispose();
+    if (m === face) { m.material.dispose(); return; } // quadros do rosto são compartilhados
     if (m.material.map) m.material.map.dispose();
     m.material.dispose();
   });
 }
 
-// poses: walk | attack | aim | swim | jump | row | leap | windup | heavyWindup | slam | guard | stagger | dodge
-//        | slashR | slashL | thrust | uppercut | spin | parry | roll | sidestep | crawl
+// poses: walk | attack | aim | reload | use | throw | strum | hammer | climb | vault | swim | jump | row | leap
+//        | windup | heavyWindup | slam | guard | stagger | dodge | slashR | slashL | thrust | uppercut | spin
+//        | parry | roll | sidestep | crawl
 const smooth01 = (x) => { x = Math.max(0, Math.min(1, x)); return x * x * (3 - 2 * x); };
 // Partes animadas: a pose calcula o ALVO e animatePill mistura suavemente do quadro anterior para
 // ele (sem "estalos" ao trocar de pose). Ângulos misturados pelo caminho mais curto (giros de 360°).
@@ -475,7 +534,7 @@ export function animatePill(pill, speed, dt, pose = 'walk', progress = 0) {
   poseTargets(pill, speed, dt, pose, progress);
   if (first) return;
   // poses de ação (golpes/esquiva) respondem mais rápido que andar/parar
-  const rate = ['walk', 'swim', 'row', 'aim'].includes(pose) ? 16 : 30, k = 1 - Math.exp(-rate * dt);
+  const rate = ['walk', 'swim', 'row', 'aim', 'strum', 'guard'].includes(pose) ? 14 : ['reload', 'use'].includes(pose) ? 20 : 30, k = 1 - Math.exp(-rate * dt);
   BLEND_PARTS.forEach((n, i) => {
     const r = p[n].rotation;
     r.x = _snap[i * 3] + wrapPi(r.x - _snap[i * 3]) * k;
@@ -484,64 +543,153 @@ export function animatePill(pill, speed, dt, pose = 'walk', progress = 0) {
   });
   p.body.position.y = _snap[15] + (p.body.position.y - _snap[15]) * k;
   p.body.position.z = _snap[16] + (p.body.position.z - _snap[16]) * k;
+  animateFace(pill.userData, dt);
 }
 
+// Pisca de vez em quando; a boca abre conforme o volume da voz (userData.talk 0..1, chat de voz).
+function animateFace(ud, dt) {
+  const f = ud.face; if (!f) return;
+  ud.blinkT -= dt;
+  if (ud.blinkT < -0.13) ud.blinkT = 2 + Math.random() * 4 * (Math.random() < 0.2 ? 0.15 : 1); // às vezes pisca duas vezes
+  const closed = ud.blinkT < 0 ? 1 : 0;
+  const talk = ud.talk || 0;
+  ud.mouthT = (ud.mouthT || 0) + dt * 14;
+  const mouth = talk > 0.05 ? (talk * (0.6 + 0.4 * Math.sin(ud.mouthT)) > 0.45 ? 2 : 1) : 0;
+  const key = closed * 3 + mouth;
+  if (key !== f.cur) { f.cur = key; f.mesh.material.map = f.frames[key]; }
+}
+
+// userData lido aqui (o jogador preenche): mf/ms = direção do movimento relativa ao corpo (frente/lado),
+// armed = 'none' | 'melee' | 'pistol' | 'long' | 'tool', vy = velocidade vertical, reloadKind, useItem,
+// vaultSide, aimPitch, kick, strum, hurt (0..1, tranco de dano) e squash (0..1, aterrissagem).
 function poseTargets(pill, speed, dt, pose, progress) {
-  const p = pill.userData.parts, k = Math.min(1, speed / 4);
-  pill.userData.phase += dt * (pose === 'swim' ? 5 : 2 + speed * 2.2);
-  const ph = pill.userData.phase, c = Math.sin(ph);
-  // base: andar gingado / respirar parado
-  p.body.position.y = BODY_Y + Math.abs(Math.cos(ph)) * 0.06 * k + Math.sin(ph * 0.5) * 0.012 * (1 - k);
+  const ud = pill.userData, p = ud.parts;
+  const run = Math.min(1, Math.max(0, (speed - 4.6) / 2.2));          // 0 andando … 1 correndo
+  const k = Math.min(1, speed / 4);
+  ud.phase += dt * (pose === 'swim' ? (speed > 0.5 ? 4.2 : 2.6) : 2 + speed * (2.1 - run * 0.35));
+  const ph = ud.phase, c = Math.sin(ph), mf = ud.mf ?? 1, ms = ud.ms ?? 0, armed = ud.armed || 'none';
+  const back = mf < -0.3 ? 1 : 0, side = Math.abs(ms) > 0.5 && Math.abs(mf) < 0.5 ? Math.sign(ms) : 0;
+  ud.idleT = speed < 0.3 ? (ud.idleT || 0) + dt : 0;
+  // ---------- locomoção base: parado (respira, olha em volta) / andar / correr / lateral / de costas ----------
+  const breathe = Math.sin(ph * 0.5) * (1 - k);
+  const look = ud.idleT > 3 ? Math.sin(ud.idleT * 0.7) * 0.25 * Math.min(1, (ud.idleT - 3) * 0.5) : 0;
+  p.body.position.y = BODY_Y + Math.abs(Math.cos(ph)) * (0.06 + run * 0.08) * k + breathe * 0.015;
   p.body.position.z = 0;
-  p.body.rotation.set(0.05 * k, 0, c * 0.06 * k);
-  p.legL.rotation.set(c * 0.55 * k, 0, 0); p.legR.rotation.set(-c * 0.55 * k, 0, 0);
-  p.armL.rotation.set(-c * 0.7 * k, 0, 0.05 + Math.sin(ph * 0.5) * 0.03 * (1 - k));
-  p.armR.rotation.set(c * 0.7 * k, 0, -0.05 - Math.sin(ph * 0.5) * 0.03 * (1 - k));
+  p.body.rotation.set((0.05 + run * 0.2) * k - back * 0.12, look + c * 0.04 * k, c * (0.06 + run * 0.03) * k + side * 0.12 * k);
+  const stride = (0.55 + run * 0.35) * k * (back ? 0.8 : 1);
+  if (side) { // passo lateral: pernas abrem e fecham
+    p.legL.rotation.set(0, 0, Math.max(0, c) * 0.45 * k); p.legR.rotation.set(0, 0, -Math.max(0, -c) * 0.45 * k);
+  } else { p.legL.rotation.set(c * stride * (back ? -1 : 1), 0, 0.02); p.legR.rotation.set(-c * stride * (back ? -1 : 1), 0, -0.02); }
+  const swing = (0.7 + run * 0.5) * k;
+  p.armL.rotation.set(-c * swing - run * 0.25, 0, 0.06 + run * 0.12 + breathe * 0.04);
+  p.armR.rotation.set(c * swing - run * 0.25, 0, -0.06 - run * 0.12 - breathe * 0.04);
+  // carregando algo: postura da arma por cima do balanço
+  if (armed === 'pistol') { p.armR.rotation.set(-0.55 - run * 0.2, 0.15, -0.05); p.armL.rotation.x *= 0.6; }
+  else if (armed === 'long') { p.armR.rotation.set(-0.75 - run * 0.15, 0.35, 0.05); p.armL.rotation.set(-0.85 - run * 0.1, -0.55, 0.35); p.body.rotation.y += -0.2; }
+  else if (armed === 'melee') { p.armR.rotation.set(-0.35 + c * swing * 0.4, 0.1, -0.2 - run * 0.1); }
+  else if (armed === 'tool') { p.armR.rotation.set(-0.45 + c * swing * 0.3, 0.2, -0.05); }
   if (p.hat) p.hat.rotation.z = -c * 0.03 * k;
+
   if (pose === 'attack') { // jab de direita com giro do corpo
     const jab = Math.sin(Math.min(1, progress) * Math.PI);
     p.armR.rotation.set(-1.55 * jab, 0, -0.05 - 0.25 * jab);
     p.armL.rotation.set(-0.5, 0, 0.2);
     p.body.rotation.y = -0.35 * jab; p.body.rotation.x = 0.12 * jab;
   } else if (pose === 'aim') {
-    // braços seguem o ângulo da câmera (aimPitch) e dão tranco no disparo (kick)
-    const ap = pill.userData.aimPitch || 0, kk = pill.userData.kick || 0;
-    p.armR.rotation.set(-1.5 - ap - kk * 0.55, 0.12, -0.12); p.armL.rotation.set(-1.32 - ap - kk * 0.45, -0.25, 0.42);
-    p.body.rotation.set(0.04 - kk * 0.09, -0.12, 0);
+    // mira: braços seguem a câmera, corpo de lado (arma longa) ou de frente (pistola, duas mãos)
+    const ap = ud.aimPitch || 0, kk = ud.kick || 0, long = (ud.gunType || 'pistol') === 'long';
+    if (long) {
+      p.armR.rotation.set(-1.45 - ap - kk * 0.45, 0.35, -0.05); p.armL.rotation.set(-1.5 - ap - kk * 0.35, -0.6, 0.55);
+      p.body.rotation.set(0.05 - kk * 0.12, -0.35, 0); p.body.position.z = -kk * 0.06;
+    } else {
+      p.armR.rotation.set(-1.52 - ap - kk * 0.7, 0.18, 0.08); p.armL.rotation.set(-1.45 - ap - kk * 0.6, -0.42, -0.1);
+      p.body.rotation.set(0.04 - kk * 0.1, -0.08, 0);
+    }
+    p.legL.rotation.x *= 0.5; p.legR.rotation.x *= 0.5;
+    p.legL.rotation.z = 0.12; p.legR.rotation.z = -0.12; // base aberta
+  } else if (pose === 'reload') {
+    // recarga em 3ª pessoa: abaixa a arma, mão esquerda pega o pente no cinto, encaixa e dá o tapa
+    const u = Math.min(1, progress), kind = ud.reloadKind || 'mag', long = (ud.gunType || 'pistol') === 'long';
+    const low = Math.sin(u * Math.PI);
+    p.armR.rotation.set(-0.9 + low * 0.25, 0.35 + low * 0.25, 0.15 + low * 0.2);
+    p.body.rotation.set(0.12 * low, -0.15, 0);
+    if (kind === 'shotgun') { // bomba repetida: braço esquerdo vai e volta
+      const pump = Math.sin(u * Math.PI * 6);
+      p.armL.rotation.set(-1.05 - pump * 0.25, -0.55, 0.45);
+    } else if (kind === 'revolver') { // gira o tambor, cartuchos com a esquerda
+      p.armR.rotation.z += Math.sin(u * Math.PI) * 0.6;
+      p.armL.rotation.set(-0.7 - Math.sin(u * Math.PI * 4) * 0.2, -0.5, -0.2);
+    } else {
+      const a = u < 0.35 ? u / 0.35 : u < 0.7 ? 1 : 1 - (u - 0.7) / 0.3; // desce → pega → sobe
+      p.armL.rotation.set(-0.2 - (1 - a) * 0.9, -0.3 - (1 - a) * 0.3, 0.25 + a * 0.15);
+      if (u > 0.82) { const sl = Math.sin((u - 0.82) / 0.18 * Math.PI); p.armL.rotation.x -= sl * 0.35; p.body.rotation.x += sl * 0.06; }
+    }
+    if (long) p.body.rotation.y -= 0.2;
+  } else if (pose === 'use') { // bandagem enrolando no braço / kit na altura do peito
+    const u = Math.min(1, progress), wrap = Math.sin(u * Math.PI * 5);
+    if (ud.useItem === 'kit') {
+      p.armR.rotation.set(-1.1, 0.4, 0.5); p.armL.rotation.set(-1.1 - wrap * 0.15, -0.4, -0.5);
+      p.body.rotation.set(0.25, 0, 0); p.body.position.y = BODY_Y - 0.12;
+    } else {
+      p.armL.rotation.set(-1.0, 0, -0.45); // braço esquerdo esticado
+      p.armR.rotation.set(-1.15 + wrap * 0.25, 0.5 + wrap * 0.3, 0.55);
+      p.body.rotation.set(0.15, 0.2, 0);
+    }
+    p.legL.rotation.x *= 0.3; p.legR.rotation.x *= 0.3;
+  } else if (pose === 'throw') { // arremesso do gancho: puxa para trás e lança
+    const u = Math.min(1, progress), wind = u < 0.4 ? smooth01(u / 0.4) : 1 - smooth01((u - 0.4) / 0.25);
+    const rel = u < 0.4 ? 0 : Math.sin(Math.min(1, (u - 0.4) / 0.6) * Math.PI);
+    p.armR.rotation.set(-2.6 * wind - 1.4 * rel, 0.3 * wind, -0.4 * wind); p.armL.rotation.set(-1.2 * rel - 0.3, -0.3, 0.3);
+    p.body.rotation.set(-0.15 * wind + 0.3 * rel, 0.5 * wind - 0.4 * rel, 0);
+    p.legL.rotation.set(-0.5 * rel, 0, 0); p.legR.rotation.set(0.4 * wind, 0, 0);
+  } else if (pose === 'strum') { // tocando banjo: esquerda no braço do banjo, direita dedilhando
+    const st = ud.strum || 0, sway = Math.sin(ph * 0.9);
+    p.armL.rotation.set(-1.25, -0.2, -0.75); p.armR.rotation.set(-0.85 - st * 0.35, 0.25, 0.65 + st * 0.15);
+    p.body.rotation.set(0.05, 0.1 + sway * 0.08, sway * 0.07); p.body.position.y += Math.abs(sway) * 0.03;
+    p.legL.rotation.x = Math.max(0, Math.sin(ph * 1.8)) * 0.25; // bate o pé no ritmo
+  } else if (pose === 'hammer') { // martelada de cima para baixo com uma mão
+    const u = Math.min(1, progress), up = u < 0.45 ? smooth01(u / 0.45) : 1 - smooth01((u - 0.45) / 0.2);
+    p.armR.rotation.set(-2.7 * up - 0.5 * (1 - up), 0.1, -0.2); p.armL.rotation.set(-0.6, -0.2, 0.3);
+    p.body.rotation.set(-0.1 * up + 0.3 * (1 - up) * (u > 0.45 ? 1 : 0), -0.15, 0); p.body.position.y = BODY_Y - 0.08 * (u > 0.45 ? 1 : 0);
   } else if (pose === 'windup') { // puxa o braço para trás (aviso do golpe / carga do pesado)
-    const k = smooth01(progress);
-    p.armR.rotation.set(0.9 * k, 0, -0.35 - 0.4 * k); p.armL.rotation.set(-0.9 * k, 0, 0.35);
-    p.body.rotation.set(-0.1 * k, 0.45 * k, 0.04 * k);
-    p.legL.rotation.set(-0.35 * k, 0, 0); p.legR.rotation.set(0.25 * k, 0, 0);
+    const k2 = smooth01(progress), tr = Math.sin(ph * 9) * 0.03 * k2; // treme de força
+    p.armR.rotation.set(0.9 * k2 + tr, 0, -0.35 - 0.4 * k2); p.armL.rotation.set(-0.9 * k2, 0, 0.35);
+    p.body.rotation.set(-0.1 * k2, 0.45 * k2, 0.04 * k2); p.body.position.y = BODY_Y - 0.1 * k2;
+    p.legL.rotation.set(-0.45 * k2, 0, 0.1); p.legR.rotation.set(0.35 * k2, 0, -0.1);
   } else if (pose === 'heavyWindup') { // os dois braços para o alto
-    const k = smooth01(progress);
-    p.armR.rotation.set(-2.9 * k, 0, -0.25 * k); p.armL.rotation.set(-2.9 * k, 0, 0.25 * k);
-    p.body.rotation.set(-0.22 * k, 0, 0); p.body.position.y = BODY_Y + 0.12 * k;
+    const k2 = smooth01(progress);
+    p.armR.rotation.set(-2.9 * k2, 0, -0.25 * k2); p.armL.rotation.set(-2.9 * k2, 0, 0.25 * k2);
+    p.body.rotation.set(-0.22 * k2, 0, 0); p.body.position.y = BODY_Y + 0.12 * k2;
   } else if (pose === 'slam') { // pancada de cima para baixo
-    const k = Math.sin(Math.min(1, progress) * Math.PI * 0.5);
-    p.armR.rotation.set(-2.9 + 2.2 * k, 0, -0.25); p.armL.rotation.set(-2.9 + 2.2 * k, 0, 0.25);
-    p.body.rotation.set(-0.22 + 0.5 * k, 0, 0); p.body.position.y = BODY_Y - 0.1 * k;
-  } else if (pose === 'guard') { // guarda: luvas na frente do rosto
+    const k2 = Math.sin(Math.min(1, progress) * Math.PI * 0.5);
+    p.armR.rotation.set(-2.9 + 2.2 * k2, 0, -0.25); p.armL.rotation.set(-2.9 + 2.2 * k2, 0, 0.25);
+    p.body.rotation.set(-0.22 + 0.55 * k2, 0, 0); p.body.position.y = BODY_Y - 0.16 * k2;
+    p.legL.rotation.set(-0.6 * k2, 0, 0.1); p.legR.rotation.set(0.45 * k2, 0, -0.1);
+  } else if (pose === 'guard') { // guarda: luvas na frente do rosto, joelhos flexionados, balança
+    const bob = Math.sin(ph * 1.5) * 0.02;
     p.armR.rotation.set(-1.9, 0.5, -0.9); p.armL.rotation.set(-1.9, -0.5, 0.9);
-    p.body.rotation.set(0.12, 0, 0); p.body.position.y = BODY_Y - 0.06;
-    p.legL.rotation.set(-0.25, 0, 0.08); p.legR.rotation.set(0.2, 0, -0.08);
+    p.body.rotation.set(0.14, -0.1, 0); p.body.position.y = BODY_Y - 0.1 + bob;
+    p.legL.rotation.set(-0.3, 0, 0.12); p.legR.rotation.set(0.25, 0, -0.12);
   } else if (pose === 'stagger') { // atordoado: cambaleia
-    const ph2 = pill.userData.phase * 2.2;
+    const ph2 = ud.phase * 2.2;
     p.body.rotation.set(-0.18 + Math.sin(ph2) * 0.12, Math.sin(ph2 * 0.7) * 0.3, Math.sin(ph2) * 0.22);
     p.armR.rotation.set(0.3, 0, -0.9 + Math.sin(ph2) * 0.3); p.armL.rotation.set(0.3, 0, 0.9 + Math.cos(ph2) * 0.3);
+    p.legL.rotation.set(Math.sin(ph2) * 0.3, 0, 0.15); p.legR.rotation.set(-Math.sin(ph2) * 0.3, 0, -0.15);
   } else if (pose === 'dodge') { // esquiva: abaixa e inclina
-    const k = Math.sin(Math.min(1, progress) * Math.PI);
-    p.body.position.y = BODY_Y - 0.5 * k; p.body.rotation.set(0.5 * k, 0, 0);
-    p.armR.rotation.set(-0.6 * k, 0, -0.6 * k); p.armL.rotation.set(-0.6 * k, 0, 0.6 * k);
-    p.legL.rotation.set(-1.0 * k, 0, 0); p.legR.rotation.set(0.6 * k, 0, 0);
-  } else if (pose === 'slashR') { // corte horizontal da direita para a esquerda
+    const k2 = Math.sin(Math.min(1, progress) * Math.PI);
+    p.body.position.y = BODY_Y - 0.5 * k2; p.body.rotation.set(0.5 * k2, 0, 0);
+    p.armR.rotation.set(-0.6 * k2, 0, -0.6 * k2); p.armL.rotation.set(-0.6 * k2, 0, 0.6 * k2);
+    p.legL.rotation.set(-1.0 * k2, 0, 0); p.legR.rotation.set(0.6 * k2, 0, 0);
+  } else if (pose === 'slashR') { // corte horizontal da direita para a esquerda, com passo à frente
     const a = smooth01(progress), sw = Math.sin(Math.min(1, progress) * Math.PI);
-    p.armR.rotation.set(-1.45, -1.3 + 2.4 * a, -0.4 + 0.3 * sw); p.armL.rotation.set(-0.6, 0, 0.5);
-    p.body.rotation.set(0.08, 0.55 - 1.2 * a, 0); p.legL.rotation.set(-0.35, 0, 0); p.legR.rotation.set(0.3, 0, 0);
+    p.armR.rotation.set(-1.45, -1.3 + 2.4 * a, -0.4 + 0.3 * sw); p.armL.rotation.set(-0.6 + 0.3 * sw, 0, 0.5 + 0.3 * a);
+    p.body.rotation.set(0.1 + 0.1 * sw, 0.6 - 1.3 * a, -0.08 * sw); p.body.position.z = 0.12 * sw; p.body.position.y = BODY_Y - 0.08 * sw;
+    p.legL.rotation.set(-0.5 * sw - 0.1, 0, 0.05); p.legR.rotation.set(0.35, 0, -0.05);
   } else if (pose === 'slashL') { // revés da esquerda para a direita
-    const a = smooth01(progress);
-    p.armR.rotation.set(-1.35, 1.1 - 2.3 * a, -0.2); p.armL.rotation.set(-0.4, 0, 0.45);
-    p.body.rotation.set(0.08, -0.6 + 1.2 * a, 0); p.legL.rotation.set(0.3, 0, 0); p.legR.rotation.set(-0.35, 0, 0);
+    const a = smooth01(progress), sw = Math.sin(Math.min(1, progress) * Math.PI);
+    p.armR.rotation.set(-1.35, 1.1 - 2.3 * a, -0.2); p.armL.rotation.set(-0.4, 0, 0.45 + 0.3 * sw);
+    p.body.rotation.set(0.1 + 0.1 * sw, -0.65 + 1.3 * a, 0.08 * sw); p.body.position.z = 0.12 * sw; p.body.position.y = BODY_Y - 0.08 * sw;
+    p.legL.rotation.set(0.35, 0, 0.05); p.legR.rotation.set(-0.5 * sw - 0.1, 0, -0.05);
   } else if (pose === 'thrust') { // estocada com avanço
     const a = Math.sin(Math.min(1, progress) * Math.PI);
     p.armR.rotation.set(-1.6, 0, -0.1); p.armL.rotation.set(0.5 * a, 0, 0.3);
@@ -551,6 +699,7 @@ function poseTargets(pill, speed, dt, pose, progress) {
     const a = smooth01(progress);
     p.armR.rotation.set(0.6 - 3.0 * a, 0, -0.25); p.armL.rotation.set(-0.5, 0, 0.4);
     p.body.position.y = BODY_Y - 0.15 + 0.3 * a; p.body.rotation.set(0.3 - 0.5 * a, -0.2, 0);
+    p.legL.rotation.set(-0.3 * (1 - a), 0, 0); p.legR.rotation.set(0.3 * (1 - a), 0, 0);
   } else if (pose === 'spin') { // giro de 360° (golpe final)
     const a = smooth01(progress);
     p.armR.rotation.set(-1.5, 0, -1.2); p.armL.rotation.set(-1.5, 0, 1.2);
@@ -560,24 +709,38 @@ function poseTargets(pill, speed, dt, pose, progress) {
     p.armR.rotation.set(-2.0, -0.9 * a, -0.4 - 0.8 * a); p.armL.rotation.set(-1.0, 0.4, 0.6);
     p.body.rotation.set(-0.15 * a, 0.5 * a, 0.08 * a); p.body.position.z = -0.2 * a;
   } else if (pose === 'roll') { // cambalhota (esquiva para frente/trás)
-    const a = smooth01(progress), dir = pill.userData.rollDir || 1;
+    const a = smooth01(progress), dir = ud.rollDir || 1;
     p.body.rotation.set(dir * a * Math.PI * 2, 0, 0);
     p.body.position.y = BODY_Y - 0.75 * Math.sin(a * Math.PI);
     p.armR.rotation.set(-2.2, 0, -0.5); p.armL.rotation.set(-2.2, 0, 0.5);
     p.legL.rotation.set(-1.4, 0, 0); p.legR.rotation.set(-1.4, 0, 0);
   } else if (pose === 'sidestep') { // esquiva lateral: inclina e abre as pernas
-    const a = Math.sin(Math.min(1, progress) * Math.PI), sd = pill.userData.rollDir || 1;
+    const a = Math.sin(Math.min(1, progress) * Math.PI), sd = ud.rollDir || 1;
     p.body.rotation.set(0.15 * a, 0, -0.55 * a * sd); p.body.position.y = BODY_Y - 0.35 * a;
     p.legL.rotation.set(0, 0, 0.5 * a); p.legR.rotation.set(0, 0, -0.5 * a);
     p.armR.rotation.set(-0.8, 0, -1.0 * a); p.armL.rotation.set(-0.8, 0, 1.0 * a);
   } else if (pose === 'crawl') { // caído: deitado de bruços, se arrastando
-    const cw = Math.sin(pill.userData.phase * 1.6), mv = Math.min(1, speed / 0.8);
+    const cw = Math.sin(ud.phase * 1.6), mv = Math.min(1, speed / 0.8);
     p.body.rotation.set(1.45, 0, cw * 0.08 * mv); p.body.position.y = 0.55; p.body.position.z = -0.6;
     p.armR.rotation.set(-2.6 + cw * 0.6 * mv, 0, -0.5); p.armL.rotation.set(-2.6 - cw * 0.6 * mv, 0, 0.5);
     p.legL.rotation.set(0.2 + cw * 0.3 * mv, 0, 0.15); p.legR.rotation.set(0.2 - cw * 0.3 * mv, 0, -0.15);
-  } else if (pose === 'jump') {
-    p.armL.rotation.set(-2.4, 0, 0.5); p.armR.rotation.set(-2.4, 0, -0.5);
-    p.legL.rotation.set(-0.7, 0, 0); p.legR.rotation.set(0.3, 0, 0);
+  } else if (pose === 'jump') { // subindo: encolhe e estica os braços; caindo: braços abertos se equilibrando
+    const vy = ud.vy ?? 2, rise = Math.max(0, Math.min(1, vy / 6)), fall = Math.max(0, Math.min(1, -vy / 8));
+    const flail = Math.sin(ph * 6) * 0.25 * fall;
+    p.armL.rotation.set(-2.4 * rise - 0.9 * fall + flail, 0, 0.5 + 0.9 * fall); p.armR.rotation.set(-2.4 * rise - 0.9 * fall - flail, 0, -0.5 - 0.9 * fall);
+    p.legL.rotation.set(-0.9 * rise - 0.2 * fall, 0, 0.05 + 0.1 * fall); p.legR.rotation.set(0.35 * rise + 0.25 * fall, 0, -0.05 - 0.1 * fall);
+    p.body.rotation.set(0.12 * rise - 0.08 * fall, 0, 0);
+  } else if (pose === 'climb') { // escalar borda: estica e agarra → puxa o corpo → sobe o joelho → fica de pé
+    const u = Math.min(1, progress);
+    const reach = u < 0.3 ? smooth01(u / 0.3) : 1, pull = u < 0.3 ? 0 : smooth01((u - 0.3) / 0.45), stand = u < 0.75 ? 0 : smooth01((u - 0.75) / 0.25);
+    p.armR.rotation.set(-2.95 * reach + 2.2 * pull - 0.3 * stand, 0, -0.25 + 0.15 * pull); p.armL.rotation.set(-2.95 * reach + 2.2 * pull - 0.3 * stand, 0, 0.25 - 0.15 * pull);
+    p.body.rotation.set((0.55 * pull) * (1 - stand), 0, 0); p.body.position.y = BODY_Y + 0.12 * reach * (1 - pull) - 0.15 * pull * (1 - stand);
+    p.legR.rotation.set(-1.5 * pull * (1 - stand) + 0.15 * (1 - reach), 0, 0); p.legL.rotation.set(0.3 * (1 - stand) * reach, 0, 0);
+  } else if (pose === 'vault') { // pular obstáculo baixo: apoia uma mão e passa as pernas de lado
+    const u = Math.min(1, progress), a = Math.sin(u * Math.PI), sd = ud.vaultSide || 1;
+    p.armL.rotation.set(-0.9 - 0.6 * a, 0, -0.2 * sd); p.armR.rotation.set(-1.8 * a, 0, -0.8 * a);
+    p.body.rotation.set(0.3 * a, 0.3 * a * sd, 0.45 * a * sd); p.body.position.y = BODY_Y + 0.1 * a;
+    p.legL.rotation.set(-1.3 * a, 0, 0.4 * a * sd); p.legR.rotation.set(-1.1 * a, 0, 0.4 * a * sd);
   } else if (pose === 'row') { // sentado na balsa, remando (progress = fase da remada)
     const st = Math.sin(progress * Math.PI * 2);
     p.body.position.y = BODY_Y - 0.55; p.body.rotation.set(0.15 + st * 0.12, 0, 0);
@@ -587,10 +750,28 @@ function poseTargets(pill, speed, dt, pose, progress) {
     const tuck = Math.sin(Math.min(1, progress) * Math.PI);
     p.armL.rotation.set(-2.8, 0, 0.3); p.armR.rotation.set(-2.9, 0, -0.3);
     p.legL.rotation.set(-0.9 * tuck, 0, 0); p.legR.rotation.set(-0.6 * tuck, 0, 0);
-  } else if (pose === 'swim') { // deitado na água: braçadas alternadas e pernas batendo
-    p.body.position.y = 1.25; p.body.position.z = -0.4;
-    p.body.rotation.set(1.25, 0, Math.sin(ph) * 0.12);
-    p.armL.rotation.set(-1.6 + Math.sin(ph) * 1.4, 0, 0.3); p.armR.rotation.set(-1.6 - Math.sin(ph) * 1.4, 0, -0.3);
-    p.legL.rotation.set(Math.sin(ph * 2) * 0.5, 0, 0); p.legR.rotation.set(-Math.sin(ph * 2) * 0.5, 0, 0);
+  } else if (pose === 'swim') {
+    if (speed > 0.5) { // crawl: corpo deitado que rola, braços em moinho, pernas batendo rápido
+      const roll = Math.sin(ph) * 0.35;
+      p.body.position.y = BODY_Y - 0.71 + Math.sin(ph * 2) * 0.03; p.body.position.z = -0.4;
+      p.body.rotation.set(1.3, 0, roll);
+      p.armL.rotation.set(-((ph % (Math.PI * 2)) + Math.PI * 2) % (Math.PI * 2), 0, 0.25);
+      p.armR.rotation.set(-((ph + Math.PI) % (Math.PI * 2)), 0, -0.25);
+      p.legL.rotation.set(Math.sin(ph * 4) * 0.35, 0, 0.05); p.legR.rotation.set(-Math.sin(ph * 4) * 0.35, 0, -0.05);
+    } else { // boiando em pé: braços remando para os lados, pernas pedalando
+      const sc = Math.sin(ph * 1.4);
+      p.body.position.y = BODY_Y - 0.4 + Math.sin(ph * 0.9) * 0.05; p.body.rotation.set(0.12, 0, sc * 0.05);
+      p.armL.rotation.set(-0.55 + sc * 0.25, sc * 0.4, 0.95); p.armR.rotation.set(-0.55 - sc * 0.25, -sc * 0.4, -0.95);
+      p.legL.rotation.set(Math.sin(ph * 1.6) * 0.6, 0, 0.1); p.legR.rotation.set(-Math.sin(ph * 1.6) * 0.6, 0, -0.1);
+    }
   }
+  // ---------- camadas por cima: tranco de dano e "amassada" ao aterrissar ----------
+  const hurt = ud.hurt || 0;
+  if (hurt > 0.01) {
+    p.body.rotation.x -= 0.35 * hurt; p.body.rotation.z += 0.12 * hurt * (ud.hurtSide || 1);
+    p.armL.rotation.z += 0.5 * hurt; p.armR.rotation.z -= 0.5 * hurt;
+  }
+  const sq = ud.squash || 0;
+  p.body.scale.set(1 + sq * 0.12, 1 - sq * 0.16, 1 + sq * 0.12);
+  p.body.position.y -= sq * 0.22;
 }

@@ -225,8 +225,11 @@ export class Startup {
     if (G.boat.sailInstalled) G.boat.sailGroup.rotation.z = Math.sin(t * 6) * storm * 0.045;
 
     const player = G.player.body.pos;
+    // ângulo ACUMULADO (antes era relógio × velocidade: quando a tempestade mudava a velocidade, o
+    // relógio enorme multiplicava a diferença e as nuvens giravam muito rápido no céu)
+    this.cloudAngle = (this.cloudAngle || 0) + dt * (0.006 + storm * 0.018);
     for (let i = 0; i < this.clouds.length; i++) {
-      const cloud = this.clouds[i], angle = t * (0.006 + storm * 0.018) + i * 0.7;
+      const cloud = this.clouds[i], angle = this.cloudAngle + i * 0.7;
       cloud.visible = storm > 0.03;
       cloud.position.set(
         player.x + Math.cos(angle) * (22 + (i % 3) * 7),

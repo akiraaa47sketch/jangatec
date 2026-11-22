@@ -67,7 +67,8 @@
 <div id="gfxPanel" hidden>
   <header><h2>Gráficos</h2><button id="gfxClose" type="button">Fechar</button></header>
   <label>Predefinição <select id="gPreset"></select></label>
-  <label class="slider">Escala de renderização <input id="gScale" type="range" min="50" max="100" step="5"><small id="gScaleVal"></small></label>
+  <label>Modo FSR <select id="gFsr"></select></label>
+  <label class="slider">Escala de renderização <input id="gScale" type="range" min="33" max="100" step="1"><small id="gScaleVal"></small></label>
   <label>Upscaler <select id="gUpscaler"></select></label>
   <label class="slider">Nitidez (RCAS) <input id="gSharp" type="range" min="0" max="100" step="5"><small id="gSharpVal"></small></label>
   <label>Sombras <select id="gShadows"></select></label>
@@ -86,7 +87,7 @@
   <label class="check"><input id="gWet" type="checkbox"> Água na lente (respingos, sair do mar)</label>
   <label class="check"><input id="gLowHp" type="checkbox"> Efeito de vida baixa (cores somem, coração)</label>
   <label class="check"><input id="gGrain" type="checkbox"> Granulado de filme + aberração cromática</label>
-  <p class="gfx-tip">Escala abaixo de 100% + FSR = mais FPS: a cena é desenhada menor e reconstruída na resolução da tela com nitidez adaptativa.</p>
+  <p class="gfx-tip">Modo FSR = em que fração da resolução a cena é desenhada antes de ser reconstruída na tela com nitidez adaptativa. Qualidade (67%) quase não se nota; Desempenho (50%) e Ultra desempenho (33%) dão bem mais FPS em PCs fracos e celulares.</p>
 </div>
 
 <div id="banjoPanel" hidden>
@@ -141,6 +142,8 @@
     <h3>Perigos do mar</h3>
     <p><b>🌊 Onda gigante:</b> chega sem aviso — repare no mar levantando no horizonte. Baixe a vela [E] e fique perto do mastro para se segurar. Com a vela cheia a jangada é arremessada e todos a bordo se machucam.<br>
     <b>🌀 Furacão:</b> o mar se abre num redemoinho gigante ao lado da rota e vai sugando a jangada aos poucos. Levante a vela e gire-a para o lado <b>oposto</b> ao redemoinho ([Z] ou [C]). Se a jangada chegar ao centro, ela é sugada, gira e é cuspida para fora — com dano.<br>
+    <b>⛈ Tempestade forte:</b> o céu fecha, cai muito raio e uma série de ondas gigantes vem de lados diferentes chacoalhando a jangada. Fique perto do mastro para não ser jogado longe.<br>
+    <b>🌀 No redemoinho</b> o vento empurra quem está a bordo para FORA: ande contra ele (na direção do redemoinho) para se firmar, ou você escorrega e cai — e na água o redemoinho te puxa.<br>
     <b>🏝 Mar cheio / Mar seco:</b> depois da partida o mar alterna entre cheio e totalmente seco — fique de olho na água baixando. Seco, o fundo do mar vira chão: ande à vontade, junte destroços — os de metal afundam e só aparecem aí — e saqueie naufrágios com baús. A jangada fica encalhada até a água voltar; quem estiver longe precisa nadar de volta!<br>
     <b>☠ Piratas:</b> invasões raras e anunciadas; as balsas aparecem ao longe, remando até a jangada.</p>
     <h3>Ferramentas</h3>

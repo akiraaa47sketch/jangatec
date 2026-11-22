@@ -6,6 +6,7 @@ import { mulberry32, hash2, rot } from '../core/util.js';
 import { CFG } from '../config.js';
 import { LOOT_CONFIG, generateCrateLoot, wreckFor } from '../systems/loot.js';
 import { seabedHeight, makeSeabedChunk, makeFarSeabed } from './seabed.js';
+import { bakeStatic } from '../core/bake.js';
 import { makePieceMesh, PIECES } from '../boat/pieces.js';
 import { makePalm, makeRock, makeBush, makeGrassTufts } from './models.js';
 import { woodTexture, woodBump, sandTexture, sandBump, grassTexture, thatchTexture, logWallTexture, metalTexture, clothTexture as clothTex, repeated, scaleBoxUVs } from './textures.js';
@@ -140,10 +141,15 @@ export class World {
     // Carrega em volta da jangada E do jogador (no fundo seco dá para se afastar a pé).
     const pp = G.player ? G.player.body.pos : G.boat;
     const centers = [[Math.round(G.boat.x / S), Math.round(G.boat.z / S)], [Math.round(pp.x / S), Math.round(pp.z / S)]];
+    // no máximo 1 chunk novo por quadro (o mais perto primeiro): sem engasgos ao navegar
+    let best = null, bd = Infinity;
     for (const [ccx, ccz] of centers) for (let i = -R; i <= R; i++) for (let j = -R; j <= R; j++) {
       const key = `${ccx + i},${ccz + j}`;
-      if (!this.chunks.has(key)) this.chunks.set(key, this.makeChunk(ccx + i, ccz + j));
+      if (this.chunks.has(key)) continue;
+      const d = i * i + j * j;
+      if (d < bd) { bd = d; best = [key, ccx + i, ccz + j]; }
     }
+    if (best) this.chunks.set(best[0], this.makeChunk(best[1], best[2]));
     this.farSeabed.position.set(pp.x, this.farSeabed.position.y, pp.z);
     this.farSeabed.visible = (G.startup ? G.startup.waterLevel : 1) < -3; // só faz falta com o mar seco
     for (const [key, ch] of this.chunks) {
@@ -172,6 +178,7 @@ export class World {
     }
     const n = 4 + ((r() * 4) | 0);
     ch.seabed = makeSeabedChunk(this.seed, cx, cz);
+    { const terrain = ch.seabed.children[0]; bakeStatic(ch.seabed, { keep: (o) => o === terrain }); }
     G.scene.add(ch.seabed);
     const wreck = wreckFor(this.seed, cx, cz);
     if (wreck) ch.wreck = this.makeWreck(ch, wreck);
@@ -198,6 +205,7 @@ export class World {
       const welded = this.weldedStates.get(id);
       if (welded && G.boat.pieces.has(welded.id)) return;
       const mesh = def.make(lr);
+      if (!mesh.isMesh) bakeStatic(mesh); // peça feita de várias caixinhas vira 1 malha por material
       mesh.scale.setScalar(1.4);
       if (def.sinks && !y) y = this.seabedHeight(x, z) + 0.3; // afundados já começam no fundo
       mesh.position.set(x, y, z); mesh.rotation.y = lr() * 6.28;
@@ -504,6 +512,10 @@ export class World {
       lid.rotation.x = -1.25 * c.openT;
       isl.crates.push(c); this.crates.push(c);
     });
+    { // junta as malhas paradas da ilha (menos draw calls); fica de fora o que anima ou colide
+      const solidSet = new Set(solids), palmSet = new Set(palmList), crateSet = new Set(isl.crates.map((c) => c.mesh));
+      bakeStatic(group, { keep: (o) => solidSet.has(o) || palmSet.has(o) || crateSet.has(o) || o === fireRef || (fireRef && o === fireRef.parent && o !== group) });
+    }
     G.scene.add(group);
     group.updateMatrixWorld(true);
     G.colliders.addSet(set);
@@ -607,6 +619,7 @@ export class World {
       crates.push(c); this.crates.push(c);
     }
     group.traverse((o) => { if (o.isMesh) { o.receiveShadow = true; o.castShadow = true; } });
+    { const chests = new Set(crates.map((c) => c.mesh)); bakeStatic(group, { keep: (o) => chests.has(o) }); }
     G.scene.add(group);
     G.colliders.addSet(set);
     G.physics.addStaticSet(set);

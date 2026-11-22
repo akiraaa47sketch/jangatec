@@ -5,9 +5,10 @@ import { rot, clamp, lerp, lerpAngle } from '../core/util.js';
 import { CFG } from '../config.js';
 import { waveHeight } from '../world/ocean.js';
 import { makeHumanoid, animateHumanoid } from './model.js';
-import { makePill, animatePill, disposePill, PILL_DEFAULT, PILL_HEIGHT } from './pill.js';
+import { makePill, animatePill, disposePill, PILL_DEFAULT, PILL_SCALE } from './pill.js';
 
-const PILL_SCALE = 1.75 / PILL_HEIGHT;
+// tipo de empunhadura das armas de fogo em 3ª pessoa
+const GUN_TYPE = { revolver: 'pistol', pistola: 'pistol', escopeta: 'long', rifle: 'long', rifle_precisao: 'long' };
 
 const _v = new THREE.Vector3(), _d = new THREE.Vector3();
 const smoothstep = (value) => {
@@ -27,11 +28,11 @@ export class Player {
     this.swimming = false; this.mantle = null; this.dead = false; this.aboard = false;
     this.downed = false; // multiplayer: caído, se arrastando até ser reanimado
     // 1ª pessoa por padrão; [F] alterna. O corpo some só para o próprio jogador.
-    this.firstPerson = true; this.fovSens = 1; this.eyeHeight = 1.6;
+    this.firstPerson = true; this.fovSens = 1; this.eyeHeight = 1.38;
     this.zoom = 5.2;          // distância da câmera em 3ª pessoa ([I] aproxima, [O] afasta)
     this.aimHold = 0;         // depois de um tiro "do quadril", segura a pose de mira um instante
     this.kick = 0;            // recuo visual dos braços em 3ª pessoa
-    this.flashT = 0;
+    this.flashT = 0; this.throwT = -1;
     this.mesh = makeHumanoid(0xb49b7b, 0xb97251);
     this.proceduralRig = this.mesh.userData.parts.rig;
     this.pillVisual = null;
@@ -80,6 +81,11 @@ export class Player {
 
   // Tiro em 3ª pessoa: tranco nos braços, clarão na boca do cano e pose de mira por um instante.
   onShot() { this.aimHold = 0.8; this.kick = 1; this.flashT = 0.06; }
+  // ganchos de animação em 3ª pessoa
+  onUse(item) { this.useAnim = { item, t: 0, dur: item === 'kit' ? 1.5 : 1.15 }; }
+  onThrow() { this.throwT = 0; }
+  onStrum() { this.strumK = 1; }
+  onHurt(n) { this.hurtT = Math.min(1, 0.4 + n / 30); this.hurtSide = Math.random() < 0.5 ? 1 : -1; }
 
   forward() { return [-Math.sin(this.camYaw), -Math.cos(this.camYaw)]; }
 
@@ -116,6 +122,13 @@ export class Player {
     if (this.downed) speed = this.swimming ? CFG.swim * 0.6 : 0.9; // caído: só se arrasta
     if (aiming) speed = Math.min(speed, 3);
     speed *= this.speedMul || 1; // bloqueando/carregando golpe anda devagar
+    // furacão: andar CONTRA o empurrão = se firmar (anda devagar e não escorrega)
+    this.bracing = 0;
+    if (this.drift && moving && this.aboard) {
+      const dl = Math.hypot(this.drift.x, this.drift.z) || 1, against = -(dx * this.drift.x + dz * this.drift.z) / dl;
+      // se firmando: o passo só vence o vento por pouco (quase parado, avança devagarinho)
+      if (against > 0.3) { this.bracing = against * 0.5; speed = Math.min(speed, (dl * (1 - this.bracing) + 0.1) / against); }
+    }
     const k = Math.min(1, (b.grounded ? 14 : this.swimming ? 6 : 3.5) * dt);
     b.vel.x += (dx * speed - b.vel.x) * k;
     b.vel.z += (dz * speed - b.vel.z) * k;
@@ -135,14 +148,17 @@ export class Player {
     if (this.swimming) { b.vel.y = 0; p.y += (wh - 1.15 - p.y) * Math.min(1, 6 * dt); }
     else { b.vel.y = Math.max(b.vel.y - CFG.gravity * dt, -20); p.y += b.vel.y * dt; }
     p.x += b.vel.x * dt; p.z += b.vel.z * dt;
+    if (this.drift && !this.mantle) { const f = 1 - (this.bracing || 0); p.x += this.drift.x * dt * f; p.z += this.drift.z * dt * f; } // vento/giro do furacão
     G.colliders.resolve(b, prevY);
 
     if (this.swimming && !this.wasSwimming && G.gfx) G.gfx.wetLens(0.5); // mergulho
     if (!this.swimming && this.wasSwimming && G.gfx) G.gfx.wetLens(1);  // saiu da água: lente molhada
     this.wasSwimming = this.swimming;
+    this.wasGroundedPrev = this.wasGrounded; this.wasGrounded = b.grounded;
     if (b.grounded) {
       this.swimming = false;
       b.carrier = b.groundSet;
+      if (!this.wasGroundedPrev && b.landVel < -4) this.squash = Math.min(1, (-b.landVel - 3) / 10); // amassa ao cair
       if (b.landVel < -13) G.survival.damage((-b.landVel - 13) * 5, 'Queda');
     } else if (!this.swimming && p.y < wh - 1.0) {
       this.swimming = true; b.carrier = null; b.vel.y = 0;
@@ -236,16 +252,39 @@ export class Player {
         else if (m.swingPose) { pose = m.swingPose.pose; progress = m.swingPose.t / m.swingPose.dur; }
       }
       if (gun && this.aimHold > 0 && pose === 'walk') pose = 'aim';
+      const c = G.combat, tools = G.tools, idle = pose === 'walk' || pose === 'aim';
+      // recarga, item, gancho, banjo: ações que tomam conta dos braços quando o corpo está livre
+      if (idle && gun && c.reloading > 0) { pose = 'reload'; progress = 1 - c.reloading / w.reload; }
+      else if (idle && this.useAnim) { pose = 'use'; progress = this.useAnim.t / this.useAnim.dur; }
+      else if (idle && this.throwT >= 0) { pose = 'throw'; progress = this.throwT / 0.5; }
+      else if (pose === 'walk' && w && w.tool === 'banjo' && tools && tools.playT > 0) pose = 'strum';
       this.aimHold = Math.max(0, this.aimHold - dt);
       this.kick = Math.max(0, this.kick - dt * 7);
+      if (this.useAnim) { this.useAnim.t += dt; if (this.useAnim.t >= this.useAnim.dur) this.useAnim = null; }
+      if (this.throwT >= 0) { this.throwT += dt; if (this.throwT > 0.5) this.throwT = -1; }
+      this.hurtT = Math.max(0, (this.hurtT || 0) - dt * 4);
+      this.squash = Math.max(0, (this.squash || 0) - dt * 5);
+      this.strumK = Math.max(0, (this.strumK || 0) - dt * 8);
       const pd = this.pillVisual.children[0].userData;
       pd.aimPitch = this.firstPerson ? 0 : -this.camPitch * 0.9; pd.kick = this.kick;
+      // direção do movimento em relação ao corpo (andar de lado / de costas)
+      const vx = b.vel.x, vz = b.vel.z, sp = Math.hypot(vx, vz);
+      if (sp > 0.5) { pd.mf = (vx * Math.sin(this.yaw) + vz * Math.cos(this.yaw)) / sp; pd.ms = (vx * Math.cos(this.yaw) - vz * Math.sin(this.yaw)) / sp; }
+      else { pd.mf = 1; pd.ms = 0; }
+      pd.vy = b.vel.y;
+      pd.armed = !w ? 'none' : w.tool && w.tool !== 'martelo' ? 'tool' : w.melee ? 'melee' : GUN_TYPE[w.id] || 'pistol';
+      pd.gunType = GUN_TYPE[w && w.id] || 'pistol';
+      pd.reloadKind = w && w.id === 'escopeta' ? 'shotgun' : w && w.id === 'revolver' ? 'revolver' : 'mag';
+      pd.useItem = this.useAnim ? this.useAnim.item : null;
+      pd.hurt = this.hurtT; pd.hurtSide = this.hurtSide || 1; pd.squash = this.squash; pd.strum = this.strumK;
+      pd.vaultSide = 1;
+      pd.talk = G.voice && G.voice.talking ? Math.min(1, G.voice.level * 30) : 0; // boca mexe com a voz
+      this.anim = { pose: pose === 'climb' || pose === 'vault' ? pose : pose, progress, armed: pd.armed };
       if (this.flashMesh) {
         this.flashT -= dt; this.flashMesh.visible = this.flashT > 0;
         if (this.flashMesh.visible) { this.flashMesh.rotation.z = Math.random() * 6.28; this.flashMesh.scale.setScalar(2.2 + Math.random()); }
       }
-      const pillPose = pose === 'climb' || pose === 'vault' ? 'jump' : pose;
-      animatePill(this.pillVisual.children[0], speed, dt, pillPose, progress);
+      animatePill(this.pillVisual.children[0], speed, dt, pose, progress);
       return;
     }
   }
@@ -255,7 +294,7 @@ export class Player {
     const G = this.G, cam = G.camera, vm = G.viewmodel;
     this.mesh.updateWorldMatrix(true, false);
     this.mesh.getWorldPosition(_v);
-    this.eyeHeight += ((this.dead ? 0.35 : this.downed ? 0.5 : 1.6) - this.eyeHeight) * Math.min(1, 6 * dt);
+    this.eyeHeight += ((this.dead ? 0.35 : this.downed ? 0.5 : 1.38) - this.eyeHeight) * Math.min(1, 6 * dt);
     _v.y += this.eyeHeight + (vm ? vm.camOff.y : 0);
     this.camTarget.copy(_v);
     this.camDist = 0;
@@ -297,7 +336,7 @@ export class Player {
     if (this.firstPerson) { this.updateFirstPersonCamera(dt, t); return; }
     const G = this.G, cam = G.camera, aiming = G.combat.aiming;
     this.mesh.updateWorldMatrix(true, false);
-    this.mesh.getWorldPosition(_v); _v.y += this.downed ? 0.7 : 1.6;
+    this.mesh.getWorldPosition(_v); _v.y += this.downed ? 0.7 : 1.4;
     this.camTarget.lerp(_v, 1 - Math.exp(-20 * dt));
     // zoom da 3ª pessoa: [I] aproxima, [O] afasta (mira sempre puxa para perto do ombro)
     const typing = G.tools && G.tools.menuOpen;
@@ -330,6 +369,6 @@ export class Player {
     b.pos.set(spawn.x, spawn.y, spawn.z); b.vel.set(0, 0, 0);
     b.carrier = spawn.groundSet; b.groundSet = spawn.groundSet; b.grounded = !!spawn.groundSet;
     this.camTarget.set(b.pos.x, b.pos.y + 1.6, b.pos.z);
-    this.swimming = false; this.mantle = null; this.dead = false; this.downed = false;
+    this.swimming = false; this.mantle = null; this.dead = false; this.downed = false; this.throwT = -1;
   }
 }

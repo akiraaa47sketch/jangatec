@@ -2,7 +2,7 @@
 // dentes serrilhados e acessórios por tipo. Mantém a interface antiga (userData.parts com
 // torso/cabeça/braços/pernas) usada pelas animações de dano e morte em enemies.js.
 import * as THREE from '../three.js';
-import { makePill, animatePill, PILL_HEIGHT } from '../player/pill.js';
+import { makePill, animatePill, PILL_SCALE } from '../player/pill.js';
 import { buildWeapon } from '../player/viewmodel-parts.js';
 
 const LOOKS = {
@@ -18,7 +18,7 @@ export function makeEnemyPill(type) {
   const pill = makePill({ npc: true, ...look });
   const holder = new THREE.Group();
   holder.add(pill);
-  holder.scale.setScalar(1.75 / PILL_HEIGHT);
+  holder.scale.setScalar(PILL_SCALE);
   const g = new THREE.Group();
   g.add(holder);
   const pp = pill.userData.parts;

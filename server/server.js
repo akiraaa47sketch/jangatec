@@ -275,9 +275,9 @@ function handle(ws, m) {
     case 'event': {
       // Onda gigante / furacão sorteados pelo host: valida e repassa a todos.
       const e = m.e;
-      if (room.hostId !== ws.id || !e || !['tsunami', 'furacao'].includes(e.kind) ||
+      if (room.hostId !== ws.id || !e || !['tsunami', 'furacao', 'tempestade'].includes(e.kind) ||
           typeof e.id !== 'string' || e.id.length > 40) break;
-      const keys = ['t0', 'dur', 'ox', 'oz', 'dx', 'dz', 'speed', 'A', 'sigma', 'cx', 'cz', 'fx', 'fz', 'lat', 'latV', 'ahead', 'R', 'depth', 'spin'];
+      const keys = ['t0', 'dur', 'ox', 'oz', 'dx', 'dz', 'speed', 'A', 'sigma', 'cx', 'cz', 'fx', 'fz', 'lat', 'latV', 'ahead', 'R', 'depth', 'spin', 'seed', 'n'];
       const clean = { id: e.id, kind: e.kind, end: !!e.end };
       for (const key of keys) {
         if (e[key] === undefined) continue;

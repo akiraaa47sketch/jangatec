@@ -147,7 +147,8 @@ export class Melee {
     G.combat.swing = G.combat.swingDuration = dur;
     const [fx, fz] = pl.forward(); pl.yaw = Math.atan2(fx, fz);
     const pick = (l) => l[(Math.random() * l.length) | 0];
-    const pose = heavy ? pick(['slam', 'spin']) : finisher ? pick(['thrust', 'uppercut', 'spin']) : step === 0 ? 'slashR' : 'slashL';
+    let pose = heavy ? pick(['slam', 'spin']) : finisher ? pick(['thrust', 'uppercut', 'spin']) : step === 0 ? 'slashR' : 'slashL';
+    if (w.tool === 'martelo') pose = heavy ? 'slam' : 'hammer'; // martelo: marteladas de cima para baixo
     const style = heavy ? (pose === 'spin' ? 'slashA' : 'overhead') : finisher ? (pose === 'thrust' ? 'stab' : 'overhead') : step === 0 ? 'slashA' : 'slashB';
     let impact = dur * (pose === 'spin' ? 0.55 : 0.4);
     if (pl.firstPerson && G.viewmodel) impact = G.viewmodel.onSwing(w, style, dur) * G.viewmodel.strikeFraction(w);

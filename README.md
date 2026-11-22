@@ -146,6 +146,13 @@ cada um sai diferente (força, velocidade, tamanho, lado e sentido de giro sorte
   mensagem `rtc` do servidor, STUN público), voz **por proximidade em 3D** ou "rádio", aperte-para-falar
   [V] ou voz aberta com detecção de fala, volume/ganho e indicador de quem está falando no HUD.
   Sem servidor TURN: em algumas redes muito restritas a voz pode não conectar.
+- **Desempenho**: malhas paradas de ilhas, fundo do mar, naufrágios e destroços são "assadas" numa malha por
+  material (`client/src/core/bake.js`, ~63% menos draw calls); destroços a mais de 70 m dormem na física; o
+  raycast de pegar peças só olha o que está ao alcance; no máximo 1 chunk novo por quadro; sombras a 30 Hz
+  (Ultra: todo quadro). **Modos do FSR**: Nativo, Qualidade (67%), Equilibrado (59%), Desempenho (50%) e
+  Ultra desempenho (33%); as predefinições usam Desempenho/Equilibrado/Qualidade/Nativo.
+- **Personagem**: pílula mais baixa (1,45 m, cápsula mais curta) e **rosto animado** — pisca sozinho e a boca
+  mexe com o volume da voz no chat (6 quadros prontos por estilo de rosto, só troca a textura).
 - **Imersão** (menu Gráficos → Imersão, tudo opcional e salvo no navegador, fora das predefinições;
   `client/src/core/graphics.js`): tremor da câmera (0–100%, suave e com rotação), profundidade de campo
   (foco automático — no personagem em 3ª pessoa, no centro ao mirar/1ª pessoa), desfoque de movimento
@@ -157,6 +164,15 @@ cada um sai diferente (força, velocidade, tamanho, lado e sentido de giro sorte
   boiando e jogadores (mensagem `yank`); **banjo** com som sintetizado (Karplus–Strong), músicas de
   domínio público no clique e painel nota por nota ([B]); quem ouve por perto recupera vida (flag `mu` no
   estado do jogador, notas pela mensagem `music`). As armas **não quebram** mais.
+- **Tempestade forte** (evento `tempestade`): céu escuro, raios frequentes e 5–8 ondas gigantes em série vindas
+  de direções diferentes (geradas de uma seed: iguais para todos) que dão trancos na jangada e derrubam quem
+  não está perto do mastro. No **furacão** quem está a bordo é empurrado para fora do redemoinho (`player.drift`);
+  andar contra o empurrão firma o personagem, parado ele escorrega e cai.
+- **Animações em 3ª pessoa** (`client/src/player/pill.js`): parado/andar/correr/de lado/de costas, postura com
+  arma (pistola, arma longa, corpo a corpo, ferramenta), mira com base aberta, recarga por tipo (pente,
+  escopeta, revólver), bandagem/kit, arremesso do gancho, banjo, martelo, escalar/pular obstáculo em etapas,
+  pulo subindo/caindo, nado crawl e boiando, tranco ao levar dano e "amassada" ao aterrissar. A pose vai pela
+  rede (`po`/`pp`/`ar`), então os aliados veem a mesma animação.
 - **Batalha naval** (`client/src/systems/naval.js`, constantes em `NAVAL`/`PIECE_HP`; modelos em
   `client/src/world/navalmodels.js`): o **canhão improvisado** (galão d'água + cano) só sai em
   caixas/naufrágios a partir da região 3 (~640 m da rota); as balas são infinitas, com recarga longa (7 s). Instalado no convés, vira uma peça da jangada;
