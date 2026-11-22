@@ -62,8 +62,8 @@ const _q = new THREE.Quaternion(), _e = new THREE.Euler(), X = new THREE.Vector3
 export function buildRealHand(mirror = false, gloveMat = null) {
   if (!handScene) return null;
   const root = new THREE.Group(), inner = cloneSkinned(handScene);
-  inner.scale.setScalar(1.2); // luva "gordinha", na proporção das armas
-  if (mirror) inner.scale.x = -1.2;
+  inner.scale.setScalar(1.06); // luva no formato natural da mão
+  if (mirror) inner.scale.x = -1.06;
   root.add(inner);
   const bones = {};
   let skin = null, cuffR = 0.03;
@@ -74,29 +74,7 @@ export function buildRealHand(mirror = false, gloveMat = null) {
   // luva: o mesmo formato da mão, na cor das luvas da pílula, com o relevo (rugas) do modelo
   if (skin && gloveMat) {
     if (!gloveMat.normalMap && skin.material.normalMap) { gloveMat.normalMap = skin.material.normalMap; gloveMat.normalScale.set(0.9, 0.9); gloveMat.needsUpdate = true; }
-    // punho da luva: a parte do pulso (z > 0 no modelo) fica num couro mais escuro, com uma costura
-    if (!gloveMat.userData.cuffed) {
-      gloveMat.userData.cuffed = true;
-      gloveMat.onBeforeCompile = (sh) => {
-        sh.vertexShader = sh.vertexShader.replace('#include <common>', '#include <common>\nvarying float vCuffZ;')
-          .replace('#include <begin_vertex>', '#include <begin_vertex>\nvCuffZ = position.z;');
-        sh.fragmentShader = sh.fragmentShader.replace('#include <common>', '#include <common>\nvarying float vCuffZ;')
-          .replace('#include <color_fragment>', `#include <color_fragment>
-            float cuff = smoothstep(-0.012, -0.004, vCuffZ);
-            float seam = 1.0 - 0.45 * smoothstep(0.0016, 0.0, abs(vCuffZ + 0.007));
-            diffuseColor.rgb = mix(diffuseColor.rgb, diffuseColor.rgb * vec3(0.42, 0.3, 0.26), cuff) * seam;`);
-      };
-      gloveMat.needsUpdate = true;
-    }
     skin.material = gloveMat;
-    // tampa do punho (o modelo termina aberto no pulso)
-    const r = Math.max(0.021, cuffR * 1.12);
-    const capMat = gloveMat.clone(); capMat.onBeforeCompile = () => {}; capMat.color.multiply(new THREE.Color(0.42, 0.3, 0.26));
-    const cuff = new THREE.Mesh(new THREE.CylinderGeometry(r, r * 1.1, 0.05, 24, 1, false), capMat);
-    cuff.rotation.x = Math.PI / 2; cuff.position.z = 0.022;
-    inner.add(cuff);
-    if (!gloveMat.userData.caps) gloveMat.userData.caps = [];
-    gloveMat.userData.caps.push(capMat);
   }
   const fingers = [0, 1, 2, 3].map((f) => [0, 1, 2].map((j) => bones[`d${f}_${j}`]));
   const BEND = [1.2, 1.4, 0.9];

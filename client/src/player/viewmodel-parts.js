@@ -164,7 +164,6 @@ MAT.gloveReal = new THREE.MeshPhysicalMaterial({ color: 0xd3202b, roughness: 0.5
 export function setGloveColor(hex) {
   MAT.glove.color.setHex(hex);
   MAT.gloveReal.color.setHex(hex);
-  for (const c of MAT.gloveReal.userData.caps || []) c.color.setHex(hex).multiply(new THREE.Color(0.42, 0.3, 0.26));
   MAT.gloveSeam.color.setHex(hex).multiplyScalar(0.62); // costura um tom mais escuro
 }
 
@@ -316,8 +315,8 @@ SPECS.tabua_prego = () => {
   add(g, box(0.092, 0.03, 0.03, MAT.tape, 0, 0, -0.12)); // remendo de fita
   return {
     group: g, type: 'melee', muzzle: null, swing: ['overhead', 'slashB'],
-    hold: { p: [0.22, -0.1, -0.4], r: [0.85, 0.3, -0.12] },
-    gripR: { p: [0, 0, 0.02], r: [-1.5708, 0, -1.5708], c: 0.95 },
+    hold: { p: [0.17, -0.14, -0.5], r: [0.9788, 0.5196, 0.5617] },
+    gripR: { p: [0, 0, 0.02], r: [-0.7854, 0, -1.5708], c: 0.95 },
   };
 };
 
@@ -332,8 +331,8 @@ SPECS.cano = () => {
   for (const yy of [-0.055, 0.055]) add(g, cylY(0.036, 0.016, MAT.iron, 0, yy, -0.6));
   return {
     group: g, type: 'melee', muzzle: null, swing: ['slashA', 'slashB'],
-    hold: { p: [0.22, -0.1, -0.4], r: [0.8, 0.25, -0.1] },
-    gripR: { p: [0, 0, 0.04], r: [-1.5708, 0, -1.5708], c: 0.8 },
+    hold: { p: [0.17, -0.14, -0.5], r: [0.9788, 0.5196, 0.5617] },
+    gripR: { p: [0, 0, 0.04], r: [-0.7854, 0, -1.5708], c: 0.8 },
   };
 };
 
@@ -345,8 +344,8 @@ SPECS.faca_manteiga = () => {
   add(g, box(0.03, 0.024, 0.02, MAT.steel, 0, 0, -0.006));
   return {
     group: g, type: 'melee', muzzle: null, swing: ['stab', 'slashShort'],
-    hold: { p: [0.22, -0.1, -0.4], r: [0.55, 0.28, -0.1] },
-    gripR: { p: [0, 0, 0.05], r: [-1.5708, 0, -1.5708], c: 0.9 },
+    hold: { p: [0.17, -0.14, -0.5], r: [0.9788, 0.5196, 0.5617] },
+    gripR: { p: [0, 0, 0.05], r: [-0.7854, 0, -1.5708], c: 0.9 },
   };
 };
 
@@ -360,8 +359,8 @@ SPECS.bastao = () => {
   add(g, cylZ(0.029, 0.029, 0.02, MAT.woodDark, 0, 0, -0.57, 9));
   return {
     group: g, type: 'melee', muzzle: null, swing: ['slashA', 'slashB'],
-    hold: { p: [0.22, -0.1, -0.4], r: [0.8, 0.25, -0.1] },
-    gripR: { p: [0, 0, 0.04], r: [-1.5708, 0, -1.5708], c: 0.78 },
+    hold: { p: [0.17, -0.14, -0.5], r: [0.9788, 0.5196, 0.5617] },
+    gripR: { p: [0, 0, 0.04], r: [-0.7854, 0, -1.5708], c: 0.78 },
   };
 };
 
@@ -375,8 +374,8 @@ SPECS.facao = () => {
   for (const z of [0.03, 0.08]) add(g, box(0.026, 0.008, 0.008, MAT.brass, 0, 0.0, z));
   return {
     group: g, type: 'melee', muzzle: null, swing: ['slashA', 'slashB', 'stab'],
-    hold: { p: [0.22, -0.1, -0.4], r: [0.75, 0.28, -0.1] },
-    gripR: { p: [0, 0, 0.035], r: [-1.5708, 0, -1.5708], c: 0.95 },
+    hold: { p: [0.17, -0.14, -0.5], r: [0.9788, 0.5196, 0.5617] },
+    gripR: { p: [0, 0, 0.035], r: [-0.7854, 0, -1.5708], c: 0.95 },
   };
 };
 
@@ -398,8 +397,8 @@ SPECS.sabre = () => {
   const pommel = new THREE.Mesh(new THREE.SphereGeometry(0.02, 12, 10), MAT.brass); pommel.position.set(0, -0.002, 0.1); add(g, pommel);
   return {
     group: g, type: 'melee', muzzle: null, swing: ['slashA', 'slashB', 'stab'],
-    hold: { p: [0.22, -0.1, -0.4], r: [0.75, 0.28, -0.1] },
-    gripR: { p: [0, 0, 0.035], r: [-1.5708, 0, -1.5708], c: 0.95 },
+    hold: { p: [0.17, -0.14, -0.5], r: [0.9788, 0.5196, 0.5617] },
+    gripR: { p: [0, 0, 0.035], r: [-0.7854, 0, -1.5708], c: 0.95 },
   };
 };
 
