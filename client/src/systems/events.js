@@ -3,11 +3,15 @@
 //     perto do mastro; com a vela cheia a jangada é arremessada e todos se machucam.
 //   • Furacão: o mar se abre num REDEMOINHO gigante ao lado da rota que gira e vai sugando a
 //     jangada aos poucos. Levante a vela e gire-a para o lado OPOSTO ao redemoinho para escapar.
+//   • Tempestade forte: céu fecha, raios e uma SÉRIE de ondas gigantes vindas de lados diferentes que
+//     chacoalham a jangada (segure no mastro!).
+//   • No furacão o vento/giro EMPURRA quem está a bordo para fora: ande em direção ao redemoinho ou
+//     você escorrega e cai da jangada.
 // Nada é anunciado: os eventos são raros, chegam do nada e cada um sai um pouco diferente.
 // O host sorteia e anuncia o evento pela rede; todos os clientes derivam o estado do mesmo
 // relógio comum (clock), então ondas e funil aparecem iguais para todos. Só o host move o barco.
 import * as THREE from '../three.js';
-import { clamp, clock } from '../core/util.js';
+import { clamp, clock, mulberry32 } from '../core/util.js';
 import { sea, eventHeight } from '../world/ocean.js';
 
 export const EVENT_BALANCE = {
@@ -15,7 +19,8 @@ export const EVENT_BALANCE = {
   interval: [420, 780],      // s entre o fim de um evento e o próximo (raros de propósito)
   tsunami: { speed: [13, 18], startDist: 235, A: [3.6, 5.6], sigma: [9, 13], damage: 22, knock: 8.5 },
   // R = raio do redemoinho, depth = fundura do funil d'água, pull = puxão (m/s), swirl = giro (m/s)
-  furacao: { dur: [55, 75], pull: 1.55, swirl: 2.2, R: [60, 85], depth: [7, 11], ahead: 40, damage: 30 },
+  tempestade: { dur: [75, 100], waves: [5, 8], A: [2.6, 4.3], speed: [12, 16], sigma: [7, 10], start: 120, knock: 6 },
+  furacao: { push: 2.6, dur: [55, 75], pull: 1.55, swirl: 2.2, R: [60, 85], depth: [7, 11], ahead: 40, damage: 30 },
 };
 const between = ([a, b]) => a + Math.random() * (b - a);
 const smooth = (x) => { x = clamp(x, 0, 1); return x * x * (3 - 2 * x); };
@@ -93,14 +98,14 @@ export class Events {
   get tiltMax() {
     const e = this.current;
     if (!e) return 0.12;
-    return e.kind === 'tsunami' ? 0.34 : 0.18;
+    return e.kind === 'tsunami' ? 0.34 : e.kind === 'tempestade' ? 0.3 : 0.18;
   }
   // Quanto o evento escurece o céu / engrossa o mar (0..1).
   stormBoost(t) {
     const e = this.current;
     if (!e) return 0;
     const u = t - e.t0, inK = smooth(u / 10), outK = 1 - smooth((u - e.dur + 8) / 8);
-    return (e.kind === 'furacao' ? 1 : 0.7) * inK * outK;
+    return (e.kind === 'tsunami' ? 0.7 : 1) * inK * outK;
   }
 
   // ---------- agendamento (host) ----------
@@ -117,9 +122,29 @@ export class Events {
     if (G.startup.waterLevel < 0.5 || (tide && (tide.phase.id === 'seco' || tide.nextIn < 75))) { this.timer = 15; return; }
     // quase nunca repete o mesmo tipo em seguida; às vezes o mar simplesmente fica quieto
     if (Math.random() < 0.18) { this.timer = between([90, 200]); return; }
-    const other = this.lastKind === 'tsunami' ? 'furacao' : 'tsunami';
-    const kind = !this.lastKind ? (Math.random() < 0.5 ? 'tsunami' : 'furacao') : Math.random() < 0.85 ? other : this.lastKind;
-    this.begin(kind === 'tsunami' ? this._makeTsunami(t) : this._makeHurricane(t), true);
+    const kinds = ['tsunami', 'furacao', 'tempestade'], others = kinds.filter((k) => k !== this.lastKind);
+    const kind = Math.random() < 0.88 ? others[(Math.random() * others.length) | 0] : kinds[(Math.random() * 3) | 0];
+    this.begin(kind === 'tsunami' ? this._makeTsunami(t) : kind === 'furacao' ? this._makeHurricane(t) : this._makeStorm(t), true);
+  }
+
+  // Tempestade: a série de ondas sai de uma seed (todos os clientes calculam igual).
+  _makeStorm(t) {
+    const B = EVENT_BALANCE.tempestade, boat = this.G.boat;
+    return {
+      id: `ev${Math.floor(t * 10)}`, kind: 'tempestade', t0: t, dur: between(B.dur),
+      seed: Math.floor(Math.random() * 1e9), n: Math.round(between(B.waves)), cx: boat.x, cz: boat.z, fx: Math.sin(boat.yaw), fz: Math.cos(boat.yaw),
+    };
+  }
+  _stormWaves(e) {
+    if (e._waves) return e._waves;
+    const B = EVENT_BALANCE.tempestade, r = mulberry32(e.seed | 0), list = [];
+    let at = 12 + r() * 6;
+    for (let i = 0; i < e.n && at < e.dur - 14; i++) {
+      const rel = (r() - 0.5) * Math.PI * 1.7, a = Math.atan2(e.fx, e.fz) + Math.PI + rel; // de onde vem (raramente por trás)
+      list.push({ at, ang: a, A: B.A[0] + r() * (B.A[1] - B.A[0]), speed: B.speed[0] + r() * (B.speed[1] - B.speed[0]), sigma: B.sigma[0] + r() * (B.sigma[1] - B.sigma[0]), hit: false });
+      at += 8 + r() * 7;
+    }
+    return (e._waves = list);
   }
 
   _makeTsunami(t) {
@@ -153,7 +178,7 @@ export class Events {
     if (!e || (this.current && this.current.id === e.id)) { if (e && this.current) Object.assign(this.current, e); return; }
     this.current = e;
     this.impacted = false;
-    this.sucked = false;
+    this.sucked = false; this.pushWarned = false; this.stormWarned = false;
     this.lastKind = e.kind;
     this._ensureVisuals();
     if (announce && this.G.net.online) this.G.net.send({ t: 'event', e });
@@ -185,7 +210,12 @@ export class Events {
     if (e) {
       if (t > e.t0 + e.dur) this._end();
       else if (e.kind === 'tsunami') this._updateTsunami(e, dt, t);
+      else if (e.kind === 'tempestade') this._updateStorm(e, dt, t);
       else this._updateHurricane(e, dt, t);
+    }
+    if (!e || e.kind !== 'furacao') G.player.drift = null;
+    if (e && e.kind === 'tempestade' && Math.random() < dt * 0.6 * this.stormBoost(t)) {
+      this.flash = 1; G.hud.flash('lightning'); this.shake = Math.max(this.shake, 0.15);
     }
     // relâmpagos durante o furacão
     if (this.flash > 0) this.flash = Math.max(0, this.flash - dt * 3);
@@ -241,6 +271,44 @@ export class Events {
     this._updateSpray(e, front, ramp, t);
   }
 
+  // Ondas da tempestade: cada uma passa pela jangada e dá um tranco (menor que a onda gigante).
+  _updateStorm(e, dt, t) {
+    const G = this.G, boat = G.boat, B = EVENT_BALANCE.tempestade, u = t - e.t0;
+    let cur = null;
+    for (const w of this._stormWaves(e)) {
+      const wu = u - w.at; if (wu < 0) continue;
+      const front = w.speed * wu;
+      if (front > B.start + 90) continue;
+      cur = w;
+      // centro da tempestade acompanha a jangada (as ondas sempre chegam até ela)
+      const ox = boat.x + Math.sin(w.ang) * B.start, oz = boat.z + Math.cos(w.ang) * B.start;
+      if (!w.o) w.o = { x: ox, z: oz, dx: -Math.sin(w.ang), dz: -Math.cos(w.ang) };
+      const ramp = smooth(wu / 2) * (1 - smooth((front - B.start - 50) / 40));
+      Object.assign(sea.surge, { A: w.A * ramp, ox: w.o.x, oz: w.o.z, dx: w.o.dx, dz: w.o.dz, front, sigma: w.sigma });
+      const sd = (boat.x - w.o.x) * w.o.dx + (boat.z - w.o.z) * w.o.dz - front;
+      if (!w.hit && sd <= 0) { w.hit = true; this._stormImpact(w); }
+      this._updateSpray({ ox: w.o.x, oz: w.o.z, dx: w.o.dx, dz: w.o.dz, A: w.A }, front, ramp, t);
+    }
+    if (!cur) { sea.surge.A *= Math.max(0, 1 - dt * 2); if (this.visuals) this.visuals.crest.visible = false; }
+    if (G.player.aboard) this.shake = Math.max(this.shake, 0.12 * this.stormBoost(t)); // jangada sempre chacoalhando
+  }
+  _stormImpact(w) {
+    const G = this.G, boat = G.boat, B = EVENT_BALANCE.tempestade, player = G.player, b = player.body;
+    this.shake = Math.max(this.shake, 0.85);
+    if (G.gfx && player.aboard) G.gfx.wetLens(0.9);
+    if (this._isHost()) {
+      const push = (boat.sailUp ? 5 : 2.5) * (w.A / 3.5);
+      boat.fling = { vx: w.o.dx * push, vz: w.o.dz * push, t: 1.6, T: 1.6 };
+      boat.spin = { rate: (Math.random() < 0.5 ? 1 : -1) * (0.5 + Math.random() * 0.6), t: 0.9 };
+    }
+    if (player.dead || !player.aboard) return;
+    if (!this._holdingMast()) {
+      const k = B.knock * (w.A / 3.5);
+      b.vel.x += w.o.dx * k; b.vel.z += w.o.dz * k; b.vel.y = 4.5; b.grounded = false;
+      if (!this.stormWarned) { this.stormWarned = true; G.hud.msg('Segure-se no mastro! As ondas estão jogando a jangada.'); }
+    }
+  }
+
   _tsunamiImpact(e) {
     const G = this.G, boat = G.boat, B = EVENT_BALANCE.tsunami, player = G.player, b = player.body;
     const sailUp = boat.sailUp;
@@ -280,7 +348,7 @@ export class Events {
     const along = (boat.x - e.cx) * e.fx + (boat.z - e.cz) * e.fz + e.ahead * (1 - 2 * u / e.dur);
     const lat = e.lat + e.latV * u;
     const cx = e.cx + e.fx * along + lx0 * lat, cz = e.cz + e.fz * along + lz0 * lat;
-    Object.assign(sea.vortex, { k, x: cx, z: cz, R, depth, spin });
+    Object.assign(sea.vortex, { k, x: cx, z: cz, R, depth, spin }); this.lastCx = cx; this.lastCz = cz;
     this._updateFunnel(cx, cz, k, dt, t, R, spin);
 
     const dx = cx - boat.x, dz = cz - boat.z, d = Math.hypot(dx, dz) || 1;
@@ -305,6 +373,20 @@ export class Events {
       this._hurricaneSucked(e, dx / d, dz / d);
     }
     if (G.player.aboard && !this.sucked) this.shake = Math.max(this.shake, 0.22 * k * reach * (1.2 - q * 0.6));
+    // força do giro: quem está a bordo é empurrado para FORA (para longe do centro). Ande em direção
+    // ao redemoinho para ficar na jangada; segurar no mastro ajuda. Na água, o redemoinho te puxa.
+    const pl = G.player, pp = pl.body.pos, pdx = cx - pp.x, pdz = cz - pp.z, pd = Math.hypot(pdx, pdz) || 1;
+    if (!this.sucked && !pl.dead && k * reach > 0.05) {
+      if (pl.aboard) {
+        const hold = this._holdingMast() ? 0.45 : 1;
+        const push = B.push * k * reach * grow * hold;
+        pl.drift = { x: -pdx / pd * push - pdz / pd * spin * push * 0.35, z: -pdz / pd * push + pdx / pd * spin * push * 0.35 };
+        if (!this.pushWarned && push > 1) { this.pushWarned = true; G.hud.msg('O vento do redemoinho está te jogando para fora — ande contra ele (na direção do redemoinho) para se firmar!'); }
+      } else if (pl.swimming) {
+        const pull = 1.6 * k * clamp(1.3 - pd / R, 0, 1);
+        pl.drift = { x: pdx / pd * pull - pdz / pd * spin * pull, z: pdz / pd * pull + pdx / pd * spin * pull };
+      } else pl.drift = null;
+    } else pl.drift = null;
     if (G.gfx && G.player.aboard && k * reach > 0.5 && Math.random() < dt * 0.4) G.gfx.wetLens(0.55); // spray do redemoinho
   }
 

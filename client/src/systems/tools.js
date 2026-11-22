@@ -142,6 +142,7 @@ export class Tools {
   strum(midi, vol = 1, broadcast = true) {
     playNote(midi, vol);
     this.playT = 1.6;
+    this.G.player.onStrum();
     if (broadcast) this.G.net.send({ t: 'music', n: midi });
     const G = this.G;
     if (G.player.firstPerson && G.viewmodel && G.viewmodel.springs) G.viewmodel.springs.kickRz.kick(0.25 * (Math.random() < 0.5 ? 1 : -1));
@@ -205,6 +206,7 @@ export class Tools {
     const G = this.G, cam = G.camera, dir = new THREE.Vector3();
     cam.getWorldDirection(dir);
     const pos = this._hand(new THREE.Vector3()).addScaledVector(dir, 0.4);
+    G.player.onThrow();
     this.hook = { state: 'fly', pos, vel: dir.multiplyScalar(HOOK.speed).add(new THREE.Vector3(0, 2.5, 0)), t: 0, crate: null };
     this.hookMesh.visible = this.rope.visible = true;
     if (G.player.weaponMesh) G.player.weaponMesh.visible = false;

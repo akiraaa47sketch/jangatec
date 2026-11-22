@@ -157,6 +157,15 @@ cada um sai diferente (força, velocidade, tamanho, lado e sentido de giro sorte
   boiando e jogadores (mensagem `yank`); **banjo** com som sintetizado (Karplus–Strong), músicas de
   domínio público no clique e painel nota por nota ([B]); quem ouve por perto recupera vida (flag `mu` no
   estado do jogador, notas pela mensagem `music`). As armas **não quebram** mais.
+- **Tempestade forte** (evento `tempestade`): céu escuro, raios frequentes e 5–8 ondas gigantes em série vindas
+  de direções diferentes (geradas de uma seed: iguais para todos) que dão trancos na jangada e derrubam quem
+  não está perto do mastro. No **furacão** quem está a bordo é empurrado para fora do redemoinho (`player.drift`);
+  andar contra o empurrão firma o personagem, parado ele escorrega e cai.
+- **Animações em 3ª pessoa** (`client/src/player/pill.js`): parado/andar/correr/de lado/de costas, postura com
+  arma (pistola, arma longa, corpo a corpo, ferramenta), mira com base aberta, recarga por tipo (pente,
+  escopeta, revólver), bandagem/kit, arremesso do gancho, banjo, martelo, escalar/pular obstáculo em etapas,
+  pulo subindo/caindo, nado crawl e boiando, tranco ao levar dano e "amassada" ao aterrissar. A pose vai pela
+  rede (`po`/`pp`/`ar`), então os aliados veem a mesma animação.
 - **Batalha naval** (`client/src/systems/naval.js`, constantes em `NAVAL`/`PIECE_HP`; modelos em
   `client/src/world/navalmodels.js`): o **canhão improvisado** (galão d'água + cano) só sai em
   caixas/naufrágios a partir da região 3 (~640 m da rota); as balas são infinitas, com recarga longa (7 s). Instalado no convés, vira uma peça da jangada;
