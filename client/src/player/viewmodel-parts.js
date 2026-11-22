@@ -666,10 +666,12 @@ SPECS.martelo = () => {
   const m = gunModel('martelo');
   if (!m) return proceduralMartelo();
   const g = new THREE.Group(); g.add(m.group);
+  // martelo se segura com o cabo quase perpendicular ao antebraço (inclinação de 20°, pulso reto)
+  // e mais perto da cabeça; dedos com dobra por junta para contornar o cabo sem atravessá-lo
   return {
     group: g, type: 'melee', muzzle: null, swing: ['overhead', 'overhead'],
-    hold: { p: [0.17, -0.14, -0.5], r: [0.9788, 0.5196, 0.5617] },
-    gripR: { p: [0, 0, 0.04], r: [-0.7854, 0, -1.5708], c: 0.95 },
+    hold: { p: [0.2, -0.215, -0.49], r: [1.2516, 1.2985, 1.2645] },
+    gripR: { p: [0, 0, -0.06], r: [-1.2217, 0, -1.5708], c: 0.95, jm: [0.45, 1.1, 0.3], th: [0.2, -0.6, 0], nudge: [0.003, 0.006, 0] },
   };
 };
 const proceduralMartelo = () => {

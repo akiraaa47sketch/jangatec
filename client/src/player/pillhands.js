@@ -61,11 +61,12 @@ export function fitWeaponToHand(pill, mesh, spec) {
   if (!grip) { mesh.position.set(0, 0, 0); mesh.quaternion.identity(); mesh.scale.setScalar(1); return true; }
   const q = new THREE.Quaternion().setFromEuler(new THREE.Euler(...grip.r, grip.order || 'XYZ'));
   const rootPos = new THREE.Vector3(...(grip.off || h.gripOff)).applyQuaternion(q).add(_v.set(...grip.p));
+  if (grip.nudge) rootPos.add(_v.set(...grip.nudge));
   const qi = q.clone().invert();
   mesh.quaternion.copy(qi);
   mesh.position.copy(rootPos).applyQuaternion(qi).negate();
   mesh.scale.setScalar(1);
-  h.grip = { c: grip.c ?? 0.9, idx: grip.idx, th: grip.th };
+  h.grip = { c: grip.c ?? 0.9, idx: grip.idx, th: grip.th, jm: grip.jm };
   return true;
 }
 export function clearWeaponGrip(pill) { const h = pill && pill.userData.parts.realHands && pill.userData.parts.realHands.R; if (h) h.grip = null; }
@@ -76,15 +77,15 @@ export function animateRealHands(pill, dt) {
   const armed = ud.armed && ud.armed !== 'none', k = 1 - Math.exp(-10 * dt);
   for (const key of ['R', 'L']) {
     const h = hands[key]; if (!h) continue;
-    let c = 0.4 + 0.08 * Math.sin((ud.phase || 0) + (key === 'L' ? Math.PI : 0)), idx = null, th = [0.25, -0.15, 0.25]; // relaxa no balanço do braço
+    let jm = null, c = 0.4 + 0.08 * Math.sin((ud.phase || 0) + (key === 'L' ? Math.PI : 0)), idx = null, th = [0.25, -0.15, 0.25]; // relaxa no balanço do braço
     if (key === 'R' && armed) {
       const g = h.grip || { c: 0.9, idx: ud.armed === 'pistol' || ud.armed === 'long' ? 0.3 : undefined };
-      c = g.c; idx = g.idx; th = g.th || [0.5, -0.2, 0.3];
+      c = g.c; idx = g.idx; th = g.th || [0.5, -0.2, 0.3]; jm = g.jm || null;
     } else if (key === 'L' && ud.armed === 'long') { c = 0.8; th = [0.3, -0.3, 0.2]; }
     else if (ud.pose === 'swim' || ud.pose === 'climb' || ud.pose === 'leap') c = 0.15; // mão aberta nadando/escalando
     h.curl += (c - h.curl) * k;
     h.idx = h.idx == null ? h.curl : h.idx + ((idx ?? c) - h.idx) * k;
-    h.setPose([h.idx, h.curl, h.curl, h.curl], th);
+    h.setPose([h.idx, h.curl, h.curl, h.curl], th, jm);
   }
   void _q;
 }

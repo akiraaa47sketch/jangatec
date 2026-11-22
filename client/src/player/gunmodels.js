@@ -82,9 +82,11 @@ export function buildRealHand(mirror = false, gloveMat = null, lod = 'fp') {
   const fingers = [0, 1, 2, 3].map((f) => [0, 1, 2].map((j) => bones[`d${f}_${j}`]));
   const BEND = [1.2, 1.4, 0.9];
   // pose ABSOLUTA: dobra 0 = dedo reto (desfaz a dobra que o modelo já tinha), como a luva antiga
-  const setPose = (c, t) => {
+  // jm (opcional): multiplica a dobra de cada junta [base, meio, ponta] — cabos grossos pedem a base
+  // menos dobrada e as pontas mais, para os dedos contornarem o cabo em vez de entrarem nele
+  const setPose = (c, t, jm = null) => {
     fingers.forEach((chain, f) => chain.forEach((b, j) => {
-      if (b) b.quaternion.copy(b.userData.q0).multiply(_q.setFromAxisAngle(X, -b.userData.rest - c[f] * BEND[j]));
+      if (b) b.quaternion.copy(b.userData.q0).multiply(_q.setFromAxisAngle(X, -b.userData.rest - c[f] * BEND[j] * (jm ? jm[j] : 1)));
     }));
     const t0 = bones.pol_0, t1 = bones.pol_1;
     if (t0) t0.quaternion.copy(t0.userData.q0).multiply(_q.setFromEuler(_e.set(t[1] * 0.8, t[0] * 0.8, 0)));

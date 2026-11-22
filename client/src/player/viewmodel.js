@@ -304,6 +304,7 @@ export class ViewModel {
     // cada modelo de mão tem o seu ponto de pegada (a mão 3D mede o buraco do punho fechado)
     const h = this.hands[hand], ho = h && h.gripOff ? (hand === 1 ? [-h.gripOff[0], h.gripOff[1], h.gripOff[2]] : h.gripOff) : null;
     const p = V(...(grip.off || ho || [0, 0.03, 0.07])).applyQuaternion(q).add(V(...grip.p));
+    if (grip.nudge) p.add(V(...grip.nudge)); // ajuste fino do cabo dentro da mão (espaço da arma)
     if (extra) p.add(extra);
     p.applyMatrix4(this.weaponRoot.matrixWorld);
     return { p, q: wq.clone().multiply(q) };
@@ -501,6 +502,7 @@ export class ViewModel {
       const trigger = this.flashT > 0 ? 0.65 : (gr.idx != null ? gr.idx : gr.c);
       hands[0].c = [trigger, gr.c, gr.c, gr.c];
       if (gr.th) hands[0].t = gr.th.slice();
+      if (gr.jm && this.hands[0].real) hands[0].jm = gr.jm; // dobra por junta (só a mão 3D)
     } else {
       const r = REST_R;
       hands[0].p = r.p.clone().add(V(restBob, -Math.abs(Math.cos(bp)) * 0.012 * walk, 0));
@@ -543,7 +545,8 @@ export class ViewModel {
       const h = hands[i], hand = this.hands[i];
       hand.root.position.copy(h.p);
       hand.root.quaternion.copy(h.q);
-      hand.setPose(h.c, h.t);
+      const busy = Math.max(this.w.carry, this.w.swim, this.w.mantle, this.w.heal) > 0.5;
+      hand.setPose(h.c, h.t, busy ? null : h.jm);
       this.arms[i].solve(i === 0 ? SHOULDER.R : SHOULDER.L, h.p, i === 0 ? POLE.R : POLE.L);
     }
 

@@ -13,7 +13,10 @@ const S = +(process.argv[4] || 0.45), GRIP_Y = +(process.argv[5] || -0.38);
 const prim = doc.getRoot().listMeshes()[0].listPrimitives()[0];
 const P = prim.getAttribute('POSITION'), N = prim.getAttribute('NORMAL');
 const pa = P.getArray().slice(), na = N.getArray().slice();
+const THIN = +(process.argv[7] || 0.72); // afina o cabo (abaixo da cabeça) para caber na mão
 for (let i = 0; i < pa.length; i += 3) {
+  const y0 = pa[i + 1], k = y0 < 0.2 ? THIN : y0 < 0.29 ? THIN + (1 - THIN) * (y0 - 0.2) / 0.09 : 1;
+  pa[i] *= k; pa[i + 2] *= k;
   const x = pa[i], y = pa[i + 1], z = pa[i + 2];
   pa[i] = x * S; pa[i + 1] = z * S; pa[i + 2] = -(y - GRIP_Y) * S + 0.04;          // (x, y, z) → (x, z, -y)
   const nx = na[i], ny = na[i + 1], nz = na[i + 2]; na[i] = nx; na[i + 1] = nz; na[i + 2] = -ny;
