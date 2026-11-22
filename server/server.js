@@ -291,7 +291,7 @@ function handle(ws, m) {
     }
     case 'naval': {
       // Batalha naval: o host manda navios/dano/estado; qualquer um pode disparar, mirar e consertar.
-      const HOST = ['ships', 'php', 'sunk', 'boom', 'crates', 'took'], ANY = ['fire', 'aim', 'repair', 'take', 'pull'];
+      const HOST = ['ships', 'php', 'sunk', 'boom', 'crates', 'took'], ANY = ['fire', 'aim', 'repair', 'take', 'pull', 'tower'];
       if (typeof m.k !== 'string' || !(HOST.includes(m.k) || ANY.includes(m.k))) break;
       if (HOST.includes(m.k) && room.hostId !== ws.id) break;
       if (JSON.stringify(m).length > 6000) break;

@@ -8,6 +8,7 @@ import { LOOT_CONFIG, generateCrateLoot, wreckFor } from '../systems/loot.js';
 import { seabedHeight, makeSeabedChunk, makeFarSeabed } from './seabed.js';
 import { bakeStatic } from '../core/bake.js';
 import { buildCamp } from './camp.js';
+import { buildScrapCamp } from './scrap.js';
 import { makePieceMesh, PIECES } from '../boat/pieces.js';
 import { makePalm, makeRock, makeBush, makeGrassTufts } from './models.js';
 import { woodTexture, woodBump, sandTexture, sandBump, grassTexture, thatchTexture, logWallTexture, metalTexture, clothTexture as clothTex, repeated, scaleBoxUVs } from './textures.js';
@@ -284,7 +285,9 @@ export class World {
   makeIsland(id, x, z, r, starterIsland = false) {
     const G = this.G, R = starterIsland ? 15 + r() * 3 : 9 + r() * 6, diff = this.difficulty(x, z);
     const islandElevation = starterIsland ? 0 : 2.7;
-    const siteType = starterIsland ? null : r() < 0.45 ? 'fort' : 'hut';
+    // acampamento: forte de troncos, cabana, ou (ilhas grandes) forte de SUCATA com torres de morteiro
+    const siteRoll = r();
+    const siteType = starterIsland ? null : R >= 11.5 && siteRoll < 0.4 ? 'scrap' : siteRoll < 0.62 ? 'fort' : 'hut';
     const group = new THREE.Group(); group.position.set(x, islandElevation, z);
     const set = { x, z, yaw: 0, y: islandElevation, radius: R + 8, items: [] };
     const solids = [];
@@ -320,8 +323,8 @@ export class World {
       ? [[-R * 0.78, 0], [R * 0.78, -R * 0.22], [0, R * 0.78]]
       : [];
     // acampamento (cabana ou forte) perto do meio; ruínas ficam longe dele
-    const campR = siteType === 'fort' ? 7.9 : 5;
-    const campA = r() * 6.28, campD = r() * Math.max(0, R - (siteType === 'fort' ? 9 : 6.5));
+    const campR = siteType === 'scrap' ? 8.6 : siteType === 'fort' ? 7.9 : 5;
+    const campA = r() * 6.28, campD = r() * Math.max(0, R - (siteType === 'scrap' ? 10.5 : siteType === 'fort' ? 9 : 6.5));
     const campC = [Math.cos(campA) * campD, Math.sin(campA) * campD];
     const nearCamp = (lx, lz, pad = 0) => !starterIsland && Math.hypot(lx - campC[0], lz - campC[1]) < campR + pad;
     const houses = r() < 0.6 ? 1 : 0, wallMat = shared().plaster, crates = [];
@@ -423,11 +426,12 @@ export class World {
       }
       if (tufts.length) group.add(makeGrassTufts(dec, tufts));
     }
-    let siteCenter = [0, 0], rooms = [];
+    let siteCenter = [0, 0], rooms = [], towers = [], spawnSpots = [];
     let fireRef = null;
     if (!starterIsland) {
-      const camp = buildCamp(siteType, { group, set, addSolid, TOP, cx: campC[0], cz: campC[1], yaw: r() * 6.28, r, shared: shared() });
-      siteCenter = camp.yard; rooms = camp.rooms;
+      const campCtx = { group, set, addSolid, solidOnly: (m) => solids.push(m), TOP, cx: campC[0], cz: campC[1], yaw: r() * 6.28, r, shared: shared(), id, destroyed: this.collected };
+      const camp = siteType === 'scrap' ? buildScrapCamp(campCtx) : buildCamp(siteType, campCtx);
+      siteCenter = camp.yard; rooms = camp.rooms; towers = camp.towers || []; spawnSpots = camp.spawns || [];
       for (const spot of camp.crateSpots) crates.push(spot);
       // Fogueira: pedras em anel, lenha cruzada e chamas em camadas (animadas em update).
       const campfire = new THREE.Group();
@@ -454,7 +458,7 @@ export class World {
     }
     const isl = {
       id, x, z, R, diff, group, set, solids, crates: [], enemies: [], palms: palmList,
-      starter: starterIsland, siteType, siteCenter, rooms, landLayers, allItems: set.items.slice(),
+      starter: starterIsland, siteType, siteCenter, rooms, towers, spawnSpots, landLayers, allItems: set.items.slice(),
       maxGround: islandElevation + 0.61, floodTier: null,
       fire: fireRef,
     };
@@ -493,7 +497,7 @@ export class World {
     });
     { // junta as malhas paradas da ilha (menos draw calls); fica de fora o que anima ou colide
       const solidSet = new Set(solids), palmSet = new Set(palmList), crateSet = new Set(isl.crates.map((c) => c.mesh));
-      bakeStatic(group, { keep: (o) => solidSet.has(o) || palmSet.has(o) || crateSet.has(o) || o === fireRef || (fireRef && o === fireRef.parent && o !== group) });
+      bakeStatic(group, { keep: (o) => solidSet.has(o) || o.userData.noBake || palmSet.has(o) || crateSet.has(o) || o === fireRef || (fireRef && o === fireRef.parent && o !== group) });
     }
     G.scene.add(group);
     group.updateMatrixWorld(true);
@@ -501,6 +505,7 @@ export class World {
     G.physics.addStaticSet(set);
     G.solids.push(...solids);
     this.islands.push(isl);
+    if (towers.length && G.siege) G.siege.addTowers(isl);
     if (!starterIsland) G.enemies.spawnForIsland(isl, r);
     return isl;
   }
@@ -644,6 +649,7 @@ export class World {
     for (const c of isl.crates) { const i = this.crates.indexOf(c); if (i >= 0) this.crates.splice(i, 1); }
     this.islands.splice(this.islands.indexOf(isl), 1);
     G.enemies.removeIsland(isl);
+    if (G.siege) G.siege.removeIsland(isl);
   }
 
   // Marca como coletado (loot legado — ainda funciona para caixotes).

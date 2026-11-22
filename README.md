@@ -92,6 +92,13 @@ golpes simultâneos fazem as espadas se chocarem (CLANG). Inimigos defendem, rev
 bloqueia. Sons sintetizados em `client/src/core/sfx.js`. Inimigos usam linha de visão
 (`Colliders.segmentBlocked`): não veem, atiram nem batem através de paredes e saem/entram pelas portas.
 
+**Fortes de sucata** (`client/src/world/scrap.js`, `client/src/systems/siege.js`): em ilhas grandes, muro de
+chapas onduladas enferrujadas com portão, contêiner e barraco com inimigos dentro e 1–2 torres de andaime
+com um inimigo de **morteiro** (granadas em arco, anel vermelho de aviso, mira à frente da jangada). Bala de
+canhão na torre tira vida (3 acertos): ela tomba, se desmancha e fica derrubada (mensagem `naval/tower`).
+A **torreta-gancho** substitui o gancho de mão: instala no convés como o canhão e fisga caixotes, aliados e
+inimigos.
+
 **Acampamentos** (`client/src/world/camp.js`): cabana de tábuas (porta, janelas, telhado de palha em A,
 varanda com barris) ou forte com paliçada pontuda, portão, torres de vigia e cabana no fundo.
 

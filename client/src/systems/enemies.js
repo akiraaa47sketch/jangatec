@@ -8,6 +8,8 @@ import { woodTexture, woodBump, repeated, scaleBoxUVs } from '../world/textures.
 import { CFG } from '../config.js';
 import { makeEnemyPill, animateEnemy } from './evilpills.js';
 import { inRoom } from '../world/camp.js';
+import { SIEGE } from './siege.js';
+const SIEGE_MORTAR = () => SIEGE.mortar;
 import { sfx } from '../core/sfx.js';
 
 export const ENEMY_TYPES = {
@@ -15,6 +17,7 @@ export const ENEMY_TYPES = {
   atirador: { nome: 'Atirador',  hp: 45,  speed: 2.4, dmg: 7,  range: 22,  cd: 1.7, cor: 0x7a6a2a, scale: 1, ranged: true },
   pesado:   { nome: 'Brutamontes', hp: 160, speed: 1.9, dmg: 22, range: 2.2, cd: 1.6, cor: 0x4a2a5a, scale: 1.3 },
   rapido:   { nome: 'Corredor',  hp: 35,  speed: 5.2, dmg: 6,  range: 1.6, cd: 0.6, cor: 0xc56a1e, scale: 0.85 },
+  morteiro: { nome: 'Morteiro', hp: 55, speed: 0, dmg: 0, range: 80, cd: 6.5, cor: 0x4a4a3a, scale: 1, ranged: true, mortar: true },
   pirata:   { nome: 'Pirata', hp: 75, speed: 5.4, dmg: 13, range: 1.8, cd: 1.2, cor: 0x553b2d, scale: 1.05, raftSpeed: 7.2 },
 };
 const BY_DIFF = [['melee'], ['melee', 'rapido'], ['melee', 'rapido', 'atirador'], ['melee', 'atirador', 'pesado', 'rapido'], ['atirador', 'pesado', 'rapido', 'pesado']];
@@ -44,6 +47,19 @@ export class Enemies {
       let [x, z] = [lx - c.x, lz - c.z]; if (c.yaw) [x, z] = rot(x, z, -c.yaw);
       return Math.abs(x) < c.hx + 0.5 && Math.abs(z) < c.hz + 0.5;
     })());
+    // forte de sucata: artilheiro de morteiro em cada torre de pé e gente dentro dos barracos
+    if (isl.siteType === 'scrap') {
+      for (const t of isl.towers || []) {
+        const id = `${t.id}m`;
+        if (G.world.collected.has(id)) continue;
+        const e = this.spawn(id, 'morteiro', isl, isl.x + t.lx + 0.2, isl.z + t.lz - 0.3);
+        e.body.pos.y = isl.set.y + 0.55 + t.top + 0.25; e.tower = t; e.state = 'idle'; e.cd = 3 + r() * 3;
+      }
+      (isl.spawnSpots || []).forEach(([lx, lz], k) => {
+        const id = `${isl.id}s${k}`;
+        if (!G.world.collected.has(id)) this.spawn(id, pool[(r() * pool.length) | 0] === 'atirador' ? 'atirador' : 'melee', isl, isl.x + lx, isl.z + lz);
+      });
+    }
     for (let i = 0; i < n; i++) {
       const id = `${isl.id}e${i}`, type = pool[(r() * pool.length) | 0];
       let lx = isl.siteCenter[0], lz = isl.siteCenter[1];
@@ -243,7 +259,31 @@ export class Enemies {
   }
 
   // Morte: tomba de lado com quique, afunda e some aos poucos.
+  // Artilheiro de morteiro: fica na torre, vira para o jogador e atira em arco de tempos em tempos.
+  _updateMortar(e, dt, dist, pdx, pdz) {
+    const G = this.G, b = e.body, p = b.pos, M = G.siege ? SIEGE_MORTAR() : null;
+    const prevY = p.y;
+    b.vel.y = Math.max(b.vel.y - CFG.gravity * dt, -20); p.y += b.vel.y * dt;
+    G.colliders.resolve(b, prevY);
+    e.cd -= dt;
+    const alive = !G.player.dead && !G.player.downed;
+    if (alive && dist < (M ? M.range : 80)) {
+      e.yaw = lerpAngle(e.yaw, Math.atan2(pdx, pdz), Math.min(1, 4 * dt));
+      if (M && e.cd <= 0 && dist > M.minRange) { e.cd = M.cd[0] + Math.random() * (M.cd[1] - M.cd[0]); G.siege.mortarShot(e); }
+    }
+    e.mesh.position.copy(p); e.mesh.rotation.y = e.yaw;
+    animateEnemy(e.mesh, 0, dt, e.swing > 0 ? 'throw' : 'walk', e.swing > 0 ? 1 - e.swing / 0.3 : 0);
+    this._animateHit(e, dt);
+    if (e.swing > 0) e.swing = Math.max(0, e.swing - dt);
+  }
+
   _animateDeath(e, dt) {
+    if (e.flung) { // caiu da torre derrubada
+      const f = e.flung, gy = (e.isl ? e.isl.set.y : 0) + 0.6;
+      f.vy -= 9.8 * dt; e.body.pos.x += f.vx * dt; e.body.pos.z += f.vz * dt; e.body.pos.y += f.vy * dt;
+      if (e.body.pos.y <= gy) { e.body.pos.y = gy; e.flung = null; }
+      e.mesh.position.copy(e.body.pos);
+    }
     e.deathT += dt;
     const t = e.deathT, fall = Math.min(1, t / 0.55);
     const ease = 1 - Math.pow(1 - fall, 3), bounce = fall >= 1 ? Math.sin(Math.min(1, (t - 0.55) / 0.35) * Math.PI) * 0.12 : 0;
@@ -531,6 +571,7 @@ export class Enemies {
       if (dist > ACTIVE) continue; // longe: dormindo
       pdx /= dist; pdz /= dist;
       if (e.state === 'dead') { this._animateDeath(e, dt); continue; }
+      if (e.def.mortar) { this._updateMortar(e, dt, dist, pdx, pdz); continue; }
       e.timer -= dt; e.cd -= dt;
       if (thinkNow) this.think(e, dist, pdx, pdz);
 

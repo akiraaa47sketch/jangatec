@@ -146,7 +146,7 @@ export function generateCrateLoot(seed, id, difficulty, playerCount = 1) {
   // escondem mais. As balas são infinitas (o canhão só tem recarga longa).
   if (regionIndex >= 2 && random() < (wreck ? 0.3 : 0.14) + (regionIndex - 2) * 0.05) add('canhao', 1);
   // Ferramentas: o GANCHO sai principalmente de destroços/naufrágios; BANJO e martelo extra em caixas.
-  if (random() < (wreck ? 0.4 : regionIndex >= 1 ? 0.07 : 0)) add('arma_gancho', 1);
+  if (random() < (wreck ? 0.4 : regionIndex >= 1 ? 0.07 : 0)) add('gancho', 1); // torreta-gancho (instala no convés)
   if (random() < (wreck ? 0.15 : regionIndex >= 1 ? 0.08 : 0.03)) add('arma_banjo', 1);
   if (regionIndex >= 1 && random() < 0.05) add('arma_martelo', 1);
 

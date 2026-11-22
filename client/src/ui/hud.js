@@ -115,7 +115,8 @@ export class Hud {
     const chip = (icon, label, n) => n ? `<span class="chip" title="${label}"><i>${icon}</i>${n}</span>` : '';
     const invHtml = chip('✚', 'Bandagens [4]', inv.bandagem) + chip('♥', 'Kits médicos [5]', inv.kit) +
       chip('•', 'Munição', inv.municao) + chip('▮', 'Cartuchos', inv.cartucho || 0) +
-      chip('⊛', 'Canhão improvisado (instale com E a bordo)', inv.canhao || 0);
+      chip('⊛', 'Canhão improvisado (instale a bordo)', inv.canhao || 0) +
+      chip('⚓', 'Torreta-gancho (instale a bordo)', inv.gancho || 0);
     if (invHtml !== this._inv) { $('inv').innerHTML = invHtml; this._inv = invHtml; }
     // Arma equipada
     const weaponHtml = w

@@ -32,6 +32,7 @@ import { MainMenu } from './ui/mainmenu.js';
 import { preloadGun, preloadHand, buildRealHand } from './player/gunmodels.js';
 import { Naval } from './systems/naval.js';
 import { Tools } from './systems/tools.js';
+import { Siege } from './systems/siege.js';
 
 const $ = (id) => document.getElementById(id);
 const canvas = $('c');
@@ -87,6 +88,7 @@ G.startup = new Startup(G, { sun, hemisphere });
 G.build = new Build(G);     // Sistema unificado de posicionamento físico
 G.interact = new Interact(G);
 G.naval = new Naval(G);     // canhões, navios piratas e dano por peça
+G.siege = new Siege(G);   // torres de sucata (derrubar com canhão) e morteiros
 G.tools = new Tools(G);     // banjo (música que cura) e gancho
 const atmo = new Atmosphere(renderer, scene, { sun, hemisphere }); // céu, IBL e sombras
 const ocean = new Ocean(scene, atmo);
@@ -263,6 +265,7 @@ function frame() {
   G.enemies.update(dt);
   G.events.update(dt, t);
   G.naval.update(dt, t);
+  G.siege.update(dt, t);
   G.tools.update(dt, t);
   if (G.bench) G.bench.update(dt);
   G.interact.update(dt);

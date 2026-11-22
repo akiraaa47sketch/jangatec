@@ -68,6 +68,46 @@ export function makeCannonMesh() {
   return g;
 }
 
+// ---------- torreta-gancho (fica parafusada no convés) ----------
+// Mesma estrutura do canhão (yawNode → pitchNode → muzzle), então mira e câmera são as mesmas.
+export function makeHookTurretMesh() {
+  const g = new THREE.Group();
+  const wood = std(0x6e4c2c, { map: repeated(woodTexture(), 0.6, 0.6), bumpMap: repeated(woodBump(), 0.6, 0.6), bumpScale: 1.4 });
+  const iron = std(0x52575d, { map: metalTexture(), metalness: 0.75, roughness: 0.42 });
+  const dark = std(0x2b2e31, { metalness: 0.6, roughness: 0.5 });
+  const rope = std(0xb59b6a, { roughness: 1 });
+  const red = std(0xa8322a, { roughness: 0.6, metalness: 0.2 });
+  // base: caixote de madeira com chapa e parafusos
+  const base = new THREE.Mesh(new THREE.BoxGeometry(0.7, 0.3, 0.7), wood); base.position.y = -0.3; g.add(base);
+  const plate = new THREE.Mesh(new THREE.CylinderGeometry(0.3, 0.34, 0.06, 16), iron); plate.position.y = -0.13; g.add(plate);
+  for (let i = 0; i < 6; i++) { const b = new THREE.Mesh(new THREE.CylinderGeometry(0.025, 0.025, 0.03, 6), dark); const a = i / 6 * Math.PI * 2; b.position.set(Math.cos(a) * 0.26, -0.09, Math.sin(a) * 0.26); g.add(b); }
+  const yawNode = new THREE.Group(); yawNode.position.y = -0.1; g.add(yawNode);
+  const post = new THREE.Mesh(new THREE.CylinderGeometry(0.08, 0.1, 0.42, 12), iron); post.position.y = 0.21; yawNode.add(post);
+  for (const x of [-0.17, 0.17]) { const fork = new THREE.Mesh(new THREE.BoxGeometry(0.05, 0.3, 0.16), red); fork.position.set(x, 0.5, 0); yawNode.add(fork); }
+  const pitchNode = new THREE.Group(); pitchNode.position.set(0, 0.55, 0); yawNode.add(pitchNode);
+  const axle = new THREE.Mesh(new THREE.CylinderGeometry(0.035, 0.035, 0.42, 8), dark); axle.rotation.z = Math.PI / 2; pitchNode.add(axle);
+  // lançador: cano grosso com bocal alargado (barrel recua no disparo)
+  const barrel = new THREE.Group(); barrel.position.z = 0.62; pitchNode.add(barrel);
+  const tube = new THREE.Mesh(new THREE.CylinderGeometry(0.075, 0.09, 1.0, 14), iron); tube.rotation.x = Math.PI / 2; tube.position.z = -0.42; barrel.add(tube);
+  const bell = new THREE.Mesh(new THREE.CylinderGeometry(0.12, 0.08, 0.14, 14, 1, true), iron); bell.rotation.x = Math.PI / 2; bell.position.z = 0.12; barrel.add(bell);
+  for (const z of [-0.75, -0.3]) { const band = new THREE.Mesh(new THREE.TorusGeometry(0.09, 0.016, 6, 16), red); band.position.z = z; barrel.add(band); }
+  const grip = new THREE.Mesh(new THREE.BoxGeometry(0.06, 0.22, 0.08), wood); grip.position.set(0, -0.15, -0.9); grip.rotation.x = 0.3; barrel.add(grip);
+  // gancho de 3 garras carregado na boca (some enquanto voa)
+  const hookTip = new THREE.Group(); hookTip.position.z = 0.2; barrel.add(hookTip);
+  const shank = new THREE.Mesh(new THREE.CylinderGeometry(0.025, 0.025, 0.32, 8), dark); shank.rotation.x = Math.PI / 2; hookTip.add(shank);
+  for (let i = 0; i < 3; i++) {
+    const claw = new THREE.Mesh(new THREE.TorusGeometry(0.09, 0.018, 6, 10, Math.PI * 0.9), dark);
+    claw.rotation.set(0, Math.PI / 2, 0); claw.rotateX(i / 3 * Math.PI * 2); claw.position.z = 0.12; hookTip.add(claw);
+  }
+  // carretel com corda e manivela do lado direito
+  const drum = new THREE.Mesh(new THREE.CylinderGeometry(0.12, 0.12, 0.16, 16), rope); drum.rotation.z = Math.PI / 2; drum.position.set(0.3, 0, -0.15); pitchNode.add(drum);
+  for (const x of [0.21, 0.39]) { const disc = new THREE.Mesh(new THREE.CylinderGeometry(0.15, 0.15, 0.02, 16), iron); disc.rotation.z = Math.PI / 2; disc.position.set(x, 0, -0.15); pitchNode.add(disc); }
+  const crank = new THREE.Mesh(new THREE.BoxGeometry(0.03, 0.22, 0.03), dark); crank.position.set(0.42, -0.08, -0.15); pitchNode.add(crank);
+  const muzzle = new THREE.Object3D(); muzzle.position.z = 0.9; pitchNode.add(muzzle);
+  g.userData.cannon = { yawNode, pitchNode, muzzle, barrel, recoil: 0, hookTip, drum };
+  return g;
+}
+
 // ---------- navio pirata ----------
 export const SHIP = { L: 18, W: 6.2, keel: -1.7, deck: 1.7 };
 // meia largura do casco ao longo do comprimento (popa reta, proa afilada)

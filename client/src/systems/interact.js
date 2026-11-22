@@ -16,7 +16,7 @@ export class Interact {
     let best = null, bd = Infinity;
     const consider = (d, o) => { if (d < bd) { bd = d; best = o; } };
     const naval = G.naval;
-    if (naval && naval.manning) return { cannon: true, label: 'Sair do canhão · clique dispara · mouse mira', run: () => naval.leave() };
+    if (naval && naval.manning) return { cannon: true, label: naval.manKind === 'gancho' ? 'Sair da torreta · clique dispara/recolhe o gancho · mouse mira' : 'Sair do canhão · clique dispara · mouse mira', run: () => naval.leave() };
 
     // Aliado caído por perto: segurar E reanima
     for (const [id, r] of G.net.remotes) {
@@ -49,11 +49,12 @@ export class Interact {
     // Canhões: usar, instalar (com o item no inventário) e consertar peças danificadas
     if (naval && G.player.aboard) {
       const boat = G.boat, [plx, plz] = boat.toLocal(p.x, p.z);
-      for (const c of naval.cannons) {
+      for (const c of naval.turrets) {
         const d = Math.hypot(c.x - plx, c.z - plz);
-        if (d < 1.9) consider(d + 0.2, { label: 'Usar canhão', run: () => naval.man(c) });
+        if (d < 1.9) consider(d + 0.2, { label: c.type === 'gancho' ? 'Usar torreta-gancho' : 'Usar canhão', run: () => naval.man(c) });
       }
-      if (G.survival.inv.canhao > 0 && naval.canInstallHere()) consider(1.6, { label: 'Instalar canhão aqui', run: () => naval.install() });
+      if (G.survival.inv.canhao > 0 && naval.canInstallHere('canhao')) consider(1.6, { label: 'Instalar canhão aqui', run: () => naval.install('canhao') });
+      if (G.survival.inv.gancho > 0 && naval.canInstallHere('gancho')) consider(1.65, { label: 'Instalar torreta-gancho aqui', run: () => naval.install('gancho') });
       let dmg = null, dd = 2.2;
       for (const piece of boat.pieces.values()) {
         if (!naval.destructible(piece)) continue;

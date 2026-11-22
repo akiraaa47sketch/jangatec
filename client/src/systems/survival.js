@@ -6,7 +6,7 @@ import { sfx } from '../core/sfx.js';
 export const ITEM_NAMES = {
   madeira: 'Madeira', metal: 'Metal', pano: 'Pano', bandagem: 'Bandagem',
   kit: 'Kit médico', municao: 'Munição', cartucho: 'Cartuchos',
-  canhao: 'Canhão improvisado', bala_canhao: 'Balas de canhão',
+  canhao: 'Canhão improvisado', gancho: 'Torreta-gancho', bala_canhao: 'Balas de canhão',
 };
 const USE = {
   bandagem: (s) => { s.vida = clamp(s.vida + 30, 0, 100); return 'Bandagem aplicada'; },
@@ -18,12 +18,13 @@ export class Survival {
   constructor(G) {
     this.G = G;
     this.vida = 100;
-    this.inv = { madeira: 0, metal: 0, pano: 0, bandagem: 0, kit: 0, municao: 0, cartucho: 0, canhao: 0, bala_canhao: 0 };
+    this.inv = { madeira: 0, metal: 0, pano: 0, bandagem: 0, kit: 0, municao: 0, cartucho: 0, canhao: 0, gancho: 0, bala_canhao: 0 };
     this.deadTimer = 0;
   }
   add(loot) {
     const parts = [];
     if (Object.keys(loot).length) sfx.pickup();
+    if (loot.arma_gancho) { loot = { ...loot, gancho: (loot.gancho || 0) + loot.arma_gancho }; delete loot.arma_gancho; } // o gancho virou torreta
     for (const k in loot) {
       if (k.startsWith('arma_')) {
         const id = k.slice(5);

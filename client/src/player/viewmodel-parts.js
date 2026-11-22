@@ -610,10 +610,10 @@ SPECS.rifle_precisao = () => {
     group: g, type: 'long', reload: 'mag', muzzle, sightY: info.sightY || 0.163, adsDist: 0.4, adsFov: 18, scope: true, flash: 1.5,
     eject: new THREE.Vector3(0.04, 0.12, 0.0),
     boltAction: true,
-    hold: { p: [0.15, -0.16, -0.42], r: [0.03, 0.09, 0] },
+    hold: { p: [0.16, -0.19, -0.47], r: [0.03, 0.07, 0] },
     gripR: { p: [0, -0.07, 0.075], r: [0, 0, -1.55], c: 0.9, idx: 0.3, th: [-0.35, -0.2, 0.2] },
-    gripL: { p: [0, 0.02, -0.42], r: [0, -1.5708, 3.1416], c: 0.8, th: [0.3, -0.3, 0.2] },
-    magPoint: [0, -0.02, -0.12],
+    gripL: { p: [0, -0.03, -0.34], r: [0, -1.5708, 3.1416], c: 0.8, th: [0.3, -0.3, 0.2] },
+    magPoint: [0, -0.05, -0.06],
     parts: { mag, bolt },
   };
 };
