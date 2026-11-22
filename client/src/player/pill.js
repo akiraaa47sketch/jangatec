@@ -184,6 +184,56 @@ function blush(g, cx, y, px) {
   }
 }
 
+// ---------- rosto animado ----------
+// O rosto fica numa camada própria logo à frente da cápsula, com 6 quadros prontos por estilo
+// (olhos abertos/fechados × boca fechada/meio aberta/aberta), compartilhados por todas as pílulas.
+const FACE_PX = 1024 / Math.PI, FACE_W = 256, FACE_H = 168;
+const FACE_EYES = {
+  tedio: [[-0.2, 0.085, 0.2, 0.12], [0.2, 0.085, 0.2, 0.12]], feliz: [[-0.19, 0.13, 0.12, 0.14], [0.19, 0.13, 0.12, 0.14]],
+  bravo: [[-0.19, 0.15, 0.13, 0.1], [0.19, 0.15, 0.13, 0.1]], surpreso: [[-0.19, 0.14, 0.14, 0.16], [0.19, 0.14, 0.14, 0.16]],
+  piscada: [[-0.19, 0.13, 0.12, 0.14]], malvado: [[-0.19, 0.15, 0.13, 0.1], [0.19, 0.15, 0.13, 0.1]],
+  louco: [[-0.19, 0.15, 0.15, 0.16], [0.19, 0.15, 0.1, 0.1]], pirata: [[0.19, 0.15, 0.12, 0.1]],
+};
+const FACE_MOUTH = { tedio: [0.245, 0.1], feliz: [0.27, 0.12], bravo: [0.31, 0.11], surpreso: [0.33, 0.08], sono: [0.26, 0.08], piscada: [0.24, 0.1], oculos: [0.32, 0.11] };
+const faceCache = new Map();
+function faceFrames(id) {
+  if (faceCache.has(id)) return faceCache.get(id);
+  const frames = [];
+  for (const closed of [0, 1]) for (const mouth of [0, 1, 2]) {
+    const c = document.createElement('canvas'); c.width = FACE_W; c.height = FACE_H;
+    const g = c.getContext('2d'), cx = FACE_W / 2, top = 2, px = FACE_PX;
+    FACE_DRAW[id](g, cx, top, px);
+    if (closed && FACE_EYES[id]) for (const [ex, ey, rx, ry] of FACE_EYES[id]) {
+      g.save(); g.globalCompositeOperation = 'destination-out';
+      g.beginPath(); g.ellipse(cx + ex * px, top + ey * px, rx * px, ry * px, 0, 0, Math.PI * 2); g.fill(); g.restore();
+      g.strokeStyle = '#151515'; g.lineWidth = 6; g.lineCap = 'round'; // olho fechado: arquinho com cílio
+      g.beginPath(); g.arc(cx + ex * px, top + (ey - 0.03) * px, rx * px * 0.7, 0.2 * Math.PI, 0.8 * Math.PI); g.stroke();
+    }
+    if (mouth && FACE_MOUTH[id]) {
+      const [my, mw] = FACE_MOUTH[id], x = cx, y = top + my * px, w = mw * px;
+      g.save(); g.globalCompositeOperation = 'destination-out';
+      g.fillRect(x - w * 1.25, y - 0.05 * px, w * 2.5, 0.12 * px); g.restore();
+      const hw = w * (0.55 + 0.25 * mouth), hh = (0.018 + 0.03 * mouth) * px;
+      g.fillStyle = '#2a0c0c'; g.beginPath(); g.ellipse(x, y + hh * 0.4, hw, hh, 0, 0, Math.PI * 2); g.fill();
+      g.fillStyle = '#d4505a'; g.beginPath(); g.ellipse(x, y + hh * 0.95, hw * 0.55, hh * 0.45, 0, 0, Math.PI * 2); g.fill();
+      g.strokeStyle = '#151515'; g.lineWidth = 4; g.beginPath(); g.ellipse(x, y + hh * 0.4, hw, hh, 0, 0, Math.PI * 2); g.stroke();
+    }
+    const t = new THREE.CanvasTexture(c); t.colorSpace = THREE.SRGBColorSpace; t.anisotropy = 4;
+    frames.push(t);
+  }
+  faceCache.set(id, frames);
+  return frames;
+}
+function makeFaceLayer(id) {
+  if (!id || !FACE_DRAW[id]) return null;
+  const frames = faceFrames(id);
+  const span = FACE_W / FACE_PX / R, hgt = FACE_H / FACE_PX, y1 = -L / 2 + (SPLIT - ARC), y0 = y1 - hgt;
+  const geo = new THREE.LatheGeometry([new THREE.Vector2(R + 0.004, y0), new THREE.Vector2(R + 0.004, y1)], 24, Math.PI - span / 2, span);
+  const mat = new THREE.MeshStandardMaterial({ map: frames[0], transparent: true, roughness: 0.35, depthWrite: false, polygonOffset: true, polygonOffsetFactor: -2 });
+  const mesh = new THREE.Mesh(geo, mat); mesh.renderOrder = 1;
+  return { mesh, frames, cur: 0 };
+}
+
 // Plástico com arranhões/manchas na cor dada; com rosto quando face != null.
 function bodyTexture(color, H, face, seed) {
   const W = 1024, c = document.createElement('canvas'); c.width = W; c.height = H;
@@ -394,8 +444,12 @@ const HATS = {
 };
 
 // ---------- montagem ----------
-export const PILL_HEIGHT = 3.24; // sola no chão (y = 0) até o topo da cápsula
-const R = 0.5, L = 1.55, ARC = Math.PI / 2 * R, TOTAL = 2 * ARC + L, SPLIT = ARC + L * 0.58, BODY_Y = 1.96;
+// Cápsula mais curta (antes L = 1,55: o personagem ficava comprido demais) e personagem de 1,45 m.
+const LEG = 0.785;
+const R = 0.5, L = 1.1, ARC = Math.PI / 2 * R, TOTAL = 2 * ARC + L, SPLIT = ARC + L * 0.58, BODY_Y = LEG + L / 2 + R * 0.8;
+export const PILL_HEIGHT = BODY_Y + L / 2 + R; // sola no chão (y = 0) até o topo da cápsula
+export const CHAR_HEIGHT = 1.45;                // altura do personagem no mundo (m)
+export const PILL_SCALE = CHAR_HEIGHT / PILL_HEIGHT;
 const SEAM_Y = -L / 2 + (SPLIT - ARC), TOP_Y = L / 2 + R;
 
 // options.npc (inimigos): aceita cores em hex (capHex, baseHex, gloveHex, bootHex), rostos e
@@ -406,9 +460,10 @@ export function makePill(options = {}) {
   const root = new THREE.Group();
   const body = new THREE.Group(); body.position.y = BODY_Y; root.add(body);
   const pxPerM = 1024 / (Math.PI * 2 * R);
-  const white = new THREE.Mesh(capsuleLathe(R, L, 0, SPLIT), plastic(0xffffff, bodyTexture(baseHex, Math.round(SPLIT * pxPerM), o.face, 7)));
+  const white = new THREE.Mesh(capsuleLathe(R, L, 0, SPLIT), plastic(0xffffff, bodyTexture(baseHex, Math.round(SPLIT * pxPerM), null, 7)));
   const red = new THREE.Mesh(capsuleLathe(R, L, SPLIT, TOTAL), plastic(0xffffff, bodyTexture(capHex, Math.round((TOTAL - SPLIT) * pxPerM), null, 3)));
   body.add(white, red);
+  const face = makeFaceLayer(o.face); if (face) body.add(face.mesh);
   const seam = new THREE.Mesh(new THREE.TorusGeometry(R + 0.004, 0.008, 6, 64), plastic(capHex));
   seam.rotation.x = Math.PI / 2; seam.position.y = SEAM_Y; body.add(seam);
 
@@ -445,15 +500,18 @@ export function makePill(options = {}) {
   }
   const hat = (HATS[o.hat] || HATS.nenhum)(o.hatColor);
   if (hat) { hat.scale.setScalar(1.3); hat.position.y = TOP_Y - 0.08; body.add(hat); parts.hat = hat; }
-  root.userData.parts = parts; root.userData.phase = 0; root.userData.pill = o;
+  root.userData.parts = parts; root.userData.phase = 0; root.userData.pill = o; root.userData.face = face;
+  root.userData.blinkT = 1 + Math.random() * 3;
   root.traverse((m) => { if (m.isMesh) { m.castShadow = true; m.receiveShadow = true; } });
   return root;
 }
 
 export function disposePill(pill) {
+  const face = pill.userData.face && pill.userData.face.mesh;
   pill.traverse((m) => {
     if (!m.isMesh) return;
     m.geometry.dispose();
+    if (m === face) { m.material.dispose(); return; } // quadros do rosto são compartilhados
     if (m.material.map) m.material.map.dispose();
     m.material.dispose();
   });
@@ -485,6 +543,20 @@ export function animatePill(pill, speed, dt, pose = 'walk', progress = 0) {
   });
   p.body.position.y = _snap[15] + (p.body.position.y - _snap[15]) * k;
   p.body.position.z = _snap[16] + (p.body.position.z - _snap[16]) * k;
+  animateFace(pill.userData, dt);
+}
+
+// Pisca de vez em quando; a boca abre conforme o volume da voz (userData.talk 0..1, chat de voz).
+function animateFace(ud, dt) {
+  const f = ud.face; if (!f) return;
+  ud.blinkT -= dt;
+  if (ud.blinkT < -0.13) ud.blinkT = 2 + Math.random() * 4 * (Math.random() < 0.2 ? 0.15 : 1); // às vezes pisca duas vezes
+  const closed = ud.blinkT < 0 ? 1 : 0;
+  const talk = ud.talk || 0;
+  ud.mouthT = (ud.mouthT || 0) + dt * 14;
+  const mouth = talk > 0.05 ? (talk * (0.6 + 0.4 * Math.sin(ud.mouthT)) > 0.45 ? 2 : 1) : 0;
+  const key = closed * 3 + mouth;
+  if (key !== f.cur) { f.cur = key; f.mesh.material.map = f.frames[key]; }
 }
 
 // userData lido aqui (o jogador preenche): mf/ms = direção do movimento relativa ao corpo (frente/lado),
@@ -681,14 +753,14 @@ function poseTargets(pill, speed, dt, pose, progress) {
   } else if (pose === 'swim') {
     if (speed > 0.5) { // crawl: corpo deitado que rola, braços em moinho, pernas batendo rápido
       const roll = Math.sin(ph) * 0.35;
-      p.body.position.y = 1.25 + Math.sin(ph * 2) * 0.03; p.body.position.z = -0.4;
+      p.body.position.y = BODY_Y - 0.71 + Math.sin(ph * 2) * 0.03; p.body.position.z = -0.4;
       p.body.rotation.set(1.3, 0, roll);
       p.armL.rotation.set(-((ph % (Math.PI * 2)) + Math.PI * 2) % (Math.PI * 2), 0, 0.25);
       p.armR.rotation.set(-((ph + Math.PI) % (Math.PI * 2)), 0, -0.25);
       p.legL.rotation.set(Math.sin(ph * 4) * 0.35, 0, 0.05); p.legR.rotation.set(-Math.sin(ph * 4) * 0.35, 0, -0.05);
     } else { // boiando em pé: braços remando para os lados, pernas pedalando
       const sc = Math.sin(ph * 1.4);
-      p.body.position.y = 1.55 + Math.sin(ph * 0.9) * 0.05; p.body.rotation.set(0.12, 0, sc * 0.05);
+      p.body.position.y = BODY_Y - 0.4 + Math.sin(ph * 0.9) * 0.05; p.body.rotation.set(0.12, 0, sc * 0.05);
       p.armL.rotation.set(-0.55 + sc * 0.25, sc * 0.4, 0.95); p.armR.rotation.set(-0.55 - sc * 0.25, -sc * 0.4, -0.95);
       p.legL.rotation.set(Math.sin(ph * 1.6) * 0.6, 0, 0.1); p.legR.rotation.set(-Math.sin(ph * 1.6) * 0.6, 0, -0.1);
     }

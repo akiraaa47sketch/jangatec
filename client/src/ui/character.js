@@ -3,7 +3,7 @@
 import * as THREE from '../three.js';
 import {
   makePill, animatePill, disposePill, sanitizePill, randomPill,
-  PILL_COLORS, PILL_BASE_COLORS, PILL_FACES, PILL_BOOTS, PILL_HATS, PILL_DEFAULT, PILL_HEIGHT,
+  PILL_COLORS, PILL_BASE_COLORS, PILL_FACES, PILL_BOOTS, PILL_HATS, PILL_DEFAULT, PILL_SCALE,
 } from '../player/pill.js';
 
 const KEY = 'mare-alta-aparencia';
@@ -95,7 +95,7 @@ export class CharacterMenu {
     }
     this.pill = null;
     const g = new THREE.Group(); g.userData.isPill = true;
-    this.pill = makePill(this.state.pill); g.add(this.pill); g.scale.setScalar(1.75 / PILL_HEIGHT);
+    this.pill = makePill(this.state.pill); g.add(this.pill); g.scale.setScalar(PILL_SCALE);
     this.holder.add(g);
   }
 

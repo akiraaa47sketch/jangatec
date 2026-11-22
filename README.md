@@ -146,6 +146,13 @@ cada um sai diferente (força, velocidade, tamanho, lado e sentido de giro sorte
   mensagem `rtc` do servidor, STUN público), voz **por proximidade em 3D** ou "rádio", aperte-para-falar
   [V] ou voz aberta com detecção de fala, volume/ganho e indicador de quem está falando no HUD.
   Sem servidor TURN: em algumas redes muito restritas a voz pode não conectar.
+- **Desempenho**: malhas paradas de ilhas, fundo do mar, naufrágios e destroços são "assadas" numa malha por
+  material (`client/src/core/bake.js`, ~63% menos draw calls); destroços a mais de 70 m dormem na física; o
+  raycast de pegar peças só olha o que está ao alcance; no máximo 1 chunk novo por quadro; sombras a 30 Hz
+  (Ultra: todo quadro). **Modos do FSR**: Nativo, Qualidade (67%), Equilibrado (59%), Desempenho (50%) e
+  Ultra desempenho (33%); as predefinições usam Desempenho/Equilibrado/Qualidade/Nativo.
+- **Personagem**: pílula mais baixa (1,45 m, cápsula mais curta) e **rosto animado** — pisca sozinho e a boca
+  mexe com o volume da voz no chat (6 quadros prontos por estilo de rosto, só troca a textura).
 - **Imersão** (menu Gráficos → Imersão, tudo opcional e salvo no navegador, fora das predefinições;
   `client/src/core/graphics.js`): tremor da câmera (0–100%, suave e com rotação), profundidade de campo
   (foco automático — no personagem em 3ª pessoa, no centro ao mirar/1ª pessoa), desfoque de movimento

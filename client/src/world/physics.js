@@ -4,6 +4,8 @@ import { rot, clamp } from '../core/util.js';
 import { waveHeight } from './ocean.js';
 
 const FIXED_STEP = 1 / 60;
+const SIM_R2 = 70 * 70; // raio (m²) em volta dos jogadores/jangada onde os destroços são simulados
+const _bLocal = new CANNON.Vec3(), _bWorld = new CANNON.Vec3(), _bOff = new CANNON.Vec3(), _bForce = new CANNON.Vec3();
 const GRAVITY = 9.82;
 const WATER_DENSITY = 1000;
 const GROUP_DEBRIS = 1;
@@ -447,18 +449,17 @@ export class Physics {
       }
       return;
     }
-    for (const x of [-size.x / 2, size.x / 2]) {
-      for (const [y, layerWeight] of [[-size.y / 2, 0.25], [0, 0.5], [size.y / 2, 0.25]]) {
-        for (const z of [-size.z / 2, size.z / 2]) {
-          const point = body.pointToWorldFrame(new CANNON.Vec3(x, y, z));
-          const depth = waveHeight(point.x, point.z, t) - point.y;
-          if (depth <= 0) continue;
-          const submerged = clamp(depth / Math.max(0.08, size.y * 0.2), 0, 1);
-          const lift = GRAVITY * WATER_DENSITY * volume * submerged * layerWeight / 4;
-          const offset = point.vsub(body.position, new CANNON.Vec3());
-          body.applyForce(new CANNON.Vec3(0, lift, 0), offset);
-        }
-      }
+    // 8 cantos (sem alocar vetores por quadro): a mesma flutuação, bem mais barata
+    const L = _bLocal, P = _bWorld, O = _bOff, F = _bForce;
+    for (let i = 0; i < 8; i++) {
+      L.set((i & 1 ? 0.5 : -0.5) * size.x, (i & 2 ? 0.25 : -0.25) * size.y, (i & 4 ? 0.5 : -0.5) * size.z);
+      body.pointToWorldFrame(L, P);
+      const depth = waveHeight(P.x, P.z, t) - P.y;
+      if (depth <= 0) continue;
+      const submerged = clamp(depth / Math.max(0.08, size.y * 0.2), 0, 1);
+      F.set(0, GRAVITY * WATER_DENSITY * volume * submerged / 8, 0);
+      P.vsub(body.position, O);
+      body.applyForce(F, O);
     }
   }
 
@@ -545,15 +546,30 @@ export class Physics {
   }
 
   update(dt, t) {
+    // Destroços longe de todos (> 70 m) dormem: não flutuam, não colidem, não custam nada.
+    const G = this.G, pp = G.player && G.player.body.pos, others = G.net ? [...G.net.remotes.values()] : [];
+    const near = (x, z) => {
+      if (pp && (x - pp.x) ** 2 + (z - pp.z) ** 2 < SIM_R2) return true;
+      if (G.boat && (x - G.boat.x) ** 2 + (z - G.boat.z) ** 2 < SIM_R2) return true;
+      for (const r of others) { const p = r.mesh.position; if (r.mesh.parent === G.scene && (x - p.x) ** 2 + (z - p.z) ** 2 < SIM_R2) return true; }
+      return false;
+    };
     for (const record of this.records.values()) {
       if (!record.active || record.kind !== 'object' || !record.obj) continue;
+      const b = record.body;
+      if (!record.holdTarget && !record.kinematic && !near(b.position.x, b.position.z)) {
+        if (b.sleepState !== CANNON.Body.SLEEPING) b.sleep();
+        record.frozen = true;
+        continue;
+      }
+      if (record.frozen) { record.frozen = false; b.wakeUp(); }
       this._applyBuoyancy(record, t);
       if (record.holdTarget) this._applyHold(record, dt);
     }
     this._syncPlayerCollider(dt);
     this.world.step(FIXED_STEP, dt, 4);
     for (const record of this.records.values()) {
-      if (!record.active) continue;
+      if (!record.active || record.frozen) continue;
       if (record.kinematic) {
         record.mesh.updateWorldMatrix(true, false);
         const position = record.mesh.getWorldPosition(new THREE.Vector3());

@@ -5,9 +5,8 @@ import { rot, clamp, lerp, lerpAngle } from '../core/util.js';
 import { CFG } from '../config.js';
 import { waveHeight } from '../world/ocean.js';
 import { makeHumanoid, animateHumanoid } from './model.js';
-import { makePill, animatePill, disposePill, PILL_DEFAULT, PILL_HEIGHT } from './pill.js';
+import { makePill, animatePill, disposePill, PILL_DEFAULT, PILL_SCALE } from './pill.js';
 
-const PILL_SCALE = 1.75 / PILL_HEIGHT;
 // tipo de empunhadura das armas de fogo em 3ª pessoa
 const GUN_TYPE = { revolver: 'pistol', pistola: 'pistol', escopeta: 'long', rifle: 'long', rifle_precisao: 'long' };
 
@@ -29,7 +28,7 @@ export class Player {
     this.swimming = false; this.mantle = null; this.dead = false; this.aboard = false;
     this.downed = false; // multiplayer: caído, se arrastando até ser reanimado
     // 1ª pessoa por padrão; [F] alterna. O corpo some só para o próprio jogador.
-    this.firstPerson = true; this.fovSens = 1; this.eyeHeight = 1.6;
+    this.firstPerson = true; this.fovSens = 1; this.eyeHeight = 1.38;
     this.zoom = 5.2;          // distância da câmera em 3ª pessoa ([I] aproxima, [O] afasta)
     this.aimHold = 0;         // depois de um tiro "do quadril", segura a pose de mira um instante
     this.kick = 0;            // recuo visual dos braços em 3ª pessoa
@@ -279,6 +278,7 @@ export class Player {
       pd.useItem = this.useAnim ? this.useAnim.item : null;
       pd.hurt = this.hurtT; pd.hurtSide = this.hurtSide || 1; pd.squash = this.squash; pd.strum = this.strumK;
       pd.vaultSide = 1;
+      pd.talk = G.voice && G.voice.talking ? Math.min(1, G.voice.level * 30) : 0; // boca mexe com a voz
       this.anim = { pose: pose === 'climb' || pose === 'vault' ? pose : pose, progress, armed: pd.armed };
       if (this.flashMesh) {
         this.flashT -= dt; this.flashMesh.visible = this.flashT > 0;
@@ -294,7 +294,7 @@ export class Player {
     const G = this.G, cam = G.camera, vm = G.viewmodel;
     this.mesh.updateWorldMatrix(true, false);
     this.mesh.getWorldPosition(_v);
-    this.eyeHeight += ((this.dead ? 0.35 : this.downed ? 0.5 : 1.6) - this.eyeHeight) * Math.min(1, 6 * dt);
+    this.eyeHeight += ((this.dead ? 0.35 : this.downed ? 0.5 : 1.38) - this.eyeHeight) * Math.min(1, 6 * dt);
     _v.y += this.eyeHeight + (vm ? vm.camOff.y : 0);
     this.camTarget.copy(_v);
     this.camDist = 0;
@@ -336,7 +336,7 @@ export class Player {
     if (this.firstPerson) { this.updateFirstPersonCamera(dt, t); return; }
     const G = this.G, cam = G.camera, aiming = G.combat.aiming;
     this.mesh.updateWorldMatrix(true, false);
-    this.mesh.getWorldPosition(_v); _v.y += this.downed ? 0.7 : 1.6;
+    this.mesh.getWorldPosition(_v); _v.y += this.downed ? 0.7 : 1.4;
     this.camTarget.lerp(_v, 1 - Math.exp(-20 * dt));
     // zoom da 3ª pessoa: [I] aproxima, [O] afasta (mira sempre puxa para perto do ombro)
     const typing = G.tools && G.tools.menuOpen;

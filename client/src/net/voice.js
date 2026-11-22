@@ -156,6 +156,7 @@ export class Voice {
         talk = this.hang > 0;
       }
       this.talking = talk && !G.player.dead;
+      if (this.settings.mode === 'ptt') this.level = this.talking ? this.micLevel() : 0;
       this.track.enabled = this.talking;
     } else this.talking = false;
     // posição 3D de cada voz
@@ -174,7 +175,8 @@ export class Voice {
         else { c.pan.positionX.value = wp.x; c.pan.positionY.value = wp.y; c.pan.positionZ.value = wp.z; }
         c.an.getFloatTimeDomainData(c.buf);
         let s = 0; for (let i = 0; i < c.buf.length; i += 4) s += c.buf[i] * c.buf[i];
-        p.speaking = Math.sqrt(s / (c.buf.length / 4)) > 0.012 ? 0.4 : Math.max(0, p.speaking - dt);
+        p.level = Math.sqrt(s / (c.buf.length / 4));
+        p.speaking = p.level > 0.012 ? 0.4 : Math.max(0, p.speaking - dt);
       }
     }
     this._hud();

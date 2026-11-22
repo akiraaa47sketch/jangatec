@@ -14,12 +14,17 @@ import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js'
 import { FullScreenQuad } from 'three/addons/postprocessing/Pass.js';
 
 export const GFX_PRESETS = {
-  baixo: { scale: 0.6, upscaler: 'fsr', sharpness: 0.45, shadows: 'off', msaa: 0, bloom: false, view: 1, water: 'baixa', grade: false, pixelCap: 1 },
-  medio: { scale: 0.75, upscaler: 'fsr', sharpness: 0.35, shadows: 'baixa', msaa: 0, bloom: false, view: 2, water: 'media', grade: true, pixelCap: 1.5 },
-  alto: { scale: 1, upscaler: 'fsr', sharpness: 0.2, shadows: 'alta', msaa: 4, bloom: true, view: 2, water: 'alta', grade: true, pixelCap: 2 },
+  // escala = modo do FSR: baixo → Desempenho, médio → Equilibrado, alto → Qualidade, ultra → nativo
+  baixo: { scale: 0.5, upscaler: 'fsr', sharpness: 0.5, shadows: 'off', msaa: 0, bloom: false, view: 1, water: 'baixa', grade: false, pixelCap: 1 },
+  medio: { scale: 0.59, upscaler: 'fsr', sharpness: 0.4, shadows: 'baixa', msaa: 0, bloom: false, view: 2, water: 'media', grade: true, pixelCap: 1 },
+  alto: { scale: 0.67, upscaler: 'fsr', sharpness: 0.3, shadows: 'alta', msaa: 4, bloom: true, view: 2, water: 'alta', grade: true, pixelCap: 1.5 },
   ultra: { scale: 1, upscaler: 'fsr', sharpness: 0.25, shadows: 'ultra', msaa: 8, bloom: true, view: 3, water: 'ultra', grade: true, pixelCap: 2 },
 };
+// Modos do FSR (como no FSR 2/3 da AMD): fração da resolução em que a cena é desenhada.
+export const FSR_MODES = { nativo: 1, qualidade: 0.67, equilibrado: 0.59, desempenho: 0.5, ultra: 0.33 };
+export const fsrModeOf = (scale) => Object.keys(FSR_MODES).find((k) => Math.abs(FSR_MODES[k] - scale) < 0.005) || 'custom';
 export const GFX_LABELS = {
+  fsr: { nativo: 'Nativo (100%)', qualidade: 'Qualidade (67%)', equilibrado: 'Equilibrado (59%)', desempenho: 'Desempenho (50%)', ultra: 'Ultra desempenho (33%)', custom: 'Personalizado' },
   preset: { baixo: 'Baixo', medio: 'Médio', alto: 'Alto', ultra: 'Ultra (no talo)', custom: 'Personalizado' },
   upscaler: { fsr: 'FSR 1 (EASU + RCAS)', bilinear: 'Bilinear simples' },
   shadows: { off: 'Desligadas', baixa: 'Baixas (1024)', media: 'Médias (2048)', alta: 'Altas (2048, suaves)', ultra: 'Ultra (4096, suaves, longe)' },
@@ -126,7 +131,7 @@ void main() {
 const FX_FRAG = /* glsl */`
 uniform sampler2D tColor; uniform sampler2D tDepth; uniform sampler2D tFocus;
 uniform vec2 uSize; uniform float uNear; uniform float uFar; uniform float uDof; uniform float uMaxR; uniform float uAperture;
-uniform float uMotion; uniform mat4 uInvProj; uniform mat4 uInvView; uniform mat4 uPrevViewProj;
+uniform float uMotion; uniform float uTaps; uniform mat4 uInvProj; uniform mat4 uInvView; uniform mat4 uPrevViewProj;
 varying vec2 vUv;
 float lin(float d) { float z = d * 2.0 - 1.0; return 2.0 * uNear * uFar / (uFar + uNear - z * (uFar - uNear)); }
 float coc(float depth, float focus) { return clamp(uAperture * abs(1.0 - focus / max(depth, 0.01)), 0.0, 1.0); }
@@ -139,8 +144,9 @@ void main() {
     if (r0 > 0.5) {
       vec3 acc = col; float wsum = 1.0;
       const float GA = 2.39996323;
-      for (int i = 1; i < 30; i++) {
-        float fi = float(i), rr = sqrt(fi / 30.0) * r0, a = fi * GA;
+      for (int i = 1; i < 24; i++) {
+        if (float(i) >= uTaps) break;
+        float fi = float(i), rr = sqrt(fi / uTaps) * r0, a = fi * GA;
         vec2 o = vec2(cos(a), sin(a)) * rr / uSize;
         float ds = lin(texture2D(tDepth, vUv + o).r);
         float cs = coc(ds, focus) * uMaxR;
@@ -207,6 +213,9 @@ export class Graphics {
   constructor(G, { renderer, scene, camera, sun, mobile }) {
     Object.assign(this, { G, renderer, scene, camera, sun, mobile });
     this.settings = this.load();
+    // quem está numa predefinição recebe os valores atuais dela (ficaram mais leves nesta versão)
+    if (GFX_PRESETS[this.settings.preset]) Object.assign(this.settings, GFX_PRESETS[this.settings.preset]);
+    this.frameN = 0;
     this.fps = { frames: 0, acc: 0, value: 0, ms: 0 };
     this.fullRT = new THREE.WebGLRenderTarget(1, 1, { type: THREE.HalfFloatType, depthBuffer: false });
     this.easu = new FullScreenQuad(new THREE.ShaderMaterial({
@@ -225,7 +234,7 @@ export class Graphics {
       uniforms: {
         tColor: { value: null }, tDepth: { value: null }, tFocus: { value: null }, uSize: { value: new THREE.Vector2() },
         uNear: { value: 0.1 }, uFar: { value: 600 }, uDof: { value: 0 }, uMaxR: { value: 4 }, uAperture: { value: 1 },
-        uMotion: { value: 0 }, uInvProj: { value: new THREE.Matrix4() }, uInvView: { value: new THREE.Matrix4() }, uPrevViewProj: { value: new THREE.Matrix4() },
+        uMotion: { value: 0 }, uTaps: { value: 12 }, uInvProj: { value: new THREE.Matrix4() }, uInvView: { value: new THREE.Matrix4() }, uPrevViewProj: { value: new THREE.Matrix4() },
       },
       vertexShader: VERT, fragmentShader: FX_FRAG, depthTest: false, depthWrite: false, toneMapped: false,
     }));
@@ -252,7 +261,7 @@ export class Graphics {
     const pick = (k, ok) => (ok(s[k]) ? s[k] : d[k]);
     return {
       preset: pick('preset', (v) => v in GFX_PRESETS || v === 'custom'),
-      scale: pick('scale', (v) => Number.isFinite(v) && v >= 0.5 && v <= 1),
+      scale: pick('scale', (v) => Number.isFinite(v) && v >= 0.33 && v <= 1),
       upscaler: pick('upscaler', (v) => v in GFX_LABELS.upscaler),
       sharpness: pick('sharpness', (v) => Number.isFinite(v) && v >= 0 && v <= 2),
       shadows: pick('shadows', (v) => v in SHADOW),
@@ -273,6 +282,7 @@ export class Graphics {
     };
   }
   save() { try { localStorage.setItem(KEY, JSON.stringify(this.settings)); } catch { /* sem armazenamento */ } }
+  setFsrMode(mode) { if (FSR_MODES[mode]) this.set('scale', FSR_MODES[mode]); }
 
   setPreset(name) {
     if (!GFX_PRESETS[name]) return;
@@ -356,6 +366,9 @@ export class Graphics {
   render(dt) {
     const r = this.renderer, s = this.settings, cam = this.camera, G = this.G;
     this.time += dt;
+    // sombras: recalculadas a cada 2 quadros (no Ultra, todo quadro) — o sol quase não se mexe
+    this.frameN++;
+    if (r.shadowMap.enabled) { r.shadowMap.autoUpdate = false; r.shadowMap.needsUpdate = s.shadows === 'ultra' || (this.frameN & 1) === 0; }
     this.composer.render(dt);
     const eu = this.easu.material.uniforms;
     let src = this.composer.readBuffer.texture;
@@ -377,6 +390,7 @@ export class Graphics {
       fu.uDof.value = dof ? 1 : 0;
       fu.uMaxR.value = (s.dof === 'forte' ? 7 : 3.5) * Math.max(0.6, k);
       fu.uAperture.value = s.dof === 'forte' ? 0.55 : 0.3;
+      fu.uTaps.value = s.dof === 'forte' ? 24 : 12;
       fu.tColor.value = src; fu.tDepth.value = depthTex; fu.uNear.value = cam.near; fu.uFar.value = cam.far;
       // desfoque só da ROTAÇÃO da câmera (andar de barco não borra a jangada)
       cam.updateMatrixWorld();

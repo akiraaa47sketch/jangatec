@@ -71,7 +71,7 @@ export class Build {
     const G = this.G;
     const targets = this._rayTargets(true);
     this._setRayFromCursor();
-    this.ray.far = Infinity;
+    this.ray.far = PICKUP_DISTANCE + 6;
     const hit = this.ray.intersectObjects(targets, true)[0];
     let target = null;
     if (hit) {
@@ -161,16 +161,18 @@ export class Build {
 
   _rayTargets(includePickupHitboxes = false) {
     const G = this.G;
-    const targets = new Set(G.solids);
+    const targets = new Set(G.solids), pp = G.player.body.pos, reach2 = (PICKUP_DISTANCE + 4) ** 2;
     for (const obj of G.world.physObjects) {
       if (obj === this.held || obj.carriedBy || obj.welded || !obj.mesh.visible) continue;
+      // para pegar, só interessa o que está ao alcance (antes testava todos os ~200 destroços por quadro)
+      if (includePickupHitboxes && (obj.mesh.position.x - pp.x) ** 2 + (obj.mesh.position.z - pp.z) ** 2 > reach2 && obj.mesh.parent === G.scene) continue;
       targets.add(obj.mesh);
       if (includePickupHitboxes) {
         const hitbox = this._pickupHitbox(obj);
         if (hitbox) targets.add(hitbox);
       }
     }
-    if (G.ocean && G.ocean.mesh) targets.add(G.ocean.mesh);
+    if (G.ocean && G.ocean.mesh && !includePickupHitboxes) targets.add(G.ocean.mesh); // o mar não importa para pegar peças
     if (this.held) {
       for (const object of Array.from(targets)) {
         let parent = object;
