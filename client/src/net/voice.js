@@ -1,4 +1,4 @@
-// Chat de voz (VOIP) entre os jogadores da sala, por WebRTC (áudio P2P em malha, até 4 pessoas).
+// Chat de voz (VOIP) entre os jogadores da sala, por WebRTC (áudio P2P em malha, até 6 pessoas).
 //   • A sinalização (oferta/resposta/ICE) passa pelo servidor do jogo (mensagem 'rtc').
 //   • Voz por PROXIMIDADE em 3D: o som vem da posição do aliado e some com a distância (~40 m);
 //     opção de ouvir todo mundo igual ("rádio").

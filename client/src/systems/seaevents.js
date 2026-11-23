@@ -25,39 +25,107 @@ const smooth = (x) => { x = clamp(x, 0, 1); return x * x * (3 - 2 * x); };
 const _v = new THREE.Vector3(), _w = new THREE.Vector3();
 
 // ---------------- modelos ----------------
-const SEG = 8, SEG_L = 0.78;
+const SEG = 12, SEG_L = 0.55, BEND = 8 / SEG; // BEND: a dobra por junta é calibrada para 8 juntas
+// Pele do kraken: roxo-avermelhado manchado (textura de manchas compartilhada)
+let krakenTex = null;
+function krakenSkin() {
+  if (krakenTex) return krakenTex;
+  const c = document.createElement('canvas'); c.width = c.height = 256;
+  const g = c.getContext('2d');
+  g.fillStyle = '#ffffff'; g.fillRect(0, 0, 256, 256);
+  let s = 7; const rnd = () => ((s = (s * 16807) % 2147483647) / 2147483647);
+  for (let i = 0; i < 220; i++) { // manchas escuras e sardas claras
+    const x = rnd() * 256, y = rnd() * 256, r = 2 + rnd() * 10;
+    g.fillStyle = rnd() < 0.7 ? `rgba(60,10,40,${0.25 + rnd() * 0.35})` : `rgba(255,220,230,${0.2 + rnd() * 0.25})`;
+    g.beginPath(); g.ellipse(x, y, r, r * (0.6 + rnd() * 0.6), rnd() * 3, 0, Math.PI * 2); g.fill();
+  }
+  krakenTex = new THREE.CanvasTexture(c); krakenTex.wrapS = krakenTex.wrapT = THREE.RepeatWrapping;
+  return krakenTex;
+}
+// Cilindro com cor por vértice: dorso escuro, parte de dentro (ventosas, +Z) rosada
+function skinCylinder(r1, r0, h) {
+  const geo = new THREE.CylinderGeometry(r1, r0, h, 16, 2), pos = geo.attributes.position, col = new Float32Array(pos.count * 3);
+  const top = new THREE.Color(0x5e1f45), under = new THREE.Color(0xe7a4a0), c = new THREE.Color();
+  for (let i = 0; i < pos.count; i++) {
+    const x = pos.getX(i), z = pos.getZ(i), r = Math.hypot(x, z) || 1, k = Math.max(0, z / r);
+    c.copy(top).lerp(under, Math.pow(k, 1.6) * 0.85);
+    col[i * 3] = c.r; col[i * 3 + 1] = c.g; col[i * 3 + 2] = c.b;
+  }
+  geo.setAttribute('color', new THREE.BufferAttribute(col, 3));
+  return geo;
+}
 function makeTentacle() {
-  const skin = new THREE.MeshStandardMaterial({ color: 0x6a2c4e, roughness: 0.45, metalness: 0.05 });
-  const belly = new THREE.MeshStandardMaterial({ color: 0xe0b0a8, roughness: 0.6 });
+  const map = krakenSkin().clone(); map.needsUpdate = true; map.repeat.set(1, 0.5);
+  const skin = new THREE.MeshStandardMaterial({ vertexColors: true, map, roughness: 0.38, metalness: 0.05 });
+  const sucker = new THREE.MeshStandardMaterial({ color: 0xf2c4bd, roughness: 0.55 });
+  const cup = new THREE.MeshStandardMaterial({ color: 0x8a3a52, roughness: 0.7 });
   const root = new THREE.Group(), segs = [];
   let parent = root;
+  const rad = (i) => 0.52 * Math.pow(1 - i / SEG, 0.85) + 0.04;
   for (let i = 0; i < SEG; i++) {
-    const r0 = 0.5 * (1 - i / SEG) + 0.07, r1 = 0.5 * (1 - (i + 1) / SEG) + 0.05;
+    const r0 = rad(i), r1 = rad(i + 1);
     const g = new THREE.Group();
-    const m = new THREE.Mesh(new THREE.CylinderGeometry(r1, r0, SEG_L, 10), skin);
-    m.position.y = SEG_L / 2; g.add(m);
-    for (let k = 0; k < 2; k++) { // ventosas na parte de dentro (virada para a jangada)
-      const s = new THREE.Mesh(new THREE.SphereGeometry(r1 * 0.42, 8, 6), belly);
-      s.scale.set(1, 1, 0.45); s.position.set(0, SEG_L * (0.3 + k * 0.4), r0 * 0.9); g.add(s);
+    const m = new THREE.Mesh(skinCylinder(r1, r0, SEG_L), skin); m.position.y = SEG_L / 2; g.add(m);
+    const joint = new THREE.Mesh(new THREE.SphereGeometry(r0 * 0.98, 16, 10), skin); g.add(joint); // esconde a emenda entre os pedaços
+    for (let k = 0; k < 2; k++) { // ventosas em fila na parte de dentro
+      const rr = r0 * (0.42 - k * 0.06), y = SEG_L * (0.28 + k * 0.45);
+      const ring = new THREE.Mesh(new THREE.TorusGeometry(rr, rr * 0.32, 6, 14), sucker); ring.position.set(0, y, r0 * 0.88 - k * 0.02); g.add(ring);
+      const hole = new THREE.Mesh(new THREE.CircleGeometry(rr * 0.75, 12), cup); hole.position.set(0, y, r0 * 0.9 - k * 0.02 + 0.005); g.add(hole);
     }
     if (i) g.position.y = SEG_L;
     parent.add(g); segs.push(g); parent = g;
   }
-  const tipGlow = new THREE.MeshStandardMaterial({ color: 0x6a2c4e, emissive: 0xff3020, emissiveIntensity: 0 });
-  segs[SEG - 1].children[0].material = tipGlow;
+  // ponta fina e curvada
+  const tipGlow = new THREE.MeshStandardMaterial({ color: 0x6a2048, emissive: 0xff3020, emissiveIntensity: 0, roughness: 0.4 });
+  const tip = new THREE.Mesh(new THREE.ConeGeometry(rad(SEG) + 0.02, 0.55, 12), tipGlow); tip.position.y = SEG_L + 0.25; segs[SEG - 1].add(tip);
   root.userData = { segs, skin, tipGlow };
   return root;
 }
+// Cabeça: manto bulboso e irregular, dois olhos dourados com pupila em fenda e pálpebras, e
+// tentáculos curtos se mexendo na base.
 function makeKrakenHead() {
   const g = new THREE.Group();
-  const skin = new THREE.MeshStandardMaterial({ color: 0x5a2442, roughness: 0.5 });
-  const dome = new THREE.Mesh(new THREE.SphereGeometry(2.6, 24, 16), skin); dome.scale.set(1, 1.35, 1); g.add(dome);
-  const white = new THREE.MeshStandardMaterial({ color: 0xf2e6a8, emissive: 0x6a5a10, emissiveIntensity: 0.6, roughness: 0.3 });
-  const eye = new THREE.Mesh(new THREE.SphereGeometry(0.85, 20, 14), white); eye.position.set(0, 0.6, 2.3); g.add(eye);
-  const pupil = new THREE.Mesh(new THREE.SphereGeometry(0.42, 14, 10), new THREE.MeshStandardMaterial({ color: 0x120808, roughness: 0.2 }));
-  pupil.scale.set(0.45, 1, 0.5); pupil.position.set(0, 0, 0.7); eye.add(pupil);
-  g.userData = { eye, skin };
+  const map = krakenSkin().clone(); map.needsUpdate = true; map.repeat.set(2, 2);
+  const skin = new THREE.MeshStandardMaterial({ color: 0x7a2a58, map, roughness: 0.35, metalness: 0.05 });
+  const geo = new THREE.SphereGeometry(2.6, 40, 28), pos = geo.attributes.position;
+  for (let i = 0; i < pos.count; i++) { // manto alongado para trás, com rugas
+    let x = pos.getX(i), y = pos.getY(i), z = pos.getZ(i);
+    const n = 1 + 0.05 * Math.sin(x * 2.1 + y * 1.3) + 0.04 * Math.sin(z * 2.7 - y * 1.9);
+    y *= 1.35; z -= Math.max(0, y) * 0.35; // inclina o "capuz" para trás
+    pos.setXYZ(i, x * n, y * n, z * n);
+  }
+  geo.computeVertexNormals();
+  const mantle = new THREE.Mesh(geo, skin); mantle.position.y = 0.8; g.add(mantle);
+  const iris = new THREE.MeshStandardMaterial({ color: 0xf2c23a, emissive: 0x8a5a00, emissiveIntensity: 0.7, roughness: 0.2 });
+  const slit = new THREE.MeshStandardMaterial({ color: 0x0a0505, roughness: 0.1 });
+  const lidM = new THREE.MeshStandardMaterial({ color: 0x5a1c40, map, roughness: 0.4 });
+  const eyes = [], lids = [];
+  for (const s of [-1, 1]) {
+    const socket = new THREE.Group(); socket.position.set(s * 1.45, 0.1, 1.85); socket.rotation.y = s * 0.45; g.add(socket);
+    const eye = new THREE.Mesh(new THREE.SphereGeometry(0.62, 22, 16), iris); socket.add(eye);
+    const pupil = new THREE.Mesh(new THREE.SphereGeometry(0.4, 14, 10), slit); pupil.scale.set(1.25, 0.28, 0.5); pupil.position.z = 0.42; eye.add(pupil);
+    const lid = new THREE.Mesh(new THREE.SphereGeometry(0.68, 20, 12, 0, Math.PI * 2, 0, Math.PI * 0.5), lidM); lid.rotation.x = -0.35; socket.add(lid);
+    const brow = new THREE.Mesh(new THREE.TorusGeometry(0.66, 0.12, 8, 18, Math.PI), skin); brow.rotation.set(0, 0, 0); brow.position.y = 0.08; socket.add(brow);
+    eyes.push(eye); lids.push(lid);
+  }
+  const stubs = [];
+  for (let i = 0; i < 8; i++) { // tentáculos curtos em volta da base
+    const a = i / 8 * Math.PI * 2, st = new THREE.Group(); st.position.set(Math.cos(a) * 1.9, -1.4, Math.sin(a) * 1.9); st.rotation.y = -a + Math.PI / 2; g.add(st);
+    let par = st;
+    for (let k = 0; k < 4; k++) {
+      const r = 0.42 - k * 0.09, seg = new THREE.Group(); if (k) seg.position.y = 0.5; par.add(seg);
+      const m = new THREE.Mesh(skinCylinder(r - 0.08, r, 0.55), new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.4 })); m.position.y = 0.27; seg.add(m);
+      seg.add(new THREE.Mesh(new THREE.SphereGeometry(r, 10, 8), skin)); par = seg; stubs.push({ seg, k, i });
+    }
+  }
+  g.userData = { eye: eyes[0], eyes, lids, stubs, skin, t: Math.random() * 10 };
   return g;
+}
+function animateKrakenHead(m, dt) {
+  const u = m.userData; u.t += dt;
+  const blink = (u.t % 4.3) < 0.18 ? 1 : 0; // pisca de vez em quando
+  u.lids.forEach((l) => { l.rotation.x += ((blink ? 0.55 : -0.35) - l.rotation.x) * Math.min(1, dt * 20); });
+  u.stubs.forEach((s) => { s.seg.rotation.x = Math.sin(u.t * 2 + s.i * 0.8 + s.k * 0.6) * 0.35 + 0.25; });
 }
 function makeShark() {
   const g = new THREE.Group(), body = new THREE.Group();
@@ -155,7 +223,7 @@ export class SeaEvents {
     for (let i = 0; i < n; i++) {
       const ang = a0 + (i / n) * Math.PI * 2 + (r() - 0.5) * 0.5;
       const mesh = makeTentacle(); G.scene.add(mesh);
-      const hp = B.tentHp[0] + (B.tentHp[1] - B.tentHp[0]) * diff / 4;
+      const hp = (B.tentHp[0] + (B.tentHp[1] - B.tentHp[0]) * diff / 4) * G.enemies.partyMul();
       const c = G.enemies.addCreature({
         id: `${e.id}-t${i}`, mesh, hp, max: hp, def: { nome: 'Tentáculo' },
         body: { pos: new THREE.Vector3() }, ang, st: 'under', stT: 1 + i * 0.9 + r() * 1.5, rise: 0, ph: r() * 6, bend: 0, tilt: 0, cd: 0,
@@ -164,7 +232,7 @@ export class SeaEvents {
       e.creatures.push(c);
     }
     e.headT = 22; e.alive = n;
-    const eyeHp = B.eyeHp[0] + (B.eyeHp[1] - B.eyeHp[0]) * diff / 4;
+    const eyeHp = (B.eyeHp[0] + (B.eyeHp[1] - B.eyeHp[0]) * diff / 4) * G.enemies.partyMul(true);
     const hm = makeKrakenHead(); hm.visible = false; hm.position.y = -80; G.scene.add(hm);
     e.head = G.enemies.addCreature({ id: `${e.id}-eye`, mesh: hm, hp: eyeHp, max: eyeHp, def: { nome: 'Olho do kraken' }, body: { pos: new THREE.Vector3(0, -50, 0) },
       up: 0, side: r() < 0.5 ? 1 : -1, immune: true,
@@ -182,7 +250,7 @@ export class SeaEvents {
   // posição das juntas (no plano do tentáculo): retorna [ [d, y], ... ] relativos à base
   _fk(tilt, bend, n = SEG) {
     const out = []; let a = tilt, d = 0, y = 0;
-    for (let i = 0; i < n; i++) { d += Math.sin(a) * SEG_L; y += Math.cos(a) * SEG_L; out.push([d, y]); a += bend; }
+    for (let i = 0; i < n; i++) { d += Math.sin(a) * SEG_L; y += Math.cos(a) * SEG_L; out.push([d, y]); a += bend * BEND; }
     return out;
   }
   _tentacle(e, c, dt) {
@@ -220,7 +288,7 @@ export class SeaEvents {
     m.position.set(A.x, A.y - (1 - k) * 7, A.z);
     m.rotation.set(0, A.yaw, 0);
     const segs = m.userData.segs, wig = c.st === 'grab' ? 0.02 : 0.06;
-    segs.forEach((s, i) => { s.rotation.set((i === 0 ? c.tilt : c.bend) + Math.sin(t * 2.4 + i * 0.7 + c.ph) * wig, 0, Math.sin(t * 1.7 + i * 0.5 + c.ph) * wig * 0.6); });
+    segs.forEach((s, i) => { s.rotation.set((i === 0 ? c.tilt : c.bend * BEND) + Math.sin(t * 2.4 + i * 0.7 + c.ph) * wig * BEND, 0, Math.sin(t * 1.7 + i * 0.5 + c.ph) * wig * 0.6 * BEND); });
     // ponto acertável: a junta mais perto da altura do peito do jogador
     m.updateMatrixWorld(true);
     const pp = G.player.body.pos; let best = 1e9;
@@ -285,6 +353,7 @@ export class SeaEvents {
       const [x, z] = boat.toWorld(h.side * (boat.set.radius + 7), 0);
       h.mesh.position.set(x, sea.level - 4.2 + u * 4.6 + Math.sin(t * 1.4) * 0.15, z);
       h.mesh.rotation.y = Math.atan2(boat.x - x, boat.z - z);
+      animateKrakenHead(h.mesh, dt);
       h.mesh.userData.eye.getWorldPosition(h.body.pos); h.body.pos.y -= 1;
       if (h.upping <= 0) { h.upping = 0; h.immune = true; h.mesh.visible = false; h.mesh.position.y = -80; h.body.pos.y = -80; e.headT = 14 + e.r() * 6; }
     }
@@ -323,7 +392,7 @@ export class SeaEvents {
     for (let i = 0; i < n; i++) {
       const mesh = makeShark(); G.scene.add(mesh);
       const c = G.enemies.addCreature({
-        id: `${e.id}-s${i}`, mesh, hp: B.hp, max: B.hp, def: { nome: 'Tubarão' }, body: { pos: new THREE.Vector3() },
+        id: `${e.id}-s${i}`, mesh, hp: B.hp * G.enemies.partyMul(), max: B.hp * G.enemies.partyMul(), def: { nome: 'Tubarão' }, body: { pos: new THREE.Vector3() },
         a: r() * 6.28, R: 9 + r() * 6, spd: 0.25 + r() * 0.15, dir: r() < 0.5 ? 1 : -1, st: 'circle', stT: 6 + r() * 8, x: 0, z: 0, dive: 0, bite: 0,
         ai: { update: (c2, dt2) => this._shark(e, c2, dt2), onDeath: (c2, by) => this._sharkDead(e, c2, by) },
       });

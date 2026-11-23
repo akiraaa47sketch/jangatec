@@ -58,7 +58,7 @@ export class Inventory {
   cell(kind, id, extra = '') {
     const c = this.G.combat, inv = this.G.survival.inv;
     if (kind === 'w') {
-      const w = wOf(id), ammo = w.ammo ? `<em>${c.mags[id] || 0}</em>` : '';
+      const w = wOf(id), ammo = w.ammo || w.noReload ? `<em>${c.mags[id] || 0}</em>` : '';
       return `<div class="inv-item w${id === c.weaponId ? ' eq' : ''}${this.sel && this.sel.id === id ? ' sel' : ''}" data-kind="w" data-id="${id}" style="--rar:${RARITY[w.stars]}" ${extra}>` +
         `<span class="nm">${short(w.nome)}</span><span class="st">${'★'.repeat(w.stars)}</span>${ammo}</div>`;
     }
@@ -80,7 +80,7 @@ export class Inventory {
     if (!s || (s.kind === 'w' ? !c.owned.has(s.id) : !(inv[s.id] > 0))) { this.sel = null; box.innerHTML = '<p class="inv-tip">Clique num item para ver detalhes. Arraste para organizar a barra rápida, ou para a faixa abaixo para largar no chão.</p>'; return; }
     let html;
     if (s.kind === 'w') {
-      const w = wOf(s.id), stats = w.ammo ? `Dano ${w.dmg}${w.pellets > 1 ? '×' + w.pellets : ''} · pente ${w.mag} · ${ITEM_NAMES[w.ammo]}` : w.tool ? 'Ferramenta' : `Corpo a corpo · dano ${w.dmg}`;
+      const w = wOf(s.id), stats = w.noReload ? `Dano ${w.dmg} · ${c.mags[s.id] || 0} balas · sem recarga (gira antes de atirar)` : w.ammo ? `Dano ${w.dmg}${w.pellets > 1 ? '×' + w.pellets : ''} · pente ${w.mag} · ${ITEM_NAMES[w.ammo]}` : w.tool ? 'Ferramenta' : `Corpo a corpo · dano ${w.dmg}`;
       html = `<div class="inv-dh"><b style="color:${RARITY[w.stars]}">${w.nome}</b><span>${'★'.repeat(w.stars)}</span></div><p>${stats}</p>` +
         `<div class="inv-btns">${s.id === c.weaponId ? '' : '<button type="button" data-do="equip">Equipar</button>'}<button type="button" data-do="drop">Largar</button></div>`;
     } else {
@@ -105,8 +105,8 @@ export class Inventory {
 
   // ---------- largar ----------
   dropWeapon(id) {
-    const G = this.G;
-    if (G.combat.removeWeapon(id)) G.drops.drop({ ['arma_' + id]: 1 });
+    const G = this.G, w = wOf(id), n = w && w.noReload ? G.combat.mags[id] || 0 : 1; // minigun leva as balas junto
+    if (G.combat.removeWeapon(id) && n > 0) G.drops.drop({ ['arma_' + id]: n });
   }
   dropItem(id, n) {
     const k = this.G.survival.take(id, n);

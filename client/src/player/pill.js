@@ -756,11 +756,12 @@ function poseTargets(pill, speed, dt, pose, progress) {
     p.armR.rotation.set(-2.9 + 2.2 * k2, 0, -0.25); p.armL.rotation.set(-2.9 + 2.2 * k2, 0, 0.25);
     p.body.rotation.set(-0.22 + 0.55 * k2, 0, 0); p.body.position.y = BODY_Y - 0.16 * k2;
     p.legL.rotation.set(-0.6 * k2, 0, 0.1); p.legR.rotation.set(0.45 * k2, 0, -0.1);
-  } else if (pose === 'guard') { // guarda: luvas na frente do rosto, joelhos flexionados, balança
-    const bob = Math.sin(ph * 1.5) * 0.02;
-    p.armR.rotation.set(-1.9, 0.5, -0.9); p.armL.rotation.set(-1.9, -0.5, 0.9);
-    p.body.rotation.set(0.14, -0.1, 0); p.body.position.y = BODY_Y - 0.1 + bob;
-    p.legL.rotation.set(-0.3, 0, 0.12); p.legR.rotation.set(0.25, 0, -0.12);
+  } else if (pose === 'guard') { // guarda: base firme; com arma, ela fica atravessada na frente (as duas mãos)
+    const bob = Math.sin(ph * 1.5) * 0.02, hit = Math.sin(Math.min(1, progress) * Math.PI * 0.5) * (progress > 0 ? 1 : 0);
+    if (armed === 'melee' || armed === 'tool') { p.armR.rotation.set(-1.45 + 0.35 * hit, 0.95, -0.15); p.armL.rotation.set(-1.4 + 0.35 * hit, -0.95, 0.35); }
+    else { p.armR.rotation.set(-1.9 + 0.3 * hit, 0.5, -0.9); p.armL.rotation.set(-1.9 + 0.3 * hit, -0.5, 0.9); }
+    p.body.rotation.set(0.16 - 0.3 * hit, -0.12, 0); p.body.position.y = BODY_Y - 0.12 + bob; p.body.position.z = -0.14 * hit; // tranco para trás ao bloquear
+    p.legL.rotation.set(-0.35, 0, 0.14); p.legR.rotation.set(0.3 + 0.15 * hit, 0, -0.14);
   } else if (pose === 'stagger') { // atordoado: cambaleia
     const ph2 = ud.phase * 2.2;
     p.body.rotation.set(-0.18 + Math.sin(ph2) * 0.12, Math.sin(ph2 * 0.7) * 0.3, Math.sin(ph2) * 0.22);
@@ -806,10 +807,12 @@ function poseTargets(pill, speed, dt, pose, progress) {
     p.armR.rotation.set(-1.6 + 1.1 * a, 0.5 * a, -0.4 - 0.5 * a); p.armL.rotation.set(-0.5, 0, 0.5 + 0.4 * a);
     p.body.rotation.set(-0.25 * a, 0.35 * a, 0); p.body.position.z = -0.18 * a;
     p.legL.rotation.set(0.25 * a, 0, 0.05); p.legR.rotation.set(-0.15 * a, 0, -0.05);
-  } else if (pose === 'parry') { // desvia o golpe com um tapa da arma para fora
-    const a = Math.sin(Math.min(1, progress) * Math.PI);
-    p.armR.rotation.set(-2.0, -0.9 * a, -0.4 - 0.8 * a); p.armL.rotation.set(-1.0, 0.4, 0.6);
-    p.body.rotation.set(-0.15 * a, 0.5 * a, 0.08 * a); p.body.position.z = -0.2 * a;
+  } else if (pose === 'parry') { // chicoteia a arma para fora (giro do tronco) e já se inclina para o contra-ataque
+    const u = Math.min(1, progress), sweep = u < 0.3 ? smooth01(u / 0.3) : 1 - smooth01((u - 0.55) / 0.45) * 0.9;
+    const lean = u > 0.45 ? smooth01((u - 0.45) / 0.3) * (1 - smooth01((u - 0.8) / 0.2)) : 0;
+    p.armR.rotation.set(-1.6 - 0.5 * sweep, -1.1 * sweep + 0.6 * (1 - sweep), -0.3 - 1.0 * sweep); p.armL.rotation.set(-1.2 + 0.4 * sweep, 0.5, 0.7 + 0.3 * sweep);
+    p.body.rotation.set(-0.12 * sweep + 0.2 * lean, 0.6 * sweep, 0.1 * sweep); p.body.position.z = -0.12 * sweep + 0.1 * lean;
+    p.legL.rotation.set(-0.4 * lean, 0, 0.12); p.legR.rotation.set(0.35 * (sweep + lean) * 0.6, 0, -0.12);
   } else if (pose === 'roll') { // cambalhota (esquiva para frente/trás)
     const a = smooth01(progress), dir = ud.rollDir || 1;
     p.body.rotation.set(dir * a * Math.PI * 2, 0, 0);

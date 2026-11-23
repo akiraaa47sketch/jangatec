@@ -147,7 +147,7 @@ export class Hud {
     const pp = G.player.body.pos;
     const boss = G.enemies.list.filter((e) => e.def.boss && e.state !== 'dead' && Math.hypot(e.body.pos.x - pp.x, e.body.pos.z - pp.z) < 70).sort((a, b) => b.def.hp - a.def.hp)[0];
     $('bossBar').hidden = !boss; document.body.classList.toggle('bossfight', !!boss);
-    if (boss) { $('bossName').textContent = boss.def.nome; $('bossFill').style.width = `${Math.max(0, Math.min(100, boss.hp / boss.def.hp * 100))}%`; $('bossBar').className = boss.def.boss; }
+    if (boss) { $('bossName').textContent = boss.def.nome; $('bossFill').style.width = `${Math.max(0, Math.min(100, boss.hp / (boss.max || boss.def.hp) * 100))}%`; $('bossBar').className = boss.def.boss; }
     // itens de instalar (sem tecla): fichinhas discretas acima da barra
     const chip = (icon, label, n) => n ? `<span class="chip" title="${label}"><i>${icon}</i>${n}</span>` : '';
     const invHtml = chip('⊛', 'Canhão improvisado (instale a bordo)', inv.canhao || 0) +
@@ -163,7 +163,7 @@ export class Hud {
     // Arma equipada: só texto, sem painel
     const weaponHtml = w
       ? `<div class="wname" style="--rar:${RARITY[w.stars]}">${w.nome}</div>` +
-        (w.ammo ? `<div class="ammo">${c.reloading > 0 ? '<small>recarregando…</small>' : `${c.mags[w.id]}<small> / ${inv[w.ammo]}</small>`}</div>` : '')
+        (w.noReload ? `<div class="ammo">${c.mags[w.id]}<small> sem recarga</small></div>` : w.ammo ? `<div class="ammo">${c.reloading > 0 ? '<small>recarregando…</small>' : `${c.mags[w.id]}<small> / ${inv[w.ammo]}</small>`}</div>` : '')
       : '<div class="wname">Mãos vazias</div>';
     if (weaponHtml !== this._weapon) { $('weapon').innerHTML = weaponHtml; this._weapon = weaponHtml; }
     // Barra de inventário: armas (slots) | consumíveis — cada um mostra a tecla configurada
@@ -173,7 +173,7 @@ export class Hud {
       const id = c.hotbar[i], weapon = id && WEAPONS.find((entry) => entry.id === id);
       if ((i >= 3 || touch) && !id) continue; // slots extras e (no celular) vazios só quando ocupados
       const k = keyOf('slot' + (i + 1));
-      const ammo = weapon && weapon.ammo ? `<em>${c.mags[id]}</em>` : '';
+      const ammo = weapon && (weapon.ammo || weapon.noReload) ? `<em>${c.mags[id]}</em>` : '';
       hot += `<button type="button" data-slot="${i}" class="slot wpn${id === c.weaponId ? ' active' : ''}${weapon ? '' : ' empty'}"` +
         `${weapon ? ` title="${weapon.nome} ${'★'.repeat(weapon.stars)}" style="--rar:${RARITY[weapon.stars]}"` : ''}>` +
         `<kbd>${k}</kbd><span class="nm">${weapon ? short(weapon.nome) : ''}</span>${ammo}</button>`;

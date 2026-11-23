@@ -6,7 +6,7 @@ import { WebSocketServer } from 'ws';
 import { difficultyForCrateId, generateCrateLoot, isGeneratedCrate, WORLD_LOOT_PARAMS } from '../client/src/systems/loot.js';
 
 const PORT = process.env.PORT || 3001;
-const MAX_PLAYERS = 4;
+const MAX_PLAYERS = 6;
 const rooms = new Map();
 let nextId = 1;
 

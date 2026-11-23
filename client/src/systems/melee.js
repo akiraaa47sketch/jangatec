@@ -147,7 +147,7 @@ export class Melee {
     if (this.swingPose) { this.swingPose.t += dt; if (this.swingPose.t >= this.swingPose.dur) this.swingPose = null; }
     this.updateSparks(dt);
 
-    if (!w || !free || this.stunT > 0) { this.blocking = false; this.cancelCharge(); pl.speedMul = this.stunT > 0 ? 0.3 : 1; return; }
+    if (!w || !free || this.stunT > 0) { this.blocking = false; this.cancelCharge(); pl.speedMul = this.stunT > 0 ? 0.3 : G.combat.weaponId === 'minigun' ? 0.72 : 1; return; } // minigun é pesada
     const ready = !this.pending && !this.dodge && G.combat.cooldown <= 0;
     // bloqueio (segurar mirar/bloquear). Bloquear antes do impacto cancela o próprio golpe (finta).
     const wantBlock = inp.mouse.right && !this.dodge && this.stamina > 0;
@@ -498,7 +498,9 @@ export class Melee {
           this.say(attacker.body.pos, 'PARRY!', '#ffe14d', true);
           sfx.parry(pp);
           G.hitStop = 0.16;
-          this.parryAnim = { t: 0, dur: 0.3 };
+          this.parryAnim = { t: 0, dur: 0.42 };
+          G.hud.flash('parry'); // borda dourada rápida
+          if (G.events) G.events.shake = Math.max(G.events.shake, 0.25);
           this.sparks(new THREE.Vector3((pp.x + attacker.body.pos.x) / 2, pp.y + 1.3, (pp.z + attacker.body.pos.z) / 2), 26);
           if (G.viewmodel && pl.firstPerson && this.weapon) G.viewmodel.onSwing(this.weapon, 'parry', 0.28);
           return;
@@ -513,9 +515,14 @@ export class Melee {
         }
         this.say(pp, 'BLOQUEOU', '#8fd3ff');
         sfx.block(pp);
-        this.sparks(new THREE.Vector3(pp.x + ax / l * 0.6, pp.y + 1.3, pp.z + az / l * 0.6), 10);
+        this.sparks(new THREE.Vector3(pp.x + ax / l * 0.6, pp.y + 1.3, pp.z + az / l * 0.6), heavy ? 18 : 10);
         G.survival.damage(dmg * (heavy ? MELEE.block.heavyMult : MELEE.block.mult), source);
         G.hitStop = 0.05;
+        // tranco da defesa: a arma é empurrada contra você e você escorrega um passo para trás
+        this.blockHit = { t: 0, dur: heavy ? 0.38 : 0.26, heavy: !!heavy };
+        pl.body.vel.x -= ax / l * (heavy ? 4.5 : 2.2); pl.body.vel.z -= az / l * (heavy ? 4.5 : 2.2);
+        if (G.viewmodel && pl.firstPerson) G.viewmodel.onBlockHit(heavy);
+        if (G.events) G.events.shake = Math.max(G.events.shake, heavy ? 0.3 : 0.12);
         return;
       }
     }
@@ -576,6 +583,7 @@ export class Melee {
   }
   updateSparks(dt) {
     if (this.parryAnim) { this.parryAnim.t += dt; if (this.parryAnim.t >= this.parryAnim.dur) this.parryAnim = null; }
+    if (this.blockHit) { this.blockHit.t += dt; if (this.blockHit.t >= this.blockHit.dur) this.blockHit = null; }
     if (!this.sparkPts) return;
     const a = this.sparkPts.geometry.attributes.position.array;
     this.sparkData.forEach((s, i) => {

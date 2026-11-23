@@ -8,7 +8,6 @@
 // Só o host sorteia e simula (os outros recebem réplicas como qualquer inimigo).
 import { sea } from '../world/ocean.js';
 import { TIDE } from './tide.js';
-import { ENEMY_TYPES } from './enemies.js';
 
 export const BOSSES = {
   runLength: 1280,      // m até a dificuldade máxima (world.difficulty chega a 4)
@@ -60,7 +59,7 @@ export class Bosses {
     if (!ok) return null;
     const isl = { id: `sb${cycle}`, x, z, R: 34, rooms: [], enemies: [], minY: gy - 6, set: { y: gy - 0.6 } };
     const e = G.enemies.spawn(`boss-${type}-${cycle}`, type, isl, x, z);
-    e.seabedBoss = true; e.max = ENEMY_TYPES[type].hp;
+    e.seabedBoss = true;
     e.body.pos.y = gy + 0.2; e.state = 'chase'; e.timer = 0; e.yaw = Math.atan2(boat.x - x, boat.z - z);
     const crab = type === 'caranguejo';
     G.hud.msg(crab ? 'A areia está tremendo… o CARANGUEJO-REI saiu da toca!' : 'Um vulto de capacete de latão anda pelo fundo seco…');

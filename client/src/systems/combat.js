@@ -11,7 +11,7 @@ export const WEAPONS = [
   { id: 'facao', nome: 'Facão reforçado', stars: 2, melee: true, dmg: 38, range: 2.6, rate: 0.42, durability: 120, color: 0x555c60, scale: [0.55, 0.55, 1.35] },
   { id: 'sabre', nome: 'Sabre pirata', stars: 3, melee: true, dmg: 34, range: 2.5, rate: 0.4, durability: 150, color: 0xb58d4a, scale: [0.5, 0.5, 1.5] },
   { id: 'revolver', nome: 'Revólver', stars: 2, dmg: 26, mag: 6, rate: 0.38, spread: 0.028, range: 60, reload: 1.55, recoil: 0.026, pellets: 1, ammo: 'municao', durability: 90, color: 0x514b45, scale: [0.8, 0.75, 0.95] },
-  { id: 'pistola', nome: 'Pistola', stars: 3, dmg: 30, mag: 12, rate: 0.24, spread: 0.009, range: 100, reload: 1.1, recoil: 0.01, pellets: 1, ammo: 'municao', durability: 140, color: 0x33383c, scale: [0.9, 0.85, 0.9], automatic: true },
+  { id: 'pistola', nome: 'Pistola', stars: 3, dmg: 30, mag: 12, rate: 0.24, spread: 0.009, range: 100, reload: 1.1, recoil: 0.02, pellets: 1, ammo: 'municao', durability: 140, color: 0x33383c, scale: [0.9, 0.85, 0.9], automatic: true },
   { id: 'escopeta', nome: 'Escopeta', stars: 4, dmg: 12, mag: 5, rate: 0.8, spread: 0.07, range: 32, reload: 1.9, recoil: 0.04, pellets: 8, ammo: 'cartucho', durability: 110, color: 0x4c3525, scale: [1, 1, 1.7] },
   { id: 'rifle', nome: 'Rifle', stars: 4, dmg: 38, mag: 20, rate: 0.12, spread: 0.006, range: 140, reload: 2, recoil: 0.018, pellets: 1, ammo: 'municao', durability: 190, color: 0x454239, scale: [0.8, 0.8, 1.8], automatic: true },
   // ferramentas: martelo conserta peças da jangada (e ainda bate), banjo toca e cura aliados,
@@ -19,12 +19,14 @@ export const WEAPONS = [
   { id: 'martelo', nome: 'Martelo', stars: 2, melee: true, tool: 'martelo', dmg: 14, range: 2.2, rate: 0.5, color: 0x6b4a2e, scale: [0.6, 0.6, 1.2] },
   { id: 'banjo', nome: 'Banjo', stars: 3, tool: 'banjo', rate: 0.2, color: 0xc49a5a, scale: [1, 1, 1] },
   { id: 'gancho', nome: 'Gancho', stars: 3, tool: 'gancho', rate: 0.6, color: 0x6d7479, scale: [1, 1, 1] },
+  // Minigun: só cai do chefe das bases militares. 140 balas e acabou (não recarrega); gira antes de atirar.
+  { id: 'minigun', nome: 'Minigun', stars: 5, dmg: 15, mag: 140, rate: 0.065, spread: 0.04, range: 90, reload: 0, recoil: 0.007, pellets: 1, noReload: true, spinUp: 0.45, automatic: true, durability: 999, color: 0x24282c, scale: [1, 1, 1.6] },
   { id: 'rifle_precisao', nome: 'Rifle de precisão', stars: 5, dmg: 70, mag: 5, rate: 0.9, spread: 0.001, range: 240, reload: 2.6, recoil: 0.07, pellets: 1, ammo: 'municao', durability: 240, color: 0x292f33, scale: [0.75, 0.8, 2] },
 ];
 
 // recuo por arma: [sobe (rad), lado (rad)]
-const RECOIL = { pistola: [0.045, 0.014], revolver: [0.08, 0.02], escopeta: [0.12, 0.035], rifle: [0.03, 0.016], rifle_precisao: [0.15, 0.025] };
-const GUN_SOUND = { pistola: 'pistol', revolver: 'revolver', escopeta: 'shotgun', rifle: 'rifle', rifle_precisao: 'sniper' };
+const RECOIL = { minigun: [0.012, 0.012], pistola: [0.075, 0.024], revolver: [0.08, 0.02], escopeta: [0.12, 0.035], rifle: [0.03, 0.016], rifle_precisao: [0.15, 0.025] };
+const GUN_SOUND = { minigun: 'rifle', pistola: 'pistol', revolver: 'revolver', escopeta: 'shotgun', rifle: 'rifle', rifle_precisao: 'sniper' };
 const STARTER_WEAPONS = ['tabua_prego', 'cano', 'faca_manteiga', 'bastao'];
 const _o = new THREE.Vector3(), _dir = new THREE.Vector3(), _m = new THREE.Vector3(), _mw = new THREE.Vector3();
 const stars = (count) => '★'.repeat(count);
@@ -42,7 +44,8 @@ export class Combat {
     this.swing = 0;
     this.swingDuration = 0.34;
     this.buildMode = false;
-    this.mags = Object.fromEntries(WEAPONS.filter((w) => w.ammo).map((w) => [w.id, 0]));
+    this.mags = Object.fromEntries(WEAPONS.filter((w) => w.ammo || w.noReload).map((w) => [w.id, 0]));
+    this.spin = 0; // minigun: giro dos canos (0..1)
     this.ray = new THREE.Raycaster();
     this.tracers = [];
     this.pendingStrike = null; // golpe corpo a corpo em 1ª pessoa: o dano cai quando a animação acerta
@@ -150,7 +153,7 @@ export class Combat {
 
   startReload() {
     const w = this.weapon, inv = this.G.survival.inv;
-    if (!w || !w.ammo || this.reloading > 0 || this.mags[w.id] >= w.mag) return;
+    if (!w || !w.ammo || w.noReload || this.reloading > 0 || this.mags[w.id] >= w.mag) return;
     if (!inv[w.ammo]) { this.G.hud.msg('Sem munição'); return; }
     this.reloading = w.reload;
     const pp = this.G.player.body.pos;
@@ -199,6 +202,7 @@ export class Combat {
       return;
     }
     if (this.mags[w.id] <= 0) {
+      if (w.noReload) { this.emptyMinigun(w); return; }
       this.startReload();
       if (this.reloading <= 0) sfx.dry();
       if (vm && this.reloading <= 0) vm.onDry();
@@ -234,7 +238,14 @@ export class Combat {
     const rk = RECOIL[w.id] || [w.recoil * 3, w.recoil];
     const aimK = this.aiming ? 0.7 : 1;
     G.player.addRecoil(rk[0] * aimK * (0.85 + Math.random() * 0.3), rk[1] * aimK * (Math.random() * 2 - 0.6));
-    if (this.mags[w.id] <= 0) this.startReload();
+    if (this.mags[w.id] <= 0) { if (w.noReload) this.emptyMinigun(w); else this.startReload(); }
+  }
+
+  // Minigun sem balas: não tem recarga — ela é descartada.
+  emptyMinigun(w) {
+    sfx.dry();
+    this.G.hud.msg(`A ${w.nome} esvaziou — sem recarga, você a largou.`);
+    this.removeWeapon(w.id);
   }
 
   update(dt) {
@@ -242,7 +253,7 @@ export class Combat {
     const building = G.build.active || !!(G.naval && G.naval.manning) || !!(G.tools && G.tools.menuOpen), looting = G.interact.lootOpen;
     this.cooldown -= dt;
     this.bloom = Math.max(0, (this.bloom || 0) - dt * 2.5);
-    this.aiming = !!w && !building && !looting && !!w.ammo && inp.mouse.right && !G.player.dead && !G.player.downed && !G.player.swimming;
+    this.aiming = !!w && !building && !looting && !!w.ammo && !w.noReload && inp.mouse.right && !G.player.dead && !G.player.downed && !G.player.swimming;
     if (this.reloading > 0 && w) {
       this.reloading -= dt;
       if (this.reloading <= 0) {
@@ -253,7 +264,13 @@ export class Combat {
     }
     if (!building && !looting && !G.player.dead && !G.player.downed && !G.player.mantle && !this.buildMode && w) {
       if (inp.act('reload')) this.startReload();
-      const trigger = inp.mouse.leftPressed || (w.automatic && inp.mouse.left);
+      let trigger = inp.mouse.leftPressed || (w.automatic && inp.mouse.left);
+      if (w.spinUp) { // minigun: os canos precisam girar antes de sair o primeiro tiro
+        const want = inp.mouse.left && !G.player.swimming ? 1 : 0;
+        this.spin = Math.max(0, Math.min(1, this.spin + (want ? dt / w.spinUp : -dt / 0.8)));
+        if (want && this.spin < 1 && Math.random() < dt * 20) sfx.click(G.player.body.pos, 0.5 + this.spin);
+        trigger = want && this.spin >= 1;
+      } else this.spin = 0;
       const drawing = G.player.firstPerson && G.viewmodel && G.viewmodel.lowerEquip > 0.35; // arma ainda sendo sacada
       // corpo a corpo (leve/pesado/bloqueio/esquiva) fica no sistema Melee
       if (trigger && !w.melee && this.cooldown <= 0 && this.reloading <= 0 && !G.player.swimming && !drawing) this.fire();
