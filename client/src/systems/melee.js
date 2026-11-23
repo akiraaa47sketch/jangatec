@@ -11,12 +11,13 @@ import { sfx, setListener } from '../core/sfx.js';
 
 export const MELEE = {
   stamina: { max: 100, regen: 30, delay: 0.7 },
-  light: { cost: 8, combo: [1, 1.15, 1.6], window: 0.7, knock: [2.4, 2.8, 6] },
+  light: { cost: 11, combo: [1, 1.15, 1.6], window: 0.8, knock: [2.4, 2.8, 6], recover: 0.14, finisherRecover: 0.32 }, // recover: respiro depois do golpe (sem spam)
   heavy: { cost: 22, minHold: 0.24, maxCharge: 0.7, mult: [1.7, 2.6], knock: 8 },
   block: { mult: 0.2, heavyMult: 0.5, cost: 14, parry: 0.18, arc: 0.3 },
   dodge: { cost: 20, speed: 10, dur: 0.34, iframes: 0.28, cd: 0.5 }, // arranque que desacelera (~1,9 m)
   kick: { cost: 14, dur: 0.42, range: 1.8, dmg: 5, knock: 7, breakStun: 1.3 }, // chute quebra-guarda
-  clash: { window: 0.14, recover: 0.42 },     // espadas se chocando: janela antes do golpe dele e recuo
+  clash: { window: 0.14, recover: 0.42, guard: [1.4, 2.4] }, // depois do choque o inimigo fica em guarda (s)
+  guardBreak: 4,                              // pesado na guarda: atordoado esse tempo (s)     // espadas se chocando: janela antes do golpe dele e recuo
   enemy: { recover: 0.32, heavyRecover: 0.6, lunge: 3.6, evade: 0.16 }, // ritmo dos inimigos
   crit: 2.2,
   swim: { drain: 5, idle: 2.5, dps: 4 },        // nadando: estamina/s (nadando / boiando parado) e vida/s sem fôlego
@@ -34,7 +35,7 @@ const MOVES = {
   pirata: [{ wind: 0.32, mult: 1, hits: 2, w: 3 }, { wind: 0.28, mult: 0.9, hits: 3, w: 1 }, { wind: 0.6, mult: 1.8, heavy: true, w: 1 }, { wind: 0.4, mult: 0.5, kick: true, w: 1.5 }],
 };
 const LIGHT_POSES = ['slashR', 'slashL', 'thrust', 'uppercut'];
-const GUARD_CHANCE = { melee: 0.35, pesado: 0.45, pirata: 0.5, rapido: 0.1, escafandrista: 0.3, caranguejo: 0.35 };
+const GUARD_CHANCE = { melee: 0.5, pesado: 0.55, pirata: 0.6, rapido: 0.2, fantasma: 0.4, escafandrista: 0.35, caranguejo: 0.4 };
 const RIPOSTE_CHANCE = { melee: 0.3, pesado: 0.15, pirata: 0.55, rapido: 0.2, escafandrista: 0.2, caranguejo: 0.3 }; // contra-ataque depois de defender
 const EVADE_CHANCE = { melee: 0.12, pesado: 0, pirata: 0.18, rapido: 0.3 }; // desviam do seu golpe
 
@@ -204,7 +205,8 @@ export class Melee {
     if (pl.firstPerson && G.viewmodel) impact = G.viewmodel.onSwing(w, style, dur) * G.viewmodel.strikeFraction(w);
     G.combat.swing = G.combat.swingDuration = dur;
     // pode emendar o próximo golpe logo depois do impacto (o resto da animação é cancelável)
-    G.combat.cooldown = Math.max(impact + 0.06, dur * (heavy ? 0.9 : 0.62));
+    // o próximo golpe só sai depois da animação inteira + um respiro (o final do combo segura mais)
+    G.combat.cooldown = heavy ? Math.max(impact + 0.06, dur * 0.9) : dur * 0.95 + (finisher ? MELEE.light.finisherRecover : MELEE.light.recover);
     const [fx, fz] = pl.forward(); pl.yaw = Math.atan2(fx, fz);
     this.swingPose = { heavy, pose, t: 0, dur };
     if (!heavy) { pl.body.vel.x += fx * 2.2; pl.body.vel.z += fz * 2.2; } // passinho à frente no golpe
@@ -267,8 +269,8 @@ export class Melee {
       const { e, dx, dz, d, front, ms } = t;
       if (ms.state === 'evade') { this.say(e.body.pos, 'DESVIOU', '#c8d2da'); continue; }
       hits++;
-      // espada com espada: o golpe dele estava saindo junto com o seu → as lâminas se chocam
-      const late = ms.state === 'strike' || (ms.state === 'windup' && ms.move && !ms.move.kick && ms.t < MELEE.clash.window);
+      // espada com espada: bater (leve) enquanto ele está atacando → as lâminas se chocam e ele se defende
+      const late = ms.state === 'strike' || (ms.state === 'windup' && ms.move && !ms.move.kick);
       if (late && front && !heavy) {
         clashed = true;
         this.clashEnemy(e, dx / d, dz / d);
@@ -278,7 +280,7 @@ export class Melee {
       if (ms.state === 'stagger') { dmg *= MELEE.crit; label = 'CRÍTICO'; color = '#ffb347'; }
       else if (ms.state === 'clashed') { dmg *= 1.4; label = 'ABERTO'; color = '#ffe9a8'; }
       else if (ms.state === 'guard' && front) {
-        if (heavy) { this.staggerEnemy(e, 1.1); label = 'GUARDA QUEBRADA'; color = '#ffd166'; dmg *= 0.8; sound = 'break'; }
+        if (heavy) { this.staggerEnemy(e, MELEE.guardBreak); label = 'GUARDA QUEBRADA'; color = '#ffd166'; dmg *= 0.8; sound = 'break'; } // ataque potente abre a guarda por ~4 s
         else {
           dmg *= 0.1; label = 'DEFENDEU'; color = '#8fd3ff'; knock *= 0.3; sound = 'block';
           // pirata que defende responde rápido (riposta) — use o chute para abrir a guarda
@@ -376,7 +378,11 @@ export class Melee {
         }
         return { pose: 'guard', hold: true };
       case 'clashed': // lâminas se chocaram: braço jogado para trás, vulnerável por um instante
-        if (ms.t <= 0) { ms.state = 'idle'; e.cd = 0.25 + Math.random() * 0.35; }
+        if (ms.t <= 0) { // se recompõe e fecha a guarda: agora só um golpe pesado (ou chute) abre
+          const [a, b] = MELEE.clash.guard;
+          ms.state = 'guard'; ms.t = a + Math.random() * (b - a); e.cd = Math.max(e.cd, 0.3);
+          return { pose: 'guard', hold: true };
+        }
         return { pose: 'clash', progress: 1 - ms.t / MELEE.clash.recover, hold: true };
       case 'windup': {
         const p = 1 - ms.t / ms.move.wind;
@@ -441,7 +447,9 @@ export class Melee {
     // e só quem o diretor de combate deixou chegar perto (os outros esperam a vez mais afastados)
     // vagas contadas por jogador alvo: cada aliado também só apanha de 1 por vez
     const key = pl.key || 'L', busy = [...this.tokens].filter((x) => ((x.tgt && x.tgt.key) || 'L') === key).length;
-    const free = ms.token || (busy < MELEE.tokens && performance.now() >= (this.gapUntil || 0));
+    // ataque em conjunto (diretor de combate): por um instante 2 podem atacar juntos, sem o respiro entre eles
+    const gang = this.gang && performance.now() < (this.gang[key] || 0);
+    const free = ms.token || (gang ? busy < 2 : busy < MELEE.tokens && performance.now() >= (this.gapUntil || 0));
     if (!pl.dead && !pl.downed && dist < def.range + 0.4 && e.cd <= 0 && e.los !== false && e.engaged !== false && free) {
       // contra quem fica só defendendo, o chute fica bem mais provável
       const moves = MOVES[e.type] || MOVES.melee, wOf = (m) => m.w * (m.kick && (mine ? this.blocking : pl.guard) ? 4 : 1), total = moves.reduce((s, m) => s + wOf(m), 0);

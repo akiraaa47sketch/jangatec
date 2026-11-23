@@ -9,6 +9,9 @@ import { CFG } from '../config.js';
 import { sea, waveHeight } from '../world/ocean.js';
 import { PIECES, STARTER_PLATFORM_SIZE, makePieceMesh } from './pieces.js';
 import { woodTexture, woodBump, metalTexture, clothTexture, repeated } from '../world/textures.js';
+// Leme pesado: gain = quanto do desvio vira giro desejado (rad/s por rad), max = giro máximo (rad/s,
+// ~8°/s), accel = quão rápido o giro aumenta/diminui (rad/s²).
+export const BOAT_TURN = { gain: 0.35, max: 0.14, accel: 0.1 };
 import { Navigation, NAV_MODE } from './navigation.js';
 
 export const DECK_BOTTOM = 0.15; // base dos pisos iniciais (local ao barco)
@@ -194,6 +197,15 @@ export class Boat {
     if (this.sailInstalled && this.sailT < 0.12) this.sailT = 0.12;
   }
 
+  // Gira com inércia: a velocidade de giro vai até a desejada devagar e nunca passa do limite.
+  // Com a jangada lenta o leme quase não pega.
+  turn(wantRate, dt) {
+    const grip = 0.3 + 0.7 * Math.min(1, this.speed / CFG.boatSpeed);
+    const want = Math.max(-BOAT_TURN.max, Math.min(BOAT_TURN.max, wantRate)) * grip;
+    const step = BOAT_TURN.accel * dt;
+    this.yawRate = (this.yawRate || 0) + Math.max(-step, Math.min(step, want - (this.yawRate || 0)));
+    this.yaw += this.yawRate * dt;
+  }
   toLocal(x, z) { return rot(x - this.x, z - this.z, -this.yaw); }
   toWorld(lx, lz) { const [x, z] = rot(lx, lz, this.yaw); return [x + this.x, z + this.z]; }
   mastWorld() { return this.toWorld(MAST.x, MAST.z); }
@@ -271,14 +283,15 @@ export class Boat {
       } else if (this.nav.isLinear) {
         // Modo LINEAR: yaw segue a rota; sailAngle só adiciona pequeno desvio lateral
         const targetYaw = this.nav.getTargetYaw(dt, this.sailAngle);
-        // Suaviza o yaw em direção à rota (retorno ao curso)
-        this.yaw = lerpAngle(this.yaw, targetYaw, Math.min(1, 0.9 * dt));
+        // Direção pesada: o leme acelera o giro aos poucos e tem um limite (jangada não vira na hora)
+        const diff = Math.atan2(Math.sin(targetYaw - this.yaw), Math.cos(targetYaw - this.yaw));
+        this.turn(diff * BOAT_TURN.gain, dt);
         // Mantém o barco avançando na direção da rota
         this.x += Math.sin(this.yaw) * this.speed * dt;
         this.z += Math.cos(this.yaw) * this.speed * dt;
       } else {
         // Modo LIVRE (batalha final): comportamento original
-        this.yaw += this.sailAngle * 0.35 * (this.speed / CFG.boatSpeed) * dt;
+        this.turn(this.sailAngle * 0.35 * (this.speed / CFG.boatSpeed), dt);
         this.x += Math.sin(this.yaw) * this.speed * dt;
         this.z += Math.cos(this.yaw) * this.speed * dt;
       }

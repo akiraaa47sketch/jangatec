@@ -14,20 +14,20 @@ const SIEGE_MORTAR = () => SIEGE.mortar;
 import { sfx } from '../core/sfx.js';
 
 export const ENEMY_TYPES = {
-  melee:    { nome: 'Saqueador', hp: 60,  speed: 3.2, dmg: 10, range: 1.8, cd: 1.0, cor: 0xa83a32, scale: 1 },
-  atirador: { nome: 'Atirador',  hp: 45,  speed: 2.4, dmg: 7,  range: 22,  cd: 1.7, cor: 0x7a6a2a, scale: 1, ranged: true },
-  pesado:   { nome: 'Brutamontes', hp: 160, speed: 1.9, dmg: 22, range: 2.2, cd: 1.6, cor: 0x4a2a5a, scale: 1.3 },
-  rapido:   { nome: 'Corredor',  hp: 35,  speed: 5.2, dmg: 6,  range: 1.6, cd: 0.6, cor: 0xc56a1e, scale: 0.85 },
+  melee:    { nome: 'Saqueador', hp: 110,  speed: 3.2, dmg: 10, range: 1.8, cd: 1.0, cor: 0xa83a32, scale: 1 },
+  atirador: { nome: 'Atirador',  hp: 70,  speed: 2.4, dmg: 7,  range: 22,  cd: 1.7, cor: 0x7a6a2a, scale: 1, ranged: true },
+  pesado:   { nome: 'Brutamontes', hp: 240, speed: 1.9, dmg: 22, range: 2.2, cd: 1.6, cor: 0x4a2a5a, scale: 1.3 },
+  rapido:   { nome: 'Corredor',  hp: 65,  speed: 5.2, dmg: 6,  range: 1.6, cd: 0.6, cor: 0xc56a1e, scale: 0.85 },
   morteiro: { nome: 'Morteiro', hp: 55, speed: 0, dmg: 0, range: 80, cd: 6.5, cor: 0x4a4a3a, scale: 1, ranged: true, mortar: true },
-  soldado:  { nome: 'Soldado', hp: 110, speed: 3.0, dmg: 8, range: 28, cd: 1.7, cor: 0x4b5530, scale: 1.05, ranged: true, burst: 3, acc: 0.72 },
-  pirata:   { nome: 'Pirata', hp: 75, speed: 5.4, dmg: 13, range: 1.8, cd: 1.2, cor: 0x553b2d, scale: 1.05, raftSpeed: 7.2 },
+  soldado:  { nome: 'Soldado', hp: 150, speed: 3.0, dmg: 8, range: 28, cd: 1.7, cor: 0x4b5530, scale: 1.05, ranged: true, burst: 3, acc: 0.72 },
+  pirata:   { nome: 'Pirata', hp: 120, speed: 5.4, dmg: 13, range: 1.8, cd: 1.2, cor: 0x553b2d, scale: 1.05, raftSpeed: 7.2 },
   // chefes da seca (ver bosses.js): ring = distância em que rodeia o jogador, hitR = raio do corpo
   // (o alcance da sua arma conta a partir da borda), armor = dano que passa pelo casco fechado
   escafandrista: { nome: 'Escafandrista amaldiçoado', hp: 320, speed: 2.4, dmg: 15, range: 2.3, cd: 1.6, cor: 0x4d5d62, scale: 1.3, boss: 'mini', ring: 2.5, hitR: 0.35 },
   caranguejo: { nome: 'Caranguejo-Rei', hp: 1500, speed: 3.2, dmg: 22, range: 3.3, cd: 1.3, cor: 0xb2401f, scale: 1, boss: 'crab', ring: 3.4, hitR: 1.4, armor: 0.3, radius: 1.5 },
   // chefe das bases militares: gira a minigun (aviso), solta uma rajada longa e superaquece
   metralhador: { nome: 'Metralhador', hp: 700, speed: 1.7, dmg: 5, range: 30, cd: 4.2, cor: 0x3a4226, scale: 1.35, ranged: true, boss: 'minigun', burst: 34, burstGap: 0.07, acc: 0.4, spinUp: 1.2, hitR: 0.4 },
-  fantasma: { nome: 'Pirata fantasma', hp: 70, speed: 4.6, dmg: 6, range: 1.8, cd: 1.5, cor: 0x8fe8d8, scale: 1.05 }, // fraco, mas atravessa a névoa
+  fantasma: { nome: 'Pirata fantasma', hp: 100, speed: 4.6, dmg: 6, range: 1.8, cd: 1.5, cor: 0x8fe8d8, scale: 1.05 }, // fraco, mas atravessa a névoa
 };
 const BY_DIFF = [['melee'], ['melee', 'rapido'], ['melee', 'rapido', 'atirador'], ['melee', 'atirador', 'pesado', 'rapido'], ['atirador', 'pesado', 'rapido', 'pesado']];
 const SIGHT = 22, LOSE = 36, ACTIVE = 75;
@@ -40,6 +40,11 @@ export const COMBAT_DIRECTOR = {
   engaged: 2,          // corpo a corpo perto do jogador ao mesmo tempo (só 1 golpeia por vez — ver MELEE.tokens)
   waitRadius: 5.6,     // anel de espera dos demais
   rotateAfter: 7,      // s engajado antes de dar a vez para quem está esperando
+  gangChance: 0.12,    // por segundo, com 2 engajados: chance de atacarem JUNTOS (um de cada lado)
+  gangDur: 1.8,        // s de janela do ataque em conjunto
+  gangCooldown: 6,     // s mínimo entre ataques em conjunto
+  flank: 0.7,          // rad: os dois engajados se posicionam assim para cada lado
+  separation: 1.35,    // m: inimigos se afastam uns dos outros (sem empilhar)
   bursts: 2,           // atiradores disparando ao mesmo tempo
   burstGap: 0.45,      // s mínimo entre o início de duas rajadas
   reaction: [0.6, 1.3],// s entre ver o jogador e o primeiro tiro
@@ -698,6 +703,13 @@ export class Enemies {
         e.local.z *= radius / localLength;
       }
     }
+    if (!(mres && mres.hold)) { // no convés também não se empilham
+      for (const o of this.list) {
+        if (o === e || !o.pirate || o.state !== 'boarded' || !o.local) continue;
+        const ox = e.local.x - o.local.x, oz = e.local.z - o.local.z, d = Math.hypot(ox, oz);
+        if (d > 0.001 && d < 1.2) { e.local.x += ox / d * (1.2 - d) * 3 * dt; e.local.z += oz / d * (1.2 - d) * 3 * dt; }
+      }
+    }
     const [x, z] = boat.toWorld(e.local.x, e.local.z);
     const previousY = p.y;
     p.set(x, boat.set.y + e.local.y, z);
@@ -774,13 +786,13 @@ export class Enemies {
       if (e.restT > 0) e.restT -= dt;
       e.engageScore = busy ? -100 : d - (e.engaged ? 1.5 : 0) + (e.engaged && e.engageT > D.rotateAfter ? 6 : 0) + (e.restT > 0 ? 6 : 0);
       if (!pools.has(T.key)) pools.set(T.key, []);
-      pools.get(T.key).push(e);
+      pools.get(T.key).push(e); e.poolT = T;
     }
-    for (const pool of pools.values()) this._directPool(pool, dt);
+    for (const pool of pools.values()) this._directPool(pool, dt, pool[0].poolT);
     // rajadas dos atiradores em andamento
     this.bursting = this.list.filter((e) => e.burstLeft > 0 && e.state !== 'dead').length;
   }
-  _directPool(pool, dt) {
+  _directPool(pool, dt, T) {
     const D = COMBAT_DIRECTOR;
     pool.sort((a, b) => a.engageScore - b.engageScore);
     const rotate = pool.length > D.engaged; // só faz rodízio se tem gente esperando
@@ -792,6 +804,47 @@ export class Enemies {
       e.engaged = on;
       if (!e.waitOff) e.waitOff = Math.random() * 1.4; // anel de espera com distâncias variadas
     });
+    this._slots(pool, dt, T);
+  }
+  // Cada inimigo ganha um ângulo próprio em volta do jogador: os engajados nos flancos, os que esperam
+  // espalhados num arco atrás deles (ninguém disputa o mesmo lugar). De vez em quando os dois da
+  // frente atacam juntos.
+  _slots(pool, dt, T) {
+    const D = COMBAT_DIRECTOR, pp = T && T.pos;
+    if (!pp || !pool.length) return;
+    const ang = (e) => Math.atan2(e.body.pos.x - pp.x, e.body.pos.z - pp.z);
+    let sx = 0, sz = 0;
+    for (const e of pool) { sx += e.body.pos.x - pp.x; sz += e.body.pos.z - pp.z; }
+    const base = Math.atan2(sx, sz), rel = (a) => Math.atan2(Math.sin(a - base), Math.cos(a - base));
+    const eng = pool.filter((e) => e.engaged).sort((a, b) => rel(ang(a)) - rel(ang(b)));
+    const wait = pool.filter((e) => !e.engaged).sort((a, b) => rel(ang(a)) - rel(ang(b)));
+    if (eng.length === 1) eng[0].slotAng = base;
+    else eng.forEach((e, i) => { e.slotAng = base + (i === 0 ? -D.flank : D.flank); });
+    const n = wait.length, arc = Math.min(Math.PI * 1.6, 0.8 * Math.max(1, n));
+    wait.forEach((e, i) => { e.slotAng = base + (n > 1 ? (i / (n - 1) - 0.5) * arc : 0); });
+    // ataque em conjunto (só faz sentido com dois engajados)
+    const M = this.G.melee, now = performance.now(), key = T.key || 'L';
+    if (M && eng.length >= 2) {
+      M.gang = M.gang || {};
+      const g = M.gang[key] || 0;
+      if (now > g + D.gangCooldown * 1000 && Math.random() < D.gangChance * dt) M.gang[key] = now + D.gangDur * 1000;
+    }
+  }
+  // Andar até o próprio lugar em volta do jogador (ângulo slotAng, distância want), encarando ele
+  _toSlot(e, pdx, pdz, dist, want, sp) {
+    const cur = Math.atan2(-pdx, -pdz), da = Math.atan2(Math.sin(e.slotAng - cur), Math.cos(e.slotAng - cur));
+    const tang = clamp(da * 2.2, -1, 1) * sp, radial = clamp((dist - want) * 1.4, -e.def.speed * 0.6, e.def.speed * 0.8);
+    return [Math.cos(cur) * tang + pdx * radial, -Math.sin(cur) * tang + pdz * radial];
+  }
+  // Empurrão de separação: ninguém fica dentro do outro
+  _separate(e, out) {
+    const D = COMBAT_DIRECTOR, p = e.body.pos;
+    for (const o of this.list) {
+      if (o === e || o.creature || o.state === 'dead' || o.pirate !== e.pirate) continue;
+      const dx = p.x - o.body.pos.x, dz = p.z - o.body.pos.z, d = Math.hypot(dx, dz), R = D.separation * Math.max(e.def.scale, o.def.scale);
+      if (d > 0.001 && d < R && Math.abs(p.y - o.body.pos.y) < 1.5) { const k = (R - d) / R * 3.2; out[0] += dx / d * k; out[1] += dz / d * k; }
+    }
+    return out;
   }
 
   think(e, dist, pdx, pdz) {
@@ -866,19 +919,25 @@ export class Enemies {
       if ((mres && mres.hold) || e.post) { mx = 0; mz = 0; }
       else if (e.engaged === false && dist < COMBAT_DIRECTOR.waitRadius + 4 && e.los !== false) {
         // esperando a vez: fica afastado, rodeando devagar e encarando o jogador
-        e.strafeDir = e.strafeDir || (Math.random() < 0.5 ? 1 : -1);
-        if (thinkNow && Math.random() < 0.05) e.strafeDir *= -1;
-        const sp = e.def.speed * 0.3, want = COMBAT_DIRECTOR.waitRadius + (e.waitOff || 0);
-        const radial = clamp((dist - want) * 1.2, -e.def.speed * 0.6, e.def.speed * 0.8);
-        mx = -pdz * e.strafeDir * sp + pdx * radial; mz = pdx * e.strafeDir * sp + pdz * radial;
+        const want = COMBAT_DIRECTOR.waitRadius + (e.waitOff || 0);
+        if (e.slotAng != null) [mx, mz] = this._toSlot(e, pdx, pdz, dist, want, e.def.speed * 0.45);
+        else {
+          e.strafeDir = e.strafeDir || (Math.random() < 0.5 ? 1 : -1);
+          const sp = e.def.speed * 0.3, radial = clamp((dist - want) * 1.2, -e.def.speed * 0.6, e.def.speed * 0.8);
+          mx = -pdz * e.strafeDir * sp + pdx * radial; mz = pdx * e.strafeDir * sp + pdz * radial;
+        }
       }
       else if (!e.def.ranged && dist < (e.def.ring || 2) + 1.6 && e.los !== false && (e.state === 'chase' || e.state === 'attack')) {
-        // esperando a vez: rodeia o jogador mantendo distância
-        e.strafeDir = e.strafeDir || (Math.random() < 0.5 ? 1 : -1);
-        if (thinkNow && Math.random() < 0.08) e.strafeDir *= -1;
-        const sp = e.def.speed * 0.42, radial = (dist - (e.def.ring || 2.0)) * 1.6;
-        mx = -pdz * e.strafeDir * sp + pdx * radial; mz = pdx * e.strafeDir * sp + pdz * radial;
+        // perto, esperando a vez do golpe: vai para o próprio flanco (um de cada lado) e rodeia devagar
+        if (e.slotAng != null) [mx, mz] = this._toSlot(e, pdx, pdz, dist, e.def.ring || 2.0, e.def.speed * 0.5);
+        else {
+          e.strafeDir = e.strafeDir || (Math.random() < 0.5 ? 1 : -1);
+          if (thinkNow && Math.random() < 0.08) e.strafeDir *= -1;
+          const sp = e.def.speed * 0.42, radial = (dist - (e.def.ring || 2.0)) * 1.6;
+          mx = -pdz * e.strafeDir * sp + pdx * radial; mz = pdx * e.strafeDir * sp + pdz * radial;
+        }
       }
+      if (!e.post && !(mres && mres.hold)) { const sep = this._separate(e, [0, 0]); mx += sep[0]; mz += sep[1]; } // sem empilhar
       if (e.state === 'attack' && e.cd <= 0 && e.def.ranged && e.los && e.def.spinUp) { // minigun: gira (aviso) e depois a rajada
         e.cd = 99; e.burstLeft = e.def.burst; e.burstT = e.def.spinUp; e.spinning = e.def.spinUp; // a espera só conta depois da rajada
       } else if (e.state === 'attack' && e.cd <= 0 && e.def.ranged && e.los) {
