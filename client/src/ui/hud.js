@@ -140,6 +140,7 @@ export class Hud {
     $('vidaNum').textContent = vida;
     $('lifeArc').style.strokeDashoffset = String(LIFE_C * (1 - vida / 100));
     $('lifeRing').classList.toggle('low', vida <= 30);
+    $('lockTag').hidden = !G.player.faceCam || G.player.firstPerson;
     $('objective').textContent = G.startup.objective;
     // itens de instalar (sem tecla): fichinhas discretas acima da barra
     const chip = (icon, label, n) => n ? `<span class="chip" title="${label}"><i>${icon}</i>${n}</span>` : '';

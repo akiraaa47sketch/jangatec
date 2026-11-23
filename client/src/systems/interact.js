@@ -1,14 +1,18 @@
 // Interação com [E]: caixas de loot, mastro e reanimar aliados caídos; [X]: peças soldadas.
 import { keyOf } from '../core/keybinds.js';
 import { sfx } from '../core/sfx.js';
+import { lootLabel } from './drops.js';
 const REVIVE_TIME = 2.5;
 export class Interact {
   constructor(G) {
     this.G = G;
     this.current = null;
     this.openCrateId = null;
-    this.lootOpen = false;
+    this._lootOpen = false;
   }
+  // "tela aberta": baú aberto OU inventário aberto (todo o resto do jogo pausa a entrada com isso)
+  get lootOpen() { return this._lootOpen || !!(this.G.inventory && this.G.inventory.open); }
+  set lootOpen(v) { this._lootOpen = v; }
 
   find() {
     const G = this.G, p = G.player.body.pos;
@@ -66,6 +70,11 @@ export class Interact {
         const hammer = G.combat.weaponId === 'martelo';
         consider(dd + 0.6, { label: `${nome} ${dmg.pct}% — ${hammer ? 'martele para consertar' : 'use o martelo para consertar'}` });
       }
+    }
+    // itens largados (saquinhos)
+    if (G.drops) {
+      const d = G.drops.nearest();
+      if (d) consider(0.4, { label: `Pegar ${lootLabel(d.loot)}`, run: () => G.drops.take(d) });
     }
     // caixotes de loot boiando (navios afundados)
     if (naval) {
@@ -143,7 +152,7 @@ export class Interact {
   }
 
   closeCrate() {
-    if (!this.lootOpen) return;
+    if (!this._lootOpen) return;
     this.openCrateId = null;
     this.lootOpen = false;
     this.G.hud.closeLoot();

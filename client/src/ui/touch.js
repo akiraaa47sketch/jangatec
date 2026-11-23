@@ -14,6 +14,9 @@ const ICON = {
   use: '<svg viewBox="0 0 24 24"><path d="M9 11V5.5a1.5 1.5 0 0 1 3 0V10h.5V3.5a1.5 1.5 0 0 1 3 0V10h.5V5a1.5 1.5 0 0 1 3 0v9.5c0 4-2.7 7-6.5 7-2.6 0-4.3-1.2-5.6-3.3L4.2 13.6a1.4 1.4 0 0 1 2.3-1.6L9 14.8z"/></svg>',
   aim: '<svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="7" fill="none" stroke="currentColor" stroke-width="2"/><circle cx="12" cy="12" r="2"/></svg>',
   reload: '<svg viewBox="0 0 24 24"><path d="M12 5a7 7 0 1 0 7 7h-2.5A4.5 4.5 0 1 1 12 7.5V11l5-5-5-5z"/></svg>',
+  bag: '<svg viewBox="0 0 24 24"><path d="M9 6V5a3 3 0 0 1 6 0v1h3l1 15H5L6 6zm2 0h2V5a1 1 0 0 0-2 0zM9 10a3 3 0 0 0 6 0h-2a1 1 0 0 1-2 0z"/></svg>',
+  drop: '<svg viewBox="0 0 24 24"><path d="M11 3h2v10l3.5-3.5L18 11l-6 6-6-6 1.5-1.5L11 13zM5 19h14v2H5z"/></svg>',
+  lock: '<svg viewBox="0 0 24 24"><path d="M12 2l3 4h-2v3.1A7 7 0 0 1 19 15h3l-4 3-4-3h2a4 4 0 0 0-8 0h2l-4 3-4-3h3a7 7 0 0 1 6-5.9V6H9z"/></svg>',
   cam: '<svg viewBox="0 0 24 24"><path d="M12 5C6 5 2 12 2 12s4 7 10 7 10-7 10-7-4-7-10-7zm0 11a4 4 0 1 1 0-8 4 4 0 0 1 0 8z"/></svg>',
   gear: '<svg viewBox="0 0 24 24"><path d="M19.4 13a7.6 7.6 0 0 0 0-2l2.1-1.6-2-3.5-2.5 1a7.4 7.4 0 0 0-1.7-1L15 3h-4l-.4 2.9a7.4 7.4 0 0 0-1.7 1l-2.5-1-2 3.5L6.5 11a7.6 7.6 0 0 0 0 2l-2.1 1.6 2 3.5 2.5-1a7.4 7.4 0 0 0 1.7 1L11 21h4l.4-2.9a7.4 7.4 0 0 0 1.7-1l2.5 1 2-3.5zM13 15.5A3.5 3.5 0 1 1 13 8.5a3.5 3.5 0 0 1 0 7z"/></svg>',
   full: '<svg viewBox="0 0 24 24"><path d="M4 4h6v2H6v4H4zm10 0h6v6h-2V6h-4zM4 14h2v4h4v2H4zm14 0h2v6h-6v-2h4z"/></svg>',
@@ -32,6 +35,11 @@ export class TouchControls {
         <button data-act="full" title="Tela cheia">${ICON.full}</button>
         <button data-act="gfx" title="Gráficos">${ICON.gear}</button>
         <button data-act="mic" title="Segure para falar">🎙</button>
+      </div>
+      <div class="tSide">
+        <button data-act="inv" title="Inventário">${ICON.bag}</button>
+        <button data-act="drop" title="Largar a arma da mão">${ICON.drop}</button>
+        <button data-act="lock" title="Travar o corpo na câmera">${ICON.lock}</button>
       </div>
       <div class="tPad">
         <button class="big" data-act="attack" title="Atacar / pegar">${ICON.attack}</button>
@@ -142,6 +150,9 @@ export class TouchControls {
       else if (act === 'jump') press(el, () => key('keydown', binds.jump), () => key('keyup', binds.jump));
       else if (act === 'use') press(el, () => key('keydown', binds.interact), () => key('keyup', binds.interact));
       else if (act === 'reload') press(el, () => key('keydown', binds.reload), () => key('keyup', binds.reload));
+      else if (act === 'inv') press(el, () => G.inventory.toggle(!G.inventory.open));
+      else if (act === 'drop') press(el, () => G.inventory.quickDrop());
+      else if (act === 'lock') press(el, () => { key('keydown', binds.lockCam); key('keyup', binds.lockCam); });
       else if (act === 'cam') press(el, () => { key('keydown', binds.camera); key('keyup', binds.camera); });
       else if (act === 'gfx') press(el, () => G.gfxMenu.toggle(!G.gfxMenu.open));
       else if (act === 'mic') press(el, () => { G.voice.touchTalk = true; }, () => { G.voice.touchTalk = false; });
@@ -169,6 +180,7 @@ export class TouchControls {
     this.root.querySelector('[data-act="aim"]').style.display = w ? '' : 'none'; // arma branca: bloquear
     this.root.querySelector('[data-act="reload"]').style.display = w && w.ammo ? '' : 'none';
     this.root.querySelector('[data-act="use"]').classList.toggle('pulse', !!cur);
+    this.root.querySelector('[data-act="lock"]').classList.toggle('lock', !!G.player.faceCam);
     this.root.querySelector('[data-act="mic"]').style.display = G.voice && G.voice.on && G.voice.settings.mic ? '' : 'none';
   }
 }

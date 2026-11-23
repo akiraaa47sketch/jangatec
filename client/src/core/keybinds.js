@@ -31,6 +31,7 @@ export const ACTIONS = [
   { id: 'attack', label: 'Atacar / atirar (segurar = golpe pesado)', cat: 'combate', ctx: 'pe', def: 'Mouse0' },
   { id: 'aim', label: 'Bloquear / mirar', cat: 'combate', ctx: 'pe', def: 'Mouse2' },
   { id: 'kick', label: 'Chute (quebra a guarda)', cat: 'combate', ctx: 'pe', def: 'Mouse1' },
+  { id: 'lockCam', label: 'Travar o corpo na direção da câmera (3ª pessoa)', cat: 'combate', ctx: 'pe', def: 'KeyL' },
   { id: 'dodge', label: 'Esquivar', cat: 'combate', ctx: 'pe', def: 'KeyQ' },
   { id: 'reload', label: 'Recarregar', cat: 'combate', ctx: 'pe', def: 'KeyR' },
 
@@ -45,6 +46,8 @@ export const ACTIONS = [
   { id: 'food1', label: 'Comer barra de proteína (+dano)', cat: 'itens', ctx: 'pe', def: 'Digit9' },
   { id: 'food2', label: 'Tomar energético (estamina)', cat: 'itens', ctx: 'pe', def: 'Digit0' },
   { id: 'food3', label: 'Comer chocolate (regenera vida)', cat: 'itens', ctx: 'pe', def: 'Minus' },
+  { id: 'inventory', label: 'Abrir inventário', cat: 'itens', ctx: 'pe', def: 'Tab' },
+  { id: 'drop', label: 'Largar a arma da mão', cat: 'itens', ctx: 'pe', def: 'KeyT' },
   { id: 'banjoMenu', label: 'Painel de notas do banjo', cat: 'itens', ctx: 'pe', def: 'KeyB' },
 
   { id: 'interact', label: 'Interagir / abrir / vela', cat: 'interagir', ctx: 'pe', def: 'KeyE' },

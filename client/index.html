@@ -37,6 +37,7 @@
       <span id="vidaNum">100</span>
     </div>
     <div id="buffs"></div>
+    <span id="lockTag" hidden>Travado</span>
   </div>
   <div id="weapon"></div>
   <div id="prompt"></div>
@@ -56,6 +57,18 @@
   <div id="hint"><kbd>H</kbd> controles · <kbd>G</kbd> gráficos · <kbd>F3</kbd> FPS · <kbd>I</kbd>/<kbd>O</kbd> zoom (3ª pessoa)</div>
 </div>
 <div id="fps" hidden></div>
+
+<div id="invPanel" hidden>
+  <div class="inv-card">
+    <header><div><p class="eyebrow">Mochila</p><h2>Inventário</h2></div><button id="invClose" type="button" class="gfx-btn">Fechar</button></header>
+    <h3>Barra rápida</h3>
+    <div class="inv-hot" id="invHot"></div>
+    <h3>Mochila</h3>
+    <div class="inv-grid" id="invBag"></div>
+    <div class="inv-detail" id="invDetail"></div>
+    <div class="inv-drop" id="invDrop">Arraste até aqui para largar no chão</div>
+  </div>
+</div>
 
 <div id="benchOverlay" hidden>
   <div class="bench-title">BENCHMARK</div>
@@ -142,6 +155,8 @@
       <tr><td>4 / 5</td><td>bandagem / kit médico</td><td>H</td><td>ajuda</td></tr>
       <tr><td>V (segurar)</td><td>falar no chat de voz</td><td>Menu → Opções</td><td>configurar microfone e voz</td></tr>
       <tr><td>6 7 8</td><td>slots extras (ferramentas)</td><td>B / botão direito (banjo)</td><td>painel de notas do banjo</td></tr>
+      <tr><td>Tab</td><td>inventário: arraste para organizar a barra ou para largar no chão</td><td>T (sem construir)</td><td>largar a arma da mão</td></tr>
+      <tr><td>L</td><td>travar o corpo na direção da câmera (3ª pessoa, bom no corpo a corpo)</td><td>E perto de um saco</td><td>pegar itens largados</td></tr>
     </table>
     <h3>Construção</h3>
     <p><b>CONTORNO VERDE → CLIQUE ESQUERDO PEGA → MOUSE/CÂMERA ARRASTA → [Q] SOLTA</b></p>

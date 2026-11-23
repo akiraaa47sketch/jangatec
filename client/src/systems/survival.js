@@ -53,6 +53,12 @@ export class Survival {
     }
     return parts.join('  ');
   }
+  // Tira itens da mochila (para largar). Retorna quantos saíram.
+  take(item, n) {
+    const have = this.inv[item] || 0, k = Math.min(have, Math.max(0, Math.floor(n)));
+    if (k) this.inv[item] = have - k;
+    return k;
+  }
   use(item) {
     if (!USE[item] || !this.inv[item] || this.G.player.dead) return;
     if (this.G.player.downed) { this.G.hud.msg('Caído você não consegue se curar — espere um aliado'); return; }

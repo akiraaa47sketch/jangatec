@@ -41,7 +41,7 @@ function getRoom(name, meta = {}) {
       max: meta.max || MAX_PLAYERS, created: Date.now(),
       seed: Number.isFinite(meta.seed) ? Math.floor(Math.abs(meta.seed)) % 1e9 : Math.floor(Math.random() * 1e9), players: new Map(), hostId: null,
       added: [], removed: [], collected: [], placed: new Map(), welded: new Map(),
-      crates: new Map(), boat: null, start: null,
+      crates: new Map(), drops: new Map(), boat: null, start: null,
     };
     rooms.set(name, r);
   }
@@ -58,6 +58,15 @@ function placementState(id, state) {
       !Array.isArray(state.q) || state.q.length !== 4 ||
       !state.p.concat(state.q).every(Number.isFinite)) return null;
   return { id, p: state.p, q: state.q, placed: true, water: !!state.water };
+}
+
+const ITEM_RE = /^(metal|bandagem|kit|municao|cartucho|canhao|gancho|bala_canhao|barra_proteina|energetico|chocolate|arma_[a-z0-9_]+)$/;
+function cleanDrop(d) {
+  if (!d || typeof d.id !== 'string' || d.id.length > 64 || !Array.isArray(d.p) || d.p.length !== 3 || !d.p.every(Number.isFinite) || !d.loot || typeof d.loot !== 'object') return null;
+  const loot = {};
+  for (const [k, v] of Object.entries(d.loot).slice(0, 12)) if (ITEM_RE.test(k) && Number.isFinite(v) && v >= 1) loot[k] = Math.min(999, Math.floor(v));
+  if (!Object.keys(loot).length) return null;
+  return { id: d.id, loot, p: d.p.map((v) => Math.round(v * 100) / 100), ab: d.ab ? 1 : 0, w: d.w ? 1 : 0 };
 }
 
 function canReachMast(room, ws) {
@@ -130,7 +139,7 @@ function handle(ws, m) {
       t: 'welcome', id: ws.id, seed: room.seed, host: room.hostId, room: { id: room.name, title: room.title, locked: !!room.passHash, max: room.max },
       added: room.added, removed: room.removed, collected: room.collected,
       placed: [...room.placed.values()], welded: [...room.welded.values()],
-      crates: [...room.crates.values()], boat: room.boat, start: room.start, event: room.event || null,
+      crates: [...room.crates.values()], drops: [...room.drops.values()], boat: room.boat, start: room.start, event: room.event || null,
     });
     broadcast(room, { t: 'msg', text: `${ws.name} entrou` }, ws);
     return;
@@ -197,6 +206,22 @@ function handle(ws, m) {
       }
       ws.openedCrates.add(m.id);
       broadcast(room, { t: 'crate:state', id: crate.id, loot: crate.loot });
+      break;
+    }
+    case 'drop:add': { // jogador largou itens no mundo (saquinho)
+      const d = cleanDrop(m.d);
+      if (!d || room.drops.has(d.id)) break;
+      if (room.drops.size >= 80) room.drops.delete(room.drops.keys().next().value); // some o mais antigo
+      room.drops.set(d.id, d);
+      broadcast(room, { t: 'drop:add', d }, ws);
+      break;
+    }
+    case 'drop:take': { // o primeiro que pedir leva
+      const d = typeof m.id === 'string' && room.drops.get(m.id);
+      if (!d) break;
+      room.drops.delete(d.id);
+      send(ws, { t: 'drop:got', loot: d.loot });
+      broadcast(room, { t: 'drop:remove', id: d.id });
       break;
     }
     case 'crate:take': {

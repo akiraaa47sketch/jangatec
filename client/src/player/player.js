@@ -189,7 +189,7 @@ export class Player {
     }
     if (this.yank) { b.vel.x = this.yank.vx; b.vel.z = this.yank.vz; if (this.swimming) b.pos.y += 3.5 * dt; } // puxado pelo gancho
     if (this.firstPerson) this.yaw = Math.atan2(fx, fz);
-    else if (aiming || this.aimHold > 0) this.yaw = lerpAngle(this.yaw, Math.atan2(fx, fz), Math.min(1, 16 * dt));
+    else if (aiming || this.aimHold > 0 || (this.faceCam && !this.swimming)) this.yaw = lerpAngle(this.yaw, Math.atan2(fx, fz), Math.min(1, 16 * dt)); // [L] trava o corpo na câmera
     else if (moving) this.yaw = lerpAngle(this.yaw, Math.atan2(dx, dz), Math.min(1, 12 * dt));
 
     if (inp.act('jump') && !this.downed) {

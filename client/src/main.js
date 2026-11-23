@@ -34,6 +34,8 @@ import { upgradeWaitingPills } from './player/pillhands.js';
 import { Naval } from './systems/naval.js';
 import { Tools } from './systems/tools.js';
 import { Siege } from './systems/siege.js';
+import { Drops } from './systems/drops.js';
+import { Inventory } from './ui/inventory.js';
 
 const $ = (id) => document.getElementById(id);
 const canvas = $('c');
@@ -91,6 +93,8 @@ G.interact = new Interact(G);
 G.naval = new Naval(G);     // canhões, navios piratas e dano por peça
 G.siege = new Siege(G);   // torres de sucata (derrubar com canhão) e morteiros
 G.tools = new Tools(G);     // banjo (música que cura) e gancho
+G.drops = new Drops(G);     // itens largados no mundo
+G.inventory = new Inventory(G); // tela de inventário (Tab)
 const atmo = new Atmosphere(renderer, scene, { sun, hemisphere }); // céu, IBL e sombras
 const ocean = new Ocean(scene, atmo);
 ocean.islandSource = () => G.world.islands;
@@ -161,7 +165,9 @@ function start(seed, welcome) {
   G.player.setAppearance(characterAppearance());
   if (G.world && G.world.farSeabed) scene.remove(G.world.farSeabed); // o mundo do menu sai de cena
   G.world = new World(G, seed);
+  G.drops.clear();
   if (welcome) {
+    for (const d of welcome.drops || []) G.drops.spawn(d);
     for (const placed of welcome.placed || []) G.world.placedStates.set(placed.id, placed);
     for (const welded of welcome.welded || []) G.world.weldedStates.set(welded.physObjId, welded);
     for (const crate of welcome.crates || []) G.world.crateStates.set(crate.id, crate);
@@ -220,6 +226,10 @@ function hotkeys() {
     if (inp.act('help')) $('help').hidden = !$('help').hidden;
     if (inp.act('camera')) G.player.setFirstPerson(!G.player.firstPerson);
   }
+  if (inp.act('lockCam') && !G.build.active && !G.interact.lootOpen) {
+    G.player.faceCam = !G.player.faceCam;
+    G.hud.msg(G.player.faceCam ? 'Corpo travado na direção da câmera' : 'Corpo livre (vira para onde anda)');
+  }
   if (G.build.active || G.interact.lootOpen || G.gfxMenu.open || G.keysMenu.open || G.naval.manning || G.tools.menuOpen) return;
   for (let i = 0; i < 6; i++) if (inp.act('slot' + (i + 1))) G.combat.select(i);
   if (inp.mouse.wheel) G.combat.cycle(Math.sign(inp.mouse.wheel));
@@ -258,6 +268,7 @@ function frame() {
     const dyaw = boat.carry(player.body);
     player.yaw += dyaw; player.camYaw += dyaw;
   }
+  G.inventory.update();
   hotkeys();
   player.update(dt, t);
   G.viewmodel.update(dt, t);
@@ -272,6 +283,7 @@ function frame() {
   G.naval.update(dt, t);
   G.siege.update(dt, t);
   G.tools.update(dt, t);
+  G.drops.update(dt);
   if (G.bench) G.bench.update(dt);
   G.interact.update(dt);
   G.combat.update(dt);

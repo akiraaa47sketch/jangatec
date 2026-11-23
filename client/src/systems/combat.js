@@ -93,6 +93,41 @@ export class Combat {
     return true;
   }
 
+  // Sem arma na mão (largou a última)
+  unequip() {
+    this.weaponId = null; this.cooldown = 0; this.reloading = 0;
+    const pl = this.G.player, mesh = pl.weaponMesh, chest = pl.chestMount;
+    if (mesh) for (const old of mesh.children.slice()) mesh.remove(old);
+    if (chest) for (const old of chest.children.slice()) chest.remove(old);
+    pl.flashMesh = null; pl.weaponSpec = null;
+    if (pl.fitWeapon3P) pl.fitWeapon3P();
+  }
+
+  // Tira a arma do inventário (para largar). A munição no pente volta para a mochila.
+  removeWeapon(id) {
+    if (!this.owned.has(id)) return false;
+    const w = WEAPONS.find((e) => e.id === id), inv = this.G.survival.inv;
+    if (w && w.ammo && this.mags[id]) { inv[w.ammo] = (inv[w.ammo] || 0) + this.mags[id]; this.mags[id] = 0; }
+    this.owned.delete(id);
+    const i = this.hotbar.indexOf(id);
+    if (i >= 0) this.hotbar[i] = null;
+    if (this.weaponId === id) {
+      const next = this.hotbar.find(Boolean) || [...this.owned][0];
+      if (next) this.equip(next); else this.unequip();
+    }
+    return true;
+  }
+
+  // Organização da barra rápida: põe a arma no slot (troca de lugar se ele já estiver ocupado)
+  assignSlot(id, slot) {
+    if (!this.owned.has(id) || slot < 0 || slot >= this.hotbar.length) return;
+    const from = this.hotbar.indexOf(id), there = this.hotbar[slot];
+    if (from >= 0) this.hotbar[from] = there; // troca de lugar com o que estava lá
+    this.hotbar[slot] = id;
+  }
+  // tira da barra rápida (fica só na mochila)
+  unassign(id) { const i = this.hotbar.indexOf(id); if (i >= 0) this.hotbar[i] = null; }
+
   select(slot) {
     if (this.buildMode) return;
     const id = this.hotbar[slot];
