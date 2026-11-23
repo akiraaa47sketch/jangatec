@@ -9,6 +9,29 @@ import { sandTexture, sandBump, repeated } from './textures.js';
 import { makeRock } from './models.js';
 
 const S = WORLD_LOOT_PARAMS.chunkSize;
+// Redemoinho do furacão: o funil d'água desce bem mais fundo que o fundo do mar. Para o centro
+// nunca ficar "seco", o fundo (e pedras/algas) afunda junto, só debaixo do funil (no shader).
+const VORTEX_U = { uSbVortex: { value: new THREE.Vector4(0, 0, 70, 9) }, uSbVortexK: { value: 0 } };
+export function setSeabedVortex(v) {
+  VORTEX_U.uSbVortex.value.set(v.x, v.z, v.R, v.depth); VORTEX_U.uSbVortexK.value = v.k || 0;
+}
+export function patchVortexDip(material) {
+  if (!material || material.userData.vortexDip) return;
+  material.userData.vortexDip = true;
+  const prev = material.onBeforeCompile;
+  material.onBeforeCompile = (shader, r) => {
+    if (prev) prev(shader, r);
+    Object.assign(shader.uniforms, VORTEX_U);
+    shader.vertexShader = 'uniform vec4 uSbVortex; uniform float uSbVortexK;\n' + shader.vertexShader.replace('#include <begin_vertex>', `#include <begin_vertex>
+      if (uSbVortexK > 0.0) {
+        vec4 vwp = modelMatrix * vec4(transformed, 1.0);
+        float vq = length(vwp.xz - uSbVortex.xy) / uSbVortex.z;
+        transformed.y -= uSbVortexK * (uSbVortex.w * 2.0 + 4.0) * exp(-vq * vq * 1.4);
+      }`);
+  };
+  material.needsUpdate = true;
+}
+
 export const SEABED = { base: -4.6, min: -6.4, islandEdge: 0.8, starterEdge: -2.0, slope: 32 };
 
 // Ilha do chunk (mesma ordem de RNG de World.makeChunk/makeIsland).

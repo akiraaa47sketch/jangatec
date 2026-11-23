@@ -69,6 +69,13 @@ function cleanDrop(d) {
   return { id: d.id, loot, p: d.p.map((v) => Math.round(v * 100) / 100), ab: d.ab ? 1 : 0, w: d.w ? 1 : 0 };
 }
 
+function cleanLoot(l) {
+  if (!l || typeof l !== 'object') return null;
+  const out = {};
+  for (const [k, v] of Object.entries(l).slice(0, 8)) if (ITEM_RE.test(k) && Number.isFinite(v) && v >= 1) out[k] = Math.min(99, Math.floor(v));
+  return Object.keys(out).length ? out : null;
+}
+
 function canReachMast(room, ws) {
   const player = room.players.get(ws.id);
   const state = player && player.state;
@@ -208,6 +215,22 @@ function handle(ws, m) {
       broadcast(room, { t: 'crate:state', id: crate.id, loot: crate.loot });
       break;
     }
+    // Inimigos sincronizados (o host simula): fotos, acertos, mortes, dano em jogadores e efeitos.
+    case 'ens': if (room.hostId === ws.id && Array.isArray(m.l) && m.l.length <= 80) broadcast(room, { t: 'ens', l: m.l }, ws); break;
+    case 'ehit': case 'emod': case 'chit': case 'fishtake': case 'fx': {
+      if (typeof m.id !== 'undefined' && (typeof m.id !== 'string' || m.id.length > 80)) break;
+      const s = JSON.stringify({ ...m, from: ws.id });
+      if (s.length > 4000) break;
+      for (const p of room.players.values()) if (p.ws !== ws && p.ws.readyState === 1) p.ws.send(s);
+      break;
+    }
+    case 'edie': if (room.hostId === ws.id && typeof m.id === 'string') broadcast(room, { t: 'edie', id: m.id.slice(0, 80), side: m.side === -1 ? -1 : 1, to: typeof m.to === 'string' ? m.to : null, loot: cleanLoot(m.loot) }, ws); break;
+    case 'pdmg': { // dano do inimigo (no host) num aliado: vai só para ele
+      if (room.hostId !== ws.id) break;
+      const target = room.players.get(m.to);
+      if (target) send(target.ws, { t: 'pdmg', to: m.to, dmg: Math.min(200, +m.dmg || 0), src: String(m.src || '').slice(0, 30), eid: typeof m.eid === 'string' ? m.eid.slice(0, 80) : null, ex: +m.ex || 0, ez: +m.ez || 0, k: m.k === 'kick' || m.k === 'melee' ? m.k : 'shot', h: m.h ? 1 : 0 });
+      break;
+    }
     case 'drop:add': { // jogador largou itens no mundo (saquinho)
       const d = cleanDrop(m.d);
       if (!d || room.drops.has(d.id)) break;
@@ -305,9 +328,10 @@ function handle(ws, m) {
       break;
     }
     case 'event': {
-      // Onda gigante / furacão sorteados pelo host: valida e repassa a todos.
+      // Eventos do mar sorteados pelo host (onda, furacão, tempestade, kraken, tubarões, peixes, raios,
+      // navio-fantasma): valida e repassa a todos.
       const e = m.e;
-      if (room.hostId !== ws.id || !e || !['tsunami', 'furacao', 'tempestade'].includes(e.kind) ||
+      if (room.hostId !== ws.id || !e || !['tsunami', 'furacao', 'tempestade', 'kraken', 'tubaroes', 'peixes', 'raios', 'fantasma'].includes(e.kind) ||
           typeof e.id !== 'string' || e.id.length > 40) break;
       const keys = ['t0', 'dur', 'ox', 'oz', 'dx', 'dz', 'speed', 'A', 'sigma', 'cx', 'cz', 'fx', 'fz', 'lat', 'latV', 'ahead', 'R', 'depth', 'spin', 'seed', 'n'];
       const clean = { id: e.id, kind: e.kind, end: !!e.end };
@@ -316,7 +340,7 @@ function handle(ws, m) {
         if (!Number.isFinite(e[key])) return;
         clean[key] = e[key];
       }
-      if (!Number.isFinite(clean.t0) || !Number.isFinite(clean.dur) || clean.dur > 120) break;
+      if (!Number.isFinite(clean.t0) || !Number.isFinite(clean.dur) || clean.dur > 300) break;
       room.event = clean.end ? null : clean;
       broadcast(room, { t: 'event', e: clean }, ws);
       break;

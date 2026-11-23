@@ -106,6 +106,7 @@ export class Net {
       case 'rtc': if (G.voice) G.voice.signal(m); break;
       case 'revive': if (m.id === this.id) G.survival.revive(m.by); break;
       case 'drag': G.world.applyDrag(m); break;
+      case 'ens': case 'ehit': case 'emod': case 'edie': case 'pdmg': case 'chit': case 'fishtake': case 'fx': G.enemyNet.handle(m); break;
       case 'drop:add': G.drops.spawn(m.d); break;
       case 'drop:remove': G.drops.remove(m.id); break;
       case 'drop:got': G.drops.got(m.loot); break;

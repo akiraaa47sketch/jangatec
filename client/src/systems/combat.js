@@ -215,7 +215,7 @@ export class Combat {
     if (!vm && G.player.flashMesh) origin = G.player.flashMesh.getWorldPosition(_mw);
     const spread = w.spread * (this.aiming ? 0.4 : 1);
     cam.getWorldPosition(_o);
-    const targets = G.enemies.hitMeshes.concat(G.solids);
+    const targets = G.enemies.hitMeshes.concat(G.solids), ends = [];
     for (let i = 0; i < w.pellets; i++) {
       cam.getWorldDirection(_dir);
       _dir.x += (Math.random() - 0.5) * 2 * spread; _dir.y += (Math.random() - 0.5) * 2 * spread; _dir.z += (Math.random() - 0.5) * 2 * spread;
@@ -226,8 +226,9 @@ export class Combat {
       const hit = this.ray.intersectObjects(targets, false)[0];
       const end = hit ? hit.point.clone() : _o.clone().addScaledVector(_dir, w.range);
       if (hit && hit.object.userData.enemy) G.enemies.damage(hit.object.userData.enemy, Math.round(w.dmg * G.survival.dmgMul));
-      this.tracer(origin.clone(), end);
+      this.tracer(origin.clone(), end); ends.push(end);
     }
+    if (G.enemyNet) G.enemyNet.playerShot(origin, ends, w.id, GUN_SOUND[w.id] || 'pistol'); // os aliados veem e ouvem o tiro
     this._useDurability(w);
     // recuo: a mira sobe e puxa para o lado; volta só uma parte (automáticas acumulam)
     const rk = RECOIL[w.id] || [w.recoil * 3, w.recoil];

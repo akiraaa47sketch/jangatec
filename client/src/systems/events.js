@@ -15,6 +15,7 @@ import { clamp, clock, mulberry32 } from '../core/util.js';
 import { sea, eventHeight } from '../world/ocean.js';
 import { sfx, ambience } from '../core/sfx.js';
 import { SEA_KINDS, SEA_BALANCE } from './seaevents.js';
+import { setSeabedVortex } from '../world/seabed.js';
 
 export const EVENT_BALANCE = {
   first: [200, 320],         // s depois da partida até o primeiro evento
@@ -216,10 +217,7 @@ export class Events {
     const old = this.current;
     this.current = null;
     if (old && SEA_KINDS.includes(old.kind) && this.G.seaEvents) this.G.seaEvents.finish(old);
-    if (old && old.kind === 'furacao') { // o redemoinho fecha e deixa um naufrágio raro no centro
-      this.G.hud.msg('O redemoinho se fechou e trouxe à tona destroços de um naufrágio!');
-      if (this._isHost() && this.lastCx != null && this.G.seaEvents) this.G.seaEvents.spawnLoot(this.lastCx, this.lastCz, 3, 'naufragio');
-    }
+
     sea.surge.A = 0;
     sea.vortex.k = 0;
     this.timer = between(EVENT_BALANCE.interval);
@@ -250,6 +248,7 @@ export class Events {
       }
     }
     if (!e || e.kind !== 'furacao') G.player.drift = null;
+    setSeabedVortex(sea.vortex);
     if (e && e.kind === 'tempestade' && Math.random() < dt * 0.6 * this.stormBoost(t)) {
       this.flash = 1; G.hud.flash('lightning'); this.shake = Math.max(this.shake, 0.15);
       sfx.thunder(0.2 + Math.random() * 1.2, Math.random());

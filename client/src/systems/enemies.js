@@ -58,12 +58,51 @@ export function ghostify(e) {
 
 export class Enemies {
   constructor(G) {
-    this.G = G; this.list = []; this.hitMeshes = []; this.tick = 0;
+    this.G = G; this.list = []; this.hitMeshes = []; this.tick = 0; this.ids = new Map(); this.P = [];
+    this.localT = { key: 'L', local: true, pos: null, vel: null };
     this.pirateSpawnTimer = between(PIRATE_BALANCE.firstWave); this.pirateWave = 0;
   }
 
+  // Multiplayer: só o host simula os inimigos (os outros recebem réplicas — ver enemynet.js).
+  get auth() { const n = this.G.net; return !n.online || n.isHost; }
+  byId(id) { return this.ids.get(id); }
+
+  // Jogadores que os inimigos podem caçar: o local + os aliados (posição interpolada no mundo).
+  players() {
+    const G = this.G, pl = G.player, L = this.localT;
+    Object.assign(L, { pos: pl.body.pos, vel: pl.body.vel, dead: pl.dead, downed: pl.downed, aboard: pl.aboard, swimming: pl.swimming });
+    const out = [L];
+    if (G.net.online) for (const [id, r] of G.net.remotes) {
+      if (!r.s || !r.mesh) continue;
+      const T = r.tgt || (r.tgt = { key: id, id, local: false, pos: new THREE.Vector3(), vel: new THREE.Vector3(), last: null });
+      r.mesh.getWorldPosition(T.pos);
+      if (T.last) T.vel.subVectors(T.pos, T.last).multiplyScalar(30); else T.last = new THREE.Vector3();
+      T.last.copy(T.pos);
+      T.dead = !!r.s.dead; T.downed = !!r.s.dn; T.aboard = !!r.s.ab; T.swimming = !!r.s.sw; T.guard = r.s.po === 'guard';
+      out.push(T);
+    }
+    return out;
+  }
+  // Alvo de um inimigo: o jogador vivo mais perto (mantém o atual se a diferença for pequena).
+  pickTarget(e) {
+    const p = e.body.pos;
+    let best = null, bd = Infinity;
+    for (const T of this.P) {
+      if (T.dead || T.downed) continue;
+      let d = Math.hypot(T.pos.x - p.x, T.pos.z - p.z);
+      if (e.tgt && e.tgt.key === T.key) d -= 3;
+      if (d < bd) { bd = d; best = T; }
+    }
+    return best || e.tgt || this.localT;
+  }
+  // Dano de inimigo num jogador: o local leva aqui; o aliado recebe pela rede (e se defende lá).
+  hurt(T, dmg, src, e, extra = {}) {
+    if (T.local) { this.G.survival.damage(dmg, src); return; }
+    this.G.net.send({ t: 'pdmg', to: T.id, dmg: Math.round(dmg * 10) / 10, src, eid: e.id, ex: Math.round(e.body.pos.x * 10) / 10, ez: Math.round(e.body.pos.z * 10) / 10, ...extra });
+  }
+
   spawnForIsland(isl, _r) {
-    if (isl.starter) return;
+    if (isl.starter || !this.auth) return;
     const G = this.G, r = mulberry32(hash2(G.world.seed, Math.round(isl.x) + 9, Math.round(isl.z) - 9));
     const pool = BY_DIFF[isl.diff];
     const baseCount = isl.diff === 0 ? (r() < 0.5 ? 1 : 0) : 1 + isl.diff + ((r() * 2) | 0);
@@ -123,7 +162,7 @@ export class Enemies {
     e.hitT = 0; e.deathT = 0; e.deathSide = Math.random() < 0.5 ? 1 : -1;
     mesh.position.copy(e.body.pos);
     this.G.scene.add(mesh);
-    this.list.push(e);
+    this.list.push(e); this.ids.set(id, e);
     if (isl) isl.enemies.push(e);
     return e;
   }
@@ -133,7 +172,7 @@ export class Enemies {
     e.creature = true; e.state = e.state || 'creature'; e.def = e.def || { nome: 'Criatura' };
     e.yaw = e.yaw || 0; e.hitT = 0; e.mats = new Set(); e.m = { state: 'idle', t: 0 };
     e.mesh.traverse((o) => { if (o.isMesh) { o.userData.enemy = e; this.hitMeshes.push(o); e.mats.add(o.material); } });
-    this.list.push(e);
+    this.list.push(e); this.ids.set(e.id, e);
     return e;
   }
   remove(e) {
@@ -143,6 +182,7 @@ export class Enemies {
     this._removeRaft(e);
     e.mesh.traverse((o) => { if (o.isMesh) { const i = this.hitMeshes.indexOf(o); if (i >= 0) this.hitMeshes.splice(i, 1); } });
     const i = this.list.indexOf(e); if (i >= 0) this.list.splice(i, 1);
+    if (this.ids.get(e.id) === e) this.ids.delete(e.id);
     if (e.isl) {
       const j = e.isl.enemies.indexOf(e);
       if (j >= 0) e.isl.enemies.splice(j, 1);
@@ -150,13 +190,21 @@ export class Enemies {
   }
   removeIsland(isl) { for (const e of isl.enemies.slice()) this.remove(e); isl.enemies.length = 0; }
 
-  damage(e, n) {
+  // by = quem bateu ('L' = jogador local, ou o id do aliado); remote = veio pela rede (não reenviar)
+  damage(e, n, by = 'L', remote = false) {
     if (e.state === 'dead') return;
-    if (e.creature) { // quem decide o que acontece é o evento
+    const G = this.G;
+    if (e.creature) { // quem decide o que acontece é o evento (todos os clientes aplicam o mesmo dano)
       if (e.immune) return;
+      if (!remote && G.net.online) G.net.send({ t: 'chit', id: e.id, n: Math.round(n) });
       e.hp -= n; e.hitT = 0.22;
       if (e.ai && e.ai.onHit) e.ai.onHit(e, n);
-      if (e.hp <= 0) { e.state = 'dead'; if (e.ai && e.ai.onDeath) e.ai.onDeath(e); }
+      if (e.hp <= 0) { e.state = 'dead'; if (e.ai && e.ai.onDeath) e.ai.onDeath(e, by); }
+      return;
+    }
+    if (e.replica) { // inimigo de outro jogador (host): o acerto vai para ele decidir
+      e.hp -= n; e.hitT = 0.22;
+      G.net.send({ t: 'ehit', id: e.id, n: Math.round(n) });
       return;
     }
     e.hp -= n;
@@ -169,16 +217,23 @@ export class Enemies {
       this.G.world.collected.add(e.id);
       const r = Math.random();
       const loot = r < 0.4 ? { municao: 6 } : r < 0.75 ? { bandagem: 1 } : r < 0.85 ? { cartucho: 4 } : null;
-      this.G.hud.msg(`${e.def.nome} derrotado` + (loot ? '  ' + this.G.survival.add(loot) : ''));
       // piratas (e às vezes saqueadores) largam o sabre
-      const dropChance = e.type === 'pirata' ? 0.45 : e.type === 'melee' ? 0.12 : 0;
-      if (dropChance && Math.random() < dropChance && !this.G.combat.owned.has('sabre') && this.G.combat.unlockWeapon('sabre') === true) this.G.hud.msg('Você pegou um Sabre pirata ★★★!');
+      const dropChance = e.type === 'pirata' || e.type === 'fantasma' ? 0.45 : e.type === 'melee' ? 0.12 : 0;
+      const sabre = dropChance && Math.random() < dropChance;
+      if (by === 'L' || !G.net.online) { // o loot vai para quem matou
+        this.G.hud.msg(`${e.def.nome} derrotado` + (loot ? '  ' + this.G.survival.add(loot) : ''));
+        if (sabre && !this.G.combat.owned.has('sabre') && this.G.combat.unlockWeapon('sabre') === true) this.G.hud.msg('Você pegou um Sabre pirata ★★★!');
+      } else this.G.hud.msg(`${e.def.nome} derrotado`);
+      if (G.net.online) {
+        G.net.send({ t: 'edie', id: e.id, side: e.deathSide, to: by === 'L' ? null : by, loot: loot ? { ...loot, ...(sabre ? { arma_sabre: 1 } : {}) } : sabre ? { arma_sabre: 1 } : null });
+        if (!e.pirate) G.net.send({ t: 'collect', id: e.id }); // quem entrar depois não vê ele de novo
+      }
     }
   }
 
   updatePirateWaves(dt) {
     const G = this.G;
-    if (!G.startup.departed) return;
+    if (!G.startup.departed || !this.auth) return;
     this.pirateSpawnTimer -= dt;
     if (this.pirateSpawnTimer > 0) return;
     if (G.startup.waterLevel < 0.5) { this.pirateSpawnTimer = 20; return; } // oceano seco: sem balsas
@@ -213,6 +268,7 @@ export class Enemies {
 
   // Tripulação do navio de abordagem: espera no convés do navio e pula de corda, um por vez.
   spawnBoarders(s) {
+    if (!this.auth) return; // a tripulação chega aos outros como réplica
     const n = 3 + Math.min(3, Math.floor(s.diff / 1.5));
     for (let i = 0; i < n; i++) {
       const id = `${s.id}-b${i}`;
@@ -342,12 +398,13 @@ export class Enemies {
     b.vel.y = Math.max(b.vel.y - CFG.gravity * dt, -20); p.y += b.vel.y * dt;
     G.colliders.resolve(b, prevY);
     e.cd -= dt;
-    const alive = !G.player.dead && !G.player.downed;
+    const T = e.tgt || this.localT, alive = !T.dead && !T.downed;
     if (alive && dist < (M ? M.range : 80)) {
       e.yaw = lerpAngle(e.yaw, Math.atan2(pdx, pdz), Math.min(1, 4 * dt));
-      if (M && e.cd <= 0 && dist > M.minRange) { e.cd = M.cd[0] + Math.random() * (M.cd[1] - M.cd[0]); G.siege.mortarShot(e); }
+      if (M && e.cd <= 0 && dist > M.minRange) { e.cd = M.cd[0] + Math.random() * (M.cd[1] - M.cd[0]); G.siege.mortarShot(e, T); }
     }
     e.mesh.position.copy(p); e.mesh.rotation.y = e.yaw;
+    e.netPose = e.swing > 0 ? 'throw' : 'walk'; e.netProg = e.swing > 0 ? 1 - e.swing / 0.3 : 0; e.netSpd = 0;
     animateEnemy(e.mesh, 0, dt, e.swing > 0 ? 'throw' : 'walk', e.swing > 0 ? 1 - e.swing / 0.3 : 0);
     this._animateHit(e, dt);
     if (e.swing > 0) e.swing = Math.max(0, e.swing - dt);
@@ -493,8 +550,10 @@ export class Enemies {
   }
 
   updatePirate(e, dt) {
-    const G = this.G, boat = G.boat, b = e.body, p = b.pos, pp = G.player.body.pos;
+    const G = this.G, boat = G.boat, b = e.body, p = b.pos;
     if (e.state === 'dead') { this._animateDeath(e, dt); return; }
+    const T = this.pickTarget(e), pp = T.pos; e.tgt = T;
+    e.netPose = e.state === 'approach' ? 'row' : e.state === 'grapple' ? 'leap' : 'walk'; e.netProg = 0; e.netSpd = 0;
     e.cd -= dt;
     if (e.state === 'onShip') { // no navio esperando a vez de pular
       if (!e.ship || e.ship.sinkT > 0) { this.damage(e, 9999); return; }
@@ -562,7 +621,7 @@ export class Enemies {
     if (e.knock) [e.local.x, e.local.z] = boat.toLocal(p.x, p.z);
     // no convés também revezam: quem não está engajado espera mais afastado
     const stopAt = e.engaged === false ? Math.min(3.6, Math.max(2.4, boat.set.radius * 0.9)) : e.def.range * 0.7;
-    if (!G.player.dead && !G.player.downed && distance > stopAt && !(mres && mres.hold)) {
+    if (!T.dead && !T.downed && distance > stopAt && !(mres && mres.hold)) {
       moved = Math.min(distance - stopAt, (e.engaged === false ? 0.45 : 1) * e.def.speed * dt);
       e.local.x += dx / distance * moved;
       e.local.z += dz / distance * moved;
@@ -598,13 +657,14 @@ export class Enemies {
     e.mesh.position.copy(p);
     e.mesh.rotation.y = e.yaw;
     animateEnemy(e.mesh, dt > 0 ? moved / dt : 0, dt, mres ? mres.pose : 'walk', mres ? mres.progress || 0 : 0);
+    e.netPose = mres ? mres.pose : 'walk'; e.netProg = mres ? mres.progress || 0 : 0; e.netSpd = dt > 0 ? moved / dt : 0;
     this._animateHit(e, dt);
     if (e.swing > 0) e.swing = Math.max(0, e.swing - dt);
   }
 
   // Linha de visão do olho do inimigo até o peito do jogador (paredes, troncos, terreno bloqueiam)
   hasLos(e, h = 1.35) {
-    const p = e.body.pos, pp = this.G.player.body.pos;
+    const p = e.body.pos, pp = (e.tgt || this.localT).pos || this.G.player.body.pos;
     return !this.G.colliders.segmentBlocked(p.x, p.y + h * e.def.scale, p.z, pp.x, pp.y + 1.15, pp.z);
   }
 
@@ -636,17 +696,26 @@ export class Enemies {
   // Escolhe quem fica perto do jogador. Prioridade: quem está no meio de um golpe, depois o mais
   // perto (com folga para quem já estava engajado). Quem passou muito tempo na frente dá a vez.
   direct(dt) {
-    const pp = this.G.player.body.pos, D = COMBAT_DIRECTOR, pool = [];
+    const D = COMBAT_DIRECTOR, pools = new Map(); // um "diretor" por jogador alvo
     for (const e of this.list) {
+      if (e.creature || e.replica) continue;
       const melee = !e.def.ranged && !e.def.mortar && e.state !== 'dead';
       const fighting = e.pirate ? e.state === 'boarded' : e.state === 'chase' || e.state === 'attack';
+      const T = e.tgt || this.localT, pp = T.pos || this.G.player.body.pos;
       const d = Math.hypot(pp.x - e.body.pos.x, pp.z - e.body.pos.z);
       if (!melee || !fighting || d > 14) { e.engaged = undefined; e.engageT = 0; continue; }
       const busy = e.m && (e.m.token || e.m.state === 'windup' || e.m.state === 'strike' || e.m.state === 'guard');
       if (e.restT > 0) e.restT -= dt;
       e.engageScore = busy ? -100 : d - (e.engaged ? 1.5 : 0) + (e.engaged && e.engageT > D.rotateAfter ? 6 : 0) + (e.restT > 0 ? 6 : 0);
-      pool.push(e);
+      if (!pools.has(T.key)) pools.set(T.key, []);
+      pools.get(T.key).push(e);
     }
+    for (const pool of pools.values()) this._directPool(pool, dt);
+    // rajadas dos atiradores em andamento
+    this.bursting = this.list.filter((e) => e.burstLeft > 0 && e.state !== 'dead').length;
+  }
+  _directPool(pool, dt) {
+    const D = COMBAT_DIRECTOR;
     pool.sort((a, b) => a.engageScore - b.engageScore);
     const rotate = pool.length > D.engaged; // só faz rodízio se tem gente esperando
     pool.forEach((e, i) => {
@@ -657,12 +726,10 @@ export class Enemies {
       e.engaged = on;
       if (!e.waitOff) e.waitOff = Math.random() * 1.4; // anel de espera com distâncias variadas
     });
-    // rajadas dos atiradores em andamento
-    this.bursting = this.list.filter((e) => e.burstLeft > 0 && e.state !== 'dead').length;
   }
 
   think(e, dist, pdx, pdz) {
-    const def = e.def, alive = !this.G.player.dead && !this.G.player.downed; // caído: inimigos perdem o interesse
+    const T = e.tgt || this.localT, def = e.def, alive = !T.dead && !T.downed; // caído: inimigos perdem o interesse
     e.los = dist < SIGHT + 10 ? this.hasLos(e) : false;
     switch (e.state) {
       case 'idle': case 'patrol': case 'search': {
@@ -682,14 +749,15 @@ export class Enemies {
         if (e.post) { e.state = e.los && dist < def.range ? 'attack' : 'chase'; e.goal = null; break; } // no alto da torre: não desce
         if (def.ranged && dist < 6 && e.los) { e.state = 'retreat'; e.goal = [e.body.pos.x - pdx * 6, e.body.pos.z - pdz * 6]; }
         else if (dist < def.range && e.los) e.state = 'attack';
-        else { e.state = 'chase'; e.goal = this.route(e, this.G.player.body.pos.x, this.G.player.body.pos.z); }
+        else { e.state = 'chase'; e.goal = this.route(e, T.pos.x, T.pos.z); }
         break;
     }
   }
 
   update(dt) {
-    const G = this.G, pp = G.player.body.pos;
-    this.updatePirateWaves(dt);
+    const G = this.G, auth = this.auth;
+    this.P = this.players();
+    if (auth) this.updatePirateWaves(dt);
     this.tick += dt;
     const thinkNow = this.tick > 0.2;
     if (thinkNow) { this.direct(this.tick); this.tick = 0; }
@@ -697,13 +765,16 @@ export class Enemies {
     for (let i = this.list.length - 1; i >= 0; i--) {
       const e = this.list[i], b = e.body, p = b.pos;
       if (e.creature) { if (e.ai && e.ai.update) e.ai.update(e, dt); this._animateHit(e, dt); continue; } // criatura morta também anima (afundando)
+      if (e.replica && auth && !G.enemyNet.adopt(e)) continue; // virou host: assume os inimigos (ou descarta)
+      if (e.replica) { G.enemyNet.animate(e, dt); continue; }
       if (e.pirate) {
         this.updatePirate(e, dt);
         continue;
       }
+      const T = this.pickTarget(e), pp = T.pos; e.tgt = T;
       let pdx = pp.x - p.x, pdz = pp.z - p.z;
       const dist = Math.hypot(pdx, pdz) || 1;
-      if (dist > ACTIVE) continue; // longe: dormindo
+      if (dist > ACTIVE) { e.netPose = 'walk'; e.netSpd = 0; continue; } // longe: dormindo
       pdx /= dist; pdz /= dist;
       if (e.state === 'dead') { this._animateDeath(e, dt); continue; }
       if (e.def.mortar) { this._updateMortar(e, dt, dist, pdx, pdz); continue; }
@@ -752,13 +823,15 @@ export class Enemies {
       }
       if (e.burstLeft > 0 && (e.burstT -= dt) <= 0) { // rajada: tiros em sequência
         e.burstLeft--; e.burstT = 0.13;
-        if (e.los && !G.player.dead) {
-          const moving = Math.hypot(G.player.body.vel.x, G.player.body.vel.z) > 3 ? 0.12 : 0; // correndo é mais difícil de acertar
+        if (e.los && !T.dead) {
+          const moving = Math.hypot(T.vel.x, T.vel.z) > 3 ? 0.12 : 0; // correndo é mais difícil de acertar
           const hit = Math.random() < (e.def.acc || 0.6) - dist * 0.012 - moving;
           const miss = hit ? 0 : 0.8 + Math.random() * 1.2, ma = Math.random() * 6.28;
-          G.combat.tracer(new THREE.Vector3(p.x, p.y + 1.3, p.z), new THREE.Vector3(pp.x + Math.cos(ma) * miss, pp.y + 1.2 + (hit ? 0 : 0.4), pp.z + Math.sin(ma) * miss), 0xffb060);
+          const from = new THREE.Vector3(p.x, p.y + 1.3, p.z), to = new THREE.Vector3(pp.x + Math.cos(ma) * miss, pp.y + 1.2 + (hit ? 0 : 0.4), pp.z + Math.sin(ma) * miss);
+          G.combat.tracer(from, to, 0xffb060);
           sfx.gun(p, e.type === 'soldado' ? 'rifle' : 'pistol');
-          if (hit) G.survival.damage(e.def.dmg, e.def.nome);
+          G.enemyNet.shotFx(from, to, e.type === 'soldado' ? 'rifle' : 'pistol');
+          if (hit) this.hurt(T, e.def.dmg, e.def.nome, e, { k: 'shot' });
           e.swing = 0.25;
         }
       }
@@ -780,6 +853,7 @@ export class Enemies {
       const pose = mres ? mres.pose : e.swing > 0 ? 'attack' : e.def.ranged && facePlayer ? 'aim' : 'walk';
       const swingProgress = mres ? mres.progress || 0 : e.swing > 0 ? 1 - e.swing / 0.25 : 0;
       animateEnemy(e.mesh, Math.hypot(mx, mz), dt, pose, swingProgress);
+      e.netPose = pose; e.netProg = swingProgress; e.netSpd = Math.hypot(mx, mz);
       this._animateHit(e, dt);
       if (e.swing > 0) e.swing = Math.max(0, e.swing - dt);
     }

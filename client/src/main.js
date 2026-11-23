@@ -35,6 +35,7 @@ import { Naval } from './systems/naval.js';
 import { Tools } from './systems/tools.js';
 import { Siege } from './systems/siege.js';
 import { Drops } from './systems/drops.js';
+import { EnemyNet } from './systems/enemynet.js';
 import { SeaEvents } from './systems/seaevents.js';
 import { Inventory } from './ui/inventory.js';
 
@@ -95,6 +96,7 @@ G.naval = new Naval(G);     // canhões, navios piratas e dano por peça
 G.siege = new Siege(G);   // torres de sucata (derrubar com canhão) e morteiros
 G.tools = new Tools(G);     // banjo (música que cura) e gancho
 G.drops = new Drops(G);     // itens largados no mundo
+G.enemyNet = new EnemyNet(G); // inimigos sincronizados (host simula, os outros veem réplicas)
 G.seaEvents = new SeaEvents(G); // kraken, tubarões, peixes voadores e raios
 G.inventory = new Inventory(G); // tela de inventário (Tab)
 const atmo = new Atmosphere(renderer, scene, { sun, hemisphere }); // céu, IBL e sombras
@@ -168,6 +170,7 @@ function start(seed, welcome) {
   if (G.world && G.world.farSeabed) scene.remove(G.world.farSeabed); // o mundo do menu sai de cena
   G.world = new World(G, seed);
   G.drops.clear();
+  for (const e of [...G.enemies.list]) G.enemies.remove(e); // inimigos do mundo do menu não entram na partida
   G.seaEvents.end();
   if (welcome) {
     for (const d of welcome.drops || []) G.drops.spawn(d);
@@ -295,6 +298,7 @@ function frame() {
   G.melee.update(dt);
   G.survival.update(dt);
   G.net.update(dt);
+  G.enemyNet.update(dt);
   G.voice.update(dt);
   atmo.update(dt, camera);
   ocean.update(t, camera.position.x, camera.position.z);

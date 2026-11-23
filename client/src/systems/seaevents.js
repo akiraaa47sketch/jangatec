@@ -229,15 +229,13 @@ export class SeaEvents {
     c.yaw = A.yaw;
   }
   _pickSlam(e, c, A, deckY) {
-    const G = this.G, boat = G.boat, pp = G.player.body.pos;
-    // alvo: o jogador local se estiver a bordo e perto desse lado; senão uma peça da jangada
-    let tx, tz, target = null;
-    const pieces = [...boat.pieces.values()].filter((p) => G.naval.destructible(p));
-    const [plx, plz] = boat.toLocal(pp.x, pp.z);
+    const G = this.G, boat = G.boat;
+    // alvo: uma peça da jangada (mesmo sorteio em todos os jogadores; quem estiver perto leva a pancada)
+    let tx = 0, tz = 0, target = null;
     const [ax, az] = boat.toLocal(A.x, A.z);
-    if (G.player.aboard && Math.hypot(plx - ax, plz - az) < 5.5 && e.r() < 0.6) { tx = plx; tz = plz; }
-    else if (pieces.length) { const p = pieces[(e.r() * pieces.length) | 0]; tx = p.x; tz = p.z; target = p.id; }
-    else { tx = 0; tz = 0; }
+    const pieces = [...boat.pieces.values()].filter((p) => G.naval.destructible(p) && Math.hypot(p.x - ax, p.z - az) < 6).sort((a, b) => (a.id < b.id ? -1 : 1));
+    const roll = e.r();
+    if (pieces.length) { const p = pieces[(roll * pieces.length) | 0]; tx = p.x; tz = p.z; target = p.id; }
     const D = clamp(Math.hypot(tx - ax, tz - az), 1.2, 5.6);
     // procura a pose (inclinação da base + dobra) cuja ponta cai mais perto do alvo
     let bestErr = 1e9;
@@ -327,7 +325,7 @@ export class SeaEvents {
       const c = G.enemies.addCreature({
         id: `${e.id}-s${i}`, mesh, hp: B.hp, max: B.hp, def: { nome: 'Tubarão' }, body: { pos: new THREE.Vector3() },
         a: r() * 6.28, R: 9 + r() * 6, spd: 0.25 + r() * 0.15, dir: r() < 0.5 ? 1 : -1, st: 'circle', stT: 6 + r() * 8, x: 0, z: 0, dive: 0, bite: 0,
-        ai: { update: (c2, dt2) => this._shark(e, c2, dt2), onDeath: (c2) => this._sharkDead(e, c2) },
+        ai: { update: (c2, dt2) => this._shark(e, c2, dt2), onDeath: (c2, by) => this._sharkDead(e, c2, by) },
       });
       const [x, z] = [G.boat.x + Math.cos(c.a) * (c.R + 20), G.boat.z + Math.sin(c.a) * (c.R + 20)]; c.x = x; c.z = z;
       e.creatures.push(c);
@@ -383,11 +381,11 @@ export class SeaEvents {
       if (best) G.naval.damagePiece(best.id, SEA_BALANCE.tubaroes.ram);
     }
   }
-  _sharkDead(e, c) {
+  _sharkDead(e, c, by) {
     const G = this.G;
     sfx.enemyDown(c.body.pos); if (G.melee) G.melee.say(c.body.pos, 'TUBARÃO ABATIDO', '#ffd166', true);
     c.dying = 0; // barriga para cima e afunda (no loop normal)
-    if (Math.random() < 0.6) G.hud.msg(G.survival.add({ peixe: 1 }) + ' (carne de tubarão)');
+    if (by === 'L' && Math.random() < 0.6) G.hud.msg(G.survival.add({ peixe: 1 }) + ' (carne de tubarão)');
     if (e.creatures.every((x) => x.state === 'dead')) G.hud.msg('Os tubarões se foram!');
   }
 
@@ -404,8 +402,8 @@ export class SeaEvents {
       const mesh = makeFish(); G.scene.add(mesh);
       const f = G.enemies.addCreature({
         id: `${e.id}-f${(e.fish.length)}`, mesh, hp: 1, max: 1, def: { nome: 'Peixe voador' }, body: { pos: new THREE.Vector3() },
-        ox, oz, fx, fz, T: 52, v: 15 + e.r() * 4, s: 0, peak: 1.4 + e.r() * 2.2, lane: e.r(),
-        ai: { update: (f2, dt2) => this._fish(e, f2, dt2), onDeath: (f2) => { G.hud.msg('Pegou um peixe no ar!  ' + G.survival.add({ peixe: 1 })); sfx.pickup(); this._killMesh(f2); f2.gone = true; } },
+        ox, oz, fx, fz, T: 52, v: 15 + e.r() * 4, s: 0, peak: 1.4 + e.r() * 2.2, lane: e.r(), land: e.r() < 0.2,
+        ai: { update: (f2, dt2) => this._fish(e, f2, dt2), onDeath: (f2, by) => { if (by === 'L') { G.hud.msg('Pegou um peixe no ar!  ' + G.survival.add({ peixe: 1 })); sfx.pickup(); } this._killMesh(f2); f2.gone = true; } },
       });
       e.fish.push(f);
     }
@@ -433,7 +431,7 @@ export class SeaEvents {
     if (!f.checked && u > 0.4 && G.player.aboard !== undefined) {
       f.checked = true;
       const [lx, lz] = G.boat.toLocal(x, z);
-      if (Math.hypot(lx, lz) < G.boat.set.radius - 0.5 && e.r() < 0.2) { this._landFish(x, z, f); f.gone = true; f.state = 'dead'; }
+      if (Math.hypot(lx, lz) < G.boat.set.radius - 0.5 && f.land) { this._landFish(x, z, f); f.gone = true; f.state = 'dead'; }
     }
   }
   _landFish(x, z, f) {
@@ -443,7 +441,7 @@ export class SeaEvents {
     const [lx, lz] = boat.toLocal(x, z);
     if (Math.hypot(lx, lz) > boat.set.radius + 0.3) return; // caiu na água
     const mesh = makeFish(); G.scene.add(mesh);
-    this.fishOnDeck.push({ mesh, lx, lz, t: Math.random() * 5, age: 0 });
+    this.fishOnDeck.push({ id: f.id, mesh, lx, lz, t: Math.random() * 5, age: 0 });
   }
   _deckFish(dt, t) {
     const boat = this.G.boat;
@@ -465,6 +463,11 @@ export class SeaEvents {
     const i = this.fishOnDeck.indexOf(f); if (i < 0) return;
     this.G.scene.remove(f.mesh); this.fishOnDeck.splice(i, 1);
     this.G.hud.msg(this.G.survival.add({ peixe: 1 }));
+    if (this.G.net.online) this.G.net.send({ t: 'fishtake', id: f.id }); // some para os outros também
+  }
+  removeFish(id) {
+    const i = this.fishOnDeck.findIndex((f) => f.id === id); if (i < 0) return;
+    this.G.scene.remove(this.fishOnDeck[i].mesh); this.fishOnDeck.splice(i, 1);
   }
 
   // ======================= RAIOS =======================
@@ -479,7 +482,8 @@ export class SeaEvents {
       else if (roll < 0.75) { const a = e.r() * 6.28, d = e.r() * (boat.set.radius + 1); target = { lx: Math.cos(a) * d, lz: Math.sin(a) * d }; }
       else { const a = e.r() * 6.28, d = 7 + e.r() * 24; target = { lx: Math.cos(a) * d, lz: Math.sin(a) * d }; }
       // às vezes mira em quem está nadando (cada cliente cuida do próprio jogador)
-      if (G.player.swimming && e.r() < 0.35) { const [lx, lz] = boat.toLocal(G.player.body.pos.x, G.player.body.pos.z); target = { lx, lz }; }
+      const rr = e.r(); // sorteio sempre consumido (todos os jogadores seguem a mesma sequência)
+      if (G.player.swimming && rr < 0.35) { const [lx, lz] = boat.toLocal(G.player.body.pos.x, G.player.body.pos.z); target = { lx, lz, mine: true }; }
       this._warn(target);
     }
     for (let i = this.warnings.length - 1; i >= 0; i--) {
