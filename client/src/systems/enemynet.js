@@ -186,6 +186,8 @@ export class EnemyNet {
       const ends = m.k === 'eshot' ? [V(m.e)] : (Array.isArray(m.e) ? m.e.slice(0, 10).map(V) : []);
       for (const end of ends) if (end) G.combat.tracer(o.clone(), end, m.k === 'eshot' ? 0xffb060 : 0xfff2a0);
       sfx.gun(o, typeof m.g === 'string' ? m.g : typeof m.s === 'string' ? m.s : 'pistol');
+    } else if (m.k === 'skill') { // habilidade de chefe (o host decidiu; aqui roda o efeito)
+      if (G.bossSkills && Array.isArray(m.o) && Array.isArray(m.tg)) G.bossSkills.start(m);
     } else if (m.k === 'banner') {
       if (G.hud.banner) G.hud.banner(String(m.ti || '').slice(0, 40), String(m.tx || '').slice(0, 160), ['pirate', 'storm', 'good'].includes(m.kd) ? m.kd : '', 6);
     } else if (m.k === 'mortar' && G.siege) {

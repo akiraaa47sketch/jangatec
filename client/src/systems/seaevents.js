@@ -354,8 +354,16 @@ export class SeaEvents {
       h.mesh.position.set(x, sea.level - 4.2 + u * 4.6 + Math.sin(t * 1.4) * 0.15, z);
       h.mesh.rotation.y = Math.atan2(boat.x - x, boat.z - z);
       animateKrakenHead(h.mesh, dt);
+      // tinta: a cabeça incha (aviso) e espirra tinta na jangada — quem está a bordo e de frente fica no escuro
+      if (h.upping < 5.4 && h.upping > 4.4) { const s = 1 + (5.4 - h.upping) * 0.12; h.mesh.scale.setScalar(s); }
+      if (h.upping <= 4.4 && !h.inked) {
+        h.inked = true; h.mesh.scale.setScalar(1); sfx.splash(h.body.pos, true);
+        const pl = G.player, pp = pl.body.pos, hx = h.mesh.position.x - pp.x, hz = h.mesh.position.z - pp.z, l = Math.hypot(hx, hz) || 1;
+        const [fx, fz] = pl.forward(), facing = (hx * fx + hz * fz) / l > -0.2;
+        if (pl.aboard && !pl.dead && facing && !(G.melee && G.melee.iframes > 0) && G.bossSkills) { G.bossSkills.blind(2.5, 'tinta'); G.hud.msg('Tinta do kraken! Vire de costas quando a cabeça inchar'); }
+      }
       h.mesh.userData.eye.getWorldPosition(h.body.pos); h.body.pos.y -= 1;
-      if (h.upping <= 0) { h.upping = 0; h.immune = true; h.mesh.visible = false; h.mesh.position.y = -80; h.body.pos.y = -80; e.headT = 14 + e.r() * 6; }
+      if (h.upping <= 0) { h.upping = 0; h.inked = false; h.immune = true; h.mesh.visible = false; h.mesh.position.y = -80; h.body.pos.y = -80; e.headT = 14 + e.r() * 6; }
     }
     if (G.player.aboard) G.events.shake = Math.max(G.events.shake, 0.08);
   }
@@ -378,7 +386,7 @@ export class SeaEvents {
       const a = Math.random() * 6.28, d = 4 + Math.random() * 6;
       let loot;
       if (kind === 'naufragio' && i === 0) loot = { ['arma_' + W[(Math.random() * (Math.random() < 0.15 ? 5 : 4)) | 0]]: 1, municao: 14, cartucho: 4 };
-      else if (i === 0) loot = { kit: 1, municao: 12, bandagem: 2 };
+      else if (i === 0) loot = { kit: 1, municao: 12, bandagem: 1 };
       else loot = Math.random() < 0.5 ? { barra_proteina: 1, energetico: 1, chocolate: 1, peixe: 2 } : { cartucho: 6, municao: 10, bala_canhao: 4 };
       naval._spawnCrate({ id: `crate-${kind}-${Date.now().toString(36)}-${i}`, x: x + Math.cos(a) * d, z: z + Math.sin(a) * d, vx: Math.cos(a), vz: Math.sin(a), loot });
     }

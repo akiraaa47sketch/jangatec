@@ -31,7 +31,8 @@ export const NAVAL = {
   maxDuration: 330,           // depois disso os navios restantes fogem
 };
 export const GHOST = { hpMult: 1.9, ballMult: 0.35 }; // navio-fantasma: mais vida, tiro bem mais fraco
-export const HOOK_TURRET = { speed: 34, range: 34 };
+// Torreta-arpão: dispara um arpão com corda (mais reto e rápido que uma bala), crava no alvo e fisga caixotes.
+export const HOOK_TURRET = { speed: 46, range: 42, gravity: 4.9, dmg: 40, creatureMul: 1.5, shipDmg: 14 };
 export const PIECE_HP = { piso: 240, plataforma: 240, tabua: 70, bloco: 130, rampa: 110, escada: 100, parede: 120, suporte: 60, chapa: 230, canhao: 160, gancho: 140, parede_plastico: 35, parede_ferro: 330 };
 const between = ([a, b]) => a + Math.random() * (b - a);
 const CHAR = new THREE.Color(0x2a1d14);
@@ -219,16 +220,15 @@ export class Naval {
     G.net.send({ t: 'naval', k: 'fire', o: o.toArray().map(r), v: v.toArray().map(r), by: 'p', id: piece.id });
   }
 
-  // há algo fisgável perto de p? (caixote boiando, aliado, inimigo)
+  // há algo que o arpão acerte perto de p? (caixote boiando, inimigo/criatura, navio)
   hookTargetNear(p) {
     const G = this.G;
     for (const c of this.crates.values()) if (c.mesh.position.distanceTo(p) < 1.4) return true;
-    for (const e of G.enemies.list) if (e.state !== 'dead' && Math.hypot(e.body.pos.x - p.x, e.body.pos.y + 0.9 - p.y, e.body.pos.z - p.z) < 1.2) return true;
-    for (const r of G.net.remotes.values()) { const wp = r.mesh.getWorldPosition(_w); if (Math.abs(wp.x - p.x) + Math.abs(wp.y + 0.9 - p.y) + Math.abs(wp.z - p.z) < 1.8) return true; }
-    return false;
+    for (const e of G.enemies.list) if (e.state !== 'dead' && Math.hypot(e.body.pos.x - p.x, e.body.pos.y + 0.9 - p.y, e.body.pos.z - p.z) < 1.2 + (e.def.hitR || 0)) return true;
+    return !!this._hitShip(p);
   }
 
-  // torreta-gancho: dispara o gancho da boca do lançador (clique de novo recolhe)
+  // torreta-arpão: dispara o arpão da boca do lançador (clique de novo recolhe a corda)
   fireHook(piece) {
     const G = this.G, tools = G.tools; if (!tools) return;
     if (tools.hook) { tools.hook.state = 'back'; return; }
@@ -843,7 +843,7 @@ export class Naval {
     for (; n < pts.count; n++) {
       pts.setXYZ(n, p.x, p.y, p.z);
       for (let k = 0; k < 2 && !hit; k++) {
-        vel.y -= NAVAL.gravity * step / 2; p.addScaledVector(vel, step / 2);
+        vel.y -= (hookT ? HOOK_TURRET.gravity : NAVAL.gravity) * step / 2; p.addScaledVector(vel, step / 2);
         if (hookT && p.distanceTo(o) > HOOK_TURRET.range) hit = { p: p.clone(), ship: false, far: true };
         else if (hookT && this.hookTargetNear(p)) hit = { p: p.clone(), ship: true };
         else if (!hookT && (this._hitShip(p) || (G.siege && G.siege.hitTower(p)))) hit = { p: p.clone(), ship: true };
@@ -871,7 +871,7 @@ export class Naval {
       if (hookT) {
         const busy = !!(G.tools && G.tools.hook);
         reticle.style.setProperty('--r', busy ? '0' : '1');
-        reticle.dataset.ammo = busy ? 'clique: recolher' : 'GANCHO PRONTO';
+        reticle.dataset.ammo = busy ? 'clique: recolher' : 'ARPÃO PRONTO';
         reticle.classList.toggle('ready', !busy);
       } else {
         reticle.style.setProperty('--r', (1 - this.reload / NAVAL.reload).toFixed(3));

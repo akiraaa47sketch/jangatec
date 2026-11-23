@@ -11,6 +11,7 @@ import { clamp } from '../core/util.js';
 import { waveHeight } from '../world/ocean.js';
 import { buildWeapon } from '../player/viewmodel-parts.js';
 import { keyOf } from '../core/keybinds.js';
+import { HOOK_TURRET } from './naval.js';
 import { sfx } from '../core/sfx.js';
 
 export const MUSIC = { healAllies: 1.6, healSelf: 0.5, radius: 12, hearing: 45 };
@@ -100,6 +101,23 @@ function noteTexture() {
   return (noteTex = new THREE.CanvasTexture(c));
 }
 
+// Arpão (projétil da torreta): haste de madeira, ponta de ferro farpada e aletas. A ponta fica em -Z.
+const _tmp = new THREE.Vector3();
+function makeHarpoon() {
+  const g = new THREE.Group();
+  const wood = new THREE.MeshStandardMaterial({ color: 0x6e4c2c, roughness: 0.8 });
+  const iron = new THREE.MeshStandardMaterial({ color: 0x9aa1a6, metalness: 0.8, roughness: 0.35 });
+  const shaft = new THREE.Mesh(new THREE.CylinderGeometry(0.03, 0.03, 1.3, 8), wood); shaft.rotation.x = Math.PI / 2; g.add(shaft);
+  const head = new THREE.Mesh(new THREE.ConeGeometry(0.07, 0.3, 4), iron); head.rotation.x = -Math.PI / 2; head.position.z = -0.8; g.add(head);
+  for (const s of [-1, 1]) {
+    const barb = new THREE.Mesh(new THREE.ConeGeometry(0.035, 0.18, 4), iron); barb.rotation.set(Math.PI / 2, 0, s * 0.5); barb.position.set(s * 0.06, 0, -0.62); g.add(barb);
+    const fin = new THREE.Mesh(new THREE.BoxGeometry(0.004, 0.12, 0.2), new THREE.MeshStandardMaterial({ color: 0xa8322a, roughness: 0.7 }));
+    fin.position.set(0, s * 0.05, 0.58); g.add(fin);
+    const fin2 = fin.clone(); fin2.rotation.z = Math.PI / 2; fin2.position.set(s * 0.05, 0, 0.58); g.add(fin2);
+  }
+  return g;
+}
+
 export class Tools {
   constructor(G) {
     this.G = G;
@@ -110,9 +128,8 @@ export class Tools {
     this.rope = new THREE.Line(new THREE.BufferGeometry().setFromPoints([new THREE.Vector3(), new THREE.Vector3()]),
       new THREE.LineBasicMaterial({ color: 0xc8b27a }));
     this.rope.frustumCulled = false; this.rope.visible = false; G.scene.add(this.rope);
-    const hm = buildWeapon('gancho');
-    this.hookMesh = hm ? hm.group : new THREE.Mesh(new THREE.SphereGeometry(0.1), new THREE.MeshStandardMaterial());
-    this.hookMesh.scale.setScalar(2.2); this.hookMesh.visible = false; G.scene.add(this.hookMesh);
+    this.hookMesh = makeHarpoon(); this.hookMesh.visible = false; G.scene.add(this.hookMesh);
+    void buildWeapon;
     this._buildPanel();
   }
 
@@ -233,32 +250,29 @@ export class Tools {
     h.t += dt;
     if (h.state === 'fly') {
       const prev = h.pos.clone();
-      h.vel.y -= 9.8 * dt; h.pos.addScaledVector(h.vel, dt);
+      h.vel.y -= (h.origin ? HOOK_TURRET.gravity : 9.8) * dt; h.pos.addScaledVector(h.vel, dt);
       // caixote boiando?
       const naval = G.naval;
       if (naval) for (const c of naval.crates.values()) {
-        if (c.mesh.position.distanceTo(h.pos) < 1.4) { h.state = 'crate'; h.crate = c.id; G.hud.msg('Gancho preso no caixote — puxando!'); sfx.hookHit(h.pos); break; }
+        if (c.mesh.position.distanceTo(h.pos) < 1.4) { h.state = 'crate'; h.crate = c.id; G.hud.msg('Arpão cravado no caixote — puxando!'); sfx.hookHit(h.pos); break; }
       }
-      // inimigo? (piratas nas balsas, gente na praia): puxa ele para perto e deixa tonto
+      // inimigo ou criatura: o arpão crava (dano alto, mais ainda em bicho do mar) e fica preso um instante
       if (h.state === 'fly') for (const e of G.enemies.list) {
-        if (e.state === 'dead' || e.def.mortar) continue;
+        if (e.state === 'dead') continue;
         const ep = e.body.pos;
-        if (Math.hypot(ep.x - h.pos.x, ep.y + 0.9 - h.pos.y, ep.z - h.pos.z) < 1.2) {
-          h.state = 'enemy'; h.enemy = e; h.t = 0; sfx.hookHit(h.pos);
-          if (G.melee) G.melee.staggerEnemy(e, 1.6);
-          G.enemies.damage(e, 8);
-          G.hud.msg(`${e.def.nome} fisgado — puxando!`);
+        if (Math.hypot(ep.x - h.pos.x, ep.y + 0.9 - h.pos.y, ep.z - h.pos.z) < 1.2 + (e.def.hitR || 0)) {
+          h.state = 'enemy'; h.enemy = e; h.t = 0; sfx.hookHit(h.pos); sfx.hit(h.pos, true);
+          if (G.melee && !e.creature && !e.def.boss) G.melee.staggerEnemy(e, 1.2);
+          const dmg = HOOK_TURRET.dmg * (e.creature ? HOOK_TURRET.creatureMul : 1) * (h.origin ? 1 : 0.6);
+          G.enemies.damage(e, Math.round(dmg));
+          if (G.melee) G.melee.num(ep.clone().setY(ep.y + 1.6), Math.round(dmg), '#ffd166', 'ARPÃO');
           break;
         }
       }
-      // jogador?
-      if (h.state === 'fly') for (const [id, r] of G.net.remotes) {
-        const wp = r.mesh.getWorldPosition(new THREE.Vector3()); wp.y += 0.9;
-        if (wp.distanceTo(h.pos) < 1.2) {
-          G.net.send({ t: 'yank', id, x: Math.round(pp.x * 10) / 10, y: Math.round(pp.y * 10) / 10, z: Math.round(pp.z * 10) / 10 });
-          G.hud.msg(`Puxando ${r.s.n || 'aliado'}!`);
-          h.state = 'player'; h.player = id; h.t = 0; break;
-        }
+      // navio: crava no casco
+      if (h.state === 'fly' && G.naval) {
+        const s = G.naval._hitShip(h.pos);
+        if (s) { h.state = 'back'; sfx.hookHit(h.pos); if (G.naval._isHost()) G.naval._damageShip(s, HOOK_TURRET.shipDmg, h.pos.clone()); }
       }
       if (h.state === 'fly') {
         const ray = this._ray || (this._ray = new THREE.Raycaster());
@@ -276,22 +290,10 @@ export class Tools {
         h.pos.copy(c.mesh.position); h.pos.y += 0.45;
         if (!G.naval.pullCrate(c.id, pp.x, pp.z)) { G.hud.msg(`Caixote ao alcance — [${keyOf('interact')}] para abrir`); h.state = 'back'; }
       }
-    } else if (h.state === 'enemy') {
+    } else if (h.state === 'enemy') { // cravado: acompanha o alvo um instante e a corda recolhe
       const e = h.enemy;
-      if (!e || e.state === 'dead' || h.t > 1.2) h.state = 'back';
-      else {
-        const ep = e.body.pos, dx = hand.x - ep.x, dz = hand.z - ep.z, d = Math.hypot(dx, dz);
-        if (d < 2.2) h.state = 'back';
-        else {
-          if (e.pirate) { h.state = 'back'; } // pirata na balsa: só leva o tranco (a balsa não vem junto)
-          else { ep.x += dx / d * 11 * dt; ep.z += dz / d * 11 * dt; }
-          h.pos.set(ep.x, ep.y + 0.9, ep.z);
-        }
-      }
-    } else if (h.state === 'player') {
-      const r = G.net.remotes.get(h.player);
-      if (!r || h.t > 1.4) h.state = 'back';
-      else { r.mesh.getWorldPosition(h.pos); h.pos.y += 0.9; }
+      if (!e || e.state === 'dead' || h.t > 0.5) h.state = 'back';
+      else h.pos.set(e.body.pos.x, e.body.pos.y + 0.9, e.body.pos.z);
     }
     if (h.state === 'back') {
       const d = hand.clone().sub(h.pos), len = d.length();
@@ -300,11 +302,12 @@ export class Tools {
       h.pos.addScaledVector(d, Math.min(1, 40 * dt / len));
     }
     this.hookMesh.position.copy(h.pos);
-    this.hookMesh.lookAt(hand); // garras (-Z) para longe da corda
+    if (h.state === 'fly') this.hookMesh.lookAt(_tmp.copy(h.pos).sub(h.vel)); // ponta (-Z) para onde voa
+    else this.hookMesh.lookAt(hand); // ponta (-Z) para longe da corda
     const a = this.rope.geometry.attributes.position;
     a.setXYZ(0, hand.x, hand.y, hand.z); a.setXYZ(1, h.pos.x, h.pos.y, h.pos.z); a.needsUpdate = true;
   }
-  // alguém nos fisgou: somos puxados até perto dele
+  // (antigo gancho que puxava aliados — o arpão não puxa mais ninguém; mantido para salas antigas)
   receiveYank(m) {
     if (m.id !== this.G.net.id || ![m.x, m.y, m.z].every(Number.isFinite)) return;
     const pl = this.G.player;

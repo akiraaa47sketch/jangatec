@@ -17,7 +17,7 @@ export const PIECES = {
   suporte:    { nome: 'Suporte',     size: [0.3, 2, 0.3],   custo: { madeira: 1 }, cor: 0x6b4f30 },
   chapa:      { nome: 'Chapa',       size: [2, 0.1, 2],     custo: { metal: 2 },   cor: 0x8f979c, metal: true },
   canhao:     { nome: 'Canhão improvisado', size: [1.0, 0.9, 1.5], custo: {}, cor: 0x3f8fd8, hidden: true, make: makeCannonMesh },
-  gancho:     { nome: 'Torreta-gancho', size: [0.8, 1.1, 1.0], custo: {}, cor: 0x52575d, hidden: true, make: makeHookTurretMesh },
+  gancho:     { nome: 'Torreta-arpão', size: [0.8, 1.1, 1.0], custo: {}, cor: 0x52575d, hidden: true, make: makeHookTurretMesh },
   mastro:     { nome: 'Mastro',      size: [0.3, 5, 0.3],   custo: {}, cor: 0x5d4428, col: 'cyl', fixed: true, hidden: true },
 };
 export const BUILD_LIST = Object.keys(PIECES).filter((k) => !PIECES[k].hidden);

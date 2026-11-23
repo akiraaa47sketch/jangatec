@@ -31,6 +31,7 @@ const MOVES = {
   rapido: [{ wind: 0.24, mult: 0.8, hits: 3, w: 3 }, { wind: 0.36, mult: 1.3, w: 1 }],
   pesado: [{ wind: 0.75, mult: 1.6, heavy: true, aoe: 3.0, w: 2 }, { wind: 0.42, mult: 0.9, w: 1 }, { wind: 0.5, mult: 0.6, kick: true, w: 1 }],
   escafandrista: [{ wind: 0.75, mult: 1.5, heavy: true, aoe: 3.2, w: 2 }, { wind: 0.45, mult: 0.9, hits: 2, w: 2 }, { wind: 0.5, mult: 0.6, kick: true, w: 1 }],
+  siri: [{ wind: 0.3, mult: 1, hits: 2, w: 3 }, { wind: 0.4, mult: 1.3, w: 1 }],
   caranguejo: [{ wind: 0.55, mult: 0.9, hits: 2, w: 3 }, { wind: 0.85, mult: 1.6, heavy: true, aoe: 4.2, w: 2 }, { wind: 0.5, mult: 0.6, kick: true, w: 1 }],
   pirata: [{ wind: 0.32, mult: 1, hits: 2, w: 3 }, { wind: 0.28, mult: 0.9, hits: 3, w: 1 }, { wind: 0.6, mult: 1.8, heavy: true, w: 1 }, { wind: 0.4, mult: 0.5, kick: true, w: 1.5 }],
 };

@@ -18,7 +18,7 @@ const LOOKS = {
 };
 
 export function makeEnemyPill(type) {
-  if (type === 'caranguejo') return makeCrab();
+  if (type === 'caranguejo' || type === 'siri') return makeCrab();
   const look = LOOKS[type] || LOOKS.melee;
   const pill = makePill({ npc: true, ...look });
   if (look.diver) addDiverHelmet(pill.userData.parts.body);

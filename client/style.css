@@ -612,3 +612,9 @@ body.touch .inv-slot > kbd { display: none; }
 #bossBar.mini s { background: linear-gradient(90deg, #7a5a18, #e0ac4c); }
 body.touch #bossBar { top: 40px; width: 44vw; } body.touch #bossBar b { font-size: 16px; }
 body.bossfight #msgs { top: 96px; } body.touch.bossfight #msgs { top: 84px; }
+
+/* cegueira dos chefes: jato d'água (azul) e tinta do kraken (preto) */
+#blind { position: absolute; inset: 0; pointer-events: none; z-index: 2; }
+#blind.agua { background: radial-gradient(ellipse at 50% 45%, rgba(170, 220, 255, 0.96), rgba(40, 120, 200, 0.98) 70%),
+  repeating-linear-gradient(100deg, rgba(255, 255, 255, 0.18) 0 3px, transparent 3px 40px); }
+#blind.tinta { background: radial-gradient(ellipse at 50% 50%, rgba(10, 4, 18, 0.93), rgba(0, 0, 0, 0.99) 70%); }

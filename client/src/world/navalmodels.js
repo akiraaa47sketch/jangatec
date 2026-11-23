@@ -68,7 +68,7 @@ export function makeCannonMesh() {
   return g;
 }
 
-// ---------- torreta-gancho (fica parafusada no convés) ----------
+// ---------- torreta-arpão (soldada no convés) ----------
 // Mesma estrutura do canhão (yawNode → pitchNode → muzzle), então mira e câmera são as mesmas.
 export function makeHookTurretMesh() {
   const g = new THREE.Group();
@@ -92,13 +92,11 @@ export function makeHookTurretMesh() {
   const bell = new THREE.Mesh(new THREE.CylinderGeometry(0.12, 0.08, 0.14, 14, 1, true), iron); bell.rotation.x = Math.PI / 2; bell.position.z = 0.12; barrel.add(bell);
   for (const z of [-0.75, -0.3]) { const band = new THREE.Mesh(new THREE.TorusGeometry(0.09, 0.016, 6, 16), red); band.position.z = z; barrel.add(band); }
   const grip = new THREE.Mesh(new THREE.BoxGeometry(0.06, 0.22, 0.08), wood); grip.position.set(0, -0.15, -0.9); grip.rotation.x = 0.3; barrel.add(grip);
-  // gancho de 3 garras carregado na boca (some enquanto voa)
+  // ponta do arpão carregada na boca (some enquanto voa): lâmina farpada
   const hookTip = new THREE.Group(); hookTip.position.z = 0.2; barrel.add(hookTip);
-  const shank = new THREE.Mesh(new THREE.CylinderGeometry(0.025, 0.025, 0.32, 8), dark); shank.rotation.x = Math.PI / 2; hookTip.add(shank);
-  for (let i = 0; i < 3; i++) {
-    const claw = new THREE.Mesh(new THREE.TorusGeometry(0.09, 0.018, 6, 10, Math.PI * 0.9), dark);
-    claw.rotation.set(0, Math.PI / 2, 0); claw.rotateX(i / 3 * Math.PI * 2); claw.position.z = 0.12; hookTip.add(claw);
-  }
+  const shank = new THREE.Mesh(new THREE.CylinderGeometry(0.022, 0.022, 0.3, 8), dark); shank.rotation.x = Math.PI / 2; hookTip.add(shank);
+  const point = new THREE.Mesh(new THREE.ConeGeometry(0.05, 0.2, 4), iron); point.rotation.x = Math.PI / 2; point.position.z = 0.24; hookTip.add(point);
+  for (let i = 0; i < 2; i++) { const barb = new THREE.Mesh(new THREE.ConeGeometry(0.025, 0.12, 4), iron); barb.rotation.set(-Math.PI / 2, 0, (i ? 1 : -1) * 0.5); barb.position.set((i ? 1 : -1) * 0.04, 0, 0.14); hookTip.add(barb); }
   // carretel com corda e manivela do lado direito
   const drum = new THREE.Mesh(new THREE.CylinderGeometry(0.12, 0.12, 0.16, 16), rope); drum.rotation.z = Math.PI / 2; drum.position.set(0.3, 0, -0.15); pitchNode.add(drum);
   for (const x of [0.21, 0.39]) { const disc = new THREE.Mesh(new THREE.CylinderGeometry(0.15, 0.15, 0.02, 16), iron); disc.rotation.z = Math.PI / 2; disc.position.set(x, 0, -0.15); pitchNode.add(disc); }

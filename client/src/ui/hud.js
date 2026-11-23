@@ -151,7 +151,6 @@ export class Hud {
     // itens de instalar (sem tecla): fichinhas discretas acima da barra
     const chip = (icon, label, n) => n ? `<span class="chip" title="${label}"><i>${icon}</i>${n}</span>` : '';
     const invHtml = chip('⊛', 'Canhão improvisado (instale a bordo)', inv.canhao || 0) +
-      chip('⚓', 'Torreta-gancho (instale a bordo)', inv.gancho || 0) +
       chip('●', 'Balas de canhão', inv.bala_canhao || 0);
     if (invHtml !== this._inv) { $('inv').innerHTML = invHtml; this._inv = invHtml; }
     // buffs ativos com o tempo que falta

@@ -55,10 +55,9 @@ export class Interact {
       const boat = G.boat, [plx, plz] = boat.toLocal(p.x, p.z);
       for (const c of naval.turrets) {
         const d = Math.hypot(c.x - plx, c.z - plz);
-        if (d < 1.9) consider(d + 0.2, { label: c.type === 'gancho' ? 'Usar torreta-gancho' : 'Usar canhão', run: () => naval.man(c) });
+        if (d < 1.9) consider(d + 0.2, { label: c.type === 'gancho' ? 'Usar torreta-arpão' : 'Usar canhão', run: () => naval.man(c) });
       }
       if (G.survival.inv.canhao > 0 && naval.canInstallHere('canhao')) consider(1.6, { label: 'Instalar canhão aqui', run: () => naval.install('canhao') });
-      if (G.survival.inv.gancho > 0 && naval.canInstallHere('gancho')) consider(1.65, { label: 'Instalar torreta-gancho aqui', run: () => naval.install('gancho') });
       let dmg = null, dd = 2.2;
       for (const piece of boat.pieces.values()) {
         if (!naval.destructible(piece)) continue;

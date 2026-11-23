@@ -27,6 +27,7 @@ export const ENEMY_TYPES = {
   caranguejo: { nome: 'Caranguejo-Rei', hp: 1500, speed: 3.2, dmg: 22, range: 3.3, cd: 1.3, cor: 0xb2401f, scale: 1, boss: 'crab', ring: 3.4, hitR: 1.4, armor: 0.3, radius: 1.5 },
   // chefe das bases militares: gira a minigun (aviso), solta uma rajada longa e superaquece
   metralhador: { nome: 'Metralhador', hp: 700, speed: 1.7, dmg: 5, range: 30, cd: 4.2, cor: 0x3a4226, scale: 1.35, ranged: true, boss: 'minigun', burst: 34, burstGap: 0.07, acc: 0.4, spinUp: 1.2, hitR: 0.4 },
+  siri: { nome: 'Siri', hp: 30, speed: 4.4, dmg: 5, range: 1.4, cd: 0.9, cor: 0xb2401f, scale: 0.4, ring: 1.6, hitR: 0.3 }, // filhote do Caranguejo-Rei
   fantasma: { nome: 'Pirata fantasma', hp: 100, speed: 4.6, dmg: 6, range: 1.8, cd: 1.5, cor: 0x8fe8d8, scale: 1.05 }, // fraco, mas atravessa a névoa
 };
 const BY_DIFF = [['melee'], ['melee', 'rapido'], ['melee', 'rapido', 'atirador'], ['melee', 'atirador', 'pesado', 'rapido'], ['atirador', 'pesado', 'rapido', 'pesado']];
@@ -237,7 +238,7 @@ export class Enemies {
 
   // by = quem bateu ('L' = jogador local, ou o id do aliado); remote = veio pela rede (não reenviar)
   damage(e, n, by = 'L', remote = false) {
-    if (e.state === 'dead') return;
+    if (e.state === 'dead' || (e.immune && !e.creature)) return; // imune: ex.: caranguejo enterrado na areia
     const G = this.G;
     if (e.creature) { // quem decide o que acontece é o evento (todos os clientes aplicam o mesmo dano)
       if (e.immune) return;
@@ -265,7 +266,7 @@ export class Enemies {
       if (this.G.melee) { this.G.melee.tokens.delete(e); this.G.melee.setTell(e, null); this.G.melee.updateStars(e, 0, false); }
       this.G.world.collected.add(e.id);
       const r = Math.random();
-      const loot = r < 0.4 ? { municao: 6 } : r < 0.75 ? { bandagem: 1 } : r < 0.85 ? { cartucho: 4 } : null;
+      const loot = r < 0.4 ? { municao: 6 } : r < 0.52 ? { bandagem: 1 } : r < 0.64 ? { cartucho: 4 } : null; // curativo só às vezes
       // piratas (e às vezes saqueadores) largam o sabre
       const dropChance = e.type === 'pirata' || e.type === 'fantasma' ? 0.45 : e.type === 'melee' ? 0.12 : 0;
       const sabre = dropChance && Math.random() < dropChance;
@@ -490,7 +491,7 @@ export class Enemies {
     }
     const t = e.deathT, fall = Math.min(1, t / 0.55);
     const ease = 1 - Math.pow(1 - fall, 3), bounce = fall >= 1 ? Math.sin(Math.min(1, (t - 0.55) / 0.35) * Math.PI) * 0.12 : 0;
-    if (e.def.boss === 'crab') { e.mesh.rotation.z = e.deathSide * (Math.PI - bounce) * ease; e.mesh.position.y = e.body.pos.y + 1.2 * ease; } // vira de barriga para cima
+    if (e.type === 'caranguejo' || e.type === 'siri') { e.mesh.rotation.z = e.deathSide * (Math.PI - bounce) * ease; e.mesh.position.y = e.body.pos.y + 1.2 * ease; } // vira de barriga para cima
     else e.mesh.rotation.x = (-Math.PI / 2 + bounce) * ease;
     e.mesh.rotation.z = e.deathSide * 0.25 * ease;
     const parts = e.mesh.userData.parts;
@@ -916,7 +917,8 @@ export class Enemies {
       let mres = null;
       if (!e.def.ranged && dist < 7 && G.melee) mres = G.melee.enemyTick(e, dt, dist);
       if (e.state === 'chase' && e.goal && e.los === false && thinkNow) e.goal = this.route(e, pp.x, pp.z);
-      if ((mres && mres.hold) || e.post) { mx = 0; mz = 0; }
+      if (e.skillHold > 0) e.skillHold -= dt; else e.skillPose = null;
+      if ((mres && mres.hold) || e.post || e.skillHold > 0) { mx = 0; mz = 0; } // usando habilidade: parado
       else if (e.engaged === false && dist < COMBAT_DIRECTOR.waitRadius + 4 && e.los !== false) {
         // esperando a vez: fica afastado, rodeando devagar e encarando o jogador
         const want = COMBAT_DIRECTOR.waitRadius + (e.waitOff || 0);
@@ -976,7 +978,8 @@ export class Enemies {
       const ix = p.x - e.isl.x, iz = p.z - e.isl.z, il = Math.hypot(ix, iz), maxR = e.isl.R - 0.6;
       if (il > maxR) { p.x = e.isl.x + (ix / il) * maxR; p.z = e.isl.z + (iz / il) * maxR; }
       G.colliders.resolve(b, prevY);
-      if (p.y < (e.isl.minY ?? -3)) { p.y = (e.isl.minY != null ? e.isl.set.y + 1 : 1.5); b.vel.y = 0; }
+      if (p.y < (e.isl.minY ?? -3) && e.burrowY == null) { p.y = (e.isl.minY != null ? e.isl.set.y + 1 : 1.5); b.vel.y = 0; }
+      if (e.burrowY != null) { p.y = e.burrowY; b.vel.y = 0; } // enterrado na areia (habilidade)
 
       const facePlayer = e.state === 'chase' || e.state === 'attack' || e.state === 'retreat';
       if (facePlayer) e.yaw = lerpAngle(e.yaw, Math.atan2(pdx, pdz), Math.min(1, 8 * dt));
@@ -984,7 +987,7 @@ export class Enemies {
       else if (mx || mz) e.yaw = lerpAngle(e.yaw, Math.atan2(mx, mz), Math.min(1, 8 * dt));
       e.mesh.position.copy(p);
       e.mesh.rotation.y = e.yaw;
-      const pose = mres ? mres.pose : e.swing > 0 ? 'attack' : e.def.ranged && facePlayer ? 'aim' : 'walk';
+      const pose = e.skillPose || (mres ? mres.pose : e.swing > 0 ? 'attack' : e.def.ranged && facePlayer ? 'aim' : 'walk');
       const swingProgress = mres ? mres.progress || 0 : e.swing > 0 ? 1 - e.swing / 0.25 : 0;
       animateEnemy(e.mesh, Math.hypot(mx, mz), dt, pose, swingProgress);
       if (e.def.spinUp) this.spinGun(e, dt, e.spinning > 0 || e.burstLeft > 0);

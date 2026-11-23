@@ -37,6 +37,7 @@ import { Siege } from './systems/siege.js';
 import { Drops } from './systems/drops.js';
 import { EnemyNet } from './systems/enemynet.js';
 import { Bosses } from './systems/bosses.js';
+import { BossSkills } from './systems/bossskills.js';
 import { SeaEvents } from './systems/seaevents.js';
 import { Inventory } from './ui/inventory.js';
 
@@ -97,6 +98,7 @@ G.naval = new Naval(G);     // canhões, navios piratas e dano por peça
 G.siege = new Siege(G);   // torres de sucata (derrubar com canhão) e morteiros
 G.tools = new Tools(G);     // banjo (música que cura) e gancho
 G.drops = new Drops(G);     // itens largados no mundo
+G.bossSkills = new BossSkills(G); // habilidades especiais dos chefes
 G.bosses = new Bosses(G);   // chefes da seca (escafandrista e Caranguejo-Rei)
 G.enemyNet = new EnemyNet(G); // inimigos sincronizados (host simula, os outros veem réplicas)
 G.seaEvents = new SeaEvents(G); // kraken, tubarões, peixes voadores e raios
@@ -176,6 +178,7 @@ function start(seed, welcome) {
   G.seaEvents.end();
   if (welcome) {
     for (const d of welcome.drops || []) G.drops.spawn(d);
+    G.world.pendingProps = welcome.props || [];
     for (const placed of welcome.placed || []) G.world.placedStates.set(placed.id, placed);
     for (const welded of welcome.welded || []) G.world.weldedStates.set(welded.physObjId, welded);
     for (const crate of welcome.crates || []) G.world.crateStates.set(crate.id, crate);
@@ -186,6 +189,7 @@ function start(seed, welcome) {
     if (welcome.boat) { const b = welcome.boat; Object.assign(G.boat, { x: b.x, z: b.z, yaw: b.yaw, speed: b.speed, sailUp: b.up, sailAngle: b.angle }); }
   }
   G.world.ensureStarterIsland();
+  for (const pr of G.world.pendingProps || []) G.world.spawnProp(pr.k, pr.p[0], pr.p[1], pr.p[2], pr.id, false); // torretas que já existiam na sala
   G.world.update(0, now());
   const starterIsland = G.world.chunks.get('0,1').island;
   G.startup.begin(starterIsland, welcome && welcome.start);
@@ -289,6 +293,7 @@ function frame() {
   G.physics.update(dt, t);
   G.enemies.update(dt);
   G.bosses.update(dt, t);
+  G.bossSkills.update(dt);
   G.events.update(dt, t);
   G.naval.update(dt, t);
   G.siege.update(dt, t);

@@ -41,7 +41,7 @@ function getRoom(name, meta = {}) {
       max: meta.max || MAX_PLAYERS, created: Date.now(),
       seed: Number.isFinite(meta.seed) ? Math.floor(Math.abs(meta.seed)) % 1e9 : Math.floor(Math.random() * 1e9), players: new Map(), hostId: null,
       added: [], removed: [], collected: [], placed: new Map(), welded: new Map(),
-      crates: new Map(), drops: new Map(), boat: null, start: null,
+      crates: new Map(), drops: new Map(), props: [], boat: null, start: null,
     };
     rooms.set(name, r);
   }
@@ -146,7 +146,7 @@ function handle(ws, m) {
       t: 'welcome', id: ws.id, seed: room.seed, host: room.hostId, room: { id: room.name, title: room.title, locked: !!room.passHash, max: room.max },
       added: room.added, removed: room.removed, collected: room.collected,
       placed: [...room.placed.values()], welded: [...room.welded.values()],
-      crates: [...room.crates.values()], drops: [...room.drops.values()], boat: room.boat, start: room.start, event: room.event || null,
+      crates: [...room.crates.values()], drops: [...room.drops.values()], props: room.props, boat: room.boat, start: room.start, event: room.event || null,
     });
     broadcast(room, { t: 'msg', text: `${ws.name} entrou` }, ws);
     return;
@@ -229,6 +229,12 @@ function handle(ws, m) {
       if (room.hostId !== ws.id) break;
       const target = room.players.get(m.to);
       if (target) send(target.ws, { t: 'pdmg', to: m.to, dmg: Math.min(200, +m.dmg || 0), src: String(m.src || '').slice(0, 30), eid: typeof m.eid === 'string' ? m.eid.slice(0, 80) : null, ex: +m.ex || 0, ez: +m.ez || 0, k: m.k === 'kick' || m.k === 'melee' ? m.k : 'shot', h: m.h ? 1 : 0 });
+      break;
+    }
+    case 'prop': { // prop do loot (torreta-arpão) criado por um jogador: todos criam igual
+      if (typeof m.id !== 'string' || m.id.length > 64 || m.k !== 'torreta' || !Array.isArray(m.p) || m.p.length !== 3 || !m.p.every(Number.isFinite)) break;
+      if (room.props.length < 60) room.props.push({ id: m.id, k: m.k, p: m.p });
+      broadcast(room, { t: 'prop', id: m.id, k: m.k, p: m.p }, ws);
       break;
     }
     case 'drop:add': { // jogador largou itens no mundo (saquinho)
