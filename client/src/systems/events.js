@@ -142,7 +142,12 @@ export class Events {
     if (kind === 'furacao') return this._makeHurricane(t);
     if (kind === 'tempestade') return this._makeStorm(t);
     const dur = kind === 'fantasma' ? 240 : SEA_BALANCE[kind].dur;
-    return { id: `ev${Math.floor(t * 10)}`, kind, t0: t, dur, seed: Math.floor(Math.random() * 1e9) };
+    const e = { id: `ev${Math.floor(t * 10)}`, kind, t0: t, dur, seed: Math.floor(Math.random() * 1e9) };
+    if (kind === 'raios') { // caos: série densa de ondas gigantes junto com os raios
+      const boat = this.G.boat;
+      Object.assign(e, { n: 9 + Math.floor(Math.random() * 4), gap: 5, cx: boat.x, cz: boat.z, fx: Math.sin(boat.yaw), fz: Math.cos(boat.yaw) });
+    }
+    return e;
   }
 
   // Tempestade: a série de ondas sai de uma seed (todos os clientes calculam igual).
@@ -160,7 +165,7 @@ export class Events {
     for (let i = 0; i < e.n && at < e.dur - 14; i++) {
       const rel = (r() - 0.5) * Math.PI * 1.7, a = Math.atan2(e.fx, e.fz) + Math.PI + rel; // de onde vem (raramente por trás)
       list.push({ at, ang: a, A: B.A[0] + r() * (B.A[1] - B.A[0]), speed: B.speed[0] + r() * (B.speed[1] - B.speed[0]), sigma: B.sigma[0] + r() * (B.sigma[1] - B.sigma[0]), hit: false });
-      at += 8 + r() * 7;
+      at += (e.gap || 8) + r() * (e.gap ? 4 : 7);
     }
     return (e._waves = list);
   }
@@ -241,7 +246,10 @@ export class Events {
       else if (e.kind === 'tsunami') this._updateTsunami(e, dt, t);
       else if (e.kind === 'tempestade') this._updateStorm(e, dt, t);
       else if (e.kind === 'furacao') this._updateHurricane(e, dt, t);
-      else if (SEA_KINDS.includes(e.kind)) G.seaEvents.update(e, dt, t);
+      else if (SEA_KINDS.includes(e.kind)) {
+        G.seaEvents.update(e, dt, t);
+        if (e.kind === 'raios' && e.n) this._updateStorm(e, dt, t); // ondas gigantes até a tempestade acabar
+      }
       else if (e.kind === 'fantasma' && this._isHost() && t - e.t0 > 15 && ![...G.naval.ships.values()].some((s) => s.ghost && s.sinkT <= 0 && !s.retreat)) {
         e.dur = Math.min(e.dur, t - e.t0 + 8); // navio afundou (ou fugiu): a névoa se dissipa
         if (G.net.online) G.net.send({ t: 'event', e });

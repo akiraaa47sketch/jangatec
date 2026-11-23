@@ -36,6 +36,7 @@ import { Tools } from './systems/tools.js';
 import { Siege } from './systems/siege.js';
 import { Drops } from './systems/drops.js';
 import { EnemyNet } from './systems/enemynet.js';
+import { Bosses } from './systems/bosses.js';
 import { SeaEvents } from './systems/seaevents.js';
 import { Inventory } from './ui/inventory.js';
 
@@ -96,6 +97,7 @@ G.naval = new Naval(G);     // canhões, navios piratas e dano por peça
 G.siege = new Siege(G);   // torres de sucata (derrubar com canhão) e morteiros
 G.tools = new Tools(G);     // banjo (música que cura) e gancho
 G.drops = new Drops(G);     // itens largados no mundo
+G.bosses = new Bosses(G);   // chefes da seca (escafandrista e Caranguejo-Rei)
 G.enemyNet = new EnemyNet(G); // inimigos sincronizados (host simula, os outros veem réplicas)
 G.seaEvents = new SeaEvents(G); // kraken, tubarões, peixes voadores e raios
 G.inventory = new Inventory(G); // tela de inventário (Tab)
@@ -286,6 +288,7 @@ function frame() {
   G.world.updateFloodLevel(G.startup.waterLevel);
   G.physics.update(dt, t);
   G.enemies.update(dt);
+  G.bosses.update(dt, t);
   G.events.update(dt, t);
   G.naval.update(dt, t);
   G.siege.update(dt, t);

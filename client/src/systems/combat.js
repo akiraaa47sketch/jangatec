@@ -174,7 +174,7 @@ export class Combat {
     let hits = 0;
     for (const e of G.enemies.list) {
       const dx = e.body.pos.x - _m.x, dz = e.body.pos.z - _m.z, d = Math.hypot(dx, dz);
-      if (d < w.range && (d < 0.8 || (dx * fx + dz * fz) / d > 0.2) && Math.abs(e.body.pos.y - (_m.y - 1.3)) < 2) {
+      if (d - (e.def.hitR || 0) < w.range && (d < 0.8 || (dx * fx + dz * fz) / d > 0.2) && Math.abs(e.body.pos.y - (_m.y - 1.3)) < 2) {
         G.enemies.damage(e, w.dmg);
         hits++;
       }

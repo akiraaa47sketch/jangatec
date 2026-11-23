@@ -143,6 +143,11 @@ export class Hud {
     $('lifeRing').classList.toggle('low', vida <= 30);
     $('lockTag').hidden = !G.player.faceCam || G.player.firstPerson;
     $('objective').textContent = G.startup.objective;
+    // barra de vida do chefe mais perto (escafandrista / Caranguejo-Rei)
+    const pp = G.player.body.pos;
+    const boss = G.enemies.list.filter((e) => e.def.boss && e.state !== 'dead' && Math.hypot(e.body.pos.x - pp.x, e.body.pos.z - pp.z) < 70).sort((a, b) => b.def.hp - a.def.hp)[0];
+    $('bossBar').hidden = !boss; document.body.classList.toggle('bossfight', !!boss);
+    if (boss) { $('bossName').textContent = boss.def.nome; $('bossFill').style.width = `${Math.max(0, Math.min(100, boss.hp / boss.def.hp * 100))}%`; $('bossBar').className = boss.def.boss; }
     // itens de instalar (sem tecla): fichinhas discretas acima da barra
     const chip = (icon, label, n) => n ? `<span class="chip" title="${label}"><i>${icon}</i>${n}</span>` : '';
     const invHtml = chip('⊛', 'Canhão improvisado (instale a bordo)', inv.canhao || 0) +

@@ -602,3 +602,12 @@ body.touch .inv-slot > kbd { display: none; }
   .inv-hot { grid-template-columns: repeat(6, minmax(0, 1fr)); } .inv-slot, .inv-item { height: 54px; }
   .inv-item { padding: 6px; font-size: 11px; } .inv-detail { margin-top: 10px; padding-top: 10px; min-height: 0; }
 }
+
+/* barra de vida de chefe */
+#bossBar { position: absolute; left: 50%; top: 46px; transform: translateX(-50%); width: min(520px, 70vw); text-align: center; }
+#bossBar b { display: block; margin-bottom: 4px; font: 400 22px/1 var(--display); letter-spacing: 0.04em; color: #ffd9b8; text-shadow: 0 2px 4px rgba(0, 0, 0, 0.8); }
+#bossBar i { display: block; height: 8px; border-radius: 2px; background: rgba(0, 0, 0, 0.55); border: 1px solid rgba(255, 255, 255, 0.18); overflow: hidden; }
+#bossBar s { display: block; height: 100%; text-decoration: none; background: linear-gradient(90deg, #8a1a10, #e2553f); transition: width 0.2s; }
+#bossBar.mini s { background: linear-gradient(90deg, #7a5a18, #e0ac4c); }
+body.touch #bossBar { top: 40px; width: 44vw; } body.touch #bossBar b { font-size: 16px; }
+body.bossfight #msgs { top: 96px; } body.touch.bossfight #msgs { top: 84px; }

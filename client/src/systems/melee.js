@@ -19,6 +19,7 @@ export const MELEE = {
   clash: { window: 0.14, recover: 0.42 },     // espadas se chocando: janela antes do golpe dele e recuo
   enemy: { recover: 0.32, heavyRecover: 0.6, lunge: 3.6, evade: 0.16 }, // ritmo dos inimigos
   crit: 2.2,
+  swim: { drain: 5, idle: 2.5, dps: 4 },        // nadando: estamina/s (nadando / boiando parado) e vida/s sem fôlego
   tokens: 1,                                  // quantos inimigos podem atacar ao mesmo tempo
   tokenGap: [0.35, 0.8],                      // respiro (s) depois de um ataque antes do próximo inimigo começar
 };
@@ -28,11 +29,13 @@ const MOVES = {
   melee: [{ wind: 0.36, mult: 1, w: 3 }, { wind: 0.3, mult: 0.85, hits: 2, w: 2 }, { wind: 0.62, mult: 1.9, heavy: true, w: 1 }, { wind: 0.42, mult: 0.5, kick: true, w: 1 }],
   rapido: [{ wind: 0.24, mult: 0.8, hits: 3, w: 3 }, { wind: 0.36, mult: 1.3, w: 1 }],
   pesado: [{ wind: 0.75, mult: 1.6, heavy: true, aoe: 3.0, w: 2 }, { wind: 0.42, mult: 0.9, w: 1 }, { wind: 0.5, mult: 0.6, kick: true, w: 1 }],
+  escafandrista: [{ wind: 0.75, mult: 1.5, heavy: true, aoe: 3.2, w: 2 }, { wind: 0.45, mult: 0.9, hits: 2, w: 2 }, { wind: 0.5, mult: 0.6, kick: true, w: 1 }],
+  caranguejo: [{ wind: 0.55, mult: 0.9, hits: 2, w: 3 }, { wind: 0.85, mult: 1.6, heavy: true, aoe: 4.2, w: 2 }, { wind: 0.5, mult: 0.6, kick: true, w: 1 }],
   pirata: [{ wind: 0.32, mult: 1, hits: 2, w: 3 }, { wind: 0.28, mult: 0.9, hits: 3, w: 1 }, { wind: 0.6, mult: 1.8, heavy: true, w: 1 }, { wind: 0.4, mult: 0.5, kick: true, w: 1.5 }],
 };
 const LIGHT_POSES = ['slashR', 'slashL', 'thrust', 'uppercut'];
-const GUARD_CHANCE = { melee: 0.35, pesado: 0.45, pirata: 0.5, rapido: 0.1 };
-const RIPOSTE_CHANCE = { melee: 0.3, pesado: 0.15, pirata: 0.55, rapido: 0.2 }; // contra-ataque depois de defender
+const GUARD_CHANCE = { melee: 0.35, pesado: 0.45, pirata: 0.5, rapido: 0.1, escafandrista: 0.3, caranguejo: 0.35 };
+const RIPOSTE_CHANCE = { melee: 0.3, pesado: 0.15, pirata: 0.55, rapido: 0.2, escafandrista: 0.2, caranguejo: 0.3 }; // contra-ataque depois de defender
 const EVADE_CHANCE = { melee: 0.12, pesado: 0, pirata: 0.18, rapido: 0.3 }; // desviam do seu golpe
 
 let bangTex = {}, starTex = null;
@@ -77,11 +80,27 @@ export class Melee {
   get weapon() { const w = this.G.combat.weapon; return w && w.melee ? w : null; }
   spend(n) { this.stamina = Math.max(0, this.stamina - n * (this.G.survival ? this.G.survival.staminaMul : 1)); this.stamDelay = MELEE.stamina.delay; }
 
+  // Nadar cansa: a estamina desce (e não volta) enquanto está na água. Sem fôlego, a vida cai aos
+  // poucos (afogamento) — cair da jangada é perigoso de verdade.
+  swimTick(dt) {
+    const G = this.G, pl = G.player, S = MELEE.swim;
+    if (!G.started || !pl.swimming || pl.dead || pl.downed) { this.drownT = 0; this.swimWarn = 0; return; }
+    const moving = Math.hypot(pl.body.vel.x, pl.body.vel.z) > 0.6;
+    this.stamina = Math.max(0, this.stamina - (moving ? S.drain : S.idle) * (G.survival ? G.survival.staminaMul : 1) * dt);
+    this.stamDelay = Math.max(this.stamDelay, 0.5); // não recupera dentro d'água
+    if (this.stamina < 35 && this.swimWarn < 1) { this.swimWarn = 1; G.hud.msg('Você está cansando na água — volte para a jangada!'); }
+    if (this.stamina > 0) { this.drownT = 0; return; }
+    if (this.swimWarn < 2) { this.swimWarn = 2; G.hud.msg('Sem fôlego! Você está se afogando'); }
+    this.drownT = (this.drownT || 0) + dt;
+    if (this.drownT >= 1) { this.drownT -= 1; G.survival.damage(S.dps, 'Afogamento'); }
+  }
+
   // ---------- jogador ----------
   update(dt) {
     const G = this.G, inp = G.input, pl = G.player, w = this.weapon;
     if (this.stamDelay > 0) this.stamDelay -= dt;
     else this.stamina = Math.min(MELEE.stamina.max, this.stamina + MELEE.stamina.regen * dt * (this.blocking ? 0.35 : 1));
+    this.swimTick(dt);
     this.comboT -= dt; if (this.comboT <= 0) this.combo = 0;
     this.iframes = Math.max(0, this.iframes - dt);
     this.dodgeCd = Math.max(0, this.dodgeCd - dt);
@@ -213,7 +232,7 @@ export class Melee {
     for (const e of G.enemies.list) {
       if (e.state === 'dead') continue;
       const dx = e.body.pos.x - p.x, dz = e.body.pos.z - p.z, d = Math.hypot(dx, dz) || 1;
-      if (d > range + 0.3 || Math.abs(e.body.pos.y - p.y) > 2 || (d > 0.8 && (dx * fx + dz * fz) / d < arc)) continue;
+      if (d - (e.def.hitR || 0) > range + 0.3 || Math.abs(e.body.pos.y - p.y) > 2.4 || (d > 0.8 && (dx * fx + dz * fz) / d < arc)) continue;
       if (G.colliders.segmentBlocked(p.x, p.y + 1.0, p.z, e.body.pos.x, e.body.pos.y + 1.0, e.body.pos.z)) continue; // não bate através da parede
       const front = ((p.x - e.body.pos.x) * Math.sin(e.yaw) + (p.z - e.body.pos.z) * Math.cos(e.yaw)) / d > 0.3;
       out.push({ e, dx, dz, d, front, ms: e.m || (e.m = { state: 'idle', t: 0 }) });
@@ -513,7 +532,7 @@ export class Melee {
     const pill = e.mesh.userData.pill;
     if (!e.tell) {
       e.tell = new THREE.Sprite(new THREE.SpriteMaterial({ map: bang('!', '#ff3b2b'), depthTest: false, transparent: true }));
-      e.tell.scale.setScalar(0.3); e.tell.position.y = 2.2; e.tell.renderOrder = 10; e.mesh.add(e.tell);
+      e.tell.scale.setScalar(0.3); e.tell.position.y = e.mesh.userData.tellY || 2.2; e.tell.renderOrder = 10; e.mesh.add(e.tell);
       e.gloveMats = pill && pill.userData.parts.gloveMat ? [pill.userData.parts.gloveMat] : [];
     }
     if (!move) { e.tell.visible = false; for (const m of e.gloveMats) m.emissive && m.emissive.setRGB(0, 0, 0); return; }
@@ -527,7 +546,7 @@ export class Melee {
   updateStars(e, dt, on) {
     if (!on && !e.stars) return;
     if (!e.stars) {
-      e.stars = new THREE.Group(); e.stars.position.y = 2.25;
+      e.stars = new THREE.Group(); e.stars.position.y = (e.mesh.userData.tellY || 2.2) + 0.05;
       for (let i = 0; i < 3; i++) {
         const s = new THREE.Sprite(new THREE.SpriteMaterial({ map: star(), depthTest: false, transparent: true }));
         s.scale.setScalar(0.28); s.renderOrder = 10; e.stars.add(s);

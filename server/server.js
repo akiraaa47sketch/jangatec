@@ -333,7 +333,7 @@ function handle(ws, m) {
       const e = m.e;
       if (room.hostId !== ws.id || !e || !['tsunami', 'furacao', 'tempestade', 'kraken', 'tubaroes', 'peixes', 'raios', 'fantasma'].includes(e.kind) ||
           typeof e.id !== 'string' || e.id.length > 40) break;
-      const keys = ['t0', 'dur', 'ox', 'oz', 'dx', 'dz', 'speed', 'A', 'sigma', 'cx', 'cz', 'fx', 'fz', 'lat', 'latV', 'ahead', 'R', 'depth', 'spin', 'seed', 'n'];
+      const keys = ['t0', 'dur', 'ox', 'oz', 'dx', 'dz', 'speed', 'A', 'sigma', 'cx', 'cz', 'fx', 'fz', 'lat', 'latV', 'ahead', 'R', 'depth', 'spin', 'seed', 'n', 'gap'];
       const clean = { id: e.id, kind: e.kind, end: !!e.end };
       for (const key of keys) {
         if (e[key] === undefined) continue;

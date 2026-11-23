@@ -21,6 +21,10 @@ export const ENEMY_TYPES = {
   morteiro: { nome: 'Morteiro', hp: 55, speed: 0, dmg: 0, range: 80, cd: 6.5, cor: 0x4a4a3a, scale: 1, ranged: true, mortar: true },
   soldado:  { nome: 'Soldado', hp: 110, speed: 3.0, dmg: 8, range: 28, cd: 1.7, cor: 0x4b5530, scale: 1.05, ranged: true, burst: 3, acc: 0.72 },
   pirata:   { nome: 'Pirata', hp: 75, speed: 5.4, dmg: 13, range: 1.8, cd: 1.2, cor: 0x553b2d, scale: 1.05, raftSpeed: 7.2 },
+  // chefes da seca (ver bosses.js): ring = distância em que rodeia o jogador, hitR = raio do corpo
+  // (o alcance da sua arma conta a partir da borda), armor = dano que passa pelo casco fechado
+  escafandrista: { nome: 'Escafandrista amaldiçoado', hp: 320, speed: 2.4, dmg: 15, range: 2.3, cd: 1.6, cor: 0x4d5d62, scale: 1.3, boss: 'mini', ring: 2.5, hitR: 0.35 },
+  caranguejo: { nome: 'Caranguejo-Rei', hp: 1500, speed: 3.2, dmg: 22, range: 3.3, cd: 1.3, cor: 0xb2401f, scale: 1, boss: 'crab', ring: 3.4, hitR: 1.4, armor: 0.3, radius: 1.5 },
   fantasma: { nome: 'Pirata fantasma', hp: 70, speed: 4.6, dmg: 6, range: 1.8, cd: 1.5, cor: 0x8fe8d8, scale: 1.05 }, // fraco, mas atravessa a névoa
 };
 const BY_DIFF = [['melee'], ['melee', 'rapido'], ['melee', 'rapido', 'atirador'], ['melee', 'atirador', 'pesado', 'rapido'], ['atirador', 'pesado', 'rapido', 'pesado']];
@@ -45,6 +49,19 @@ export const PIRATE_BALANCE = {
   spawnDistance: 42,       // as balsas aparecem longe o bastante para serem vistas
 };
 const between = ([a, b]) => a + Math.random() * (b - a);
+
+// Loot dos chefes da seca (vai num saco no chão)
+function bossLoot(kind) {
+  const r = Math.random();
+  if (kind === 'crab') {
+    const W = r < 0.3 ? 'rifle_precisao' : r < 0.65 ? 'rifle' : 'escopeta';
+    return { ['arma_' + W]: 1, kit: 2, municao: 30, cartucho: 10, bala_canhao: 6, peixe: 3 };
+  }
+  const loot = { municao: 10, bandagem: 2, chocolate: 1 };
+  if (r < 0.35) loot['arma_' + ['revolver', 'facao', 'martelo'][(Math.random() * 3) | 0]] = 1;
+  else if (r < 0.7) loot.kit = 1;
+  return loot;
+}
 
 // Pirata fantasma: translúcido e esverdeado (o brilho de dano e o sumiço na morte continuam valendo)
 export function ghostify(e) {
@@ -155,7 +172,7 @@ export class Enemies {
     const e = {
       id, type, def, isl, mesh, hp: def.hp, state: 'idle', timer: 1 + Math.random() * 3, cd: 0, yaw: 0, goal: null, moving: false,
       pirate: false,
-      body: { pos: new THREE.Vector3(x, isl ? isl.set.y + 1.2 : 1.2, z), vel: new THREE.Vector3(), radius: 0.35, height: 1.7 * def.scale, grounded: false, groundSet: null },
+      body: { pos: new THREE.Vector3(x, isl ? isl.set.y + 1.2 : 1.2, z), vel: new THREE.Vector3(), radius: def.radius || 0.35, height: 1.7 * def.scale, grounded: false, groundSet: null },
     };
     e.mats = new Set();
     mesh.traverse((o) => { if (o.isMesh) { o.userData.enemy = e; this.hitMeshes.push(o); e.mats.add(o.material); } });
@@ -188,6 +205,14 @@ export class Enemies {
       if (j >= 0) e.isl.enemies.splice(j, 1);
     }
   }
+  // Morre sem loot (ex.: o escafandrista afogado quando a água volta)
+  killSilently(e, msg) {
+    if (e.state === 'dead') return;
+    e.state = 'dead'; e.timer = 5; e.deathT = 0; e.hp = 0;
+    if (this.G.melee) { this.G.melee.tokens.delete(e); this.G.melee.setTell(e, null); this.G.melee.updateStars(e, 0, false); }
+    if (msg) this.G.hud.msg(msg);
+    if (this.G.net.online) this.G.net.send({ t: 'edie', id: e.id, side: e.deathSide, to: null, loot: null });
+  }
   removeIsland(isl) { for (const e of isl.enemies.slice()) this.remove(e); isl.enemies.length = 0; }
 
   // by = quem bateu ('L' = jogador local, ou o id do aliado); remote = veio pela rede (não reenviar)
@@ -201,6 +226,10 @@ export class Enemies {
       if (e.ai && e.ai.onHit) e.ai.onHit(e, n);
       if (e.hp <= 0) { e.state = 'dead'; if (e.ai && e.ai.onDeath) e.ai.onDeath(e, by); }
       return;
+    }
+    if (e.def.armor && !e.replica && !['stagger', 'recover', 'clashed'].includes(e.m && e.m.state)) { // casco fechado
+      n *= e.def.armor;
+      if (G.melee && Math.random() < 0.35) G.melee.say(e.body.pos.clone().setY(e.body.pos.y + 1.6), 'CASCO', '#c8d2da');
     }
     if (e.replica) { // inimigo de outro jogador (host): o acerto vai para ele decidir
       e.hp -= n; e.hitT = 0.22;
@@ -224,6 +253,11 @@ export class Enemies {
         this.G.hud.msg(`${e.def.nome} derrotado` + (loot ? '  ' + this.G.survival.add(loot) : ''));
         if (sabre && !this.G.combat.owned.has('sabre') && this.G.combat.unlockWeapon('sabre') === true) this.G.hud.msg('Você pegou um Sabre pirata ★★★!');
       } else this.G.hud.msg(`${e.def.nome} derrotado`);
+      if (e.def.boss && G.drops) { // chefe: saco de loot no chão para quem pegar primeiro
+        G.drops.dropAt(e.body.pos, bossLoot(e.def.boss));
+        G.hud.msg(e.def.boss === 'crab' ? 'O Caranguejo-Rei caiu! Pegue o saco de loot' : 'O escafandrista caiu e largou um saco de loot');
+        if (G.enemyNet) G.enemyNet.banner(e.def.boss === 'crab' ? 'CARANGUEJO-REI DERROTADO' : 'ESCAFANDRISTA DERROTADO', 'O loot ficou no chão — pegue com E.', 'good');
+      }
       if (G.net.online) {
         G.net.send({ t: 'edie', id: e.id, side: e.deathSide, to: by === 'L' ? null : by, loot: loot ? { ...loot, ...(sabre ? { arma_sabre: 1 } : {}) } : sabre ? { arma_sabre: 1 } : null });
         if (!e.pirate) G.net.send({ t: 'collect', id: e.id }); // quem entrar depois não vê ele de novo
@@ -418,9 +452,15 @@ export class Enemies {
       e.mesh.position.copy(e.body.pos);
     }
     e.deathT += dt;
+    if (e.burrow) { // caranguejo fugindo: afunda na areia
+      e.mesh.position.y -= dt * 0.9; e.mesh.rotation.z = Math.sin(e.deathT * 20) * 0.05;
+      if ((e.timer -= dt) <= 0) this.remove(e);
+      return;
+    }
     const t = e.deathT, fall = Math.min(1, t / 0.55);
     const ease = 1 - Math.pow(1 - fall, 3), bounce = fall >= 1 ? Math.sin(Math.min(1, (t - 0.55) / 0.35) * Math.PI) * 0.12 : 0;
-    e.mesh.rotation.x = (-Math.PI / 2 + bounce) * ease;
+    if (e.def.boss === 'crab') { e.mesh.rotation.z = e.deathSide * (Math.PI - bounce) * ease; e.mesh.position.y = e.body.pos.y + 1.2 * ease; } // vira de barriga para cima
+    else e.mesh.rotation.x = (-Math.PI / 2 + bounce) * ease;
     e.mesh.rotation.z = e.deathSide * 0.25 * ease;
     const parts = e.mesh.userData.parts;
     if (parts && t < 0.6) {
@@ -806,11 +846,11 @@ export class Enemies {
         const radial = clamp((dist - want) * 1.2, -e.def.speed * 0.6, e.def.speed * 0.8);
         mx = -pdz * e.strafeDir * sp + pdx * radial; mz = pdx * e.strafeDir * sp + pdz * radial;
       }
-      else if (!e.def.ranged && dist < 3.6 && e.los !== false && (e.state === 'chase' || e.state === 'attack')) {
+      else if (!e.def.ranged && dist < (e.def.ring || 2) + 1.6 && e.los !== false && (e.state === 'chase' || e.state === 'attack')) {
         // esperando a vez: rodeia o jogador mantendo distância
         e.strafeDir = e.strafeDir || (Math.random() < 0.5 ? 1 : -1);
         if (thinkNow && Math.random() < 0.08) e.strafeDir *= -1;
-        const sp = e.def.speed * 0.42, radial = (dist - 2.0) * 1.6;
+        const sp = e.def.speed * 0.42, radial = (dist - (e.def.ring || 2.0)) * 1.6;
         mx = -pdz * e.strafeDir * sp + pdx * radial; mz = pdx * e.strafeDir * sp + pdz * radial;
       }
       if (e.state === 'attack' && e.cd <= 0 && e.def.ranged && e.los) {
@@ -842,7 +882,7 @@ export class Enemies {
       const ix = p.x - e.isl.x, iz = p.z - e.isl.z, il = Math.hypot(ix, iz), maxR = e.isl.R - 0.6;
       if (il > maxR) { p.x = e.isl.x + (ix / il) * maxR; p.z = e.isl.z + (iz / il) * maxR; }
       G.colliders.resolve(b, prevY);
-      if (p.y < -3) { p.y = 1.5; b.vel.y = 0; }
+      if (p.y < (e.isl.minY ?? -3)) { p.y = (e.isl.minY != null ? e.isl.set.y + 1 : 1.5); b.vel.y = 0; }
 
       const facePlayer = e.state === 'chase' || e.state === 'attack' || e.state === 'retreat';
       if (facePlayer) e.yaw = lerpAngle(e.yaw, Math.atan2(pdx, pdz), Math.min(1, 8 * dt));

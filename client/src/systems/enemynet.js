@@ -111,6 +111,11 @@ export class EnemyNet {
   }
 
   // ---------- efeitos para todos ----------
+  banner(title, text, kind) { // aviso grande (chefe apareceu / caiu) para todos
+    const G = this.G;
+    if (G.hud.banner) G.hud.banner(title, text, kind, 6);
+    if (G.net.online) G.net.send({ t: 'fx', k: 'banner', ti: String(title).slice(0, 40), tx: String(text).slice(0, 160), kd: kind });
+  }
   shotFx(from, to, kind) { // tiro de inimigo (host)
     if (!this.G.net.online) return;
     this.G.net.send({ t: 'fx', k: 'eshot', o: [r1(from.x), r1(from.y), r1(from.z)], e: [r1(to.x), r1(to.y), r1(to.z)], g: kind });
@@ -180,6 +185,8 @@ export class EnemyNet {
       const ends = m.k === 'eshot' ? [V(m.e)] : (Array.isArray(m.e) ? m.e.slice(0, 10).map(V) : []);
       for (const end of ends) if (end) G.combat.tracer(o.clone(), end, m.k === 'eshot' ? 0xffb060 : 0xfff2a0);
       sfx.gun(o, typeof m.g === 'string' ? m.g : typeof m.s === 'string' ? m.s : 'pistol');
+    } else if (m.k === 'banner') {
+      if (G.hud.banner) G.hud.banner(String(m.ti || '').slice(0, 40), String(m.tx || '').slice(0, 160), ['pirate', 'storm', 'good'].includes(m.kd) ? m.kd : '', 6);
     } else if (m.k === 'mortar' && G.siege) {
       const o = V(m.o), v = V(m.v), tg = V(m.tg);
       if (o && v && tg && Number.isFinite(m.T)) G.siege.spawnShell(o, v, Math.min(8, m.T), tg);
