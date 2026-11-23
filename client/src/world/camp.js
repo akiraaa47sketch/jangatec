@@ -179,7 +179,7 @@ export function buildCamp(type, ctx) {
   };
   const roomOf = (frame, hw, hd) => ({ x: frame.x, z: frame.z, yaw: frame.yaw, hw, hd });
 
-  const out = { rooms, crateSpots: [], fire: null, yard: [ctx.cx, ctx.cz], spawns: [] };
+  const out = { rooms, crateSpots: [], fire: null, yard: [ctx.cx, ctx.cz], spawns: [], ladders: [] };
   // ponto de posição de inimigo: [x, z] na ilha + altura (no alto de torre) e se é posto de atirador
   const spot = (frame, lx, lz, y = 0, high = false) => { const [x, z] = P(lx, lz, frame.yaw, frame.x, frame.z); out.spawns.push({ x, z, y, high }); };
 
@@ -199,7 +199,9 @@ export function buildCamp(type, ctx) {
     set.items.push({ type: 'box', x: cx, y: TOP + h / 2, z: cz, hx: 0.25, hy: h / 2, hz: len / 2, yaw: frame.yaw + yaw });
   };
   // torre de vigia com plataforma onde dá para ficar em pé (colisores), parapeito e teto
-  const watchTower = (frame, lx, lz, H = 4.2, mat = m.log, roofMat = m.thatch, wide = 1.0) => {
+  // dir = lado da escada (+1 frente / -1 fundo do acampamento); a escada sobe de verdade (W) e o
+  // parapeito tem uma abertura desse lado para entrar na plataforma
+  const watchTower = (frame, lx, lz, H = 4.2, mat = m.log, roofMat = m.thatch, wide = 1.0, dir = 1) => {
     for (const ox of [-wide, wide]) for (const oz of [-wide, wide]) {
       decor(frame, cylY(0.1, H + 0.2, mat, 7), lx + ox, (H + 0.2) / 2, lz + oz);
       const [x, z] = P(lx + ox, lz + oz, frame.yaw, frame.x, frame.z); set.items.push({ type: 'cyl', x, y: TOP + H / 2, z, hx: 0.12, hy: H / 2, hz: 0.12 });
@@ -208,15 +210,18 @@ export function buildCamp(type, ctx) {
       const b = new THREE.Mesh(boxGeo(0.08, 0.1, len), mat); decor(frame, b, lx + ax, y, lz + az, ry);
     }
     solid(frame, lx, H, lz, 2 * wide + 0.5, 0.14, 2 * wide + 0.5, m.floor);
-    for (const [ox, oz, w, l] of [[0, wide + 0.22, 2 * wide + 0.5, 0.08], [0, -wide - 0.22, 2 * wide + 0.5, 0.08], [wide + 0.22, 0, 0.08, 2 * wide + 0.5], [-wide - 0.22, 0, 0.08, 2 * wide + 0.5]]) {
+    for (const [ox, oz, w, l] of [[0, -dir * (wide + 0.22), 2 * wide + 0.5, 0.08], [wide + 0.22, 0, 0.08, 2 * wide + 0.5], [-wide - 0.22, 0, 0.08, 2 * wide + 0.5]]) {
       solid(frame, lx + ox, H + 0.14, lz + oz, w, 0.8, l, m.plank);
     }
+    const seg = (2 * wide + 0.5 - 0.75) / 2; // lado da escada: dois pedaços com vão no meio
+    for (const sx of [-1, 1]) solid(frame, lx + sx * (0.375 + seg / 2), H + 0.14, lz + dir * (wide + 0.22), seg, 0.8, 0.08, m.plank);
     for (const ox of [-wide - 0.2, wide + 0.2]) for (const oz of [-wide - 0.2, wide + 0.2]) decor(frame, cylY(0.06, 1.5, mat, 6), lx + ox, H + 0.85, lz + oz);
     const roof = new THREE.Mesh(new THREE.ConeGeometry(wide * 1.75, 0.9, 4), roofMat); roof.rotation.y = Math.PI / 4; decor(frame, roof, lx, H + 2.0, lz);
     const ladder = new THREE.Group();
     for (const x2 of [-0.22, 0.22]) { const rail = new THREE.Mesh(boxGeo(0.07, H + 0.4, 0.07), mat); rail.position.x = x2; ladder.add(rail); }
     for (let i = 0; i < Math.floor(H / 0.42); i++) { const rung = new THREE.Mesh(boxGeo(0.44, 0.05, 0.05), mat); rung.position.y = -H / 2 + 0.3 + i * 0.42; ladder.add(rung); }
-    ladder.rotation.x = -0.18; decor(frame, ladder, lx, H / 2, lz + wide + 0.55);
+    ladder.rotation.x = -0.18 * dir; decor(frame, ladder, lx, H / 2, lz + dir * (wide + 0.55));
+    { const [x, z] = P(lx, lz + dir * (wide + 0.45), frame.yaw, frame.x, frame.z); out.ladders.push({ x, z, top: H + 0.14, yaw: frame.yaw, dir }); }
     spot(frame, lx, lz, H + 0.2, true);
   };
   // barraca (lona em A) com colisor baixo
@@ -346,23 +351,8 @@ export function buildCamp(type, ctx) {
       decor(site, leaf, sx * gate, 1.15, S - 0.05, sx * 1.35);
     }
     flag(site, 0, S + 0.05, 4.4);
-    // torres de vigia nos cantos da frente
-    for (const sx of [-1, 1]) {
-      const tx = sx * (S - 0.9), tz = S - 0.9;
-      for (const ox of [-0.7, 0.7]) for (const oz of [-0.7, 0.7]) decor(site, cylY(0.1, 4.2, m.log, 7), tx + ox, 2.1, tz + oz);
-      const plat = new THREE.Mesh(boxGeo(1.9, 0.14, 1.9), m.floor); decor(site, plat, tx, 2.75, tz);
-      for (const [ox, oz, w, l] of [[0, 0.92, 1.9, 0.08], [0, -0.92, 1.9, 0.08], [0.92, 0, 0.08, 1.9], [-0.92, 0, 0.08, 1.9]]) {
-        const rail = new THREE.Mesh(boxGeo(w, 0.5, l), m.plank); decor(site, rail, tx + ox, 3.08, tz + oz);
-      }
-      const roof = new THREE.Mesh(new THREE.ConeGeometry(1.55, 0.9, 4), m.thatch); roof.rotation.y = Math.PI / 4; decor(site, roof, tx, 4.6, tz);
-      // escada encostada
-      const ladder = new THREE.Group();
-      for (const lx2 of [-0.22, 0.22]) { const rail = new THREE.Mesh(boxGeo(0.07, 3.0, 0.07), m.log); rail.position.x = lx2; ladder.add(rail); }
-      for (let i = 0; i < 7; i++) { const rung = new THREE.Mesh(boxGeo(0.44, 0.05, 0.05), m.log); rung.position.y = -1.3 + i * 0.42; ladder.add(rung); }
-      ladder.rotation.x = -0.25;
-      decor(site, ladder, tx - sx * 0.2, 1.45, tz - 1.15);
-      blocker(site, tx, 0, tz, 1.5, 0.6, 1.5); // base da torre (não atravessa os postes)
-    }
+    // torres de vigia nos cantos da frente (com colisão e escada por dentro do forte)
+    for (const sx of [-1, 1]) watchTower(site, sx * (S - 0.9), S - 0.9, 2.75, m.log, m.thatch, 0.75, -1);
     // cabana no fundo, fogueira no centro, barris e caixotes nas paredes
     const [hx, hz] = P(0, -S + 2.35);
     const c = cabin({ x: hx, z: hz, yaw: ctx.yaw }, 4.2, 3.2, 2.2);

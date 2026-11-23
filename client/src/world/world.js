@@ -4,11 +4,12 @@
 import * as THREE from '../three.js';
 import { mulberry32, hash2, rot } from '../core/util.js';
 import { CFG } from '../config.js';
-import { LOOT_CONFIG, generateCrateLoot, wreckFor, seabedCratesFor } from '../systems/loot.js';
+import { LOOT_CONFIG, generateCrateLoot, wreckFor, seabedCratesFor, seaSiteFor } from '../systems/loot.js';
 import { seabedHeight, makeSeabedChunk, makeFarSeabed, patchVortexDip } from './seabed.js';
 import { bakeStatic } from '../core/bake.js';
 import { buildCamp } from './camp.js';
 import { buildScrapCamp } from './scrap.js';
+import { buildSeaTower, buildLeaningBuilding } from './seasites.js';
 import { makePieceMesh, PIECES } from '../boat/pieces.js';
 import { makeHookTurretMesh } from './navalmodels.js';
 import { makePalm, makeRock, makeBush, makeGrassTufts } from './models.js';
@@ -102,6 +103,13 @@ export const DEBRIS = [
   { nome: 'Boia', w: 1, real: true, pieceType: 'bloco', size: [1.1, 1.1, 1.1], make: () => { const g = new THREE.Group(); const b = new THREE.Mesh(new THREE.SphereGeometry(0.55, 16, 12), M(0xf07a1e, { roughness: 0.6 })); g.add(b); const band = new THREE.Mesh(new THREE.TorusGeometry(0.55, 0.045, 6, 20), M(0xf3efe6)); band.rotation.x = Math.PI / 2; g.add(band); return g; } },
   { nome: 'Palete', w: 2, real: true, pieceType: 'piso', size: [1.6, 0.2, 1.3], make: (r) => { const g = new THREE.Group(), m = plankMat(WOOD[(r() * 4) | 0]); for (let i = -2; i <= 2; i++) { const s = box(1.6, 0.04, 0.2, m); s.position.set(0, 0.08, i * 0.27); g.add(s); } for (const x of [-0.7, 0, 0.7]) { const run = box(0.14, 0.13, 1.3, plankMat(WOOD[3])); run.position.set(x, -0.03, 0); g.add(run); } return g; } },
 ];
+// Paredes, vigas, guarda-corpo e escada um pouquinho maiores (+8%): colisão e modelo crescem juntos.
+for (const d of DEBRIS) {
+  if (!['parede', 'parede_plastico', 'parede_ferro', 'suporte', 'escada'].includes(d.pieceType)) continue;
+  const k = 1.08, make = d.make;
+  d.size = d.size.map((v) => v * k);
+  d.make = (r) => { const g = new THREE.Group(), m = make(r); m.scale.multiplyScalar(k); g.add(m); return g; };
+}
 const DEBRIS_W = DEBRIS.reduce((s, d) => s + d.w, 0);
 // Props que vêm do loot (não aparecem soltos no mar): carregue e solde na jangada como qualquer peça.
 // noBake: o modelo tem partes que se mexem (a torreta gira e levanta o lançador).
@@ -237,6 +245,8 @@ export class World {
     G.scene.add(ch.seabed);
     const wreck = wreckFor(this.seed, cx, cz);
     if (wreck) ch.wreck = this.makeWreck(ch, wreck);
+    const site = seaSiteFor(this.seed, cx, cz);
+    if (site) ch.site = this.makeSeaSite(ch, site);
     ch.seaCrates = this.makeSeaCrates(cx, cz);
     for (let i = 0; i < n; i++) {
       // Sempre consome o RNG na mesma ordem para manter o determinismo.
@@ -246,6 +256,7 @@ export class World {
       const lr = mulberry32(hash2(this.seed, cx * 131 + i, cz * 17 + 7));
       const id = `d${cx},${cz},${i}`;
       if (ch.island && Math.hypot(x - ch.island.x, z - ch.island.z) < ch.island.R + 9) continue;
+      if (ch.site && Math.hypot(x - ch.site.x, z - ch.site.z) < 16) continue;
       this.spawnDebris(ch, id, def, x, z, lr);
     }
     return ch;
@@ -361,6 +372,79 @@ export class World {
     }
   }
 
+  // Caixote de loot preso a um grupo (ilha/estrutura): (lx, ly, lz) no grupo, (ox, oy, oz) = origem do grupo.
+  _crate(group, cid, lx, ly, lz, ox, oy, oz, diff, yaw) {
+    if (this.collected.has(cid)) return null;
+    const m = new THREE.Group();
+    const S = shared();
+    const base = box(0.8, 0.46, 0.8, S.crate);
+    // cantoneiras de ferro
+    for (const [ex, ez] of [[-0.39, -0.39], [0.39, -0.39], [-0.39, 0.39], [0.39, 0.39]]) {
+      const edge = box(0.06, 0.48, 0.06, S.iron); edge.position.set(ex, 0.23, ez); m.add(edge);
+    }
+    base.position.y = 0.23;
+    const lid = new THREE.Group();
+    lid.position.set(0, 0.46, -0.36);
+    const top = box(0.84, 0.14, 0.84, S.crateLid);
+    top.position.set(0, 0.07, 0.36);
+    lid.add(top);
+    const strap = box(0.12, 0.12, 0.86, S.iron);
+    strap.position.set(0, 0.08, 0.36);
+    lid.add(strap);
+    m.add(base, lid);
+    m.scale.setScalar(1.4);
+    m.position.set(lx, ly, lz);
+    m.rotation.y = yaw;
+    group.add(m);
+    const saved = this.crateStates.get(cid);
+    const c = {
+      id: cid, mesh: m, lid, x: ox + lx, z: oz + lz, y: oy + ly, diff,
+      starter: cid === LOOT_CONFIG.starterCache.id,
+      opened: !!(saved && saved.opened), openT: saved && saved.opened ? 1 : 0,
+    };
+    lid.rotation.x = -1.25 * c.openT;
+    this.crates.push(c);
+    return c;
+  }
+
+  // Estrutura no meio do mar (torre de sucata / prédio inclinado): entra na lista de ilhas para a IA,
+  // o cerco e as escadas, mas sem areia, sem maré e com bloqueio próprio para a jangada.
+  makeSeaSite(ch, st) {
+    const G = this.G, id = `${st.kind === 'predio' ? 'p' : 'q'}${st.cx},${st.cz}`;
+    const ctx = { x: st.x, z: st.z, yaw: st.yaw, r: st.rng, id, destroyed: this.collected, seabed: (x, z) => this.seabedHeight(x, z) };
+    const b = st.kind === 'predio' ? buildLeaningBuilding(ctx) : buildSeaTower(ctx);
+    const { group, set, solids } = b;
+    const isl = {
+      id, x: st.x, z: st.z, R: b.R, diff: st.diff, group, set, solids, crates: [], enemies: [], palms: [],
+      seaSite: st.kind, siteType: st.kind === 'predio' ? 'predio' : 'seatower', siteCenter: b.center || [0, 0],
+      cx: b.center ? st.x + b.center[0] : st.x, cz: b.center ? st.z + b.center[1] : st.z,
+      rooms: b.rooms, towers: b.towers, spawnSpots: b.spawnSpots, ladders: b.ladders, landLayers: [], allItems: set.items.slice(),
+      maxGround: Infinity, floodTier: null, minY: set.y - 2.5, block: b.block,
+    };
+    b.crateSpots.forEach(([lx, lz], i) => {
+      const c = this._crate(group, `${id.replace('q', 'p')}c${i}`, lx, 0.55, lz, st.x, set.y, st.z, st.diff, st.rng() * 3);
+      if (c) isl.crates.push(c);
+    });
+    if (st.kind === 'predio') b.debrisSpots.forEach(([x, z], i) => { // peças para a jangada largadas na sala
+      let pick = st.rng() * DEBRIS_W, def = DEBRIS[0];
+      for (const d of DEBRIS) { pick -= d.w; if (pick <= 0) { def = d; break; } }
+      if (i < 1 || st.rng() < 0.7) this.spawnDebris(ch, `${id}d${i}`, def, x, z, mulberry32(hash2(this.seed ^ 0x1d, st.cx * 53 + i, st.cz)), b.floorY + 0.35);
+    });
+    {
+      const solidSet = new Set(solids), crateSet = new Set(isl.crates.map((c) => c.mesh));
+      bakeStatic(group, { keep: (o) => solidSet.has(o) || o.userData.noBake || crateSet.has(o) });
+    }
+    G.scene.add(group);
+    group.updateMatrixWorld(true);
+    G.colliders.addSet(set);
+    G.physics.addStaticSet(set);
+    G.solids.push(...solids);
+    this.islands.push(isl);
+    if (isl.towers.length && G.siege) G.siege.addTowers(isl);
+    G.enemies.spawnForIsland(isl);
+    return isl;
+  }
+
   makeIsland(id, x, z, r, starterIsland = false) {
     const G = this.G, R = starterIsland ? 15 + r() * 3 : 9 + r() * 6, diff = this.difficulty(x, z);
     const islandElevation = starterIsland ? 0 : 2.7;
@@ -370,9 +454,9 @@ export class World {
     const SITES = [
       [['hut', 1], ['tendas', 1]],
       [['hut', 1], ['tendas', 1], ['fort', 1], ['vigia', 1]],
-      [['fort', 1], ['vigia', 1], ['bunker', 1.2], ['scrap', 1]],
-      [['bunker', 1], ['scrap', 1], ['vigia', 0.6], ['militar', 1.6]],
-      [['bunker', 0.7], ['scrap', 1], ['militar', 2.4]],
+      [['fort', 1], ['vigia', 1], ['bunker', 1.2]],          // sucata agora fica no meio do mar (seasites.js)
+      [['bunker', 1], ['vigia', 0.6], ['fort', 0.6], ['militar', 1.6]],
+      [['bunker', 0.7], ['fort', 0.4], ['militar', 2.4]],
     ][diff];
     const MIN_R = { scrap: 11.5, militar: 12, bunker: 10 };
     const options = SITES.filter(([t]) => R >= (MIN_R[t] || 0)), totalW = options.reduce((a, [, w]) => a + w, 0);
@@ -517,13 +601,14 @@ export class World {
       }
       if (tufts.length) group.add(makeGrassTufts(dec, tufts));
     }
-    let siteCenter = [0, 0], rooms = [], towers = [], spawnSpots = [];
+    let siteCenter = [0, 0], rooms = [], towers = [], spawnSpots = [], ladders = [];
     let fireRef = null;
     if (!starterIsland) {
       const campCtx = { group, set, addSolid, solidOnly: (m) => solids.push(m), TOP, cx: campC[0], cz: campC[1], yaw: r() * 6.28, r, shared: shared(), id, destroyed: this.collected };
       const camp = siteType === 'scrap' ? buildScrapCamp(campCtx) : buildCamp(siteType, campCtx);
       siteCenter = camp.yard; rooms = camp.rooms; towers = camp.towers || [];
       spawnSpots = (camp.spawns || []).map((p) => (Array.isArray(p) ? { x: p[0], z: p[1], y: 0, high: false } : p));
+      ladders = (camp.ladders || []).map((l) => ({ ...l, x: l.x + x, z: l.z + z, y0: islandElevation + TOP, top: islandElevation + TOP + l.top }));
       for (const spot of camp.crateSpots) crates.push(spot);
       // Fogueira: pedras em anel, lenha cruzada e chamas em camadas (animadas em update).
       const campfire = new THREE.Group();
@@ -550,42 +635,13 @@ export class World {
     }
     const isl = {
       id, x, z, R, diff, group, set, solids, crates: [], enemies: [], palms: palmList,
-      starter: starterIsland, siteType, siteCenter, rooms, towers, spawnSpots, landLayers, allItems: set.items.slice(),
+      starter: starterIsland, siteType, siteCenter, rooms, towers, spawnSpots, ladders, landLayers, allItems: set.items.slice(),
       maxGround: islandElevation + 0.61, floodTier: null,
       fire: fireRef,
     };
     crates.forEach(([cx2, cz2], i) => {
-      const cid = `${id}c${i}`;
-      if (this.collected.has(cid)) return;
-      const m = new THREE.Group();
-      const S = shared();
-      const base = box(0.8, 0.46, 0.8, S.crate);
-      // cantoneiras de ferro
-      for (const [ex, ez] of [[-0.39, -0.39], [0.39, -0.39], [-0.39, 0.39], [0.39, 0.39]]) {
-        const edge = box(0.06, 0.48, 0.06, S.iron); edge.position.set(ex, 0.23, ez); m.add(edge);
-      }
-      base.position.y = 0.23;
-      const lid = new THREE.Group();
-      lid.position.set(0, 0.46, -0.36);
-      const top = box(0.84, 0.14, 0.84, S.crateLid);
-      top.position.set(0, 0.07, 0.36);
-      lid.add(top);
-      const strap = box(0.12, 0.12, 0.86, S.iron);
-      strap.position.set(0, 0.08, 0.36);
-      lid.add(strap);
-      m.add(base, lid);
-      m.scale.setScalar(1.4);
-      m.position.set(cx2, TOP, cz2);
-      m.rotation.y = r() * 3;
-      group.add(m);
-      const saved = this.crateStates.get(cid);
-      const c = {
-        id: cid, mesh: m, lid, x: x + cx2, z: z + cz2, y: islandElevation + TOP, diff,
-        starter: cid === LOOT_CONFIG.starterCache.id,
-        opened: !!(saved && saved.opened), openT: saved && saved.opened ? 1 : 0,
-      };
-      lid.rotation.x = -1.25 * c.openT;
-      isl.crates.push(c); this.crates.push(c);
+      const c = this._crate(group, `${id}c${i}`, cx2, TOP, cz2, x, islandElevation, z, diff, r() * 3);
+      if (c) isl.crates.push(c);
     });
     { // junta as malhas paradas da ilha (menos draw calls); fica de fora o que anima ou colide
       const solidSet = new Set(solids), palmSet = new Set(palmList), crateSet = new Set(isl.crates.map((c) => c.mesh));
@@ -760,8 +816,11 @@ export class World {
       const i = this.debris.indexOf(d); if (i >= 0) this.debris.splice(i, 1);
       const j = this.physObjects.indexOf(d); if (j >= 0) this.physObjects.splice(j, 1);
     }
-    const isl = ch.island;
-    if (!isl) return;
+    if (ch.site) this._dropIsland(ch.site);
+    if (ch.island) this._dropIsland(ch.island);
+  }
+  _dropIsland(isl) {
+    const G = this.G;
     G.physics.removeStaticSet(isl.set);
     G.scene.remove(isl.group);
     G.colliders.removeSet(isl.set);
@@ -817,6 +876,15 @@ export class World {
   pushBoat(boat) {
     const level = this.G.startup.waterLevel, boatR = Math.min(boat.set.radius, 7) * 0.75;
     for (const isl of this.islands) {
+      if (isl.block) { // estrutura do mar: retângulo orientado (encosta, não atravessa)
+        const k = isl.block, [lx, lz] = rot(boat.x - k.x, boat.z - k.z, -k.yaw), ex = k.hx + boatR, ez = k.hz + boatR;
+        if (Math.abs(lx) < ex && Math.abs(lz) < ez) {
+          const px = ex - Math.abs(lx), pz = ez - Math.abs(lz);
+          const [nx, nz] = px < pz ? [Math.sign(lx) * px, 0] : [0, Math.sign(lz) * pz], [wx, wz] = rot(nx, nz, k.yaw);
+          boat.x += wx; boat.z += wz; boat.speed *= 0.9;
+        }
+        continue;
+      }
       if (isl.flooded) continue;
       const dx = boat.x - isl.x, dz = boat.z - isl.z, d = Math.hypot(dx, dz) || 1;
       // Faixas ainda fora d'água definem até onde a jangada chega (maré cheia = chega mais perto).

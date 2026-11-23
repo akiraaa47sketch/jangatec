@@ -8,8 +8,8 @@ import { TIDE } from './tide.js';
 
 export const BOSSES = {
   runLength: 1280,      // m até a dificuldade máxima (world.difficulty chega a 4)
-  miniChance: 0.8,      // por seca
-  miniMaxProgress: 0.7, // depois disso o escafandrista não aparece mais
+  miniChance: 0.22,     // por seca: evento raro (não toda seca, para não ficar previsível)
+  miniMaxProgress: 0.5, // miniboss fraco: só na primeira metade da rota
   dist: [26, 40],       // m da jangada até onde o chefe surge
 };
 

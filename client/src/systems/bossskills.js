@@ -14,6 +14,9 @@ export const SKILLS = {
   jet: { cd: [11, 15], range: [4, 15], wind: 0.9, speed: 24, radius: 1.2, blind: 4, blindBlocked: 1.5 },
   stomp: { cd: [9, 12], range: 7, wind: 0.7, speed: 9, maxR: 10, width: 0.7, dmg: 14 },
   grenade: { cd: [7, 10], hiddenFor: 1.5, fuse: 1.6, radius: 3.6, dmg: 28 },
+  // inimigos comuns: bombardeiro (bomba de pólvora) e atirador de elite (mira laser, saia da linha)
+  bomb: { cd: [5, 8], range: [4, 17], wind: 0.5, fuse: 1.4, radius: 2.8, dmg: 18 },
+  snipe: { cd: [5, 7.5], range: [8, 45], wind: 1.3, dmg: 30, radius: 1.0 },
 };
 const between = ([a, b]) => a + Math.random() * (b - a);
 const r1 = (x) => Math.round(x * 10) / 10;
@@ -31,14 +34,19 @@ export class BossSkills {
     const G = this.G, E = G.enemies;
     if (!E.auth) return;
     for (const e of E.list) {
-      if (!e.def.boss || e.replica || e.state === 'dead' || e.creature) continue;
+      if (!(e.def.boss || e.def.skill) || e.replica || e.state === 'dead' || e.creature) continue;
       const T = e.tgt; if (!T || T.dead || T.downed || !T.pos) continue;
-      const sk = e.sk || (e.sk = { jet: between([4, 7]), stomp: between([3, 6]), grenade: 3, hidden: 0 });
+      const sk = e.sk || (e.sk = { jet: between([4, 7]), stomp: between([3, 6]), grenade: 3, bomb: between([2, 4]), snipe: between([2, 4]), hidden: 0 });
       for (const k in sk) if (typeof sk[k] === 'number' && k !== 'hidden') sk[k] -= dt;
       if (e.skillHold > 0 || (e.m && ['windup', 'strike', 'stagger'].includes(e.m.state))) continue;
       const p = e.body.pos, d = Math.hypot(T.pos.x - p.x, T.pos.z - p.z);
-      if (d > 30) continue;
-      const kind = e.def.boss;
+      const kind = e.def.boss || e.def.skill;
+      if (d > (kind === 'snipe' ? SKILLS.snipe.range[1] : 30)) continue;
+      if (kind === 'bomb' || kind === 'snipe') { // inimigos comuns com habilidade
+        const S = SKILLS[kind];
+        if (sk[kind] <= 0 && d > S.range[0] && d < S.range[1] && (kind === 'bomb' || e.los !== false)) { sk[kind] = between(S.cd); this.cast(kind, e, T); }
+        continue;
+      }
       if (kind === 'mini') {
         if (sk.stomp <= 0 && d < SKILLS.stomp.range) { sk.stomp = between(SKILLS.stomp.cd); this.cast('stomp', e, T); }
         else if (sk.jet <= 0 && d > SKILLS.jet.range[0] && d < SKILLS.jet.range[1] && e.los !== false) { sk.jet = between(SKILLS.jet.cd); this.cast('jet', e, T); }
@@ -53,7 +61,7 @@ export class BossSkills {
     const G = this.G, p = e.body.pos;
     const m = { t: 'fx', k: 'skill', s, id: e.id, o: [r1(p.x), r1(p.y), r1(p.z)], tg: [r1(T.pos.x), r1(T.pos.y), r1(T.pos.z)], seed: Math.floor(Math.random() * 1e6) };
     e.skillHold = (SKILLS[s].wind || 0.6) + 0.3;
-    e.skillPose = s === 'stomp' ? 'heavyWindup' : 'aim';
+    e.skillPose = s === 'stomp' ? 'heavyWindup' : s === 'bomb' ? 'throw' : 'aim';
     this.start(m);
     if (G.net.online) G.net.send(m);
   }
@@ -65,11 +73,16 @@ export class BossSkills {
     const add = (obj) => { G.scene.add(obj); fx.objs.push(obj); return obj; };
     if (m.s === 'jet') { fx.stream = add(new THREE.Group()); for (let i = 0; i < 14; i++) fx.stream.add(new THREE.Mesh(new THREE.SphereGeometry(0.16 + Math.random() * 0.1, 8, 6), new THREE.MeshBasicMaterial({ color: 0xbfe8ff, transparent: true, opacity: 0.85 }))); fx.stream.visible = false; sfx.splash(o, false); }
     if (m.s === 'stomp') { fx.ring = add(new THREE.Mesh(new THREE.RingGeometry(0.85, 1, 48).rotateX(-Math.PI / 2), new THREE.MeshBasicMaterial({ color: 0xe8d2a0, transparent: true, opacity: 0.9, side: THREE.DoubleSide, depthWrite: false }))); fx.ring.visible = false; }
-    if (m.s === 'grenade') { // marca no chão
+    if (m.s === 'snipe') { // laser vermelho até onde você estava
+      const geo = new THREE.BufferGeometry().setFromPoints([o.clone().setY(o.y + 1.5), tg.clone().setY(tg.y + 1.1)]);
+      fx.laser = add(new THREE.Line(geo, new THREE.LineBasicMaterial({ color: 0xff2a1a, transparent: true, opacity: 0.8 })));
+      fx.dot = add(new THREE.Mesh(new THREE.SphereGeometry(0.06, 8, 6), new THREE.MeshBasicMaterial({ color: 0xff2a1a }))); fx.dot.position.copy(tg).setY(tg.y + 1.1);
+    }
+    if (m.s === 'grenade' || m.s === 'bomb') { // marca no chão
       const col = 0xff3b2b, R = S.radius;
       fx.mark = add(new THREE.Mesh(new THREE.RingGeometry(R * 0.92, R, 40).rotateX(-Math.PI / 2), new THREE.MeshBasicMaterial({ color: col, transparent: true, opacity: 0.6, side: THREE.DoubleSide, depthWrite: false })));
       fx.mark.position.set(tg.x, this._ground(tg.x, tg.z, tg.y) + 0.06, tg.z);
-      { fx.nade = add(new THREE.Mesh(new THREE.SphereGeometry(0.13, 10, 8), new THREE.MeshStandardMaterial({ color: 0x3a4226, roughness: 0.6 }))); fx.nade.position.copy(o).setY(o.y + 2); }
+      { fx.nade = add(new THREE.Mesh(new THREE.SphereGeometry(m.s === 'bomb' ? 0.18 : 0.13, 10, 8), new THREE.MeshStandardMaterial({ color: m.s === 'bomb' ? 0x1a1a1a : 0x3a4226, roughness: 0.6, emissive: m.s === 'bomb' ? 0x401000 : 0 }))); fx.nade.position.copy(o).setY(o.y + 2); }
     }
     this.active.push(fx);
   }
@@ -131,14 +144,25 @@ export class BossSkills {
           }
           if (R > S.maxR) done = true;
         }
-      } else if (f.s === 'grenade') {
+      } else if (f.s === 'snipe') {
+        f.laser.material.opacity = 0.4 + 0.5 * Math.abs(Math.sin(f.t * (8 + f.t * 10)));
+        if (f.t >= S.wind) {
+          const from = f.o.clone().setY(f.o.y + 1.5), to = f.tg.clone().setY(f.tg.y + 1.1);
+          G.combat.tracer(from, to, 0xffb060); sfx.gun(f.o, 'sniper');
+          const me = this._me();
+          if (me && Math.hypot(pp.x - f.tg.x, pp.z - f.tg.z) < S.radius && Math.abs(pp.y - f.tg.y) < 2 && !(G.melee && G.melee.iframes > 0)) {
+            G.survival.damage(S.dmg, 'Atirador de elite'); sfx.hit(pp, true);
+          }
+          done = true;
+        }
+      } else if (f.s === 'grenade' || f.s === 'bomb') {
         const u = Math.min(1, f.t / 0.9);
         f.nade.position.lerpVectors(f.o.clone().setY(f.o.y + 2), f.mark.position, u); f.nade.position.y += Math.sin(u * Math.PI) * 4;
         f.mark.material.opacity = 0.4 + 0.5 * Math.abs(Math.sin(f.t * (6 + f.t * 6)));
         if (f.t >= S.fuse) {
           if (G.naval) G.naval.boom.spawn(f.mark.position, 1); sfx.explosion(f.mark.position, 1);
           const me = this._me(), d = Math.hypot(pp.x - f.tg.x, pp.z - f.tg.z);
-          if (me && d < S.radius) this._hit(S.dmg * (1 - 0.5 * d / S.radius), 'Granada', f.mark.position, 6);
+          if (me && d < S.radius) this._hit(S.dmg * (1 - 0.5 * d / S.radius), f.s === 'bomb' ? 'Bomba' : 'Granada', f.mark.position, 6);
           done = true;
         }
       }

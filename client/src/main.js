@@ -105,7 +105,7 @@ G.seaEvents = new SeaEvents(G); // kraken, tubarões, peixes voadores e raios
 G.inventory = new Inventory(G); // tela de inventário (Tab)
 const atmo = new Atmosphere(renderer, scene, { sun, hemisphere }); // céu, IBL e sombras
 const ocean = new Ocean(scene, atmo);
-ocean.islandSource = () => G.world.islands;
+ocean.islandSource = () => G.world.islands.filter((i) => !i.seaSite); // estruturas do mar não têm água rasa
 G.atmosphere = atmo;
 G.ocean = ocean;
 G.viewmodel.scene.environment = scene.environment; // metais da 1ª pessoa também refletem o céu

@@ -32,6 +32,24 @@ export function seabedCratesFor(seed, cx, cz) {
   return out;
 }
 
+// Estruturas no MEIO DO MAR (sem ilha): torre de sucata com morteiro (derrubável a canhão) ou
+// prédio afundado e inclinado (sobe pela face torta; às vezes tem inimigos; caixotes p<cx>,<cz>c<n>).
+// RNG próprio; nunca no mesmo chunk de ilha ou naufrágio.
+export const SEA_SITES = { predio: 0.055, torre: 0.03, torrePerDiff: 0.008 };
+export function seaSiteFor(seed, cx, cz) {
+  if (Math.abs(cx) + Math.abs(cz) <= 2 || chunkHasIsland(seed, cx, cz) || wreckFor(seed, cx, cz)) return null;
+  const r = mulberry32(hash2(seed ^ 0x2f6b91d3, cx, cz)), S = WORLD_LOOT_PARAMS.chunkSize;
+  const diff = Math.min(4, Math.floor(Math.hypot(cx * S, cz * S) / 320)), roll = r();
+  let kind = null;
+  if (roll < SEA_SITES.predio) kind = 'predio';
+  else if (diff >= 1 && roll < SEA_SITES.predio + SEA_SITES.torre + diff * SEA_SITES.torrePerDiff) kind = 'torre';
+  if (!kind) return null;
+  return {
+    kind, cx, cz, diff, x: cx * S + (r() - 0.5) * 36, z: cz * S + (r() - 0.5) * 36, yaw: r() * Math.PI * 2,
+    crates: kind === 'predio' ? (r() < 0.4 ? 2 : 1) : 0, rng: r,
+  };
+}
+
 export const LOOT_CONFIG = {
   starterCache: {
     id: 'i0,1c0',
@@ -178,7 +196,7 @@ export function generateCrateLoot(seed, id, difficulty, playerCount = 1) {
 }
 
 export function difficultyForCrateId(id) {
-  const match = /^[ibs](-?\d+),(-?\d+)c\d+$/.exec(id);
+  const match = /^[ibsp](-?\d+),(-?\d+)c\d+$/.exec(id);
   if (!match) return 0;
   const x = Number(match[1]) * WORLD_LOOT_PARAMS.chunkSize;
   const z = Number(match[2]) * WORLD_LOOT_PARAMS.chunkSize;
@@ -190,6 +208,8 @@ export function isGeneratedCrate(seed, id) {
   if (wreck) { const w = wreckFor(seed, Number(wreck[1]), Number(wreck[2])); return !!w && Number(wreck[3]) < w.crates; }
   const sea = /^s(-?\d+),(-?\d+)c(\d+)$/.exec(id);
   if (sea) return Number(sea[3]) < seabedCratesFor(seed, Number(sea[1]), Number(sea[2])).length;
+  const site = /^p(-?\d+),(-?\d+)c(\d+)$/.exec(id);
+  if (site) { const st = seaSiteFor(seed, Number(site[1]), Number(site[2])); return !!st && Number(site[3]) < st.crates; }
   const match = /^i(-?\d+),(-?\d+)c(\d+)$/.exec(id);
   if (!match) return false;
   const cx = Number(match[1]), cz = Number(match[2]), crateIndex = Number(match[3]);

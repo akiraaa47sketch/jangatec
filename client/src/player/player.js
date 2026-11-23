@@ -101,6 +101,16 @@ export class Player {
 
   // Escada de mão soldada na jangada perto de p (encostado nela, de frente)? → { top, fx, fz } (mundo)
   ladderAt(p) {
+    // escadas das torres de vigia das ilhas
+    for (const isl of this.G.world ? this.G.world.islands : []) {
+      if (!isl.ladders || !isl.ladders.length || Math.hypot(p.x - isl.x, p.z - isl.z) > isl.R + 10) continue;
+      for (const L of isl.ladders) {
+        const [lx, lz] = rot(p.x - L.x, p.z - L.z, -L.yaw);
+        if (Math.abs(lx) > 0.4 || Math.abs(lz) > 0.6 || p.y < L.y0 - 0.3 || p.y > L.top + 0.1) continue;
+        const [dx, dz] = rot(0, -L.dir, L.yaw); // para dentro da torre
+        return { top: L.top, fx: dx, fz: dz };
+      }
+    }
     const boat = this.G.boat; if (!boat) return null;
     const [bx, bz] = boat.toLocal(p.x, p.z), by = p.y - boat.set.y;
     for (const piece of boat.pieces.values()) {

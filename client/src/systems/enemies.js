@@ -3,7 +3,7 @@
 // Só "pensam" a 5 Hz e apenas quando o jogador está por perto (ativação por distância).
 import * as THREE from '../three.js';
 import { mulberry32, hash2, lerpAngle, rot, clamp, clock } from '../core/util.js';
-import { waveHeight } from '../world/ocean.js';
+import { waveHeight, sea } from '../world/ocean.js';
 import { woodTexture, woodBump, repeated, scaleBoxUVs } from '../world/textures.js';
 import { CFG } from '../config.js';
 import { makeEnemyPill, animateEnemy } from './evilpills.js';
@@ -14,21 +14,39 @@ const SIEGE_MORTAR = () => SIEGE.mortar;
 import { sfx } from '../core/sfx.js';
 
 export const ENEMY_TYPES = {
-  melee:    { nome: 'Saqueador', hp: 110,  speed: 3.2, dmg: 10, range: 1.8, cd: 1.0, cor: 0xa83a32, scale: 1 },
-  atirador: { nome: 'Atirador',  hp: 70,  speed: 2.4, dmg: 7,  range: 22,  cd: 1.7, cor: 0x7a6a2a, scale: 1, ranged: true },
-  pesado:   { nome: 'Brutamontes', hp: 240, speed: 1.9, dmg: 22, range: 2.2, cd: 1.6, cor: 0x4a2a5a, scale: 1.3 },
-  rapido:   { nome: 'Corredor',  hp: 65,  speed: 5.2, dmg: 6,  range: 1.6, cd: 0.6, cor: 0xc56a1e, scale: 0.85 },
+  melee:    { nome: 'Saqueador', hp: 85,  speed: 3.2, dmg: 10, range: 1.8, cd: 1.0, cor: 0xa83a32, scale: 1 },
+  atirador: { nome: 'Atirador',  hp: 55,  speed: 2.4, dmg: 7,  range: 22,  cd: 1.7, cor: 0x7a6a2a, scale: 1, ranged: true },
+  pesado:   { nome: 'Brutamontes', hp: 190, speed: 1.9, dmg: 22, range: 2.2, cd: 1.6, cor: 0x4a2a5a, scale: 1.3 },
+  rapido:   { nome: 'Corredor',  hp: 50,  speed: 5.2, dmg: 6,  range: 1.6, cd: 0.6, cor: 0xc56a1e, scale: 0.85 },
+  // --- sobreviventes (acampamentos das ilhas) ---
+  lanceiro: { nome: 'Lanceiro', hp: 70, speed: 3.0, dmg: 11, range: 2.6, cd: 1.2, cor: 0x8a6a3a, scale: 1, ring: 2.6, hitR: 0 },          // lança: alcance longo
+  esquivo:  { nome: 'Esquivo', hp: 70, speed: 3.8, dmg: 9, range: 1.8, cd: 0.9, cor: 0x3a7a5a, scale: 0.95, dodge: { cd: 3.5, chance: 0.8 } }, // desvia (com recarga)
+  // --- piratas (balsas e abordagem) ---
+  duelista: { nome: 'Pirata duelista', hp: 90, speed: 4.6, dmg: 12, range: 1.9, cd: 1.0, cor: 0x7a1e2a, scale: 1.05, dodge: { cd: 3, chance: 0.75 } },
+  pistoleiro: { nome: 'Pirata pistoleiro', hp: 70, speed: 3.6, dmg: 13, range: 16, cd: 3.2, cor: 0x3b2a1d, scale: 1, ranged: true, acc: 0.55, keep: 6 }, // tiro único, recarga lenta
+  bombardeiro: { nome: 'Pirata bombardeiro', hp: 65, speed: 3.4, dmg: 0, range: 16, cd: 99, cor: 0x2a2a2a, scale: 1, ranged: true, burst: 0, skill: 'bomb', keep: 7 },
+  // --- soldados (bases militares e bunkers) ---
+  escopeteiro: { nome: 'Escopeteiro', hp: 105, speed: 3.2, dmg: 4, range: 11, cd: 2.4, cor: 0x4b5530, scale: 1.05, ranged: true, pellets: 6, acc: 0.45, close: true },
+  elite: { nome: 'Atirador de elite', hp: 70, speed: 2.6, dmg: 0, range: 45, cd: 99, cor: 0x3f4a2a, scale: 1, ranged: true, burst: 0, skill: 'snipe' }, // mira laser antes do tiro
   morteiro: { nome: 'Morteiro', hp: 55, speed: 0, dmg: 0, range: 80, cd: 6.5, cor: 0x4a4a3a, scale: 1, ranged: true, mortar: true },
-  soldado:  { nome: 'Soldado', hp: 150, speed: 3.0, dmg: 8, range: 28, cd: 1.7, cor: 0x4b5530, scale: 1.05, ranged: true, burst: 3, acc: 0.72 },
-  pirata:   { nome: 'Pirata', hp: 120, speed: 5.4, dmg: 13, range: 1.8, cd: 1.2, cor: 0x553b2d, scale: 1.05, raftSpeed: 7.2 },
+  soldado:  { nome: 'Soldado', hp: 115, speed: 3.0, dmg: 8, range: 28, cd: 1.7, cor: 0x4b5530, scale: 1.05, ranged: true, burst: 3, acc: 0.72 },
+  pirata:   { nome: 'Pirata', hp: 95, speed: 5.4, dmg: 13, range: 1.8, cd: 1.2, cor: 0x553b2d, scale: 1.05, raftSpeed: 7.2 },
   // chefes da seca (ver bosses.js): ring = distância em que rodeia o jogador, hitR = raio do corpo
   // (o alcance da sua arma conta a partir da borda), armor = dano que passa pelo casco fechado
   escafandrista: { nome: 'Escafandrista amaldiçoado', hp: 320, speed: 2.4, dmg: 15, range: 2.3, cd: 1.6, cor: 0x4d5d62, scale: 1.3, boss: 'mini', ring: 2.5, hitR: 0.35 },
   // chefe das bases militares: gira a minigun (aviso), solta uma rajada longa e superaquece
   metralhador: { nome: 'Metralhador', hp: 700, speed: 1.7, dmg: 5, range: 30, cd: 4.2, cor: 0x3a4226, scale: 1.35, ranged: true, boss: 'minigun', burst: 34, burstGap: 0.07, acc: 0.4, spinUp: 1.2, hitR: 0.4 },
-  fantasma: { nome: 'Pirata fantasma', hp: 100, speed: 4.6, dmg: 6, range: 1.8, cd: 1.5, cor: 0x8fe8d8, scale: 1.05 }, // fraco, mas atravessa a névoa
+  fantasma: { nome: 'Pirata fantasma', hp: 80, speed: 4.6, dmg: 6, range: 1.8, cd: 1.5, cor: 0x8fe8d8, scale: 1.05 }, // fraco, mas atravessa a névoa
 };
-const BY_DIFF = [['melee'], ['melee', 'rapido'], ['melee', 'rapido', 'atirador'], ['melee', 'atirador', 'pesado', 'rapido'], ['atirador', 'pesado', 'rapido', 'pesado']];
+// Quem aparece onde (por dificuldade = distância na rota):
+//   sobreviventes nos acampamentos (cabana, tendas, forte, vigia, sucata); soldados nas bases
+//   militares e bunkers; piratas no mar (balsas e navios de abordagem); fantasmas no navio-fantasma.
+const BY_DIFF = [['melee', 'melee', 'lanceiro'], ['melee', 'rapido', 'lanceiro'], ['melee', 'lanceiro', 'atirador', 'esquivo', 'rapido'], ['lanceiro', 'atirador', 'pesado', 'esquivo', 'rapido'], ['atirador', 'pesado', 'esquivo', 'lanceiro', 'pesado']];
+const SOLDIERS = (r, high, diff) => high ? (diff >= 2 && r() < 0.45 ? 'elite' : 'soldado') : (() => { const x = r(); return x < 0.45 ? 'soldado' : x < 0.7 ? 'escopeteiro' : x < 0.85 ? 'pesado' : 'melee'; })();
+export function pirateType(diff, roll = Math.random()) {
+  if (diff < 1) return roll < 0.8 ? 'pirata' : 'pistoleiro';
+  return roll < 0.45 ? 'pirata' : roll < 0.65 ? 'duelista' : roll < 0.85 ? 'pistoleiro' : 'bombardeiro';
+}
 const SIGHT = 22, LOSE = 36, ACTIVE = 75;
 const FOV_COS = Math.cos(65 * Math.PI / 180); // cone de visão: 130° à frente
 const HEAR = 3.5;                              // perto assim ele percebe mesmo de costas
@@ -130,6 +148,7 @@ export class Enemies {
   spawnForIsland(isl, _r) {
     if (isl.starter || !this.auth) return;
     const G = this.G, r = mulberry32(hash2(G.world.seed, Math.round(isl.x) + 9, Math.round(isl.z) - 9));
+    if (isl.seaSite) { this._spawnSeaSite(isl, r); return; }
     const pool = BY_DIFF[isl.diff];
     const baseCount = isl.diff === 0 ? (r() < 0.5 ? 1 : 0) : 1 + isl.diff + ((r() * 2) | 0);
     const n = Math.max(isl.siteType === 'fort' ? 3 : 2, baseCount);
@@ -157,7 +176,7 @@ export class Enemies {
     for (let i = 0; i < count; i++) {
       const id = `${isl.id}e${i}`, sp = spots.length ? spots[i % spots.length] : null;
       let type = pool[(r() * pool.length) | 0];
-      if (military) type = sp && sp.high ? 'soldado' : r() < 0.7 ? 'soldado' : r() < 0.5 ? 'pesado' : 'melee'; // base militar: a maioria atira
+      if (military || isl.siteType === 'bunker') type = SOLDIERS(r, sp && sp.high, isl.diff); // soldados: a maioria atira
       else if (sp && sp.high) type = isl.diff >= 3 && r() < 0.5 ? 'soldado' : 'atirador';
       let lx = sp ? sp.x : isl.siteCenter[0], lz = sp ? sp.z : isl.siteCenter[1];
       if (i >= spots.length || !sp) { // mais inimigos que pontos: em volta de um ponto livre
@@ -172,10 +191,34 @@ export class Enemies {
       e.yaw = r() * 6.28;
     }
     // base militar: o chefe com a minigun fica no pátio
-    if (military && !G.world.collected.has(`${isl.id}boss`)) {
+    // chefe forte: só nas bases militares do meio/fim da rota (dificuldade 2+) e nem sempre
+    if (military && isl.diff >= 2 && r() < 0.6 && !G.world.collected.has(`${isl.id}boss`)) {
       const b = this.spawn(`${isl.id}boss`, 'metralhador', isl, isl.x + isl.siteCenter[0], isl.z + isl.siteCenter[1]);
       b.yaw = r() * 6.28;
     }
+  }
+
+  // Estruturas no meio do mar: torre = artilheiro de morteiro + 1–2 atiradores no pontão;
+  // prédio inclinado = às vezes (55%) um bando na sala de cima.
+  _spawnSeaSite(isl, r) {
+    const G = this.G, spots = isl.spawnSpots || [];
+    const put = (id, type, sp, y) => {
+      if (G.world.collected.has(id)) return null;
+      const e = this.spawn(id, type, isl, isl.x + sp.x, isl.z + sp.z);
+      e.body.pos.y = y; e.yaw = r() * 6.28; return e;
+    };
+    if (isl.siteType === 'seatower') {
+      for (const t of isl.towers || []) {
+        const e = put(`${t.id}m`, 'morteiro', { x: t.lx + 0.2, z: t.lz - 0.3 }, isl.set.y + 0.55 + t.top + 0.25);
+        if (e) { e.tower = t; e.state = 'idle'; e.cd = 3 + r() * 3; }
+      }
+      const n = 1 + (isl.diff >= 3 ? 1 : 0);
+      for (let i = 0; i < n && i < spots.length; i++) put(`${isl.id}e${i}`, isl.diff >= 2 && r() < 0.5 ? 'soldado' : r() < 0.5 ? 'pistoleiro' : 'atirador', spots[i], isl.set.y + 0.75);
+      return;
+    }
+    if (r() >= 0.55) return;
+    const pool = BY_DIFF[isl.diff], n = Math.min(spots.length, 1 + ((r() * 2) | 0) + (isl.diff >= 2 ? 1 : 0));
+    for (let i = 0; i < n; i++) put(`${isl.id}e${i}`, pool[(r() * pool.length) | 0], spots[i], isl.set.y + 0.75);
   }
 
   spawn(id, type, isl, x, z) {
@@ -322,10 +365,26 @@ export class Enemies {
     for (let i = 0; i < n; i++) {
       const id = `${s.id}-b${i}`;
       if (this.G.world.collected.has(id)) continue;
-      const e = this.spawn(id, s.ghost ? 'fantasma' : 'pirata', null, s.x, s.z);
+      const e = this.spawn(id, s.ghost ? 'fantasma' : pirateType(s.diff || 0), null, s.x, s.z);
       if (s.ghost) ghostify(e);
       e.pirate = true; e.ship = s; e.state = 'onShip'; e.boardDelay = 0.4 + i * 0.75; e.deckZ = -5 + i * (10 / Math.max(1, n - 1));
       this._placeOnShip(e);
+    }
+  }
+  // Navio encalhado na seca: a tripulação (que ainda não pulou) desce pelo costado e corre a pé.
+  spawnDisembark(s) {
+    if (!this.auth) return;
+    const n = 2 + Math.min(3, Math.floor((s.diff || 0) / 1.5)) + Math.floor((this.party - 1) / PARTY.extraPirateEvery);
+    const bx = this.G.boat.x - s.x, bz = this.G.boat.z - s.z;
+    const [lx] = rot(bx, bz, -s.yaw), side = lx > 0 ? 1 : -1; // desce pelo lado virado para a jangada
+    for (let i = 0; i < n; i++) {
+      const id = `${s.id}-w${i}`;
+      if (this.G.world.collected.has(id)) continue;
+      const [ox, oz] = rot(side * (SHIP.W / 2 + 1.2), -5 + i * (10 / Math.max(1, n - 1)), s.yaw);
+      const e = this.spawn(id, s.ghost ? 'fantasma' : pirateType(s.diff || 0), null, s.x + ox, s.z + oz);
+      if (s.ghost) ghostify(e);
+      this.toLand(e, s.x + ox, s.z + oz);
+      e.cd = 0.6 + i * 0.4;
     }
   }
   _placeOnShip(e) {
@@ -335,7 +394,7 @@ export class Enemies {
   }
 
   spawnPirate(id, x, z) {
-    const e = this.spawn(id, 'pirata', null, x, z);
+    const b = this.G.boat, e = this.spawn(id, pirateType(this.G.world.difficulty(b.x, b.z)), null, x, z);
     e.pirate = true;
     e.state = 'approach';
     e.body.pos.y = this.G.startup.waterLevel + 0.55;
@@ -437,6 +496,76 @@ export class Enemies {
     e.hitGlow = k > 0;
     const parts = e.mesh.userData.parts;
     if (parts) { parts.torso.rotation.x -= Math.sin(k * Math.PI) * 0.45; parts.head.rotation.x -= Math.sin(k * Math.PI) * 0.3; }
+  }
+
+  // ---------- piratas no seco ----------
+  isDry(x, z) { return sea.level < this.G.world.seabedHeight(x, z) + 0.3; }
+  // Pirata vira "andarilho": anda pelo fundo seco atrás dos jogadores (IA de terra numa arena de areia).
+  toLand(e, x = e.body.pos.x, z = e.body.pos.z) {
+    const G = this.G, gy = G.world.seabedHeight(x, z);
+    this._removeRaft(e); this._removeHook(e);
+    e.pirate = false; e.walker = true; e.ship = null; e.grapple = null;
+    e.isl = { id: `seco-${e.id}`, x, z, R: 90, rooms: [], enemies: [], minY: gy - 6, set: { y: gy - 0.6 } };
+    e.body.pos.set(x, gy + 0.4, z); e.body.vel.set(0, 0, 0); e.body.grounded = false; e.body.groundSet = null;
+    e.mesh.rotation.set(0, e.yaw, 0);
+    e.state = 'chase'; e.timer = 0; e.cd = 0.5; e.m = { state: 'idle', t: 0 };
+  }
+  // Água voltou: o andarilho volta para a balsa e rema até a jangada de novo.
+  toSea(e) {
+    const G = this.G, p = e.body.pos;
+    e.walker = false; e.pirate = true; e.isl = null; e.state = 'approach';
+    p.y = G.startup.waterLevel + 0.55; e.body.vel.set(0, 0, 0); e.body.groundSet = null;
+    e.raft = this._makePirateRaft(); G.scene.add(e.raft);
+  }
+  // Andarilhos: perto da jangada e o alvo a bordo → sobe de gancho; água subindo → balsa.
+  _walkerTick(e) {
+    const G = this.G, boat = G.boat, p = e.body.pos;
+    if (!this.isDry(p.x, p.z)) { this.toSea(e); return true; }
+    const T = e.tgt;
+    if (T && T.aboard && Math.hypot(boat.x - p.x, boat.z - p.z) < boat.set.radius + 5) {
+      e.walker = false; e.pirate = true; e.isl = null; this._startPirateGrapple(e); return true;
+    }
+    return false;
+  }
+
+  // Esquivos: se você está mirando neles (a mira em cima), dão um passo para o lado — com recarga.
+  _dodgeAim(e, T, dist) {
+    const G = this.G, c = G.combat, w = c.weapon, now = performance.now();
+    if (!T.local || !w || w.melee || dist > 35 || now < (e.dodgeAt || 0)) return;
+    if (!(c.aiming || c.cooldown > 0)) return; // mirando ou acabou de atirar
+    const cam = G.camera, dir = this._dv || (this._dv = new THREE.Vector3()); cam.getWorldDirection(dir);
+    const tx = e.body.pos.x - cam.position.x, ty = e.body.pos.y + 1 - cam.position.y, tz = e.body.pos.z - cam.position.z, l = Math.hypot(tx, ty, tz) || 1;
+    if ((tx * dir.x + ty * dir.y + tz * dir.z) / l < 0.997) return; // a mira não está nele
+    if (Math.random() > e.def.dodge.chance) { e.dodgeAt = now + 600; return; }
+    e.dodgeAt = now + e.def.dodge.cd * 1000;
+    const sd = Math.random() < 0.5 ? 1 : -1, px = -dir.z, pz = dir.x, pl = Math.hypot(px, pz) || 1;
+    e.dashV = { x: px / pl * 7 * sd, z: pz / pl * 7 * sd, t: 0.3 };
+    e.skillPose = 'sidestep'; e.skillHold = 0.3;
+    if (e.mesh.userData.pill) e.mesh.userData.pill.userData.rollDir = sd;
+  }
+
+  // Rajada de tiros (inimigos com arma de fogo). Escopeta: vários chumbos por tiro.
+  _burst(e, T, dist, dt) {
+    const G = this.G, p = e.body.pos, pp = T.pos;
+    if (!(e.burstLeft > 0) || (e.burstT -= dt) > 0) return;
+    e.burstLeft--; e.burstT = e.def.burstGap || 0.13;
+    if (e.def.spinUp && e.burstLeft === 0) { e.heat = 1; e.cd = e.def.cd * (0.9 + Math.random() * 0.3); } // superaqueceu: janela para atacar
+    if (e.los === false || T.dead) return;
+    const moving = Math.hypot(T.vel.x, T.vel.z) > 3 ? 0.12 : 0; // correndo é mais difícil de acertar
+    const from = new THREE.Vector3(p.x, p.y + 1.3, p.z), n = e.def.pellets || 1;
+    const snd = e.type === 'soldado' || e.type === 'metralhador' ? 'rifle' : e.def.pellets ? 'shotgun' : e.type === 'pistoleiro' ? 'revolver' : 'pistol';
+    let hits = 0;
+    for (let k = 0; k < n; k++) {
+      const hit = Math.random() < (e.def.acc || 0.6) - dist * (e.def.pellets ? 0.035 : 0.012) - moving;
+      const miss = hit ? 0 : 0.8 + Math.random() * 1.2, ma = Math.random() * 6.28;
+      const to = new THREE.Vector3(pp.x + Math.cos(ma) * miss, pp.y + 1.2 + (hit ? 0 : 0.4), pp.z + Math.sin(ma) * miss);
+      G.combat.tracer(from, to, 0xffb060);
+      if (k === 0) G.enemyNet.shotFx(from, to, snd);
+      if (hit) hits++;
+    }
+    sfx.gun(p, snd);
+    if (hits) this.hurt(T, e.def.dmg * hits, e.def.nome, e, { k: 'shot' });
+    e.swing = 0.25;
   }
 
   // Minigun do chefe: canos giram enquanto aquece/atira; depois da rajada brilham vermelhos (superaquecida).
@@ -615,8 +744,10 @@ export class Enemies {
     const T = this.pickTarget(e), pp = T.pos; e.tgt = T;
     e.netPose = e.state === 'approach' ? 'row' : e.state === 'grapple' ? 'leap' : 'walk'; e.netProg = 0; e.netSpd = 0;
     e.cd -= dt;
+    if (e.skillHold > 0) e.skillHold -= dt; else e.skillPose = null;
     if (e.state === 'onShip') { // no navio esperando a vez de pular
       if (!e.ship || e.ship.sinkT > 0) { this.damage(e, 9999); return; }
+      if (e.ship.stranded) { this.toLand(e, e.ship.x + Math.sin(e.ship.yaw + Math.PI / 2) * 4, e.ship.z + Math.cos(e.ship.yaw + Math.PI / 2) * 4); return; } // navio encalhado: desce e vai a pé
       this._placeOnShip(e);
       e.yaw = lerpAngle(e.yaw, Math.atan2(boat.x - p.x, boat.z - p.z), Math.min(1, 6 * dt));
       e.mesh.rotation.y = e.yaw;
@@ -677,10 +808,14 @@ export class Enemies {
     const [playerX, playerZ] = boat.toLocal(pp.x, pp.z);
     const dx = playerX - e.local.x, dz = playerZ - e.local.z, distance = Math.hypot(dx, dz);
     let moved = 0;
-    const mres = G.melee ? G.melee.enemyTick(e, dt, Math.hypot(pp.x - p.x, pp.z - p.z)) : null; // aviso/golpe/guarda
+    const mres = G.melee && !e.def.ranged ? G.melee.enemyTick(e, dt, Math.hypot(pp.x - p.x, pp.z - p.z)) : null; // aviso/golpe/guarda
     if (e.knock) [e.local.x, e.local.z] = boat.toLocal(p.x, p.z);
     // no convés também revezam: quem não está engajado espera mais afastado
-    const stopAt = e.engaged === false ? Math.min(3.6, Math.max(2.4, boat.set.radius * 0.9)) : e.def.range * 0.7;
+    const stopAt = e.def.ranged ? Math.min(3.4, Math.max(2.2, boat.set.radius * 0.8)) : e.engaged === false ? Math.min(3.6, Math.max(2.4, boat.set.radius * 0.9)) : e.def.range * 0.7;
+    if (e.def.ranged && e.def.burst !== 0 && !T.dead && !T.downed) { // pistoleiro a bordo: atira de onde está
+      if (e.cd <= 0 && distance < e.def.range) { e.cd = e.def.cd * (0.85 + Math.random() * 0.4); e.burstLeft = e.def.burst ?? 1; e.burstT = 0.35; }
+      e.los = true; this._burst(e, T, distance, dt);
+    }
     if (!T.dead && !T.downed && distance > stopAt && !(mres && mres.hold)) {
       moved = Math.min(distance - stopAt, (e.engaged === false ? 0.45 : 1) * e.def.speed * dt);
       e.local.x += dx / distance * moved;
@@ -708,6 +843,7 @@ export class Enemies {
     [e.local.x, e.local.z] = boat.toLocal(p.x, p.z);
     e.local.y = p.y - boat.set.y;
     if (p.y < boat.set.y - 0.5) {
+      if (this.isDry(p.x, p.z)) { this.toLand(e); return; } // caiu no fundo seco: anda a pé
       e.state = 'approach';
       p.y = G.startup.waterLevel + 0.55;
       b.vel.set(0, 0, 0);
@@ -855,7 +991,7 @@ export class Enemies {
       case 'chase': case 'attack': case 'retreat':
         if (!alive || dist > LOSE) { e.state = 'search'; e.timer = 3; e.goal = null; break; }
         if (e.post) { e.state = e.los && dist < def.range ? 'attack' : 'chase'; e.goal = null; break; } // no alto da torre: não desce
-        if (def.ranged && dist < 6 && e.los) { e.state = 'retreat'; e.goal = [e.body.pos.x - pdx * 6, e.body.pos.z - pdz * 6]; }
+        if (def.ranged && !def.close && dist < (def.keep || 6) && e.los) { e.state = 'retreat'; e.goal = [e.body.pos.x - pdx * 6, e.body.pos.z - pdz * 6]; }
         else if (dist < def.range && e.los) e.state = 'attack';
         else { e.state = 'chase'; e.goal = this.route(e, T.pos.x, T.pos.z); }
         break;
@@ -876,9 +1012,11 @@ export class Enemies {
       if (e.replica && auth && !G.enemyNet.adopt(e)) continue; // virou host: assume os inimigos (ou descarta)
       if (e.replica) { G.enemyNet.animate(e, dt); continue; }
       if (e.pirate) {
+        if (auth && e.state === 'approach' && this.isDry(p.x, p.z)) { this.toLand(e); continue; } // balsa encalhou: vai a pé
         this.updatePirate(e, dt);
         continue;
       }
+      if (e.walker && auth && e.state !== 'dead' && this._walkerTick(e)) continue;
       const T = this.pickTarget(e), pp = T.pos; e.tgt = T;
       let pdx = pp.x - p.x, pdz = pp.z - p.z;
       const dist = Math.hypot(pdx, pdz) || 1;
@@ -928,13 +1066,15 @@ export class Enemies {
         }
       }
       if (!e.post && !(mres && mres.hold)) { const sep = this._separate(e, [0, 0]); mx += sep[0]; mz += sep[1]; } // sem empilhar
+      if (e.def.dodge) this._dodgeAim(e, T, dist);
+      if (e.dashV) { mx += e.dashV.x; mz += e.dashV.z; if ((e.dashV.t -= dt) <= 0) e.dashV = null; } // passo lateral da esquiva
       if (e.state === 'attack' && e.cd <= 0 && e.def.ranged && e.los && e.def.spinUp) { // minigun: gira (aviso) e depois a rajada
         e.cd = 99; e.burstLeft = e.def.burst; e.burstT = e.def.spinUp; e.spinning = e.def.spinUp; // a espera só conta depois da rajada
-      } else if (e.state === 'attack' && e.cd <= 0 && e.def.ranged && e.los) {
+      } else if (e.state === 'attack' && e.cd <= 0 && e.def.ranged && e.los && e.def.burst !== 0) {
         // revezamento: no máximo N rajadas juntas e um respiro entre o começo de cada uma
         if ((this.bursting || 0) >= COMBAT_DIRECTOR.bursts || this.burstGapT > 0) e.cd = 0.25 + Math.random() * 0.45;
         else {
-          e.cd = e.def.cd * (0.85 + Math.random() * 0.4); e.burstLeft = e.def.burst || 1; e.burstT = 0.12;
+          e.cd = e.def.cd * (0.85 + Math.random() * 0.4); e.burstLeft = e.def.burst ?? 1; e.burstT = 0.12;
           this.bursting = (this.bursting || 0) + 1; this.burstGapT = COMBAT_DIRECTOR.burstGap;
         }
       }
@@ -943,28 +1083,14 @@ export class Enemies {
         if (G.melee) G.melee.setTell(e, e.spinning > 0 ? { heavy: true } : null, 1 - Math.max(0, e.spinning) / e.def.spinUp);
         if (Math.random() < dt * 14) sfx.click(p, 0.6 + (1 - e.spinning / e.def.spinUp));
       }
-      if (e.burstLeft > 0 && (e.burstT -= dt) <= 0) { // rajada: tiros em sequência
-        e.burstLeft--; e.burstT = e.def.burstGap || 0.13;
-        if (e.def.spinUp && e.burstLeft === 0) { e.heat = 1; e.cd = e.def.cd * (0.9 + Math.random() * 0.3); } // superaqueceu: janela para atacar
-        if (e.los && !T.dead) {
-          const moving = Math.hypot(T.vel.x, T.vel.z) > 3 ? 0.12 : 0; // correndo é mais difícil de acertar
-          const hit = Math.random() < (e.def.acc || 0.6) - dist * 0.012 - moving;
-          const miss = hit ? 0 : 0.8 + Math.random() * 1.2, ma = Math.random() * 6.28;
-          const from = new THREE.Vector3(p.x, p.y + 1.3, p.z), to = new THREE.Vector3(pp.x + Math.cos(ma) * miss, pp.y + 1.2 + (hit ? 0 : 0.4), pp.z + Math.sin(ma) * miss);
-          G.combat.tracer(from, to, 0xffb060);
-          const snd = e.type === 'soldado' || e.type === 'metralhador' ? 'rifle' : 'pistol';
-          sfx.gun(p, snd);
-          G.enemyNet.shotFx(from, to, snd);
-          if (hit) this.hurt(T, e.def.dmg, e.def.nome, e, { k: 'shot' });
-          e.swing = 0.25;
-        }
-      }
+      this._burst(e, T, dist, dt);
       // Movimento + colisão (o mesmo resolvedor do jogador). Não saem da ilha.
       const prevY = p.y;
       b.vel.y = Math.max(b.vel.y - CFG.gravity * dt, -20);
       p.x += mx * dt; p.z += mz * dt; p.y += b.vel.y * dt;
-      const ix = p.x - e.isl.x, iz = p.z - e.isl.z, il = Math.hypot(ix, iz), maxR = e.isl.R - 0.6;
-      if (il > maxR) { p.x = e.isl.x + (ix / il) * maxR; p.z = e.isl.z + (iz / il) * maxR; }
+      const icx = e.isl.cx ?? e.isl.x, icz = e.isl.cz ?? e.isl.z; // estruturas do mar: presos na sala/pontão
+      const ix = p.x - icx, iz = p.z - icz, il = Math.hypot(ix, iz), maxR = e.isl.R - 0.6;
+      if (il > maxR) { p.x = icx + (ix / il) * maxR; p.z = icz + (iz / il) * maxR; }
       G.colliders.resolve(b, prevY);
       if (p.y < (e.isl.minY ?? -3)) { p.y = (e.isl.minY != null ? e.isl.set.y + 1 : 1.5); b.vel.y = 0; }
 
