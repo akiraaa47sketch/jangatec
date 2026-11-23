@@ -173,7 +173,6 @@ export class Player {
     if (this.downed) speed = this.swimming ? CFG.swim * 0.6 : 0.9; // caído: só se arrasta
     if (aiming) speed = Math.min(speed, 3);
     speed *= this.speedMul || 1; // bloqueando/carregando golpe anda devagar
-    if (this.slowT > 0) speed *= 0.5; // espuma do Caranguejo-Rei
     // furacão: andar CONTRA o empurrão = se firmar (anda devagar e não escorrega)
     this.bracing = 0;
     if (this.drift && moving && this.aboard) {

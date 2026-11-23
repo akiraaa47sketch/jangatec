@@ -1,19 +1,14 @@
-// Chefes da SECA (quando o mar seca e dá para andar no fundo):
+// Chefe da SECA (quando o mar seca e dá para andar no fundo):
 //   • Escafandrista amaldiçoado (miniboss do começo): um mergulhador antigo de capacete de latão que
 //     anda pelo fundo seco guardando os naufrágios. Bate forte e devagar. Se a água voltar ele se
 //     AFOGA (sem loot); se você matar, larga um saco com loot.
-//   • Caranguejo-Rei (chefe, a partir de ~40% da run): carapaça blindada — o golpe só entra direito
-//     depois que ele ataca (recuperando), quando está atordoado (parry/chute) ou nas lâminas cruzadas.
-//     Quando a água volta ele se enterra e some. Derrotado, larga um saco com loot raro.
 // Só o host sorteia e simula (os outros recebem réplicas como qualquer inimigo).
 import { sea } from '../world/ocean.js';
 import { TIDE } from './tide.js';
 
 export const BOSSES = {
   runLength: 1280,      // m até a dificuldade máxima (world.difficulty chega a 4)
-  crabFrom: 0.4,        // fração da run a partir da qual o Caranguejo-Rei pode aparecer
-  crabChance: 0.65,     // por seca (depois de 40%)
-  miniChance: 0.8,      // por seca (antes do caranguejo, ou quando ele não vier)
+  miniChance: 0.8,      // por seca
   miniMaxProgress: 0.7, // depois disso o escafandrista não aparece mais
   dist: [26, 40],       // m da jangada até onde o chefe surge
 };
@@ -26,13 +21,12 @@ export class Bosses {
   update(dt, t) {
     const G = this.G, E = G.enemies;
     if (!G.started || !G.startup.departed) return;
-    // água voltando: quem é do fundo seco se afoga (escafandrista) ou se enterra (caranguejo)
+    // água voltando: o escafandrista se afoga (sem loot)
     if (E.auth) for (const e of E.list) {
       if (!e.seabedBoss || e.state === 'dead' || e.replica) continue;
       const ground = G.world.seabedHeight(e.body.pos.x, e.body.pos.z);
       if (sea.level > ground + 0.9) {
-        if (e.def.boss === 'crab') { E.killSilently(e, 'O Caranguejo-Rei se enterrou na areia quando a água voltou…'); e.burrow = true; }
-        else E.killSilently(e, e.type === 'siri' ? null : 'A água voltou e o escafandrista se afogou dentro do capacete.');
+        E.killSilently(e, 'A água voltou e o escafandrista se afogou dentro do capacete.');
       }
     }
     if (!E.auth) return;
@@ -43,8 +37,7 @@ export class Bosses {
     this.cycle = cycle; // uma tentativa por seca
     if (G.events.current || (G.naval && G.naval.active)) return;
     const prog = this.progress();
-    if (prog >= BOSSES.crabFrom && Math.random() < BOSSES.crabChance) this.spawn('caranguejo', cycle);
-    else if (prog < BOSSES.miniMaxProgress && Math.random() < BOSSES.miniChance) this.spawn('escafandrista', cycle);
+    if (prog < BOSSES.miniMaxProgress && Math.random() < BOSSES.miniChance) this.spawn('escafandrista', cycle);
   }
 
   // Surge no fundo seco a uns 30 m da jangada (fora das ilhas). isl = "arena" de areia para a IA.
@@ -61,10 +54,8 @@ export class Bosses {
     const e = G.enemies.spawn(`boss-${type}-${cycle}`, type, isl, x, z);
     e.seabedBoss = true;
     e.body.pos.y = gy + 0.2; e.state = 'chase'; e.timer = 0; e.yaw = Math.atan2(boat.x - x, boat.z - z);
-    const crab = type === 'caranguejo';
-    G.hud.msg(crab ? 'A areia está tremendo… o CARANGUEJO-REI saiu da toca!' : 'Um vulto de capacete de latão anda pelo fundo seco…');
-    if (G.enemyNet) G.enemyNet.banner(crab ? 'CARANGUEJO-REI' : 'ESCAFANDRISTA AMALDIÇOADO',
-      crab ? 'O casco segura quase tudo: bata depois que ele atacar, ou atordoe com parry e chute. A água volta e ele foge!' : 'Mate antes que a água volte — ele larga um saco de loot.', crab ? 'pirate' : 'storm');
+    G.hud.msg('Um vulto de capacete de latão anda pelo fundo seco…');
+    if (G.enemyNet) G.enemyNet.banner('ESCAFANDRISTA AMALDIÇOADO', 'Mate antes que a água volte — ele larga um saco de loot.', 'storm');
     return e;
   }
 }

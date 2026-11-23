@@ -143,7 +143,7 @@ export class Hud {
     $('lifeRing').classList.toggle('low', vida <= 30);
     $('lockTag').hidden = !G.player.faceCam || G.player.firstPerson;
     $('objective').textContent = G.startup.objective;
-    // barra de vida do chefe mais perto (escafandrista / Caranguejo-Rei)
+    // barra de vida do chefe mais perto (escafandrista / Metralhador)
     const pp = G.player.body.pos;
     const boss = G.enemies.list.filter((e) => e.def.boss && e.state !== 'dead' && Math.hypot(e.body.pos.x - pp.x, e.body.pos.z - pp.z) < 70).sort((a, b) => b.def.hp - a.def.hp)[0];
     $('bossBar').hidden = !boss; document.body.classList.toggle('bossfight', !!boss);
