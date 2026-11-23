@@ -21,6 +21,12 @@ export const ENEMY_TYPES = {
   morteiro: { nome: 'Morteiro', hp: 55, speed: 0, dmg: 0, range: 80, cd: 6.5, cor: 0x4a4a3a, scale: 1, ranged: true, mortar: true },
   soldado:  { nome: 'Soldado', hp: 110, speed: 3.0, dmg: 8, range: 28, cd: 1.7, cor: 0x4b5530, scale: 1.05, ranged: true, burst: 3, acc: 0.72 },
   pirata:   { nome: 'Pirata', hp: 75, speed: 5.4, dmg: 13, range: 1.8, cd: 1.2, cor: 0x553b2d, scale: 1.05, raftSpeed: 7.2 },
+  // chefes da seca (ver bosses.js): ring = distância em que rodeia o jogador, hitR = raio do corpo
+  // (o alcance da sua arma conta a partir da borda), armor = dano que passa pelo casco fechado
+  escafandrista: { nome: 'Escafandrista amaldiçoado', hp: 320, speed: 2.4, dmg: 15, range: 2.3, cd: 1.6, cor: 0x4d5d62, scale: 1.3, boss: 'mini', ring: 2.5, hitR: 0.35 },
+  caranguejo: { nome: 'Caranguejo-Rei', hp: 1500, speed: 3.2, dmg: 22, range: 3.3, cd: 1.3, cor: 0xb2401f, scale: 1, boss: 'crab', ring: 3.4, hitR: 1.4, armor: 0.3, radius: 1.5 },
+  // chefe das bases militares: gira a minigun (aviso), solta uma rajada longa e superaquece
+  metralhador: { nome: 'Metralhador', hp: 700, speed: 1.7, dmg: 5, range: 30, cd: 4.2, cor: 0x3a4226, scale: 1.35, ranged: true, boss: 'minigun', burst: 34, burstGap: 0.07, acc: 0.4, spinUp: 1.2, hitR: 0.4 },
   fantasma: { nome: 'Pirata fantasma', hp: 70, speed: 4.6, dmg: 6, range: 1.8, cd: 1.5, cor: 0x8fe8d8, scale: 1.05 }, // fraco, mas atravessa a névoa
 };
 const BY_DIFF = [['melee'], ['melee', 'rapido'], ['melee', 'rapido', 'atirador'], ['melee', 'atirador', 'pesado', 'rapido'], ['atirador', 'pesado', 'rapido', 'pesado']];
@@ -39,12 +45,29 @@ export const COMBAT_DIRECTOR = {
   reaction: [0.6, 1.3],// s entre ver o jogador e o primeiro tiro
 };
 // Invasões piratas: raras e anunciadas. Intervalo em segundos depois da partida.
+// Escala por jogador na sessão (1 a 6): +12% de vida por aliado nos inimigos, +20% nos chefes,
+// e +1 pirata nas invasões a cada 2 aliados. Dano e velocidade não mudam.
+export const PARTY = { hp: 0.12, bossHp: 0.2, extraPirateEvery: 2 };
 export const PIRATE_BALANCE = {
   firstWave: [110, 160],   // primeira invasão
   interval: [140, 230],    // entre invasões (conta só depois que a anterior acabou)
   spawnDistance: 42,       // as balsas aparecem longe o bastante para serem vistas
 };
 const between = ([a, b]) => a + Math.random() * (b - a);
+
+// Loot dos chefes da seca (vai num saco no chão)
+function bossLoot(kind) {
+  const r = Math.random();
+  if (kind === 'minigun') return { arma_minigun: 140, municao: 20, kit: 1, bandagem: 2 }; // a minigun vem com 140 balas
+  if (kind === 'crab') {
+    const W = r < 0.3 ? 'rifle_precisao' : r < 0.65 ? 'rifle' : 'escopeta';
+    return { ['arma_' + W]: 1, kit: 2, municao: 30, cartucho: 10, bala_canhao: 6, peixe: 3 };
+  }
+  const loot = { municao: 10, bandagem: 2, chocolate: 1 };
+  if (r < 0.35) loot['arma_' + ['revolver', 'facao', 'martelo'][(Math.random() * 3) | 0]] = 1;
+  else if (r < 0.7) loot.kit = 1;
+  return loot;
+}
 
 // Pirata fantasma: translúcido e esverdeado (o brilho de dano e o sumiço na morte continuam valendo)
 export function ghostify(e) {
@@ -65,6 +88,9 @@ export class Enemies {
 
   // Multiplayer: só o host simula os inimigos (os outros recebem réplicas — ver enemynet.js).
   get auth() { const n = this.G.net; return !n.online || n.isHost; }
+  // Grupo maior = um pouco mais difícil (não muito): vida dos inimigos e dos chefes e piratas extras.
+  get party() { const n = this.G.net; return n.online ? 1 + Math.min(5, n.remotes.size) : 1; }
+  partyMul(boss = false) { return 1 + (this.party - 1) * (boss ? PARTY.bossHp : PARTY.hp); }
   byId(id) { return this.ids.get(id); }
 
   // Jogadores que os inimigos podem caçar: o local + os aliados (posição interpolada no mundo).
@@ -145,6 +171,11 @@ export class Enemies {
       if (sp && sp.high && i < spots.length) { e.body.pos.y = isl.set.y + 0.55 + sp.y + 0.1; e.post = true; } // fica no posto
       e.yaw = r() * 6.28;
     }
+    // base militar: o chefe com a minigun fica no pátio
+    if (military && !G.world.collected.has(`${isl.id}boss`)) {
+      const b = this.spawn(`${isl.id}boss`, 'metralhador', isl, isl.x + isl.siteCenter[0], isl.z + isl.siteCenter[1]);
+      b.yaw = r() * 6.28;
+    }
   }
 
   spawn(id, type, isl, x, z) {
@@ -153,10 +184,11 @@ export class Enemies {
     mesh.scale.setScalar(def.scale);
     mesh.rotation.order = 'YXZ';
     const e = {
-      id, type, def, isl, mesh, hp: def.hp, state: 'idle', timer: 1 + Math.random() * 3, cd: 0, yaw: 0, goal: null, moving: false,
+      id, type, def, isl, mesh, hp: Math.round(def.hp * this.partyMul(!!def.boss)), state: 'idle', timer: 1 + Math.random() * 3, cd: 0, yaw: 0, goal: null, moving: false,
       pirate: false,
-      body: { pos: new THREE.Vector3(x, isl ? isl.set.y + 1.2 : 1.2, z), vel: new THREE.Vector3(), radius: 0.35, height: 1.7 * def.scale, grounded: false, groundSet: null },
+      body: { pos: new THREE.Vector3(x, isl ? isl.set.y + 1.2 : 1.2, z), vel: new THREE.Vector3(), radius: def.radius || 0.35, height: 1.7 * def.scale, grounded: false, groundSet: null },
     };
+    e.max = e.hp;
     e.mats = new Set();
     mesh.traverse((o) => { if (o.isMesh) { o.userData.enemy = e; this.hitMeshes.push(o); e.mats.add(o.material); } });
     e.hitT = 0; e.deathT = 0; e.deathSide = Math.random() < 0.5 ? 1 : -1;
@@ -188,6 +220,14 @@ export class Enemies {
       if (j >= 0) e.isl.enemies.splice(j, 1);
     }
   }
+  // Morre sem loot (ex.: o escafandrista afogado quando a água volta)
+  killSilently(e, msg) {
+    if (e.state === 'dead') return;
+    e.state = 'dead'; e.timer = 5; e.deathT = 0; e.hp = 0;
+    if (this.G.melee) { this.G.melee.tokens.delete(e); this.G.melee.setTell(e, null); this.G.melee.updateStars(e, 0, false); }
+    if (msg) this.G.hud.msg(msg);
+    if (this.G.net.online) this.G.net.send({ t: 'edie', id: e.id, side: e.deathSide, to: null, loot: null });
+  }
   removeIsland(isl) { for (const e of isl.enemies.slice()) this.remove(e); isl.enemies.length = 0; }
 
   // by = quem bateu ('L' = jogador local, ou o id do aliado); remote = veio pela rede (não reenviar)
@@ -201,6 +241,10 @@ export class Enemies {
       if (e.ai && e.ai.onHit) e.ai.onHit(e, n);
       if (e.hp <= 0) { e.state = 'dead'; if (e.ai && e.ai.onDeath) e.ai.onDeath(e, by); }
       return;
+    }
+    if (e.def.armor && !e.replica && !['stagger', 'recover', 'clashed'].includes(e.m && e.m.state)) { // casco fechado
+      n *= e.def.armor;
+      if (G.melee && Math.random() < 0.35) G.melee.say(e.body.pos.clone().setY(e.body.pos.y + 1.6), 'CASCO', '#c8d2da');
     }
     if (e.replica) { // inimigo de outro jogador (host): o acerto vai para ele decidir
       e.hp -= n; e.hitT = 0.22;
@@ -224,6 +268,11 @@ export class Enemies {
         this.G.hud.msg(`${e.def.nome} derrotado` + (loot ? '  ' + this.G.survival.add(loot) : ''));
         if (sabre && !this.G.combat.owned.has('sabre') && this.G.combat.unlockWeapon('sabre') === true) this.G.hud.msg('Você pegou um Sabre pirata ★★★!');
       } else this.G.hud.msg(`${e.def.nome} derrotado`);
+      if (e.def.boss && G.drops) { // chefe: saco de loot no chão para quem pegar primeiro
+        G.drops.dropAt(e.body.pos, bossLoot(e.def.boss));
+        G.hud.msg(e.def.boss === 'crab' ? 'O Caranguejo-Rei caiu! Pegue o saco de loot' : 'O escafandrista caiu e largou um saco de loot');
+        if (G.enemyNet) G.enemyNet.banner(e.def.boss === 'crab' ? 'CARANGUEJO-REI DERROTADO' : 'ESCAFANDRISTA DERROTADO', 'O loot ficou no chão — pegue com E.', 'good');
+      }
       if (G.net.online) {
         G.net.send({ t: 'edie', id: e.id, side: e.deathSide, to: by === 'L' ? null : by, loot: loot ? { ...loot, ...(sabre ? { arma_sabre: 1 } : {}) } : sabre ? { arma_sabre: 1 } : null });
         if (!e.pirate) G.net.send({ t: 'collect', id: e.id }); // quem entrar depois não vê ele de novo
@@ -249,7 +298,7 @@ export class Enemies {
       this.pirateSpawnTimer = between(PIRATE_BALANCE.interval);
       return;
     }
-    const count = wave === 0 ? 1 : wave < 3 ? 2 : 2 + (Math.random() < 0.4 ? 1 : 0);
+    const count = (wave === 0 ? 1 : wave < 3 ? 2 : 2 + (Math.random() < 0.4 ? 1 : 0)) + Math.floor((this.party - 1) / PARTY.extraPirateEvery);
     const forwardX = Math.sin(G.boat.yaw), forwardZ = Math.cos(G.boat.yaw);
     const sideX = forwardZ, sideZ = -forwardX;
     const flank = Math.random() < 0.5 ? 1 : -1, D = PIRATE_BALANCE.spawnDistance;
@@ -269,7 +318,7 @@ export class Enemies {
   // Tripulação do navio de abordagem: espera no convés do navio e pula de corda, um por vez.
   spawnBoarders(s) {
     if (!this.auth) return; // a tripulação chega aos outros como réplica
-    const n = 3 + Math.min(3, Math.floor(s.diff / 1.5));
+    const n = 3 + Math.min(3, Math.floor(s.diff / 1.5)) + Math.floor((this.party - 1) / PARTY.extraPirateEvery);
     for (let i = 0; i < n; i++) {
       const id = `${s.id}-b${i}`;
       if (this.G.world.collected.has(id)) continue;
@@ -390,6 +439,17 @@ export class Enemies {
     if (parts) { parts.torso.rotation.x -= Math.sin(k * Math.PI) * 0.45; parts.head.rotation.x -= Math.sin(k * Math.PI) * 0.3; }
   }
 
+  // Minigun do chefe: canos giram enquanto aquece/atira; depois da rajada brilham vermelhos (superaquecida).
+  spinGun(e, dt, on) {
+    const parts = e.mesh.userData.gunParts;
+    if (!parts || !parts.spin) return;
+    e.gunSpin = (e.gunSpin || 0) + ((on ? 30 : 0) - (e.gunSpin || 0)) * Math.min(1, dt * 3);
+    parts.spin.rotation.z += e.gunSpin * dt;
+    e.heat = Math.max(0, (e.heat || 0) - dt * 0.3);
+    if (!parts.heatMats) { parts.heatMats = []; parts.spin.traverse((o) => { if (o.isMesh) { o.material = o.material.clone(); parts.heatMats.push(o.material); } }); }
+    for (const m of parts.heatMats) if (m.emissive) m.emissive.setRGB(e.heat * 0.9, e.heat * 0.2, 0);
+  }
+
   // Morte: tomba de lado com quique, afunda e some aos poucos.
   // Artilheiro de morteiro: fica na torre, vira para o jogador e atira em arco de tempos em tempos.
   _updateMortar(e, dt, dist, pdx, pdz) {
@@ -418,9 +478,15 @@ export class Enemies {
       e.mesh.position.copy(e.body.pos);
     }
     e.deathT += dt;
+    if (e.burrow) { // caranguejo fugindo: afunda na areia
+      e.mesh.position.y -= dt * 0.9; e.mesh.rotation.z = Math.sin(e.deathT * 20) * 0.05;
+      if ((e.timer -= dt) <= 0) this.remove(e);
+      return;
+    }
     const t = e.deathT, fall = Math.min(1, t / 0.55);
     const ease = 1 - Math.pow(1 - fall, 3), bounce = fall >= 1 ? Math.sin(Math.min(1, (t - 0.55) / 0.35) * Math.PI) * 0.12 : 0;
-    e.mesh.rotation.x = (-Math.PI / 2 + bounce) * ease;
+    if (e.def.boss === 'crab') { e.mesh.rotation.z = e.deathSide * (Math.PI - bounce) * ease; e.mesh.position.y = e.body.pos.y + 1.2 * ease; } // vira de barriga para cima
+    else e.mesh.rotation.x = (-Math.PI / 2 + bounce) * ease;
     e.mesh.rotation.z = e.deathSide * 0.25 * ease;
     const parts = e.mesh.userData.parts;
     if (parts && t < 0.6) {
@@ -806,14 +872,16 @@ export class Enemies {
         const radial = clamp((dist - want) * 1.2, -e.def.speed * 0.6, e.def.speed * 0.8);
         mx = -pdz * e.strafeDir * sp + pdx * radial; mz = pdx * e.strafeDir * sp + pdz * radial;
       }
-      else if (!e.def.ranged && dist < 3.6 && e.los !== false && (e.state === 'chase' || e.state === 'attack')) {
+      else if (!e.def.ranged && dist < (e.def.ring || 2) + 1.6 && e.los !== false && (e.state === 'chase' || e.state === 'attack')) {
         // esperando a vez: rodeia o jogador mantendo distância
         e.strafeDir = e.strafeDir || (Math.random() < 0.5 ? 1 : -1);
         if (thinkNow && Math.random() < 0.08) e.strafeDir *= -1;
-        const sp = e.def.speed * 0.42, radial = (dist - 2.0) * 1.6;
+        const sp = e.def.speed * 0.42, radial = (dist - (e.def.ring || 2.0)) * 1.6;
         mx = -pdz * e.strafeDir * sp + pdx * radial; mz = pdx * e.strafeDir * sp + pdz * radial;
       }
-      if (e.state === 'attack' && e.cd <= 0 && e.def.ranged && e.los) {
+      if (e.state === 'attack' && e.cd <= 0 && e.def.ranged && e.los && e.def.spinUp) { // minigun: gira (aviso) e depois a rajada
+        e.cd = 99; e.burstLeft = e.def.burst; e.burstT = e.def.spinUp; e.spinning = e.def.spinUp; // a espera só conta depois da rajada
+      } else if (e.state === 'attack' && e.cd <= 0 && e.def.ranged && e.los) {
         // revezamento: no máximo N rajadas juntas e um respiro entre o começo de cada uma
         if ((this.bursting || 0) >= COMBAT_DIRECTOR.bursts || this.burstGapT > 0) e.cd = 0.25 + Math.random() * 0.45;
         else {
@@ -821,16 +889,23 @@ export class Enemies {
           this.bursting = (this.bursting || 0) + 1; this.burstGapT = COMBAT_DIRECTOR.burstGap;
         }
       }
+      if (e.spinning > 0) { // canos girando: "!!" crescendo + chiado (saia da frente / procure cobertura)
+        e.spinning -= dt;
+        if (G.melee) G.melee.setTell(e, e.spinning > 0 ? { heavy: true } : null, 1 - Math.max(0, e.spinning) / e.def.spinUp);
+        if (Math.random() < dt * 14) sfx.click(p, 0.6 + (1 - e.spinning / e.def.spinUp));
+      }
       if (e.burstLeft > 0 && (e.burstT -= dt) <= 0) { // rajada: tiros em sequência
-        e.burstLeft--; e.burstT = 0.13;
+        e.burstLeft--; e.burstT = e.def.burstGap || 0.13;
+        if (e.def.spinUp && e.burstLeft === 0) { e.heat = 1; e.cd = e.def.cd * (0.9 + Math.random() * 0.3); } // superaqueceu: janela para atacar
         if (e.los && !T.dead) {
           const moving = Math.hypot(T.vel.x, T.vel.z) > 3 ? 0.12 : 0; // correndo é mais difícil de acertar
           const hit = Math.random() < (e.def.acc || 0.6) - dist * 0.012 - moving;
           const miss = hit ? 0 : 0.8 + Math.random() * 1.2, ma = Math.random() * 6.28;
           const from = new THREE.Vector3(p.x, p.y + 1.3, p.z), to = new THREE.Vector3(pp.x + Math.cos(ma) * miss, pp.y + 1.2 + (hit ? 0 : 0.4), pp.z + Math.sin(ma) * miss);
           G.combat.tracer(from, to, 0xffb060);
-          sfx.gun(p, e.type === 'soldado' ? 'rifle' : 'pistol');
-          G.enemyNet.shotFx(from, to, e.type === 'soldado' ? 'rifle' : 'pistol');
+          const snd = e.type === 'soldado' || e.type === 'metralhador' ? 'rifle' : 'pistol';
+          sfx.gun(p, snd);
+          G.enemyNet.shotFx(from, to, snd);
           if (hit) this.hurt(T, e.def.dmg, e.def.nome, e, { k: 'shot' });
           e.swing = 0.25;
         }
@@ -842,7 +917,7 @@ export class Enemies {
       const ix = p.x - e.isl.x, iz = p.z - e.isl.z, il = Math.hypot(ix, iz), maxR = e.isl.R - 0.6;
       if (il > maxR) { p.x = e.isl.x + (ix / il) * maxR; p.z = e.isl.z + (iz / il) * maxR; }
       G.colliders.resolve(b, prevY);
-      if (p.y < -3) { p.y = 1.5; b.vel.y = 0; }
+      if (p.y < (e.isl.minY ?? -3)) { p.y = (e.isl.minY != null ? e.isl.set.y + 1 : 1.5); b.vel.y = 0; }
 
       const facePlayer = e.state === 'chase' || e.state === 'attack' || e.state === 'retreat';
       if (facePlayer) e.yaw = lerpAngle(e.yaw, Math.atan2(pdx, pdz), Math.min(1, 8 * dt));
@@ -853,6 +928,7 @@ export class Enemies {
       const pose = mres ? mres.pose : e.swing > 0 ? 'attack' : e.def.ranged && facePlayer ? 'aim' : 'walk';
       const swingProgress = mres ? mres.progress || 0 : e.swing > 0 ? 1 - e.swing / 0.25 : 0;
       animateEnemy(e.mesh, Math.hypot(mx, mz), dt, pose, swingProgress);
+      if (e.def.spinUp) this.spinGun(e, dt, e.spinning > 0 || e.burstLeft > 0);
       e.netPose = pose; e.netProg = swingProgress; e.netSpd = Math.hypot(mx, mz);
       this._animateHit(e, dt);
       if (e.swing > 0) e.swing = Math.max(0, e.swing - dt);

@@ -145,6 +145,7 @@ body.touch #banjoPanel { bottom: 8px; padding: 8px; } body.touch #banjoPanel .ti
 #buildPanel { left: 14px; top: 44px; width: 250px; }
 #vignette { position: absolute; inset: 0; opacity: 0; }
 #vignette.hurt { box-shadow: inset 0 0 140px 40px rgba(200, 30, 20, 0.8); animation: pulse 0.5s; }
+#vignette.parry { box-shadow: inset 0 0 120px 30px rgba(255, 214, 90, 0.75); animation: pulse 0.35s; }
 #vignette.heal { box-shadow: inset 0 0 120px 30px rgba(80, 210, 120, 0.6); animation: pulse 0.6s; }
 #vignette.lightning { background: rgba(225, 235, 255, 0.55); animation: pulse 0.35s; }
 @keyframes pulse { 0% { opacity: 1; } 100% { opacity: 0; } }
@@ -602,3 +603,12 @@ body.touch .inv-slot > kbd { display: none; }
   .inv-hot { grid-template-columns: repeat(6, minmax(0, 1fr)); } .inv-slot, .inv-item { height: 54px; }
   .inv-item { padding: 6px; font-size: 11px; } .inv-detail { margin-top: 10px; padding-top: 10px; min-height: 0; }
 }
+
+/* barra de vida de chefe */
+#bossBar { position: absolute; left: 50%; top: 46px; transform: translateX(-50%); width: min(520px, 70vw); text-align: center; }
+#bossBar b { display: block; margin-bottom: 4px; font: 400 22px/1 var(--display); letter-spacing: 0.04em; color: #ffd9b8; text-shadow: 0 2px 4px rgba(0, 0, 0, 0.8); }
+#bossBar i { display: block; height: 8px; border-radius: 2px; background: rgba(0, 0, 0, 0.55); border: 1px solid rgba(255, 255, 255, 0.18); overflow: hidden; }
+#bossBar s { display: block; height: 100%; text-decoration: none; background: linear-gradient(90deg, #8a1a10, #e2553f); transition: width 0.2s; }
+#bossBar.mini s { background: linear-gradient(90deg, #7a5a18, #e0ac4c); }
+body.touch #bossBar { top: 40px; width: 44vw; } body.touch #bossBar b { font-size: 16px; }
+body.bossfight #msgs { top: 96px; } body.touch.bossfight #msgs { top: 84px; }

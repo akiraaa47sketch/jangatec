@@ -601,6 +601,51 @@ SPECS.rifle = () => {
 };
 
 // Rifle de precisão com o modelo 3D importado (Tripo, pintado por vértice); procedural enquanto carrega.
+// Minigun: 6 canos que giram (parts.spin), motor atrás, caixa de munição com cinta de balas na
+// esquerda, alça de carregar em cima, punho atrás e empunhadura de apoio embaixo. Atira do quadril.
+SPECS.minigun = () => {
+  const g = new THREE.Group();
+  add(g, box(0.11, 0.12, 0.3, MAT.black, 0, 0.012, -0.08));                     // corpo
+  add(g, box(0.112, 0.02, 0.26, MAT.blued, 0, 0.076, -0.08));                   // tampa
+  add(g, cylZ(0.034, 0.034, 0.07, MAT.iron, 0, 0.02, 0.085, 16));                 // motor
+  add(g, cylZ(0.036, 0.036, 0.01, MAT.black, 0, 0.02, 0.122, 16));
+  for (let i = 0; i < 6; i++) add(g, box(0.003, 0.062, 0.05, MAT.black, 0, 0.02, 0.085).rotateZ(i * Math.PI / 3)); // aletas do motor
+  // alça de carregar
+  add(g, box(0.02, 0.02, 0.22, MAT.black, 0, 0.14, -0.1));
+  add(g, box(0.018, 0.06, 0.018, MAT.black, 0, 0.105, 0.0), box(0.018, 0.06, 0.018, MAT.black, 0, 0.105, -0.2));
+  // canos giratórios
+  const spin = new THREE.Group(); spin.position.set(0, 0.02, -0.24); g.add(spin);
+  for (let i = 0; i < 6; i++) {
+    const a = i * Math.PI / 3;
+    spin.add(cylZ(0.011, 0.012, 0.56, MAT.blued, Math.cos(a) * 0.034, Math.sin(a) * 0.034, -0.28, 10));
+  }
+  for (const z of [-0.06, -0.3, -0.54]) spin.add(cylZ(0.05, 0.05, 0.018, MAT.black, 0, 0, z, 16)); // braçadeiras
+  spin.add(cylZ(0.012, 0.012, 0.6, MAT.iron, 0, 0, -0.3, 10));                     // eixo
+  // empunhadura de apoio embaixo dos canos
+  add(g, box(0.045, 0.03, 0.14, MAT.black, 0, -0.045, -0.24));
+  add(g, profile([[-0.21, -0.055], [-0.26, -0.055], [-0.27, -0.16], [-0.22, -0.16]], 0.036, MAT.black));
+  // punho atrás
+  add(g, profile([[0.01, -0.04], [-0.05, -0.04], [-0.08, -0.15], [-0.02, -0.15]], 0.036, MAT.black));
+  trigger(g, 0.0, -0.05);
+  // caixa de munição + cinta
+  add(g, box(0.1, 0.12, 0.14, MAT.blued, -0.115, -0.03, -0.06));
+  add(g, box(0.102, 0.012, 0.142, MAT.black, -0.115, 0.034, -0.06));
+  for (let i = 0; i < 7; i++) {
+    const b = cylY(0.0065, 0.034, MAT.brass, -0.065 + i * 0.006, 0.045 - i * 0.004, -0.09 + Math.sin(i * 0.6) * 0.01, 8);
+    b.rotation.z = Math.PI / 2; add(g, b);
+  }
+  const muzzle = new THREE.Vector3(0, 0.02, -0.84);
+  return {
+    group: g, type: 'long', reload: 'mag', muzzle, sightY: 0.15, adsDist: 0.12, adsFov: 62, flash: 1.6,
+    eject: new THREE.Vector3(0.06, 0.03, -0.08),
+    hold: { p: [0.2, -0.19, -0.62], r: [0.02, 0.05, 0] },
+    gripR: { p: [0, -0.08, 0.06], r: [0, 0, -1.55], c: 0.9, idx: 0.3, th: [-0.35, -0.2, 0.2] },
+    gripL: { p: [0, -0.06, -0.24], r: [0, -1.5708, 3.1416], c: 0.85, th: [0.3, -0.3, 0.2] },
+    magPoint: [-0.115, -0.03, -0.06],
+    parts: { spin },
+  };
+};
+
 SPECS.rifle_precisao = () => {
   const m = gunModel('sniper');
   if (!m) return proceduralSniper();

@@ -26,6 +26,7 @@
   <div id="voiceHud"></div>
   <div id="cannonReticle" hidden><i></i></div>
   <div id="objective"></div>
+  <div id="bossBar" hidden><b id="bossName"></b><i><s id="bossFill"></s></i></div>
   <div id="vitals">
     <div id="lifeRing">
       <svg viewBox="0 0 64 64" aria-hidden="true">
@@ -178,7 +179,11 @@
     <b>⛈ Tempestade forte:</b> o céu fecha, cai muito raio e uma série de ondas gigantes vem de lados diferentes chacoalhando a jangada. Fique perto do mastro para não ser jogado longe.<br>
     <b>🌀 No redemoinho</b> o vento empurra quem está a bordo para FORA: ande contra ele (na direção do redemoinho) para se firmar, ou você escorrega e cai — e na água o redemoinho te puxa.<br>
     <b>🏝 Mar cheio / Mar seco:</b> depois da partida o mar alterna entre cheio e totalmente seco — fique de olho na água baixando. Seco, o fundo do mar vira chão: ande à vontade, junte destroços — os de metal afundam e só aparecem aí — e saqueie naufrágios com baús. A jangada fica encalhada até a água voltar; quem estiver longe precisa nadar de volta!<br>
-    <b>Eventos do mar:</b> <b>Kraken</b> (corte os tentáculos que agarram a jangada e atire no olho quando a cabeça subir) · <b>tubarões</b> (mordem quem cair na água; dá para matar) · <b>peixes voadores</b> (acerte no ar ou pegue no convés com E: viram comida, tecla =) · <b>tempestade de raios</b> (fuja dos anéis brilhando; vela levantada atrai raio para o mastro; raio na água eletrocuta tubarões e piratas) · <b>navio-fantasma</b> na névoa verde (tiro fraco, mas aguenta muito).<br>
+    <b>Bases militares:</b> o <b>Metralhador</b> guarda o pátio com uma minigun — quando os canos começam a girar (<b>!!</b>), procure cobertura; depois da rajada ela superaquece e ele fica exposto. Derrotado, larga a <b>Minigun</b> com 140 balas (sem recarga; ela gira antes de atirar e é pesada).<br>
+    <b>Grupo:</b> até 6 jogadores; cada aliado deixa os inimigos um pouco mais resistentes (e as invasões com mais piratas).<br>
+    <b>Nadar cansa:</b> na água a estamina desce e não volta; sem fôlego você começa a se afogar e perde vida aos poucos — volte para a jangada!<br>
+    <b>Chefes da seca:</b> com o mar seco pode aparecer o <b>Escafandrista amaldiçoado</b> (começo da viagem; se a água voltar ele se afoga, se você matar ele larga um saco de loot) e, a partir de uns 40% da rota, o <b>Caranguejo-Rei</b> (casco blindado: bata logo depois que ele atacar ou atordoe com parry/chute; quando a água volta ele se enterra e foge).<br>
+    <b>Eventos do mar:</b> <b>Kraken</b> (corte os tentáculos que agarram a jangada e atire no olho quando a cabeça subir) · <b>tubarões</b> (mordem quem cair na água; dá para matar) · <b>peixes voadores</b> (acerte no ar ou pegue no convés com E: viram comida, tecla =) · <b>tempestade de raios</b> (ondas gigantes o tempo todo; fuja dos anéis brilhando; vela levantada atrai raio para o mastro; raio na água eletrocuta tubarões e piratas) · <b>navio-fantasma</b> na névoa verde (tiro fraco, mas aguenta muito).<br>
     <b>☠ Piratas:</b> invasões anunciadas: às vezes balsas remando até a jangada; às vezes um <b>navio de abordagem</b> que vem de longe bombardeando com canhão, encosta no costado e a tripulação pula de corda para o convés — derrote todos e o navio foge.</p>
     <h3>Duelo de espadas</h3>
     <p>O golpe leve sai no clique; clique de novo durante o golpe para emendar o combo. <b>Espada com espada:</b> se você golpear enquanto o inimigo também está golpeando, as lâminas se chocam (CLANG) — os dois recuam e ele fica aberto para um contra-ataque. Inimigos que <b>defendem</b> seguram golpes leves e podem revidar na hora: use o <b>chute</b> (botão do meio) ou o golpe pesado para quebrar a guarda. Cuidado com o aviso <b>✋ azul</b>: é o chute deles, que atravessa o seu bloqueio — esquive ou bata antes. Piratas podem largar o <b>Sabre pirata</b>.<br>
@@ -257,7 +262,7 @@
           </article>
           <article class="play-card multi">
             <h3>Multiplayer</h3>
-            <p>Até 4 náufragos na mesma jangada, com chat de voz por proximidade.</p>
+            <p>Até 6 náufragos na mesma jangada, com chat de voz por proximidade.</p>
             <button id="btnQuick" type="button" class="primary">Sala pública</button>
             <button type="button" class="ghost" data-goto="servers">Ver servidores ou criar sala</button>
           </article>
@@ -283,7 +288,7 @@
           <label>Nome da sala <input id="newTitle" maxlength="28" placeholder="Jangada do capitão" required></label>
           <label>Senha <input id="newPass" maxlength="32" type="password" placeholder="opcional — deixe vazio para sala aberta"></label>
           <div class="row2">
-            <label>Jogadores <select id="newMax"><option value="2">2</option><option value="3">3</option><option value="4" selected>4</option></select></label>
+            <label>Jogadores <select id="newMax"><option value="2">2</option><option value="3">3</option><option value="4">4</option><option value="5">5</option><option value="6" selected>6</option></select></label>
             <label>Seed <input id="newSeed" inputmode="numeric" placeholder="aleatória"></label>
           </div>
           <div class="row2"><button type="button" class="ghost" id="srvCancel">Cancelar</button><button type="submit" class="primary">Criar e entrar</button></div>

@@ -466,7 +466,7 @@ export class Naval {
     for (let i = 0; i < count; i++) {
       const side = count === 2 ? (i === 0 ? flank : -flank) : flank;
       const ahead = 120 + Math.random() * 50, lat = side * (70 + Math.random() * 40);
-      const hp = NAVAL.ship.hp[Math.min(4, diff)] * (0.9 + Math.random() * 0.2);
+      const hp = G.enemies.partyMul() * NAVAL.ship.hp[Math.min(4, diff)] * (0.9 + Math.random() * 0.2);
       this._spawnShip({
         id: `ship-${Date.now().toString(36)}-${i}`, x: boat.x + fx * ahead + rx * lat, z: boat.z + fz * ahead + rz * lat,
         yaw: boat.yaw + Math.PI + side * 0.4, hp, max: hp, side, R: between(NAVAL.ship.orbit), diff,
@@ -485,7 +485,7 @@ export class Naval {
     const fx = Math.sin(boat.yaw), fz = Math.cos(boat.yaw), rx = fz, rz = -fx, flank = Math.random() < 0.5 ? 1 : -1;
     for (let i = 0; i < count; i++) {
       const side = i === 0 ? flank : -flank, ahead = 60 + Math.random() * 60, lat = side * (110 + Math.random() * 30);
-      const hp = NAVAL.ship.hp[Math.min(4, diff)] * 0.75;
+      const hp = G.enemies.partyMul() * NAVAL.ship.hp[Math.min(4, diff)] * 0.75;
       this._spawnShip({
         id: `board-${Date.now().toString(36)}-${i}`, x: boat.x + fx * ahead + rx * lat, z: boat.z + fz * ahead + rz * lat,
         yaw: Math.atan2(-rx * side, -rz * side), hp, max: hp, side, R: 9, diff, b: 1,
@@ -503,7 +503,7 @@ export class Naval {
     const G = this.G, boat = G.boat, diff = G.world.difficulty(boat.x, boat.z);
     const fx = Math.sin(boat.yaw), fz = Math.cos(boat.yaw), rx = fz, rz = -fx, side = Math.random() < 0.5 ? 1 : -1;
     const ahead = 50 + Math.random() * 30, lat = side * (70 + Math.random() * 20);
-    const hp = NAVAL.ship.hp[Math.min(4, diff)] * GHOST.hpMult;
+    const hp = G.enemies.partyMul() * NAVAL.ship.hp[Math.min(4, diff)] * GHOST.hpMult;
     this._spawnShip({
       id: `ghost-${Date.now().toString(36)}`, x: boat.x + fx * ahead + rx * lat, z: boat.z + fz * ahead + rz * lat,
       yaw: Math.atan2(-rx * side, -rz * side), hp, max: hp, side, R: 9, diff, b: 1, g: 1,

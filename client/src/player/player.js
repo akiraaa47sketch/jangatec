@@ -11,7 +11,7 @@ import { sfx } from '../core/sfx.js';
 import { cam as camSet } from '../core/camsettings.js';
 
 // tipo de empunhadura das armas de fogo em 3ª pessoa
-const GUN_TYPE = { revolver: 'pistol', pistola: 'pistol', escopeta: 'long', rifle: 'long', rifle_precisao: 'long' };
+const GUN_TYPE = { minigun: 'long', revolver: 'pistol', pistola: 'pistol', escopeta: 'long', rifle: 'long', rifle_precisao: 'long' };
 
 const _v = new THREE.Vector3(), _d = new THREE.Vector3();
 const smoothstep = (value) => {
@@ -321,13 +321,13 @@ export class Player {
     if (this.pillVisual) {
       this.proceduralRig.visible = false;
       // arma de fogo: mira (ou acabou de atirar) = braços apontando para onde a câmera olha
-      const w = G.combat.weapon, gun = w && w.ammo, m = G.melee;
+      const w = G.combat.weapon, gun = w && (w.ammo || w.noReload), m = G.melee;
       if (m) { // corpo a corpo: esquiva, guarda, carga do pesado e pancada pesada
         if (this.downed && !this.swimming) pose = 'crawl';
         else if (m.dodge) { pose = m.dodge.anim; progress = m.dodge.t / 0.34; this.pillVisual.children[0].userData.rollDir = m.dodge.dir; }
         else if (m.parryAnim) { pose = 'parry'; progress = m.parryAnim.t / m.parryAnim.dur; }
         else if (m.stunT > 0) pose = 'stagger';
-        else if (m.blocking) pose = 'guard';
+        else if (m.blocking) { pose = 'guard'; progress = m.blockHit ? 1 - m.blockHit.t / m.blockHit.dur : 0; } // progress = tranco ao bloquear
         else if (m.charging) { pose = 'charge'; progress = Math.min(1, m.holdT / 0.7); }
         else if (m.swingPose) { pose = m.swingPose.pose; progress = m.swingPose.t / m.swingPose.dur; }
       }

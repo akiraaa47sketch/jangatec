@@ -6,7 +6,7 @@ import { lerpAngle } from '../core/util.js';
 import { makeHumanoid, animateHumanoid } from '../player/model.js';
 import { makePill, animatePill, disposePill, decodePill, encodePill, PILL_SCALE } from '../player/pill.js';
 
-const COLORS = [0xd1a02f, 0x3fae5a, 0xb84fc9, 0xd1552f];
+const COLORS = [0xd1a02f, 0x3fae5a, 0xb84fc9, 0xd1552f, 0x2f8fd1, 0xd12f8a];
 
 export class Net {
   constructor(G) {

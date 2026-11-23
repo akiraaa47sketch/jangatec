@@ -38,10 +38,10 @@ export class EnemyNet {
       let x = p.x, z = p.z, y = p.y, yaw = e.yaw;
       if (ab) { [x, z] = boat.toLocal(x, z); y -= boat.set.y; yaw -= boat.yaw; }
       const ms = e.m || {}, mv = ms.move || {};
-      const flags = (e.pirate ? 1 : 0) | (e.state === 'approach' ? 2 : 0) | (e.ghost ? 4 : 0) | (ab ? 8 : 0);
+      const flags = (e.pirate ? 1 : 0) | (e.state === 'approach' ? 2 : 0) | (e.ghost ? 4 : 0) | (ab ? 8 : 0) | (e.spinning > 0 ? 16 : 0) | (e.burstLeft > 0 ? 32 : 0) | (e.heat > 0.5 ? 64 : 0);
       const wind = ms.state === 'windup' && mv.wind ? r2(1 - ms.t / mv.wind) : 0;
       l.push([e.id, e.type, r1(x), r2(y), r1(z), r2(yaw), Math.max(0, POSES.indexOf(e.netPose || 'walk')), r2(e.netProg || 0), r1(e.netSpd || 0),
-        Math.round(e.hp), flags, Math.max(0, MS.indexOf(ms.state || 'idle')), (mv.heavy ? 1 : 0) | (mv.kick ? 2 : 0), wind, r2(Math.max(0, ms.t || 0))]);
+        Math.round(e.hp), flags, Math.max(0, MS.indexOf(ms.state || 'idle')), (mv.heavy ? 1 : 0) | (mv.kick ? 2 : 0), wind, r2(Math.max(0, ms.t || 0)), Math.round(e.max || e.hp)]);
     }
     net.send({ t: 'ens', l });
   }
@@ -51,7 +51,7 @@ export class EnemyNet {
     const G = this.G, E = G.enemies, now = performance.now();
     if (E.auth) return;
     for (const a of list || []) {
-      const [id, type, x, y, z, yaw, pose, prog, spd, hp, flags, msi, mvf, wind, mst] = a;
+      const [id, type, x, y, z, yaw, pose, prog, spd, hp, flags, msi, mvf, wind, mst, max] = a;
       let e = E.byId(id);
       if (e && e.state === 'dead') continue;
       if (!e) {
@@ -65,12 +65,12 @@ export class EnemyNet {
       }
       e.net = { x, y, z, yaw, ab: !!(flags & 8) };
       e.netPose = POSES[pose] || 'walk'; e.netProg = prog; e.netSpd = spd;
-      e.hp = hp; e.pirate = !!(flags & 1); e.seen = now;
+      e.hp = hp; e.max = max || e.max; e.pirate = !!(flags & 1); e.seen = now;
       const ms = e.m || (e.m = {});
       ms.state = MS[msi] || 'idle'; ms.t = mst; ms.move = { heavy: !!(mvf & 1), kick: !!(mvf & 2), wind: 0.3 }; ms.wind = wind;
       if (flags & 2) { if (!e.raft) { e.raft = E._makePirateRaft(); G.scene.add(e.raft); } }
       else if (e.raft) E._removeRaft(e);
-      e.rafting = !!(flags & 2);
+      e.rafting = !!(flags & 2); e.spinFlag = !!(flags & 16); e.fireFlag = !!(flags & 32); if (flags & 64) e.heat = Math.max(e.heat || 0, 0.8);
     }
   }
 
@@ -92,8 +92,9 @@ export class EnemyNet {
     }
     // aviso do golpe ("!"), luva brilhando e estrelinhas de atordoado — iguais aos do host
     const M = G.melee, ms = e.m || {};
+    if (e.def.spinUp) E.spinGun(e, dt, e.spinFlag || e.fireFlag);
     if (M) {
-      if (ms.state === 'windup') M.setTell(e, ms.move, ms.wind || 0); else M.setTell(e, null);
+      if (ms.state === 'windup') M.setTell(e, ms.move, ms.wind || 0); else if (e.spinFlag) M.setTell(e, { heavy: true }, 0.6); else M.setTell(e, null);
       M.updateStars(e, dt, ms.state === 'stagger');
     }
     E._animateHit(e, dt);
@@ -111,6 +112,11 @@ export class EnemyNet {
   }
 
   // ---------- efeitos para todos ----------
+  banner(title, text, kind) { // aviso grande (chefe apareceu / caiu) para todos
+    const G = this.G;
+    if (G.hud.banner) G.hud.banner(title, text, kind, 6);
+    if (G.net.online) G.net.send({ t: 'fx', k: 'banner', ti: String(title).slice(0, 40), tx: String(text).slice(0, 160), kd: kind });
+  }
   shotFx(from, to, kind) { // tiro de inimigo (host)
     if (!this.G.net.online) return;
     this.G.net.send({ t: 'fx', k: 'eshot', o: [r1(from.x), r1(from.y), r1(from.z)], e: [r1(to.x), r1(to.y), r1(to.z)], g: kind });
@@ -180,6 +186,8 @@ export class EnemyNet {
       const ends = m.k === 'eshot' ? [V(m.e)] : (Array.isArray(m.e) ? m.e.slice(0, 10).map(V) : []);
       for (const end of ends) if (end) G.combat.tracer(o.clone(), end, m.k === 'eshot' ? 0xffb060 : 0xfff2a0);
       sfx.gun(o, typeof m.g === 'string' ? m.g : typeof m.s === 'string' ? m.s : 'pistol');
+    } else if (m.k === 'banner') {
+      if (G.hud.banner) G.hud.banner(String(m.ti || '').slice(0, 40), String(m.tx || '').slice(0, 160), ['pirate', 'storm', 'good'].includes(m.kd) ? m.kd : '', 6);
     } else if (m.k === 'mortar' && G.siege) {
       const o = V(m.o), v = V(m.v), tg = V(m.tg);
       if (o && v && tg && Number.isFinite(m.T)) G.siege.spawnShell(o, v, Math.min(8, m.T), tg);

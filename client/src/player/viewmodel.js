@@ -54,10 +54,11 @@ const sampleCurl = (u) => (u > 0.4 && u < 0.78 ? 0.08 + 0.12 * Math.sin((u - 0.4
 
 // Keyframes [tempo, [px, py, pz, rx, ry, rz]] relativos à pose de empunhadura.
 const SWINGS = {
-  parry: [ // tapa a arma para fora, desviando o golpe
+  parry: [ // recolhe um instante e chicoteia a arma para fora, desviando o golpe; segura e volta
     [0, [0, 0, 0, 0, 0, 0]],
-    [0.25, [-0.18, 0.14, 0.04, 0.5, 0.9, 1.2]],
-    [0.55, [0.12, 0.1, -0.06, 0.3, -0.5, -0.4]],
+    [0.12, [-0.07, 0.06, 0.04, 0.18, 0.45, 0.55]],
+    [0.3, [0.24, 0.17, -0.12, 0.42, -1.0, -1.2]],
+    [0.52, [0.27, 0.13, -0.1, 0.34, -1.08, -1.25]],
     [1, [0, 0, 0, 0, 0, 0]],
   ],
   slashA: [ // do alto-direita para baixo-esquerda
@@ -242,6 +243,12 @@ export class ViewModel {
     else if (spec.boltAction) this.cycle = { t: -0.3, dur: 0.55, kind: 'bolt', ejected: false };
     else if (spec.eject) this.spawnCase(spec);
     if (spec.type === 'pistol' || spec.type === 'long') this.reachT = -1;
+  }
+  // golpe bloqueado: a arma é empurrada contra você (tranco + tremor)
+  onBlockHit(heavy) {
+    const s = this.springs, k = heavy ? 1.8 : 1;
+    s.kickZ.kick(6 * k); s.kickY.kick(-1.5 * k); s.kickRx.kick(-2.2 * k);
+    s.kickRz.kick((Math.random() - 0.5) * 3 * k); s.shake.kick(1.6 * k);
   }
   onDry() { this.springs.kickZ.kick(0.5); this.springs.kickRx.kick(1.2); }
   onUse(item) {
@@ -475,7 +482,9 @@ export class ViewModel {
     this.chargeW = approach(this.chargeW || 0, mel && mel.charging ? Math.min(1, mel.holdT / 0.7) : 0, dt * 8);
     if (spec && spec.type === 'melee') {
       const bw = this.blockW, cw = this.chargeW;
-      P[0] += -0.16 * bw; P[1] += 0.12 * bw; P[2] += 0.05 * bw; R[0] += 0.25 * bw; R[1] += 0.85 * bw; R[2] += 1.3 * bw;
+      // guarda: arma atravessada na frente do rosto, segura com firmeza (respira de leve)
+      const br = Math.sin(performance.now() * 0.004) * 0.006 * bw;
+      P[0] += -0.17 * bw; P[1] += 0.14 * bw + br; P[2] += 0.08 * bw; R[0] += 0.3 * bw; R[1] += 0.9 * bw; R[2] += 1.35 * bw;
       // carga: arma sobe por cima do ombro e vai para trás (= 1º quadro do golpe pesado)
       const ck = SWINGS.heavy[0][1], e = cw * cw * (3 - 2 * cw);
       for (let i = 0; i < 6; i++) { if (i < 3) P[i] += ck[i] * e; else R[i - 3] += ck[i] * e; }
@@ -488,6 +497,11 @@ export class ViewModel {
     // peças móveis (ferrolho, bomba, tambor, carregador)
     const parts = spec ? spec.parts || {} : {};
     if (parts.slide) parts.slide.position.z = clamp(slide, 0, 1) * 0.035;
+    if (parts.spin) { // minigun: canos giram com o gatilho
+      const sp = (this.G.combat.spin || 0) * 32;
+      this.spinV = (this.spinV || 0) + (sp - (this.spinV || 0)) * Math.min(1, dt * 4);
+      parts.spin.rotation.z += this.spinV * dt;
+    }
     this.updateCycle(dt, spec, parts);
     if (reload) this.applyReloadParts(spec, parts, reloadP, wt.reload);
     this.weaponRoot.updateMatrixWorld(true);

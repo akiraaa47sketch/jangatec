@@ -49,6 +49,13 @@ export class Drops {
     if (G.net.online) G.net.send({ t: 'drop:add', d });
   }
 
+  // Saco num ponto do mundo (loot de chefe). No multiplayer só quem cria (o host) chama.
+  dropAt(pos, loot) {
+    const G = this.G, d = { id: `b-${Date.now().toString(36)}-${(this.seq++).toString(36)}`, loot, p: [pos.x, pos.y, pos.z], w: 0 };
+    this.spawn(d);
+    if (G.net.online) G.net.send({ t: 'drop:add', d });
+  }
+
   spawn(d) {
     if (!d || this.list.has(d.id)) return;
     const mesh = makeSack(Object.keys(d.loot).some((k) => k.startsWith('arma_')));
