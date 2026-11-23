@@ -37,7 +37,7 @@ export const LOOT_CONFIG = {
     id: 'i0,1c0',
     pistolAmmo: 12,
     bandageBase: 1,
-    bandagesPerPlayer: 2,
+    bandagesPerPlayer: 1,
   },
   crateTypes: {
     supply: { resourceRolls: [2, 3], weaponChance: [0.08, 0.18, 0.32, 0.5, 0.68] },
@@ -47,31 +47,31 @@ export const LOOT_CONFIG = {
     {
       rarity: [0.76, 0.24, 0, 0, 0],
       resources: [
-        ['municao', 4, 8, 3], ['bandagem', 1, 2, 3], ['barra_proteina', 1, 1, 1], ['chocolate', 1, 1, 1], ['energetico', 1, 1, 1],
+        ['municao', 4, 8, 3], ['bandagem', 1, 1, 1], ['barra_proteina', 1, 1, 1], ['chocolate', 1, 1, 1], ['energetico', 1, 1, 1],
       ],
     },
     {
       rarity: [0.45, 0.43, 0.12, 0, 0],
       resources: [
-        ['municao', 5, 10, 3], ['cartucho', 2, 4, 1], ['bandagem', 1, 2, 3], ['barra_proteina', 1, 1, 1], ['chocolate', 1, 2, 1], ['energetico', 1, 1, 1],
+        ['municao', 5, 10, 3], ['cartucho', 2, 4, 1], ['bandagem', 1, 1, 1], ['barra_proteina', 1, 1, 1], ['chocolate', 1, 2, 1], ['energetico', 1, 1, 1],
       ],
     },
     {
       rarity: [0.2, 0.43, 0.3, 0.065, 0.005],
       resources: [
-        ['municao', 6, 12, 3], ['cartucho', 3, 6, 2], ['bandagem', 1, 3, 2], ['kit', 1, 1, 1], ['barra_proteina', 1, 2, 1], ['chocolate', 1, 2, 1], ['energetico', 1, 2, 1],
+        ['municao', 6, 12, 3], ['cartucho', 3, 6, 2], ['bandagem', 1, 2, 1], ['kit', 1, 1, 1], ['barra_proteina', 1, 2, 1], ['chocolate', 1, 2, 1], ['energetico', 1, 2, 1],
       ],
     },
     {
       rarity: [0.07, 0.27, 0.42, 0.21, 0.03],
       resources: [
-        ['municao', 8, 15, 3], ['cartucho', 4, 8, 2], ['bandagem', 2, 4, 2], ['kit', 1, 2, 1], ['barra_proteina', 1, 2, 1], ['chocolate', 1, 2, 1], ['energetico', 1, 2, 1],
+        ['municao', 8, 15, 3], ['cartucho', 4, 8, 2], ['bandagem', 1, 2, 1], ['kit', 1, 2, 1], ['barra_proteina', 1, 2, 1], ['chocolate', 1, 2, 1], ['energetico', 1, 2, 1],
       ],
     },
     {
       rarity: [0.01, 0.1, 0.31, 0.43, 0.15],
       resources: [
-        ['municao', 10, 20, 3], ['cartucho', 5, 10, 2], ['bandagem', 2, 5, 2], ['kit', 1, 2, 2], ['barra_proteina', 1, 3, 1], ['chocolate', 1, 3, 1], ['energetico', 1, 3, 1],
+        ['municao', 10, 20, 3], ['cartucho', 5, 10, 2], ['bandagem', 1, 3, 1], ['kit', 1, 2, 2], ['barra_proteina', 1, 3, 1], ['chocolate', 1, 3, 1], ['energetico', 1, 3, 1],
       ],
     },
   ],
@@ -122,7 +122,7 @@ export function generateCrateLoot(seed, id, difficulty, playerCount = 1) {
   const regionIndex = Math.max(0, Math.min(4, Math.floor(difficulty)));
   if (id.startsWith('s')) { // caixote da seca: só o básico (curativo, munição, comida)
     const random = seededRandom(seed, id), loot = {}, add = (k, n) => { loot[k] = (loot[k] || 0) + n; };
-    add('bandagem', 1 + (random() < 0.4 ? 1 : 0));
+    if (random() < 0.4) add('bandagem', 1);
     add('municao', 6 + Math.floor(random() * 8) + regionIndex * 2);
     if (random() < 0.45) add('cartucho', 3 + Math.floor(random() * 4));
     const foods = ['barra_proteina', 'energetico', 'chocolate'];
@@ -167,12 +167,12 @@ export function generateCrateLoot(seed, id, difficulty, playerCount = 1) {
   // escondem mais. As balas são infinitas (o canhão só tem recarga longa).
   if (regionIndex >= 2 && random() < (wreck ? 0.3 : 0.14) + (regionIndex - 2) * 0.05) add('canhao', 1);
   // Ferramentas: o GANCHO sai principalmente de destroços/naufrágios; BANJO e martelo extra em caixas.
-  if (random() < (wreck ? 0.4 : regionIndex >= 1 ? 0.07 : 0)) add('gancho', 1); // torreta-gancho (instala no convés)
+  if (random() < (wreck ? 0.4 : regionIndex >= 1 ? 0.07 : 0)) add('gancho', 1); // torreta-arpão (aparece como peça para soldar)
   if (random() < (wreck ? 0.15 : regionIndex >= 1 ? 0.08 : 0.03)) add('arma_banjo', 1);
   if (regionIndex >= 1 && random() < 0.05) add('arma_martelo', 1);
 
-  if (random() < 0.25 + regionIndex * 0.08) {
-    add(regionIndex >= 2 && random() < 0.16 ? 'kit' : 'bandagem', 1 + (random() < 0.35 ? 1 : 0));
+  if (random() < 0.12 + regionIndex * 0.05) { // curativo extra: raro (antes saía demais)
+    add(regionIndex >= 2 && random() < 0.25 ? 'kit' : 'bandagem', 1);
   }
   return loot;
 }

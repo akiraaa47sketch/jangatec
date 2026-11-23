@@ -6,7 +6,7 @@ import { sfx } from '../core/sfx.js';
 export const ITEM_NAMES = {
   metal: 'Metal', peixe: 'Peixe', bandagem: 'Bandagem', barra_proteina: 'Barra de proteína', energetico: 'Energético', chocolate: 'Chocolate',
   kit: 'Kit médico', municao: 'Munição', cartucho: 'Cartuchos',
-  canhao: 'Canhão improvisado', gancho: 'Torreta-gancho', bala_canhao: 'Balas de canhão',
+  canhao: 'Canhão improvisado', gancho: 'Torreta-arpão', bala_canhao: 'Balas de canhão',
 };
 // Comidas: buffs temporários (4 min). Comer de novo renova o tempo.
 export const BUFFS = {
@@ -54,6 +54,12 @@ export class Survival {
           const weapon = WEAPONS.find((entry) => entry.id === id);
           parts.push(weapon ? `${weapon.nome} ${'★'.repeat(weapon.stars)} adquirido` : 'Arma adquirida');
         }
+        continue;
+      }
+      if (k === 'gancho') { // torreta-arpão não vai para a mochila: aparece na sua frente para carregar e soldar
+        const pl = this.G.player, [fx, fz] = pl.forward(), p = pl.body.pos;
+        for (let i = 0; i < loot[k]; i++) this.G.world.spawnProp('torreta', p.x + fx * (1.6 + i), p.y + 0.8, p.z + fz * (1.6 + i));
+        parts.push('Torreta-arpão (carregue e solde na jangada)');
         continue;
       }
       this.inv[k] = (this.inv[k] || 0) + loot[k];

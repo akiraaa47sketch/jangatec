@@ -32,7 +32,7 @@ export class Bosses {
       const ground = G.world.seabedHeight(e.body.pos.x, e.body.pos.z);
       if (sea.level > ground + 0.9) {
         if (e.def.boss === 'crab') { E.killSilently(e, 'O Caranguejo-Rei se enterrou na areia quando a água voltou…'); e.burrow = true; }
-        else E.killSilently(e, 'A água voltou e o escafandrista se afogou dentro do capacete.');
+        else E.killSilently(e, e.type === 'siri' ? null : 'A água voltou e o escafandrista se afogou dentro do capacete.');
       }
     }
     if (!E.auth) return;

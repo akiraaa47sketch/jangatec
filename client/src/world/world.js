@@ -10,6 +10,7 @@ import { bakeStatic } from '../core/bake.js';
 import { buildCamp } from './camp.js';
 import { buildScrapCamp } from './scrap.js';
 import { makePieceMesh, PIECES } from '../boat/pieces.js';
+import { makeHookTurretMesh } from './navalmodels.js';
 import { makePalm, makeRock, makeBush, makeGrassTufts } from './models.js';
 import { woodTexture, woodBump, sandTexture, sandBump, grassTexture, thatchTexture, logWallTexture, metalTexture, clothTexture as clothTex, repeated, scaleBoxUVs } from './textures.js';
 
@@ -102,6 +103,11 @@ export const DEBRIS = [
   { nome: 'Palete', w: 2, real: true, pieceType: 'piso', size: [1.6, 0.2, 1.3], make: (r) => { const g = new THREE.Group(), m = plankMat(WOOD[(r() * 4) | 0]); for (let i = -2; i <= 2; i++) { const s = box(1.6, 0.04, 0.2, m); s.position.set(0, 0.08, i * 0.27); g.add(s); } for (const x of [-0.7, 0, 0.7]) { const run = box(0.14, 0.13, 1.3, plankMat(WOOD[3])); run.position.set(x, -0.03, 0); g.add(run); } return g; } },
 ];
 const DEBRIS_W = DEBRIS.reduce((s, d) => s + d.w, 0);
+// Props que vêm do loot (não aparecem soltos no mar): carregue e solde na jangada como qualquer peça.
+// noBake: o modelo tem partes que se mexem (a torreta gira e levanta o lançador).
+export const PROPS = {
+  torreta: { nome: 'Torreta-arpão', real: true, noBake: true, pieceType: 'gancho', size: [0.8, 1.1, 1.0], make: () => makeHookTurretMesh() },
+};
 
 export class World {
   constructor(G, seed) {
@@ -196,6 +202,20 @@ export class World {
     }
   }
 
+  // Prop do loot (ex.: torreta-arpão) na frente do jogador. Quem pegou cria e avisa a sala (mesmo id).
+  spawnProp(kind, x, y, z, id = null, broadcast = true) {
+    const G = this.G, def = PROPS[kind]; if (!def) return null;
+    id = id || `prop-${G.net.online ? G.net.id : 's'}-${Date.now().toString(36)}-${Math.floor(Math.random() * 1e4)}`;
+    if (this.physObjects.some((o) => o.id === id)) return null;
+    const holder = this.propChunk || (this.propChunk = { debris: [] }); // não some com os chunks
+    const r = mulberry32(hash2(this.seed, Math.round(x * 10), Math.round(z * 10)));
+    this.spawnDebris(holder, id, def, x, z, r, y);
+    const obj = this.physObjects.find((o) => o.id === id);
+    if (obj) obj.prop = kind;
+    if (broadcast && G.net.online) G.net.send({ t: 'prop', id, k: kind, p: [Math.round(x * 10) / 10, Math.round(y * 10) / 10, Math.round(z * 10) / 10] });
+    return obj;
+  }
+
   makeChunk(cx, cz) {
     const G = this.G, S = CFG.chunk, r = mulberry32(hash2(this.seed, cx, cz));
     const ch = { cx, cz, debris: [], island: null };
@@ -241,7 +261,7 @@ export class World {
       const welded = this.weldedStates.get(id);
       if (welded && G.boat.pieces.has(welded.id)) return;
       const mesh = def.make(lr);
-      if (!mesh.isMesh) bakeStatic(mesh); // peça feita de várias caixinhas vira 1 malha por material
+      if (!mesh.isMesh && !def.noBake) bakeStatic(mesh); // peça feita de várias caixinhas vira 1 malha por material
       if (!def.real) mesh.scale.setScalar(1.4);
       if (def.sinks && !y) y = this.seabedHeight(x, z) + 0.3; // afundados já começam no fundo
       mesh.position.set(x, y, z); mesh.rotation.y = lr() * 6.28;
