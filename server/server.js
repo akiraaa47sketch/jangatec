@@ -41,7 +41,7 @@ function getRoom(name, meta = {}) {
       max: meta.max || MAX_PLAYERS, created: Date.now(),
       seed: Number.isFinite(meta.seed) ? Math.floor(Math.abs(meta.seed)) % 1e9 : Math.floor(Math.random() * 1e9), players: new Map(), hostId: null,
       added: [], removed: [], collected: [], placed: new Map(), welded: new Map(),
-      crates: new Map(), boat: null, start: null,
+      crates: new Map(), drops: new Map(), boat: null, start: null,
     };
     rooms.set(name, r);
   }
@@ -58,6 +58,22 @@ function placementState(id, state) {
       !Array.isArray(state.q) || state.q.length !== 4 ||
       !state.p.concat(state.q).every(Number.isFinite)) return null;
   return { id, p: state.p, q: state.q, placed: true, water: !!state.water };
+}
+
+const ITEM_RE = /^(metal|bandagem|kit|municao|cartucho|canhao|gancho|bala_canhao|barra_proteina|energetico|chocolate|peixe|arma_[a-z0-9_]+)$/;
+function cleanDrop(d) {
+  if (!d || typeof d.id !== 'string' || d.id.length > 64 || !Array.isArray(d.p) || d.p.length !== 3 || !d.p.every(Number.isFinite) || !d.loot || typeof d.loot !== 'object') return null;
+  const loot = {};
+  for (const [k, v] of Object.entries(d.loot).slice(0, 12)) if (ITEM_RE.test(k) && Number.isFinite(v) && v >= 1) loot[k] = Math.min(999, Math.floor(v));
+  if (!Object.keys(loot).length) return null;
+  return { id: d.id, loot, p: d.p.map((v) => Math.round(v * 100) / 100), ab: d.ab ? 1 : 0, w: d.w ? 1 : 0 };
+}
+
+function cleanLoot(l) {
+  if (!l || typeof l !== 'object') return null;
+  const out = {};
+  for (const [k, v] of Object.entries(l).slice(0, 8)) if (ITEM_RE.test(k) && Number.isFinite(v) && v >= 1) out[k] = Math.min(99, Math.floor(v));
+  return Object.keys(out).length ? out : null;
 }
 
 function canReachMast(room, ws) {
@@ -130,7 +146,7 @@ function handle(ws, m) {
       t: 'welcome', id: ws.id, seed: room.seed, host: room.hostId, room: { id: room.name, title: room.title, locked: !!room.passHash, max: room.max },
       added: room.added, removed: room.removed, collected: room.collected,
       placed: [...room.placed.values()], welded: [...room.welded.values()],
-      crates: [...room.crates.values()], boat: room.boat, start: room.start, event: room.event || null,
+      crates: [...room.crates.values()], drops: [...room.drops.values()], boat: room.boat, start: room.start, event: room.event || null,
     });
     broadcast(room, { t: 'msg', text: `${ws.name} entrou` }, ws);
     return;
@@ -199,11 +215,43 @@ function handle(ws, m) {
       broadcast(room, { t: 'crate:state', id: crate.id, loot: crate.loot });
       break;
     }
+    // Inimigos sincronizados (o host simula): fotos, acertos, mortes, dano em jogadores e efeitos.
+    case 'ens': if (room.hostId === ws.id && Array.isArray(m.l) && m.l.length <= 80) broadcast(room, { t: 'ens', l: m.l }, ws); break;
+    case 'ehit': case 'emod': case 'chit': case 'fishtake': case 'fx': {
+      if (typeof m.id !== 'undefined' && (typeof m.id !== 'string' || m.id.length > 80)) break;
+      const s = JSON.stringify({ ...m, from: ws.id });
+      if (s.length > 4000) break;
+      for (const p of room.players.values()) if (p.ws !== ws && p.ws.readyState === 1) p.ws.send(s);
+      break;
+    }
+    case 'edie': if (room.hostId === ws.id && typeof m.id === 'string') broadcast(room, { t: 'edie', id: m.id.slice(0, 80), side: m.side === -1 ? -1 : 1, to: typeof m.to === 'string' ? m.to : null, loot: cleanLoot(m.loot) }, ws); break;
+    case 'pdmg': { // dano do inimigo (no host) num aliado: vai só para ele
+      if (room.hostId !== ws.id) break;
+      const target = room.players.get(m.to);
+      if (target) send(target.ws, { t: 'pdmg', to: m.to, dmg: Math.min(200, +m.dmg || 0), src: String(m.src || '').slice(0, 30), eid: typeof m.eid === 'string' ? m.eid.slice(0, 80) : null, ex: +m.ex || 0, ez: +m.ez || 0, k: m.k === 'kick' || m.k === 'melee' ? m.k : 'shot', h: m.h ? 1 : 0 });
+      break;
+    }
+    case 'drop:add': { // jogador largou itens no mundo (saquinho)
+      const d = cleanDrop(m.d);
+      if (!d || room.drops.has(d.id)) break;
+      if (room.drops.size >= 80) room.drops.delete(room.drops.keys().next().value); // some o mais antigo
+      room.drops.set(d.id, d);
+      broadcast(room, { t: 'drop:add', d }, ws);
+      break;
+    }
+    case 'drop:take': { // o primeiro que pedir leva
+      const d = typeof m.id === 'string' && room.drops.get(m.id);
+      if (!d) break;
+      room.drops.delete(d.id);
+      send(ws, { t: 'drop:got', loot: d.loot });
+      broadcast(room, { t: 'drop:remove', id: d.id });
+      break;
+    }
     case 'crate:take': {
       const crate = room.crates.get(m.id);
       if (!validCrateId(m.id, room.seed, m) || !ws.openedCrates.has(m.id) || !crate ||
           !canReachCrate(room, ws, m) || typeof m.item !== 'string' ||
-          !/^(metal|bandagem|kit|municao|cartucho|canhao|gancho|bala_canhao|barra_proteina|energetico|chocolate|arma_[a-z0-9_]+)$/.test(m.item)) {
+          !/^(metal|bandagem|kit|municao|cartucho|canhao|gancho|bala_canhao|barra_proteina|energetico|chocolate|peixe|arma_[a-z0-9_]+)$/.test(m.item)) {
         send(ws, { t: 'crate:error', id: m.id });
         break;
       }
@@ -280,9 +328,10 @@ function handle(ws, m) {
       break;
     }
     case 'event': {
-      // Onda gigante / furacão sorteados pelo host: valida e repassa a todos.
+      // Eventos do mar sorteados pelo host (onda, furacão, tempestade, kraken, tubarões, peixes, raios,
+      // navio-fantasma): valida e repassa a todos.
       const e = m.e;
-      if (room.hostId !== ws.id || !e || !['tsunami', 'furacao', 'tempestade'].includes(e.kind) ||
+      if (room.hostId !== ws.id || !e || !['tsunami', 'furacao', 'tempestade', 'kraken', 'tubaroes', 'peixes', 'raios', 'fantasma'].includes(e.kind) ||
           typeof e.id !== 'string' || e.id.length > 40) break;
       const keys = ['t0', 'dur', 'ox', 'oz', 'dx', 'dz', 'speed', 'A', 'sigma', 'cx', 'cz', 'fx', 'fz', 'lat', 'latV', 'ahead', 'R', 'depth', 'spin', 'seed', 'n'];
       const clean = { id: e.id, kind: e.kind, end: !!e.end };
@@ -291,7 +340,7 @@ function handle(ws, m) {
         if (!Number.isFinite(e[key])) return;
         clean[key] = e[key];
       }
-      if (!Number.isFinite(clean.t0) || !Number.isFinite(clean.dur) || clean.dur > 120) break;
+      if (!Number.isFinite(clean.t0) || !Number.isFinite(clean.dur) || clean.dur > 300) break;
       room.event = clean.end ? null : clean;
       broadcast(room, { t: 'event', e: clean }, ws);
       break;

@@ -159,25 +159,32 @@ export class Siege {
 
   // ---------- morteiro ----------
   // e = inimigo morteiro; atira na posição prevista do jogador
-  mortarShot(e) {
+  // tgt = jogador alvo ({ pos, aboard }); no multiplayer só o host chama e a granada vai para todos
+  mortarShot(e, tgt = null) {
     const G = this.G, pl = G.player, M = SIEGE.mortar;
     const o = e.body.pos.clone(); o.y += 1.4;
-    const pp = pl.body.pos, d = Math.hypot(pp.x - o.x, pp.z - o.z);
+    const pp = tgt && tgt.pos ? tgt.pos : pl.body.pos, aboard = tgt ? tgt.aboard : (pl.aboard || pl.body.carrier === G.boat.set), d = Math.hypot(pp.x - o.x, pp.z - o.z);
     const T = M.flight[0] + (M.flight[1] - M.flight[0]) * Math.min(1, d / M.range);
     // mira à frente: onde a jangada vai estar quando a granada cair
     const target = new THREE.Vector3(pp.x, pp.y, pp.z);
-    if (pl.aboard || pl.body.carrier === G.boat.set) { target.x += Math.sin(G.boat.yaw) * G.boat.speed * T; target.z += Math.cos(G.boat.yaw) * G.boat.speed * T; }
+    if (aboard) { target.x += Math.sin(G.boat.yaw) * G.boat.speed * T; target.z += Math.cos(G.boat.yaw) * G.boat.speed * T; }
     const sc = M.scatter * (0.4 + Math.random() * 0.8), a = Math.random() * 6.28;
     target.x += Math.cos(a) * sc; target.z += Math.sin(a) * sc;
     target.y = Math.max(target.y, waveHeight(target.x, target.z, G.naval ? G.naval.t || 0 : 0));
     const v = new THREE.Vector3((target.x - o.x) / T, (target.y - o.y) / T + 0.5 * 9.8 * T, (target.z - o.z) / T);
+    this.spawnShell(o, v, T, target);
+    const r1 = (x) => Math.round(x * 10) / 10;
+    if (G.net.online) G.net.send({ t: 'fx', k: 'mortar', o: o.toArray().map(r1), v: v.toArray().map((x) => Math.round(x * 100) / 100), T: Math.round(T * 100) / 100, tg: target.toArray().map(r1) });
+    e.swing = 0.3;
+  }
+  spawnShell(o, v, T, target) {
+    const G = this.G, M = SIEGE.mortar;
     const mesh = new THREE.Mesh(this.shellGeo, this.shellMat); mesh.position.copy(o); G.scene.add(mesh);
     const ring = new THREE.Mesh(this.ringGeo, new THREE.MeshBasicMaterial({ color: 0xff3b2b, transparent: true, opacity: 0.0, depthWrite: false, side: THREE.DoubleSide }));
     ring.scale.setScalar(M.radius); ring.position.copy(target); ring.position.y += 0.15; G.scene.add(ring);
     this.shells.push({ pos: o.clone(), vel: v, t: 0, T, mesh, ring, target, whistled: false });
     sfx.mortar(o);
     if (G.naval) for (let i = 0; i < 10; i++) G.naval.smoke.emit(o.x, o.y + 0.5, o.z, (Math.random() - 0.5), 1 + Math.random() * 1.5, (Math.random() - 0.5), 1.8, 0.9, -0.2, 2);
-    e.swing = 0.3;
   }
 
   _updateShells(dt, t) {

@@ -87,6 +87,13 @@ const SWINGS = {
     [0.76, [-0.04, -0.28, -0.22, -0.8, 0.1, 0.1]],
     [1, [0, 0, 0, 0, 0, 0]],
   ],
+  heavy: [ // pesado carregado: começa da arma armada por cima do ombro e desce na diagonal
+    [0, [0.1, 0.24, 0.2, 1.15, -0.3, -0.55]],
+    [0.16, [0.12, 0.28, 0.24, 1.25, -0.36, -0.62]],
+    [0.42, [-0.3, -0.22, -0.34, -0.85, 0.95, 0.72]],
+    [0.7, [-0.34, -0.27, -0.27, -0.92, 1.05, 0.78]],
+    [1, [0, 0, 0, 0, 0, 0]],
+  ],
   stab: [ // estocada
     [0, [0, 0, 0, 0, 0, 0]],
     [0.3, [0.05, 0.02, 0.1, 0.12, -0.1, -0.1]],
@@ -189,6 +196,7 @@ export class ViewModel {
   onSwing(w, style = null, dur = null) {
     const styles = (this.spec && this.spec.swing) || ['slashA', 'slashB'];
     this.swingStyle = style || styles[this.combo++ % styles.length];
+    if (this.swingStyle === 'heavy') this.chargeW = 0; // a pose armada passa a ser o 1º quadro do golpe
     this.swingDur = dur || clamp(w.rate * 0.88, 0.3, 0.55);
     this.swingT = 0;
     return this.swingDur;
@@ -464,12 +472,15 @@ export class ViewModel {
     // corpo a corpo: guarda (arma atravessada na frente) e carga do golpe pesado (puxa para trás)
     const mel = this.G.melee;
     this.blockW = approach(this.blockW || 0, mel && mel.blocking ? 1 : 0, dt * 12);
-    this.chargeW = approach(this.chargeW || 0, mel && mel.charging ? Math.min(1, mel.holdT / 0.6) : 0, dt * 8);
+    this.chargeW = approach(this.chargeW || 0, mel && mel.charging ? Math.min(1, mel.holdT / 0.7) : 0, dt * 8);
     if (spec && spec.type === 'melee') {
       const bw = this.blockW, cw = this.chargeW;
       P[0] += -0.16 * bw; P[1] += 0.12 * bw; P[2] += 0.05 * bw; R[0] += 0.25 * bw; R[1] += 0.85 * bw; R[2] += 1.3 * bw;
-      P[0] += 0.04 * cw; P[1] += 0.08 * cw; P[2] += 0.14 * cw; R[0] += 0.75 * cw; R[2] -= 0.35 * cw;
-      if (cw > 0.95) { P[0] += (Math.random() - 0.5) * 0.004; P[1] += (Math.random() - 0.5) * 0.004; } // tremor de força
+      // carga: arma sobe por cima do ombro e vai para trás (= 1º quadro do golpe pesado)
+      const ck = SWINGS.heavy[0][1], e = cw * cw * (3 - 2 * cw);
+      for (let i = 0; i < 6; i++) { if (i < 3) P[i] += ck[i] * e; else R[i - 3] += ck[i] * e; }
+      const full = mel.charging && mel.holdT >= 0.7, amp = (0.0015 + (full ? 0.005 : 0)) * e; // tremor de força
+      P[0] += (Math.random() - 0.5) * amp; P[1] += (Math.random() - 0.5) * amp; R[2] += (Math.random() - 0.5) * amp * 4;
     }
     this.weaponRoot.position.set(P[0], P[1], P[2]);
     this.weaponRoot.rotation.set(R[0], R[1], R[2]);

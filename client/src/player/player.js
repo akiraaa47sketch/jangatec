@@ -183,10 +183,13 @@ export class Player {
     const k = Math.min(1, (b.grounded ? 14 : this.swimming ? 6 : 3.5) * dt);
     b.vel.x += (dx * speed - b.vel.x) * k;
     b.vel.z += (dz * speed - b.vel.z) * k;
-    if (this.dash) { b.vel.x = this.dash.vx; b.vel.z = this.dash.vz; } // esquiva [Q]
+    if (this.dash) { // esquiva: arranque curto que perde velocidade (não é um teleporte)
+      const u = Math.min(1, this.dash.t / (this.dash.dur || 0.34)), k = 0.25 + 0.75 * Math.pow(1 - u, 1.5);
+      b.vel.x = this.dash.vx * k; b.vel.z = this.dash.vz * k;
+    }
     if (this.yank) { b.vel.x = this.yank.vx; b.vel.z = this.yank.vz; if (this.swimming) b.pos.y += 3.5 * dt; } // puxado pelo gancho
     if (this.firstPerson) this.yaw = Math.atan2(fx, fz);
-    else if (aiming || this.aimHold > 0) this.yaw = lerpAngle(this.yaw, Math.atan2(fx, fz), Math.min(1, 16 * dt));
+    else if (aiming || this.aimHold > 0 || (this.faceCam && !this.swimming)) this.yaw = lerpAngle(this.yaw, Math.atan2(fx, fz), Math.min(1, 16 * dt)); // [L] trava o corpo na câmera
     else if (moving) this.yaw = lerpAngle(this.yaw, Math.atan2(dx, dz), Math.min(1, 12 * dt));
 
     if (inp.act('jump') && !this.downed) {
@@ -325,7 +328,7 @@ export class Player {
         else if (m.parryAnim) { pose = 'parry'; progress = m.parryAnim.t / m.parryAnim.dur; }
         else if (m.stunT > 0) pose = 'stagger';
         else if (m.blocking) pose = 'guard';
-        else if (m.charging) { pose = 'windup'; progress = Math.min(1, m.holdT / 0.5); }
+        else if (m.charging) { pose = 'charge'; progress = Math.min(1, m.holdT / 0.7); }
         else if (m.swingPose) { pose = m.swingPose.pose; progress = m.swingPose.t / m.swingPose.dur; }
       }
       if (gun && this.aimHold > 0 && pose === 'walk') pose = 'aim';

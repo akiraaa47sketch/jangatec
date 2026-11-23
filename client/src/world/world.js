@@ -5,7 +5,7 @@ import * as THREE from '../three.js';
 import { mulberry32, hash2, rot } from '../core/util.js';
 import { CFG } from '../config.js';
 import { LOOT_CONFIG, generateCrateLoot, wreckFor, seabedCratesFor } from '../systems/loot.js';
-import { seabedHeight, makeSeabedChunk, makeFarSeabed } from './seabed.js';
+import { seabedHeight, makeSeabedChunk, makeFarSeabed, patchVortexDip } from './seabed.js';
 import { bakeStatic } from '../core/bake.js';
 import { buildCamp } from './camp.js';
 import { buildScrapCamp } from './scrap.js';
@@ -169,6 +169,12 @@ export class World {
     // Carrega em volta da jangada E do jogador (no fundo seco dá para se afastar a pé).
     const pp = G.player ? G.player.body.pos : G.boat;
     const centers = [[Math.round(G.boat.x / S), Math.round(G.boat.z / S)], [Math.round(pp.x / S), Math.round(pp.z / S)]];
+    // o host também carrega em volta dos aliados: é ele quem simula os inimigos das ilhas deles
+    if (G.net && G.net.online && G.net.isHost) for (const r of G.net.remotes.values()) {
+      if (!r.mesh || !r.mesh.parent) continue;
+      r.mesh.getWorldPosition(this._rw || (this._rw = new THREE.Vector3()));
+      centers.push([Math.round(this._rw.x / S), Math.round(this._rw.z / S)]);
+    }
     // no máximo 1 chunk novo por quadro (o mais perto primeiro): sem engasgos ao navegar
     let best = null, bd = Infinity;
     for (const [ccx, ccz] of centers) for (let i = -R; i <= R; i++) for (let j = -R; j <= R; j++) {
@@ -207,6 +213,7 @@ export class World {
     const n = 4 + ((r() * 4) | 0);
     ch.seabed = makeSeabedChunk(this.seed, cx, cz);
     { const terrain = ch.seabed.children[0]; bakeStatic(ch.seabed, { keep: (o) => o === terrain }); }
+    ch.seabed.traverse((o) => { if (o.isMesh) patchVortexDip(o.material); }); // fundo afunda sob o redemoinho
     G.scene.add(ch.seabed);
     const wreck = wreckFor(this.seed, cx, cz);
     if (wreck) ch.wreck = this.makeWreck(ch, wreck);

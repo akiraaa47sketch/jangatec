@@ -93,6 +93,41 @@ export class Combat {
     return true;
   }
 
+  // Sem arma na mão (largou a última)
+  unequip() {
+    this.weaponId = null; this.cooldown = 0; this.reloading = 0;
+    const pl = this.G.player, mesh = pl.weaponMesh, chest = pl.chestMount;
+    if (mesh) for (const old of mesh.children.slice()) mesh.remove(old);
+    if (chest) for (const old of chest.children.slice()) chest.remove(old);
+    pl.flashMesh = null; pl.weaponSpec = null;
+    if (pl.fitWeapon3P) pl.fitWeapon3P();
+  }
+
+  // Tira a arma do inventário (para largar). A munição no pente volta para a mochila.
+  removeWeapon(id) {
+    if (!this.owned.has(id)) return false;
+    const w = WEAPONS.find((e) => e.id === id), inv = this.G.survival.inv;
+    if (w && w.ammo && this.mags[id]) { inv[w.ammo] = (inv[w.ammo] || 0) + this.mags[id]; this.mags[id] = 0; }
+    this.owned.delete(id);
+    const i = this.hotbar.indexOf(id);
+    if (i >= 0) this.hotbar[i] = null;
+    if (this.weaponId === id) {
+      const next = this.hotbar.find(Boolean) || [...this.owned][0];
+      if (next) this.equip(next); else this.unequip();
+    }
+    return true;
+  }
+
+  // Organização da barra rápida: põe a arma no slot (troca de lugar se ele já estiver ocupado)
+  assignSlot(id, slot) {
+    if (!this.owned.has(id) || slot < 0 || slot >= this.hotbar.length) return;
+    const from = this.hotbar.indexOf(id), there = this.hotbar[slot];
+    if (from >= 0) this.hotbar[from] = there; // troca de lugar com o que estava lá
+    this.hotbar[slot] = id;
+  }
+  // tira da barra rápida (fica só na mochila)
+  unassign(id) { const i = this.hotbar.indexOf(id); if (i >= 0) this.hotbar[i] = null; }
+
   select(slot) {
     if (this.buildMode) return;
     const id = this.hotbar[slot];
@@ -180,7 +215,7 @@ export class Combat {
     if (!vm && G.player.flashMesh) origin = G.player.flashMesh.getWorldPosition(_mw);
     const spread = w.spread * (this.aiming ? 0.4 : 1);
     cam.getWorldPosition(_o);
-    const targets = G.enemies.hitMeshes.concat(G.solids);
+    const targets = G.enemies.hitMeshes.concat(G.solids), ends = [];
     for (let i = 0; i < w.pellets; i++) {
       cam.getWorldDirection(_dir);
       _dir.x += (Math.random() - 0.5) * 2 * spread; _dir.y += (Math.random() - 0.5) * 2 * spread; _dir.z += (Math.random() - 0.5) * 2 * spread;
@@ -191,8 +226,9 @@ export class Combat {
       const hit = this.ray.intersectObjects(targets, false)[0];
       const end = hit ? hit.point.clone() : _o.clone().addScaledVector(_dir, w.range);
       if (hit && hit.object.userData.enemy) G.enemies.damage(hit.object.userData.enemy, Math.round(w.dmg * G.survival.dmgMul));
-      this.tracer(origin.clone(), end);
+      this.tracer(origin.clone(), end); ends.push(end);
     }
+    if (G.enemyNet) G.enemyNet.playerShot(origin, ends, w.id, GUN_SOUND[w.id] || 'pistol'); // os aliados veem e ouvem o tiro
     this._useDurability(w);
     // recuo: a mira sobe e puxa para o lado; volta só uma parte (automáticas acumulam)
     const rk = RECOIL[w.id] || [w.recoil * 3, w.recoil];

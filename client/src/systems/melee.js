@@ -14,7 +14,7 @@ export const MELEE = {
   light: { cost: 8, combo: [1, 1.15, 1.6], window: 0.7, knock: [2.4, 2.8, 6] },
   heavy: { cost: 22, minHold: 0.24, maxCharge: 0.7, mult: [1.7, 2.6], knock: 8 },
   block: { mult: 0.2, heavyMult: 0.5, cost: 14, parry: 0.18, arc: 0.3 },
-  dodge: { cost: 20, speed: 11.5, dur: 0.34, iframes: 0.3, cd: 0.45 },
+  dodge: { cost: 20, speed: 10, dur: 0.34, iframes: 0.28, cd: 0.5 }, // arranque que desacelera (~1,9 m)
   kick: { cost: 14, dur: 0.42, range: 1.8, dmg: 5, knock: 7, breakStun: 1.3 }, // chute quebra-guarda
   clash: { window: 0.14, recover: 0.42 },     // espadas se chocando: janela antes do golpe dele e recuo
   enemy: { recover: 0.32, heavyRecover: 0.6, lunge: 3.6, evade: 0.16 }, // ritmo dos inimigos
@@ -102,12 +102,23 @@ export class Melee {
       // cambalhota para frente/trás, passo lateral para os lados
       const along = dx * fx + dz * fz, side = dx * rx + dz * rz;
       const anim = Math.abs(along) >= Math.abs(side) ? 'roll' : 'sidestep';
-      this.dodge = { vx: dx * MELEE.dodge.speed, vz: dz * MELEE.dodge.speed, t: 0, anim, dir: anim === 'roll' ? Math.sign(along) || -1 : -Math.sign(side) || 1, side };
+      this.dodge = { vx: dx * MELEE.dodge.speed, vz: dz * MELEE.dodge.speed, t: 0, dur: MELEE.dodge.dur, anim, dir: anim === 'roll' ? Math.sign(along) || -1 : -Math.sign(side) || 1, side };
       this.iframes = MELEE.dodge.iframes; this.dodgeCd = MELEE.dodge.cd;
       this.cancelCharge(); this.pending = null; G.combat.cooldown = 0; this.buffer = 0;
       if (G.viewmodel && pl.firstPerson) G.viewmodel.springs.kickRx.kick(1.5);
     }
     pl.dash = this.dodge;
+    // carga máxima do pesado: brilho de faíscas na arma + som curto (solta agora!)
+    if (this.charging && !this.chargeFull && this.holdT >= MELEE.heavy.maxCharge) {
+      this.chargeFull = true;
+      const [fx, fz] = pl.forward(), p = pl.body.pos;
+      const at = new THREE.Vector3(p.x + fx * 0.35 + fz * 0.25, p.y + 1.75, p.z + fz * 0.35 - fx * 0.25);
+      sfx.block(at);
+      if (pl.firstPerson) { if (G.viewmodel) G.viewmodel.springs.kickRx.kick(-0.8); } // em 1ª pessoa as faíscas ficariam na cara da câmera
+      else this.sparks(at, 10);
+      if (G.events) G.events.shake = Math.max(G.events.shake, 0.06);
+    }
+    if (!this.charging) this.chargeFull = false;
 
     // pancada do jogador no momento certo da animação
     if (this.pending) {
@@ -167,10 +178,10 @@ export class Melee {
     // golpe com um leve atraso (peso da arma): o leve leva ~0,3 s e o impacto vem perto da metade
     const dur = heavy ? clamp(w.rate * 1.05, 0.42, 0.6) : clamp(w.rate * (finisher ? 0.82 : 0.68), 0.27, 0.44);
     const pick = (l) => l[(Math.random() * l.length) | 0];
-    let pose = heavy ? pick(['slam', 'spin']) : finisher ? pick(['thrust', 'uppercut', 'spin']) : step === 0 ? 'slashR' : 'slashL';
+    let pose = heavy ? 'heavyStrike' : finisher ? pick(['thrust', 'uppercut', 'spin']) : step === 0 ? 'slashR' : 'slashL';
     if (w.tool === 'martelo') pose = heavy ? 'slam' : 'hammer'; // martelo: marteladas de cima para baixo
-    const style = heavy ? (pose === 'spin' ? 'slashA' : 'overhead') : finisher ? (pose === 'thrust' ? 'stab' : 'overhead') : step === 0 ? 'slashA' : 'slashB';
-    let impact = dur * (pose === 'spin' ? 0.55 : 0.4);
+    const style = heavy ? (pose === 'slam' ? 'overhead' : 'heavy') : finisher ? (pose === 'thrust' ? 'stab' : 'overhead') : step === 0 ? 'slashA' : 'slashB';
+    let impact = dur * (pose === 'spin' ? 0.55 : pose === 'heavyStrike' ? 0.42 : 0.4);
     if (pl.firstPerson && G.viewmodel) impact = G.viewmodel.onSwing(w, style, dur) * G.viewmodel.strikeFraction(w);
     G.combat.swing = G.combat.swingDuration = dur;
     // pode emendar o próximo golpe logo depois do impacto (o resto da animação é cancelável)
@@ -220,7 +231,7 @@ export class Melee {
       else if (ms.state === 'windup') { this.staggerEnemy(e, 0.6); label = 'INTERROMPIDO'; sfx.kick(e.body.pos); }
       else { if (ms.state !== 'stagger') this.staggerEnemy(e, 0.35); sfx.kick(e.body.pos); }
       G.enemies.damage(e, dmg);
-      e.knock = { x: dx / d * k.knock, z: dz / d * k.knock };
+      this.knockEnemy(e, dx / d * k.knock, dz / d * k.knock);
       this.num(e.body.pos, dmg, color, label);
     }
     if (hits) { G.hitStop = 0.07; if (G.events) G.events.shake = Math.max(G.events.shake, 0.2); }
@@ -266,7 +277,7 @@ export class Melee {
       else if (sound === 'break') sfx.guardBreak(at);
       else sfx.hit(at, heavy || finisher);
       G.enemies.damage(e, Math.round(dmg));
-      e.knock = { x: dx / d * knock, z: dz / d * knock };
+      this.knockEnemy(e, dx / d * knock, dz / d * knock);
       this.num(e.body.pos, Math.round(dmg), color, label);
     }
     // martelo: martelar uma peça da jangada conserta ela
@@ -289,6 +300,7 @@ export class Melee {
 
   clashEnemy(e, nx, nz) {
     const ms = e.m, pp = this.G.player.body.pos;
+    if (e.replica) this.G.net.send({ t: 'emod', id: e.id, cl: [Math.round(nx * 100) / 100, Math.round(nz * 100) / 100] });
     if (ms.token) { this.tokens.delete(e); ms.token = false; }
     Object.assign(ms, { state: 'clashed', t: MELEE.clash.recover, move: null, hit: 0 });
     this.setTell(e, null);
@@ -299,6 +311,11 @@ export class Melee {
   }
 
   // ---------- inimigos ----------
+  // Empurrão causado pelo jogador local: num inimigo-réplica (multiplayer) o host é que aplica.
+  knockEnemy(e, x, z) {
+    e.knock = { x, z };
+    if (e.replica) this.G.net.send({ t: 'emod', id: e.id, kn: [Math.round(x * 10) / 10, Math.round(z * 10) / 10] });
+  }
   // devolve a vez de atacar: o próximo só começa depois de um respiro curto
   releaseToken(e) {
     this.tokens.delete(e); if (e.m) e.m.token = false;
@@ -307,6 +324,7 @@ export class Melee {
   }
   staggerEnemy(e, dur) {
     const ms = e.m || (e.m = {});
+    if (e.replica) this.G.net.send({ t: 'emod', id: e.id, st: Math.round(dur * 100) / 100 });
     if (ms.token) { this.tokens.delete(e); ms.token = false; }
     Object.assign(ms, { state: 'stagger', t: dur, move: null, riposte: false, flinch: 0 });
     this.setTell(e, null);
@@ -349,7 +367,7 @@ export class Melee {
           ms.anim = ms.move.kick ? 'kick' : ms.move.heavy ? 'slam' : LIGHT_POSES[(Math.random() * LIGHT_POSES.length) | 0];
           if (!ms.move.kick) sfx.swing(e.body.pos, !!ms.move.heavy);
           // investida: o golpe avança em direção ao jogador (recuar um passo não basta)
-          const pp = G.player.body.pos, dx = pp.x - e.body.pos.x, dz = pp.z - e.body.pos.z, l = Math.hypot(dx, dz) || 1;
+          const pp = (e.tgt && e.tgt.pos) || G.player.body.pos, dx = pp.x - e.body.pos.x, dz = pp.z - e.body.pos.z, l = Math.hypot(dx, dz) || 1;
           if (l > 1.1) e.knock = { x: dx / l * MELEE.enemy.lunge, z: dz / l * MELEE.enemy.lunge };
           this.enemyHit(e, ms.move, dist);
         }
@@ -381,17 +399,18 @@ export class Melee {
     }
     if (ms.flinch > 0) { ms.flinch -= dt; return { pose: 'stagger', hold: true }; }
     // ocioso: defende quando o jogador carrega um pesado ou ataca de perto
-    const pl = G.player;
-    if (dist < 3.2 && (this.charging || (G.combat.swing > 0 && this.pending)) && !ms.guardTried) {
+    // alvo do inimigo (jogador local ou aliado); as reações ao seu golpe só valem contra o jogador local
+    const pl = e.tgt || G.enemies.localT, mine = pl.local !== false;
+    if (mine && dist < 3.2 && (this.charging || (G.combat.swing > 0 && this.pending)) && !ms.guardTried) {
       ms.guardTried = true;
       if (Math.random() < (GUARD_CHANCE[e.type] || 0)) { ms.state = 'guard'; ms.t = 0.8 + Math.random() * 0.5; return { pose: 'guard', hold: true }; }
     }
     if (!this.pending && !this.charging) ms.guardTried = false;
     // desvia do seu golpe que está vindo (pulo lateral)
-    if (this.pending && dist < 2.8 && !ms.evadeTried) {
+    if (mine && this.pending && dist < 2.8 && !ms.evadeTried) {
       ms.evadeTried = true;
       if (Math.random() < (EVADE_CHANCE[e.type] || 0)) {
-        const pp = pl.body.pos, dx = pp.x - e.body.pos.x, dz = pp.z - e.body.pos.z, l = Math.hypot(dx, dz) || 1, sd = Math.random() < 0.5 ? 1 : -1;
+        const pp = pl.pos || G.player.body.pos, dx = pp.x - e.body.pos.x, dz = pp.z - e.body.pos.z, l = Math.hypot(dx, dz) || 1, sd = Math.random() < 0.5 ? 1 : -1;
         e.knock = { x: -dz / l * 7 * sd - dx / l * 2, z: dx / l * 7 * sd - dz / l * 2 };
         e.mesh.userData.pill && (e.mesh.userData.pill.userData.rollDir = sd);
         ms.state = 'evade'; ms.t = 0.3;
@@ -401,10 +420,12 @@ export class Melee {
     if (!this.pending) ms.evadeTried = false;
     // começa um ataque se estiver perto, sem recarga e com "vaga" (no máximo N atacando juntos)
     // e só quem o diretor de combate deixou chegar perto (os outros esperam a vez mais afastados)
-    const free = ms.token || (this.tokens.size < MELEE.tokens && performance.now() >= (this.gapUntil || 0));
+    // vagas contadas por jogador alvo: cada aliado também só apanha de 1 por vez
+    const key = pl.key || 'L', busy = [...this.tokens].filter((x) => ((x.tgt && x.tgt.key) || 'L') === key).length;
+    const free = ms.token || (busy < MELEE.tokens && performance.now() >= (this.gapUntil || 0));
     if (!pl.dead && !pl.downed && dist < def.range + 0.4 && e.cd <= 0 && e.los !== false && e.engaged !== false && free) {
       // contra quem fica só defendendo, o chute fica bem mais provável
-      const moves = MOVES[e.type] || MOVES.melee, wOf = (m) => m.w * (m.kick && this.blocking ? 4 : 1), total = moves.reduce((s, m) => s + wOf(m), 0);
+      const moves = MOVES[e.type] || MOVES.melee, wOf = (m) => m.w * (m.kick && (mine ? this.blocking : pl.guard) ? 4 : 1), total = moves.reduce((s, m) => s + wOf(m), 0);
       let r = Math.random() * total, move = moves[0];
       for (const m of moves) { r -= wOf(m); if (r <= 0) { move = m; break; } }
       ms.state = 'windup'; ms.t = move.wind; ms.move = move; ms.hit = 0; ms.token = true; this.tokens.add(e);
@@ -414,13 +435,17 @@ export class Melee {
   }
 
   enemyHit(e, move, dist) {
-    const G = this.G, pl = G.player, pp = pl.body.pos, p = e.body.pos;
+    const G = this.G, T = e.tgt || G.enemies.localT, pl = T, pp = T.pos || G.player.body.pos, p = e.body.pos;
     const d = Math.hypot(pp.x - p.x, pp.z - p.z);
     const reach = move.aoe || e.def.range + 0.5;
     if (pl.dead || pl.downed || d > reach || Math.abs(pp.y - p.y) > 1.8) { this.say(e.body.pos, 'ERROU', '#c8d2da'); return; }
     if (G.colliders.segmentBlocked(p.x, p.y + 1.0, p.z, pp.x, pp.y + 1.0, pp.z)) { this.say(e.body.pos, 'ERROU', '#c8d2da'); return; } // parede no meio
     // golpe direcional: só acerta quem está na frente (exceto a pancada em área)
     if (!move.aoe && d > 0.6 && ((pp.x - p.x) * Math.sin(e.yaw) + (pp.z - p.z) * Math.cos(e.yaw)) / d < 0.25) { this.say(e.body.pos, 'ERROU', '#c8d2da'); return; }
+    if (T.local === false) { // aliado: ele recebe o golpe e se defende (bloqueio/parry/esquiva) do lado dele
+      G.enemies.hurt(T, e.def.dmg * move.mult, e.def.nome, e, { k: move.kick ? 'kick' : 'melee', h: move.heavy ? 1 : 0 });
+      return;
+    }
     if (move.kick) { this.incomingKick(e, e.def.dmg * move.mult); return; }
     this.incoming(e.def.dmg * move.mult, e.def.nome, e, !!move.heavy);
   }
@@ -449,7 +474,7 @@ export class Melee {
       if ((ax * fx + az * fz) / l > MELEE.block.arc) {
         if (this.blockT <= MELEE.block.parry * (heavy ? 0.7 : 1)) { // PARRY
           this.staggerEnemy(attacker, heavy ? 1.8 : 1.4);
-          attacker.knock = { x: ax / l * 4, z: az / l * 4 };
+          this.knockEnemy(attacker, ax / l * 4, az / l * 4);
           this.stamina = Math.min(MELEE.stamina.max, this.stamina + 15);
           this.say(attacker.body.pos, 'PARRY!', '#ffe14d', true);
           sfx.parry(pp);

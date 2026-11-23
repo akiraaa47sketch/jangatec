@@ -30,6 +30,7 @@ export const NAVAL = {
   ship: { hp: [110, 140, 170, 200, 240], orbit: [40, 58], fireCd: [3.6, 5.6], spread: [0.085, 0.05], range: 120 },
   maxDuration: 330,           // depois disso os navios restantes fogem
 };
+export const GHOST = { hpMult: 1.9, ballMult: 0.35 }; // navio-fantasma: mais vida, tiro bem mais fraco
 export const HOOK_TURRET = { speed: 34, range: 34 };
 export const PIECE_HP = { piso: 240, plataforma: 240, tabua: 70, bloco: 130, rampa: 110, escada: 100, parede: 120, suporte: 60, chapa: 230, canhao: 160, gancho: 140, parede_plastico: 35, parede_ferro: 330 };
 const between = ([a, b]) => a + Math.random() * (b - a);
@@ -186,10 +187,12 @@ export class Naval {
   }
 
   // ---------- balas ----------
-  spawnBall(o, v, by) {
-    const mesh = new THREE.Mesh(this.ballGeo, this.ballMat);
+  spawnBall(o, v, by, mult = 1) {
+    const ghost = mult < 1; // bala do navio-fantasma: fraca e brilhando verde
+    if (ghost && !this.ghostBallMat) this.ghostBallMat = new THREE.MeshStandardMaterial({ color: 0x9ff5e4, emissive: 0x3affc8, emissiveIntensity: 1.4, transparent: true, opacity: 0.8 });
+    const mesh = new THREE.Mesh(this.ballGeo, ghost ? this.ghostBallMat : this.ballMat);
     mesh.position.copy(o); this.G.scene.add(mesh);
-    this.balls.push({ pos: o.clone(), vel: v.clone(), by, mesh, t: 0 });
+    this.balls.push({ pos: o.clone(), vel: v.clone(), by, mesh, t: 0, mult });
     // fumaça e clarão na boca
     for (let i = 0; i < 14; i++) {
       const s = Math.random();
@@ -254,7 +257,7 @@ export class Naval {
     const pl = G.player, pp = pl.body.pos;
     const d = Math.hypot(pp.x - point.x, pp.y + 0.9 - point.y, pp.z - point.z);
     if (!pl.dead && d < NAVAL.dmg.splashR + 0.6) {
-      G.survival.damage(NAVAL.dmg.player * (1 - 0.6 * d / (NAVAL.dmg.splashR + 0.6)), 'Bala de canhão');
+      G.survival.damage(NAVAL.dmg.player * (b.mult || 1) * (1 - 0.6 * d / (NAVAL.dmg.splashR + 0.6)), b.mult < 1 ? 'Bala fantasma' : 'Bala de canhão');
       const k = 5 / Math.max(0.6, d);
       pl.body.vel.x += (pp.x - point.x) * k; pl.body.vel.z += (pp.z - point.z) * k; pl.body.vel.y = 5; pl.body.grounded = false;
       if (this.manning) this.leave();
@@ -264,7 +267,7 @@ export class Naval {
     if ((kind === 'tower' || kind === 'ground') && b.by === 'p' && b.mine && G.siege) G.siege.cannonImpact(point, b.vel, kind === 'tower' ? target : null);
     if (!this._isHost()) return;
     if (kind === 'ship') this._damageShip(target, NAVAL.dmg.ship * (0.85 + Math.random() * 0.3), point);
-    else if (kind === 'raft') this._damageRaftAt(point, target);
+    else if (kind === 'raft') this._damageRaftAt(point, target, b.mult || 1);
   }
 
   _removeBall(b) {
@@ -323,14 +326,14 @@ export class Naval {
   }
 
   // ---------- dano nas peças da jangada (host) ----------
-  _damageRaftAt(point, primary) {
+  _damageRaftAt(point, primary, mult = 1) {
     const boat = this.G.boat;
     const [lx, lz] = boat.toLocal(point.x, point.z);
     for (const piece of [...boat.pieces.values()]) {
       if (!this.destructible(piece)) continue;
-      if (piece === primary) { this.damagePiece(piece.id, NAVAL.dmg.piece); continue; }
+      if (piece === primary) { this.damagePiece(piece.id, NAVAL.dmg.piece * mult); continue; }
       const d = Math.hypot(piece.x - lx, piece.z - lz);
-      if (d < NAVAL.dmg.splashR) this.damagePiece(piece.id, NAVAL.dmg.piece * 0.45 * (1 - d / NAVAL.dmg.splashR));
+      if (d < NAVAL.dmg.splashR) this.damagePiece(piece.id, NAVAL.dmg.piece * mult * 0.45 * (1 - d / NAVAL.dmg.splashR));
     }
   }
   damagePiece(id, dmg) {
@@ -403,8 +406,17 @@ export class Naval {
       hp: st.hp, max: st.max, sinkT: st.sink || 0, side: st.side || 1, R: st.R || 48, phase: Math.random() * 6,
       speed: 0, fireCd: between(NAVAL.ship.fireCd) + 3, roll: 0, pitch: 0, fires: [], scorch: 0,
       net: { x: st.x, z: st.z, yaw: st.yaw }, diff: st.diff || 0, retreat: false,
-      boarder: !!st.b, boardT: 0,
+      boarder: !!st.b, boardT: 0, ghost: !!st.g,
     };
+    if (s.ghost) { // navio-fantasma: casco translúcido esverdeado, velas rasgadas brilhando
+      mesh.traverse((o) => {
+        if (!o.isMesh || o.isSprite || !o.material || !o.material.color) return;
+        o.material = o.material.clone();
+        o.material.transparent = true; o.material.opacity = 0.5; o.material.depthWrite = false;
+        o.material.color.lerp(new THREE.Color(0x9ff5e4), 0.6);
+        if (o.material.emissive) { o.material.emissive.setHex(0x0f4a3e); o.material.emissiveIntensity = 1; }
+      });
+    }
     drawShipHp(s.data, s.hp / s.max);
     this.ships.set(s.id, s);
     return s;
@@ -485,12 +497,29 @@ export class Naval {
     this._sendShips();
   }
 
+  // Navio-fantasma (evento da névoa): fraco no tiro e na tripulação, mas aguenta bem mais que um
+  // navio comum. Vem atirando e encosta para a tripulação fantasma abordar.
+  startGhost() {
+    const G = this.G, boat = G.boat, diff = G.world.difficulty(boat.x, boat.z);
+    const fx = Math.sin(boat.yaw), fz = Math.cos(boat.yaw), rx = fz, rz = -fx, side = Math.random() < 0.5 ? 1 : -1;
+    const ahead = 50 + Math.random() * 30, lat = side * (70 + Math.random() * 20);
+    const hp = NAVAL.ship.hp[Math.min(4, diff)] * GHOST.hpMult;
+    this._spawnShip({
+      id: `ghost-${Date.now().toString(36)}`, x: boat.x + fx * ahead + rx * lat, z: boat.z + fz * ahead + rz * lat,
+      yaw: Math.atan2(-rx * side, -rz * side), hp, max: hp, side, R: 9, diff, b: 1, g: 1,
+    });
+    this.active = true; this.battleT = 0;
+    G.hud.msg('Um navio-fantasma surgiu da névoa!');
+    if (G.hud.banner) G.hud.banner('NAVIO-FANTASMA', 'Tiros fracos, mas o casco aguenta muito. A tripulação fantasma vai abordar.', 'pirate', 7);
+    this._sendShips();
+  }
+
   _sendShips() {
     if (!this.G.net.online || !this._isHost()) return;
     const r = (x) => Math.round(x * 10) / 10;
     this.G.net.send({
       t: 'naval', k: 'ships', on: this.active ? 1 : 0,
-      s: [...this.ships.values()].map((s) => ({ id: s.id, x: r(s.x), z: r(s.z), yaw: Math.round(s.yaw * 100) / 100, hp: Math.round(s.hp), max: Math.round(s.max), sink: r(s.sinkT), side: s.side, R: r(s.R), diff: s.diff, b: s.boarder ? 1 : 0 })),
+      s: [...this.ships.values()].map((s) => ({ id: s.id, x: r(s.x), z: r(s.z), yaw: Math.round(s.yaw * 100) / 100, hp: Math.round(s.hp), max: Math.round(s.max), sink: r(s.sinkT), side: s.side, R: r(s.R), diff: s.diff, b: s.boarder ? 1 : 0, g: s.ghost ? 1 : 0 })),
     });
   }
 
@@ -547,10 +576,11 @@ export class Naval {
     const ang = Math.atan((V * V - Math.sqrt(disc)) / (g * D)) + (Math.random() - 0.5) * spread;
     const head = Math.atan2(tx - o.x, tz - o.z) + (Math.random() - 0.5) * spread;
     const v = new THREE.Vector3(Math.sin(head) * Math.cos(ang) * V, Math.sin(ang) * V, Math.cos(head) * Math.cos(ang) * V);
+    const mult = s.ghost ? GHOST.ballMult : 1;
     const go = () => {
-      this.spawnBall(o, v, 's');
+      this.spawnBall(o, v, 's', mult);
       const r = (x) => Math.round(x * 100) / 100;
-      G.net.send({ t: 'naval', k: 'fire', o: o.toArray().map(r), v: v.toArray().map(r), by: 's' });
+      G.net.send({ t: 'naval', k: 'fire', o: o.toArray().map(r), v: v.toArray().map(r), by: 's', gm: mult });
     };
     if (delay > 0) setTimeout(go, delay * 1000); else go();
   }
@@ -700,7 +730,7 @@ export class Naval {
       case 'fire': {
         if (!Array.isArray(m.o) || !Array.isArray(m.v)) return;
         const o = new THREE.Vector3().fromArray(m.o), v = new THREE.Vector3().fromArray(m.v);
-        this.spawnBall(o, v, m.by === 's' ? 's' : 'r');
+        this.spawnBall(o, v, m.by === 's' ? 's' : 'r', Number.isFinite(m.gm) ? clamp(m.gm, 0.1, 1) : 1);
         const piece = m.id && G.boat.pieces.get(m.id), c = this._nodes(piece); if (c) c.recoil = 1;
         break;
       }

@@ -4,7 +4,7 @@ import { WEAPONS } from './combat.js';
 import { sfx } from '../core/sfx.js';
 
 export const ITEM_NAMES = {
-  metal: 'Metal', bandagem: 'Bandagem', barra_proteina: 'Barra de proteína', energetico: 'Energético', chocolate: 'Chocolate',
+  metal: 'Metal', peixe: 'Peixe', bandagem: 'Bandagem', barra_proteina: 'Barra de proteína', energetico: 'Energético', chocolate: 'Chocolate',
   kit: 'Kit médico', municao: 'Munição', cartucho: 'Cartuchos',
   canhao: 'Canhão improvisado', gancho: 'Torreta-gancho', bala_canhao: 'Balas de canhão',
 };
@@ -21,6 +21,7 @@ const USE = {
   barra_proteina: (s) => eat(s, 'forca', 'Barra de proteína: +25% de dano por 4 min'),
   energetico: (s) => eat(s, 'energia', 'Energético: estamina gasta pela metade por 4 min'),
   chocolate: (s) => eat(s, 'regen', 'Chocolate: vida regenerando por 4 min'),
+  peixe: (s) => { s.vida = clamp(s.vida + 20, 0, 100); sfx.pickup(); return 'Peixe: +20 de vida'; },
 };
 const FOODS = ['barra_proteina', 'energetico', 'chocolate'];
 
@@ -29,7 +30,7 @@ export class Survival {
   constructor(G) {
     this.G = G;
     this.vida = 100;
-    this.inv = { metal: 0, bandagem: 0, kit: 0, municao: 0, cartucho: 0, canhao: 0, gancho: 0, bala_canhao: 0, barra_proteina: 0, energetico: 0, chocolate: 0 };
+    this.inv = { metal: 0, bandagem: 0, kit: 0, municao: 0, cartucho: 0, canhao: 0, gancho: 0, bala_canhao: 0, barra_proteina: 0, energetico: 0, chocolate: 0, peixe: 0 };
     this.buffs = {}; // nome → segundos restantes
     this.deadTimer = 0;
   }
@@ -52,6 +53,12 @@ export class Survival {
       parts.push(`+${loot[k]} ${ITEM_NAMES[k] || k}`);
     }
     return parts.join('  ');
+  }
+  // Tira itens da mochila (para largar). Retorna quantos saíram.
+  take(item, n) {
+    const have = this.inv[item] || 0, k = Math.min(have, Math.max(0, Math.floor(n)));
+    if (k) this.inv[item] = have - k;
+    return k;
   }
   use(item) {
     if (!USE[item] || !this.inv[item] || this.G.player.dead) return;
