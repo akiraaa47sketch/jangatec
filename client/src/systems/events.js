@@ -14,6 +14,7 @@ import * as THREE from '../three.js';
 import { clamp, clock, mulberry32 } from '../core/util.js';
 import { sea, eventHeight } from '../world/ocean.js';
 import { sfx, ambience } from '../core/sfx.js';
+import { SEA_KINDS, SEA_BALANCE } from './seaevents.js';
 
 export const EVENT_BALANCE = {
   first: [200, 320],         // s depois da partida até o primeiro evento
@@ -99,14 +100,22 @@ export class Events {
   get tiltMax() {
     const e = this.current;
     if (!e) return 0.12;
-    return e.kind === 'tsunami' ? 0.34 : e.kind === 'tempestade' ? 0.3 : 0.18;
+    return e.kind === 'tsunami' ? 0.34 : e.kind === 'tempestade' ? 0.3 : e.kind === 'kraken' ? 0.24 : 0.18;
   }
   // Quanto o evento escurece o céu / engrossa o mar (0..1).
   stormBoost(t) {
     const e = this.current;
     if (!e) return 0;
     const u = t - e.t0, inK = smooth(u / 10), outK = 1 - smooth((u - e.dur + 8) / 8);
-    return (e.kind === 'tsunami' ? 0.7 : 1) * inK * outK;
+    const k = { tsunami: 0.7, kraken: 0.55, tubaroes: 0.15, peixes: 0, raios: 1, fantasma: 0.6 }[e.kind] ?? 1;
+    return k * inK * outK;
+  }
+  // névoa verde do navio-fantasma (0..1)
+  ghostFog(t) {
+    const e = this.current;
+    if (!e || e.kind !== 'fantasma') return 0;
+    const u = t - e.t0;
+    return smooth(u / 12) * (1 - smooth((u - e.dur + 10) / 10));
   }
 
   // ---------- agendamento (host) ----------
@@ -123,9 +132,16 @@ export class Events {
     if (G.startup.waterLevel < 0.5 || (tide && (tide.phase.id === 'seco' || tide.nextIn < 75))) { this.timer = 15; return; }
     // quase nunca repete o mesmo tipo em seguida; às vezes o mar simplesmente fica quieto
     if (Math.random() < 0.18) { this.timer = between([90, 200]); return; }
-    const kinds = ['tsunami', 'furacao', 'tempestade'], others = kinds.filter((k) => k !== this.lastKind);
-    const kind = Math.random() < 0.88 ? others[(Math.random() * others.length) | 0] : kinds[(Math.random() * 3) | 0];
-    this.begin(kind === 'tsunami' ? this._makeTsunami(t) : kind === 'furacao' ? this._makeHurricane(t) : this._makeStorm(t), true);
+    const kinds = ['tsunami', 'furacao', 'tempestade', ...SEA_KINDS, 'fantasma'], others = kinds.filter((k) => k !== this.lastKind);
+    const kind = Math.random() < 0.88 ? others[(Math.random() * others.length) | 0] : kinds[(Math.random() * kinds.length) | 0];
+    this.begin(this.make(kind, t), true);
+  }
+  make(kind, t) {
+    if (kind === 'tsunami') return this._makeTsunami(t);
+    if (kind === 'furacao') return this._makeHurricane(t);
+    if (kind === 'tempestade') return this._makeStorm(t);
+    const dur = kind === 'fantasma' ? 240 : SEA_BALANCE[kind].dur;
+    return { id: `ev${Math.floor(t * 10)}`, kind, t0: t, dur, seed: Math.floor(Math.random() * 1e9) };
   }
 
   // Tempestade: a série de ondas sai de uma seed (todos os clientes calculam igual).
@@ -183,6 +199,10 @@ export class Events {
     this.lastKind = e.kind;
     this._ensureVisuals();
     if (announce && this.G.net.online) this.G.net.send({ t: 'event', e });
+    if (e.kind === 'fantasma') {
+      if (announce && this._isHost()) this.G.naval.startGhost();
+      this.G.hud.msg('Uma névoa estranha e esverdeada cobre o mar...');
+    }
   }
 
   receive(e) {
@@ -193,7 +213,13 @@ export class Events {
   }
 
   _end() {
+    const old = this.current;
     this.current = null;
+    if (old && SEA_KINDS.includes(old.kind) && this.G.seaEvents) this.G.seaEvents.finish(old);
+    if (old && old.kind === 'furacao') { // o redemoinho fecha e deixa um naufrágio raro no centro
+      this.G.hud.msg('O redemoinho se fechou e trouxe à tona destroços de um naufrágio!');
+      if (this._isHost() && this.lastCx != null && this.G.seaEvents) this.G.seaEvents.spawnLoot(this.lastCx, this.lastCz, 3, 'naufragio');
+    }
     sea.surge.A = 0;
     sea.vortex.k = 0;
     this.timer = between(EVENT_BALANCE.interval);
@@ -209,14 +235,19 @@ export class Events {
     if (this._isHost()) this._schedule(dt, t);
     const e = this.current;
     // som ambiente: mar e vento (mais forte na tempestade e no furacão)
-    const amb = !e ? 0 : e.kind === 'tempestade' ? 1 : e.kind === 'furacao' ? 0.85 : 0.35;
+    const amb = !e ? 0 : e.kind === 'tempestade' || e.kind === 'raios' ? 1 : e.kind === 'furacao' ? 0.85 : e.kind === 'peixes' ? 0.1 : 0.35;
     this.ambK = (this.ambK || 0) + (amb - (this.ambK || 0)) * Math.min(1, dt * 0.5);
     ambience(this.ambK, G.startup && G.startup.waterLevel < 0.5 ? 0.15 : 1);
     if (e) {
       if (t > e.t0 + e.dur) this._end();
       else if (e.kind === 'tsunami') this._updateTsunami(e, dt, t);
       else if (e.kind === 'tempestade') this._updateStorm(e, dt, t);
-      else this._updateHurricane(e, dt, t);
+      else if (e.kind === 'furacao') this._updateHurricane(e, dt, t);
+      else if (SEA_KINDS.includes(e.kind)) G.seaEvents.update(e, dt, t);
+      else if (e.kind === 'fantasma' && this._isHost() && t - e.t0 > 15 && ![...G.naval.ships.values()].some((s) => s.ghost && s.sinkT <= 0 && !s.retreat)) {
+        e.dur = Math.min(e.dur, t - e.t0 + 8); // navio afundou (ou fugiu): a névoa se dissipa
+        if (G.net.online) G.net.send({ t: 'event', e });
+      }
     }
     if (!e || e.kind !== 'furacao') G.player.drift = null;
     if (e && e.kind === 'tempestade' && Math.random() < dt * 0.6 * this.stormBoost(t)) {

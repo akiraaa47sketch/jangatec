@@ -71,6 +71,11 @@ export class Interact {
         consider(dd + 0.6, { label: `${nome} ${dmg.pct}% — ${hammer ? 'martele para consertar' : 'use o martelo para consertar'}` });
       }
     }
+    // peixes voadores que caíram no convés
+    if (G.seaEvents && G.player.aboard) {
+      const f = G.seaEvents.nearestFish();
+      if (f) consider(0.35, { label: 'Pegar peixe', run: () => G.seaEvents.takeFish(f) });
+    }
     // itens largados (saquinhos)
     if (G.drops) {
       const d = G.drops.nearest();

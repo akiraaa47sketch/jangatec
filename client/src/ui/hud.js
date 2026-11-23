@@ -12,6 +12,7 @@ const CONSUMABLES = [
   ['barra_proteina', 'food1', '🥜', 'Barra de proteína — +25% de dano por 4 min'],
   ['energetico', 'food2', '🥤', 'Energético — estamina gasta pela metade por 4 min'],
   ['chocolate', 'food3', '🍫', 'Chocolate — regenera vida por 4 min'],
+  ['peixe', 'food4', '🐟', 'Peixe — +20 de vida'],
 ];
 const RARITY = ['', '#b9c0c4', '#6fdc8c', '#5fb4ff', '#c58bff', '#ffc94d'];
 const short = (nome) => nome.replace(/ (com|de|improvisado|reforçado|pirata).*$/i, '').replace(/^Rifle de precisão$/, 'Precisão');

@@ -8,15 +8,15 @@ import { keyOf } from '../core/keybinds.js';
 
 const $ = (id) => document.getElementById(id);
 const RARITY = ['', '#b9c0c4', '#6fdc8c', '#5fb4ff', '#c58bff', '#ffc94d'];
-const ICON = { bandagem: '✚', kit: '♥', municao: '•', cartucho: '▮', bala_canhao: '●', canhao: '⊛', gancho: '⚓', barra_proteina: 'P', energetico: 'E', chocolate: 'C', metal: '▤' };
+const ICON = { bandagem: '✚', kit: '♥', municao: '•', cartucho: '▮', bala_canhao: '●', canhao: '⊛', gancho: '⚓', barra_proteina: 'P', energetico: 'E', chocolate: 'C', peixe: '~', metal: '▤' };
 const DESC = {
   bandagem: 'Recupera 30 de vida.', kit: 'Recupera toda a vida.', municao: 'Munição de pistola, revólver e rifles.',
   cartucho: 'Cartuchos de escopeta.', bala_canhao: 'Munição dos canhões da jangada.', canhao: 'Instale a bordo, num ponto livre.',
   gancho: 'Torreta-gancho: instale a bordo.', barra_proteina: '+25% de dano por 4 min.', energetico: 'Estamina gasta pela metade por 4 min.',
-  chocolate: 'Regenera vida por 4 min.', metal: 'Material.',
+  chocolate: 'Regenera vida por 4 min.', peixe: 'Recupera 20 de vida.', metal: 'Material.',
 };
-const USABLE = { bandagem: 'bandage', kit: 'medkit', barra_proteina: 'food1', energetico: 'food2', chocolate: 'food3' };
-const ORDER = ['bandagem', 'kit', 'barra_proteina', 'energetico', 'chocolate', 'municao', 'cartucho', 'bala_canhao', 'canhao', 'gancho', 'metal'];
+const USABLE = { bandagem: 'bandage', kit: 'medkit', barra_proteina: 'food1', energetico: 'food2', chocolate: 'food3', peixe: 'food4' };
+const ORDER = ['bandagem', 'kit', 'peixe', 'barra_proteina', 'energetico', 'chocolate', 'municao', 'cartucho', 'bala_canhao', 'canhao', 'gancho', 'metal'];
 const wOf = (id) => WEAPONS.find((w) => w.id === id);
 const short = (nome) => nome.replace(/ (com|de|improvisado|reforçado|pirata).*$/i, '').replace(/^Rifle de precisão$/, 'Precisão');
 

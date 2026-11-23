@@ -35,6 +35,7 @@ import { Naval } from './systems/naval.js';
 import { Tools } from './systems/tools.js';
 import { Siege } from './systems/siege.js';
 import { Drops } from './systems/drops.js';
+import { SeaEvents } from './systems/seaevents.js';
 import { Inventory } from './ui/inventory.js';
 
 const $ = (id) => document.getElementById(id);
@@ -94,6 +95,7 @@ G.naval = new Naval(G);     // canhões, navios piratas e dano por peça
 G.siege = new Siege(G);   // torres de sucata (derrubar com canhão) e morteiros
 G.tools = new Tools(G);     // banjo (música que cura) e gancho
 G.drops = new Drops(G);     // itens largados no mundo
+G.seaEvents = new SeaEvents(G); // kraken, tubarões, peixes voadores e raios
 G.inventory = new Inventory(G); // tela de inventário (Tab)
 const atmo = new Atmosphere(renderer, scene, { sun, hemisphere }); // céu, IBL e sombras
 const ocean = new Ocean(scene, atmo);
@@ -166,6 +168,7 @@ function start(seed, welcome) {
   if (G.world && G.world.farSeabed) scene.remove(G.world.farSeabed); // o mundo do menu sai de cena
   G.world = new World(G, seed);
   G.drops.clear();
+  G.seaEvents.end();
   if (welcome) {
     for (const d of welcome.drops || []) G.drops.spawn(d);
     for (const placed of welcome.placed || []) G.world.placedStates.set(placed.id, placed);
@@ -238,6 +241,7 @@ function hotkeys() {
   if (inp.act('food1')) G.survival.use('barra_proteina');
   if (inp.act('food2')) G.survival.use('energetico');
   if (inp.act('food3')) G.survival.use('chocolate');
+  if (inp.act('food4')) G.survival.use('peixe');
 }
 
 function frame() {
@@ -284,6 +288,7 @@ function frame() {
   G.siege.update(dt, t);
   G.tools.update(dt, t);
   G.drops.update(dt);
+  G.seaEvents.tick(dt, t);
   if (G.bench) G.bench.update(dt);
   G.interact.update(dt);
   G.combat.update(dt);

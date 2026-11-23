@@ -21,6 +21,7 @@ export const ENEMY_TYPES = {
   morteiro: { nome: 'Morteiro', hp: 55, speed: 0, dmg: 0, range: 80, cd: 6.5, cor: 0x4a4a3a, scale: 1, ranged: true, mortar: true },
   soldado:  { nome: 'Soldado', hp: 110, speed: 3.0, dmg: 8, range: 28, cd: 1.7, cor: 0x4b5530, scale: 1.05, ranged: true, burst: 3, acc: 0.72 },
   pirata:   { nome: 'Pirata', hp: 75, speed: 5.4, dmg: 13, range: 1.8, cd: 1.2, cor: 0x553b2d, scale: 1.05, raftSpeed: 7.2 },
+  fantasma: { nome: 'Pirata fantasma', hp: 70, speed: 4.6, dmg: 6, range: 1.8, cd: 1.5, cor: 0x8fe8d8, scale: 1.05 }, // fraco, mas atravessa a névoa
 };
 const BY_DIFF = [['melee'], ['melee', 'rapido'], ['melee', 'rapido', 'atirador'], ['melee', 'atirador', 'pesado', 'rapido'], ['atirador', 'pesado', 'rapido', 'pesado']];
 const SIGHT = 22, LOSE = 36, ACTIVE = 75;
@@ -44,6 +45,16 @@ export const PIRATE_BALANCE = {
   spawnDistance: 42,       // as balsas aparecem longe o bastante para serem vistas
 };
 const between = ([a, b]) => a + Math.random() * (b - a);
+
+// Pirata fantasma: translúcido e esverdeado (o brilho de dano e o sumiço na morte continuam valendo)
+export function ghostify(e) {
+  for (const m of e.mats) {
+    m.transparent = true; m.opacity = 0.55; m.depthWrite = false;
+    if (m.color) m.color.lerp(new THREE.Color(0x9ff5e4), 0.55);
+    if (m.emissive) { m.emissive.setHex(0x1a6a5a); m.userData.ghost = true; }
+  }
+  e.ghost = true;
+}
 
 export class Enemies {
   constructor(G) {
@@ -116,6 +127,15 @@ export class Enemies {
     if (isl) isl.enemies.push(e);
     return e;
   }
+  // Criaturas dos eventos do mar (tentáculo do kraken, tubarão, peixe voador): ficam na lista para
+  // as armas e o corpo a corpo acertarem, mas quem move e decide é o próprio evento (e.ai).
+  addCreature(e) {
+    e.creature = true; e.state = e.state || 'creature'; e.def = e.def || { nome: 'Criatura' };
+    e.yaw = e.yaw || 0; e.hitT = 0; e.mats = new Set(); e.m = { state: 'idle', t: 0 };
+    e.mesh.traverse((o) => { if (o.isMesh) { o.userData.enemy = e; this.hitMeshes.push(o); e.mats.add(o.material); } });
+    this.list.push(e);
+    return e;
+  }
   remove(e) {
     if (this.G.melee) this.G.melee.tokens.delete(e);
     this.G.scene.remove(e.mesh);
@@ -132,6 +152,13 @@ export class Enemies {
 
   damage(e, n) {
     if (e.state === 'dead') return;
+    if (e.creature) { // quem decide o que acontece é o evento
+      if (e.immune) return;
+      e.hp -= n; e.hitT = 0.22;
+      if (e.ai && e.ai.onHit) e.ai.onHit(e, n);
+      if (e.hp <= 0) { e.state = 'dead'; if (e.ai && e.ai.onDeath) e.ai.onDeath(e); }
+      return;
+    }
     e.hp -= n;
     e.hitT = 0.22;
     if (!e.pirate && !e.def.mortar && e.state !== 'chase' && e.state !== 'attack') this.alert(e); // levou tiro: ele e o grupo percebem
@@ -190,7 +217,8 @@ export class Enemies {
     for (let i = 0; i < n; i++) {
       const id = `${s.id}-b${i}`;
       if (this.G.world.collected.has(id)) continue;
-      const e = this.spawn(id, 'pirata', null, s.x, s.z);
+      const e = this.spawn(id, s.ghost ? 'fantasma' : 'pirata', null, s.x, s.z);
+      if (s.ghost) ghostify(e);
       e.pirate = true; e.ship = s; e.state = 'onShip'; e.boardDelay = 0.4 + i * 0.75; e.deckZ = -5 + i * (10 / Math.max(1, n - 1));
       this._placeOnShip(e);
     }
@@ -300,7 +328,7 @@ export class Enemies {
     if (e.hitT <= 0 && !e.hitGlow) return;
     e.hitT = Math.max(0, e.hitT - dt);
     const k = e.hitT / 0.22;
-    for (const m of e.mats) if (m.emissive) { m.emissive.setRGB(0.9 * k, 0.1 * k, 0.05 * k); }
+    for (const m of e.mats) if (m.emissive) { if (m.userData.ghost && k <= 0) m.emissive.setHex(0x1a6a5a); else m.emissive.setRGB(0.9 * k, 0.1 * k, 0.05 * k); }
     e.hitGlow = k > 0;
     const parts = e.mesh.userData.parts;
     if (parts) { parts.torso.rotation.x -= Math.sin(k * Math.PI) * 0.45; parts.head.rotation.x -= Math.sin(k * Math.PI) * 0.3; }
@@ -668,6 +696,7 @@ export class Enemies {
     this.burstGapT = (this.burstGapT || 0) - dt;
     for (let i = this.list.length - 1; i >= 0; i--) {
       const e = this.list[i], b = e.body, p = b.pos;
+      if (e.creature) { if (e.ai && e.ai.update) e.ai.update(e, dt); this._animateHit(e, dt); continue; } // criatura morta também anima (afundando)
       if (e.pirate) {
         this.updatePirate(e, dt);
         continue;

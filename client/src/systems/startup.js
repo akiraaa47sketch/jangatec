@@ -1,6 +1,7 @@
 import * as THREE from '../three.js';
 import { clamp } from '../core/util.js';
 import { sea } from '../world/ocean.js';
+const GHOST_FOG = new THREE.Color(0x6f9a8e);
 import { Tide } from './tide.js';
 
 const PHASES = new Set(['build', 'install', 'calm', 'storm', 'flood', 'board', 'depart']);
@@ -216,6 +217,12 @@ export class Startup {
       const view = G.viewScale || 1; // distância de visão (opções gráficas)
       G.scene.fog.near = (120 - storm * 65) * view;
       G.scene.fog.far = (330 - storm * 180) * view;
+      const gf = G.events && G.events.ghostFog ? G.events.ghostFog(t) : 0; // névoa verde do navio-fantasma
+      if (gf > 0) {
+        G.scene.fog.color.lerp(GHOST_FOG, gf * 0.75);
+        if (G.scene.background && G.scene.background.isColor) G.scene.background.lerp(GHOST_FOG, gf * 0.6);
+        G.scene.fog.near *= 1 - 0.75 * gf; G.scene.fog.far *= 1 - 0.55 * gf;
+      }
     }
     this.sun.color.copy(this.clearSun).lerp(this.stormSun, storm);
     this.sun.intensity = 1.7 - storm * 0.95;

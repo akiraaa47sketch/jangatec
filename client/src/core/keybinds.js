@@ -46,6 +46,7 @@ export const ACTIONS = [
   { id: 'food1', label: 'Comer barra de proteína (+dano)', cat: 'itens', ctx: 'pe', def: 'Digit9' },
   { id: 'food2', label: 'Tomar energético (estamina)', cat: 'itens', ctx: 'pe', def: 'Digit0' },
   { id: 'food3', label: 'Comer chocolate (regenera vida)', cat: 'itens', ctx: 'pe', def: 'Minus' },
+  { id: 'food4', label: 'Comer peixe (+20 de vida)', cat: 'itens', ctx: 'pe', def: 'Equal' },
   { id: 'inventory', label: 'Abrir inventário', cat: 'itens', ctx: 'pe', def: 'Tab' },
   { id: 'drop', label: 'Largar a arma da mão', cat: 'itens', ctx: 'pe', def: 'KeyT' },
   { id: 'banjoMenu', label: 'Painel de notas do banjo', cat: 'itens', ctx: 'pe', def: 'KeyB' },
