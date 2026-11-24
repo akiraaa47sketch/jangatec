@@ -1,5 +1,5 @@
 import * as THREE from '../three.js';
-import { clamp } from '../core/util.js';
+import { clamp, mulberry32 } from '../core/util.js';
 import { sea } from '../world/ocean.js';
 const GHOST_FOG = new THREE.Color(0x6f9a8e);
 import { Tide } from './tide.js';
@@ -10,6 +10,15 @@ const STORM_DURATION = 13;
 const FLOOD_DURATION = 34;
 const FLOOD_LEVEL = 0.9;
 const CLOCK_WRAP = 100000;
+// Marulho: de vez em quando (~45% das janelas de 40 s) as ondas crescem e baixam de novo em ~20 s.
+// Deriva só do relógio comum: todos os jogadores veem as mesmas ondas.
+export const SWELL = { slot: 40, chance: 0.45, A: [0.45, 1.1] };
+export function swellAt(t) {
+  const k = Math.floor(t / SWELL.slot), u = t / SWELL.slot - k, h = mulberry32(k * 7919 + 13)();
+  if (h > SWELL.chance) return 0;
+  const A = SWELL.A[0] + (SWELL.A[1] - SWELL.A[0]) * (h / SWELL.chance);
+  return A * Math.sin(Math.PI * u) ** 2;
+}
 const clockNow = () => (Date.now() / 1000) % CLOCK_WRAP; // o mesmo relógio comum de main.js
 
 export class Startup {
@@ -243,7 +252,10 @@ export class Startup {
     this.sun.intensity = 1.7 - storm * 0.95;
     this.hemisphere.intensity = 1.15 - storm * 0.55;
     if (G.sunVisual) G.sunVisual.setStorm(storm);
-    sea.amp = 1 + storm * 0.7;
+    const swell = this.departed && this.waterLevel > 0.5 ? swellAt(t) : 0;
+    if (swell > 0.35 && !this.swellOn) G.hud.msg('Ondas grandes chegando — segure-se!');
+    this.swellOn = swell > 0.35 ? true : swell < 0.1 ? false : this.swellOn;
+    sea.amp = 1 + storm * 0.7 + swell;
     if (G.boat.sailInstalled) G.boat.sailGroup.rotation.z = Math.sin(t * 6) * storm * 0.045;
 
     const player = G.player.body.pos;

@@ -32,7 +32,8 @@ export function patchVortexDip(material) {
   material.needsUpdate = true;
 }
 
-export const SEABED = { base: -4.6, min: -6.4, islandEdge: 0.8, starterEdge: -2.0, slope: 32 };
+// islandEdge bem abaixo da quilha (0,9 m): perto das ilhas o fundo não encalha mais a jangada com o mar cheio
+export const SEABED = { base: -4.6, min: -6.4, islandEdge: -1.9, starterEdge: -2.0, slope: 22 };
 
 // Ilha do chunk (mesma ordem de RNG de World.makeChunk/makeIsland).
 const islandCache = new Map();
@@ -45,7 +46,7 @@ function chunkIsland(seed, cx, cz) {
     if (starter || roll < WORLD_LOOT_PARAMS.islandChance) {
       const x = cx * S + (r() - 0.5) * 30, z = cz * S + (r() - 0.5) * 30;
       const R = starter ? 15 + r() * 3 : 9 + r() * 6;
-      isl = { x, z, R: R + 7.5, edge: starter ? SEABED.starterEdge : SEABED.islandEdge };
+      isl = { x, z, R: R + (starter ? 7.5 : 2.2), edge: starter ? SEABED.starterEdge : SEABED.islandEdge };
     }
   }
   if (islandCache.size > 4000) islandCache.clear();

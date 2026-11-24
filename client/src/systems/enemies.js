@@ -177,7 +177,7 @@ export class Enemies {
       while (hi.length || lo.length) { if (lo.length) spots.push(lo.shift()); if (hi.length) spots.push(hi.shift()); }
     } else spots.sort((a, b) => (b.high ? 1 : 0) - (a.high ? 1 : 0)); // torres primeiro (sempre ocupadas)
     // base militar: um inimigo por ponto (espalhados pelas salas), sem amontoar
-    const count = military ? Math.min(spots.length, 4 + isl.diff) : Math.max(n, Math.min(spots.length, n + 1));
+    const count = military ? Math.min(spots.length, 5 + isl.diff) : Math.max(n, Math.min(spots.length, n + 1));
     for (let i = 0; i < count; i++) {
       const id = `${isl.id}e${i}`, sp = spots.length ? spots[i % spots.length] : null;
       let type = pool[(r() * pool.length) | 0];

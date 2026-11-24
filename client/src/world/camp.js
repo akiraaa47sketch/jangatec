@@ -306,7 +306,7 @@ export function buildCamp(type, ctx) {
     // largo), saguão com escada até o 1º andar, arsenal e alojamento no térreo; corredor e cinco
     // salas em cima. Pátio na frente com sacos de areia, caixas de munição e a bandeira.
     // Inimigos ficam espalhados pelas salas (os de cima ficam de posto e atiram pelas janelas).
-    const B = { x: P(0, -2)[0], z: P(0, -2)[1], yaw: ctx.yaw }; // frame do prédio (frente = +Z)
+    const B = { x: P(0, -9)[0], z: P(0, -9)[1], yaw: ctx.yaw }; // frame do prédio (frente = +Z), no fundo do complexo
     const HW = 8, HD = 6, T = 0.3, FH = 3.0, SL = 0.25, UP = FH + SL, TOPY = 2 * FH + SL;
     // parede ao longo de u (u0..u1) na altura y0..y1, com vãos [a, b, lo, hi] (porta/janela)
     const wall = (along, at, u0, u1, y0, y1, holes = [], mat = m.concrete, t = T) => {
@@ -383,12 +383,94 @@ export function buildCamp(type, ctx) {
     for (const [x, z] of [[-5.4, -5.1], [0, -5.1], [5.4, -5.1], [-4.5, 5.2], [2.5, 5.2]]) {
       const desk = new THREE.Mesh(boxGeo(1.4, 0.78, 0.7), m.plankDark); decor(B, desk, x, UP + 0.39, z);
     }
-    // pátio na frente: sacos de areia, caixas, barris e bandeira
-    sandbags(site, -6, 8.4, -2.4, 8.4, 3); sandbags(site, 2.4, 8.4, 6, 8.4, 3);
-    for (const [x, z] of [[6.6, 5.4], [7.2, 6.2]]) ammoCrate(site, x, z);
-    barrel(site, -7, 5.4); barrel(site, -7.6, 6.1);
-    flag(site, -4.4, 6.2, 6.2);
-    out.yard = P(0, 6.3); out.fire = P(3.6, 6.8);
+    // ======== COMPLEXO: muralha com torres redondas, radomes, antenas, parabólicas, contêineres ========
+    const solidify = (mesh) => { mesh.traverse((o) => { if (o.isMesh) ctx.solidOnly(o); }); return mesh; };
+    const cyl = (frame, lx, lz, rad, y0, h) => { const [x, z] = P(lx, lz, frame.yaw, frame.x, frame.z); set.items.push({ type: 'cyl', x, y: TOP + y0 + h / 2, z, hx: rad, hy: h / 2, hz: rad }); };
+    const W = 22, WH = 4.6, WT = 1.0, GATE = 3.6;
+    // muralha de concreto (portão largo na frente, +Z) com passarela e ameias
+    const bigWall = (x0, z0, x1, z1) => {
+      const len = Math.hypot(x1 - x0, z1 - z0), yaw = Math.atan2(x1 - x0, z1 - z0);
+      solid(site, (x0 + x1) / 2, 0, (z0 + z1) / 2, WT, WH, len, m.concrete, yaw);
+      const n = Math.floor(len / 1.6);
+      for (let i = 0; i < n; i++) { const t = (i + 0.5) / n, merlon = new THREE.Mesh(boxGeo(WT + 0.1, 0.6, 0.8), m.concreteDark); decor(site, merlon, x0 + (x1 - x0) * t, WH + 0.3, z0 + (z1 - z0) * t, yaw); }
+      for (let i = 1; i < len / 4; i++) { const t = i / Math.ceil(len / 4), but = new THREE.Mesh(boxGeo(1.6, WH * 0.8, 0.7), m.concreteDark); decor(site, but, x0 + (x1 - x0) * t, WH * 0.4, z0 + (z1 - z0) * t, yaw + Math.PI / 2); } // contrafortes
+    };
+    bigWall(-W, -W, W, -W); bigWall(-W, -W, -W, W); bigWall(W, -W, W, W);
+    bigWall(-W, W, -GATE, W); bigWall(GATE, W, W, W);
+    // portão: folhas de aço abertas e pórtico
+    for (const sx of [-1, 1]) { const leaf = new THREE.Mesh(boxGeo(GATE - 0.1, WH - 0.6, 0.15), m.steel); leaf.geometry.translate(-sx * (GATE - 0.1) / 2, 0, 0); decor(site, leaf, sx * GATE, (WH - 0.6) / 2, W + 0.2, sx * 1.2); }
+    { const arch = new THREE.Mesh(boxGeo(2 * GATE + 2, 1.0, WT + 0.4), m.concreteDark); decor(site, arch, 0, WH + 0.6, W); solidify(arch); }
+    // torres redondas de concreto (cantos e meio dos lados) com escada por dentro e posto no alto
+    const roundTower = (lx, lz, rad = 2.4, H = 8.5) => {
+      const body = new THREE.Mesh(new THREE.CylinderGeometry(rad * 0.95, rad, H, 20), m.concrete); decor(site, body, lx, H / 2, lz); solidify(body);
+      cyl(site, lx, lz, rad, 0, H);
+      for (let i = 0; i < 6; i++) { const a = i / 6 * Math.PI * 2, rib = new THREE.Mesh(boxGeo(0.5, H * 0.85, 0.7), m.concreteDark); decor(site, rib, lx + Math.cos(a) * rad, H * 0.42, lz + Math.sin(a) * rad, -a); }
+      const rim = new THREE.Mesh(new THREE.TorusGeometry(rad * 0.98, 0.18, 6, 24), m.concreteDark); rim.rotation.x = Math.PI / 2; decor(site, rim, lx, H + 0.2, lz);
+      for (let i = 0; i < 4; i++) { const slit = new THREE.Mesh(boxGeo(0.25, 1.0, 0.1), m.cloth); const a = i / 4 * Math.PI * 2 + 0.4; decor(site, slit, lx + Math.cos(a) * (rad + 0.02), H * 0.6, lz + Math.sin(a) * (rad + 0.02), Math.PI / 2 - a); }
+      // escada do lado de dentro do complexo (virada para o centro)
+      const d = Math.hypot(lx, lz) || 1, ux = -lx / d, uz = -lz / d, ax = lx + ux * (rad + 0.45), az = lz + uz * (rad + 0.45);
+      const lyaw = Math.atan2(-ux, -uz), ladder = new THREE.Group();
+      for (const x2 of [-0.22, 0.22]) { const rail = new THREE.Mesh(boxGeo(0.07, H + 0.6, 0.07), m.steel); rail.position.set(x2, 0, 0); ladder.add(rail); }
+      for (let i = 0; i < Math.floor(H / 0.42); i++) { const rung = new THREE.Mesh(boxGeo(0.44, 0.05, 0.05), m.steel); rung.position.y = -H / 2 + 0.3 + i * 0.42; ladder.add(rung); }
+      decor(site, ladder, lx + ux * (rad + 0.12), H / 2 + 0.2, lz + uz * (rad + 0.12), lyaw);
+      { const [x, z] = P(ax, az); out.ladders.push({ x, z, top: H + 0.05, yaw: ctx.yaw + lyaw, dir: -1 }); } // sobe para dentro da torre
+      spot(site, lx, lz, H, true);
+    };
+    for (const [x, z] of [[-W, -W], [W, -W], [-W, W], [W, W], [-W, 0], [W, 0]]) roundTower(x, z);
+    // radomes (esfera geodésica branca sobre base de concreto)
+    const dome = new THREE.MeshStandardMaterial({ color: 0xf2f2ee, roughness: 0.55, flatShading: true });
+    const radome = (lx, lz, baseR, baseH, R) => {
+      const base = new THREE.Mesh(new THREE.CylinderGeometry(baseR, baseR * 1.03, baseH, 28), m.concrete); decor(site, base, lx, baseH / 2, lz); solidify(base);
+      const door = new THREE.Mesh(boxGeo(1.2, 2.2, 0.12), m.steel); decor(site, door, lx, 1.1, lz + baseR, 0);
+      const sph = new THREE.Mesh(new THREE.IcosahedronGeometry(R, 3), dome); decor(site, sph, lx, baseH + R * 0.82, lz); solidify(sph);
+      cyl(site, lx, lz, baseR, 0, baseH); cyl(site, lx, lz, R * 0.9, baseH, R * 1.7);
+    };
+    radome(-14, -12, 4.6, 5.2, 6.4);   // o grandão
+    radome(14, 9, 2.6, 3.2, 3.6);
+    radome(-16, 15, 1.6, 2.4, 2.2);
+    // torres de antena treliçadas com prato no alto
+    const lattice = (lx, lz, H, w = 1.4) => {
+      const g = new THREE.Group(), legGeo = boxGeo(0.12, H, 0.12);
+      for (const sx of [-1, 1]) for (const sz of [-1, 1]) { const leg = new THREE.Mesh(legGeo, m.steel); leg.position.set(sx * w / 2, H / 2, sz * w / 2); g.add(leg); }
+      for (let y = 1.2; y < H; y += 1.6) for (const [ax, az, ry] of [[0, -w / 2, 0], [0, w / 2, 0], [-w / 2, 0, Math.PI / 2], [w / 2, 0, Math.PI / 2]]) {
+        const br = new THREE.Mesh(boxGeo(w, 0.06, 0.06), m.steel); br.position.set(ax, y, az); br.rotation.y = ry; g.add(br);
+        const dg = new THREE.Mesh(boxGeo(Math.hypot(w, 1.6), 0.05, 0.05), m.steel); dg.position.set(ax, y - 0.8, az); dg.rotation.set(0, ry, Math.atan2(1.6, w)); g.add(dg);
+      }
+      const dish = new THREE.Mesh(new THREE.SphereGeometry(1.4, 16, 8, 0, Math.PI * 2, 0, 0.9), new THREE.MeshStandardMaterial({ color: 0xd8d8d2, side: THREE.DoubleSide, roughness: 0.6 }));
+      dish.rotation.x = -1.2; dish.position.set(0, H + 0.6, 0.4); g.add(dish);
+      const light = new THREE.Mesh(new THREE.SphereGeometry(0.15, 8, 6), new THREE.MeshStandardMaterial({ color: 0xff3020, emissive: 0xff2010, emissiveIntensity: 3 })); light.position.y = H + 0.2; g.add(light);
+      decor(site, g, lx, 0, lz, r() * 6);
+      cyl(site, lx, lz, w * 0.6, 0, H);
+    };
+    lattice(15, -16, 16); lattice(19.5, -8, 12, 1.1); lattice(-19.5, 6, 11, 1.1);
+    // parabólicas no chão
+    const dishStand = (lx, lz, size, aim) => {
+      const g = new THREE.Group();
+      const post = new THREE.Mesh(new THREE.CylinderGeometry(0.25, 0.35, 2.2, 10), m.concreteDark); post.position.y = 1.1; g.add(post);
+      const dsh = new THREE.Mesh(new THREE.SphereGeometry(size, 20, 10, 0, Math.PI * 2, 0, 0.85), new THREE.MeshStandardMaterial({ color: 0x9a8f7c, side: THREE.DoubleSide, roughness: 0.7 }));
+      dsh.rotation.x = -1.0; dsh.position.set(0, 2.2 + size * 0.5, 0); g.add(dsh);
+      decor(site, g, lx, 0, lz, aim); solidify(dsh);
+      cyl(site, lx, lz, 0.4, 0, 2.2);
+    };
+    dishStand(10, -7, 2.4, 0.6); dishStand(18, 16, 1.8, 2.2);
+    // contêineres vermelhos (fileira, alguns empilhados) e chaminés/dutos
+    const ribbed = (() => { const c = document.createElement('canvas'); c.width = 64; c.height = 16; const g = c.getContext('2d'); g.fillStyle = '#8f2d1d'; g.fillRect(0, 0, 64, 16); g.fillStyle = '#6b1f13'; for (let x = 0; x < 64; x += 4) g.fillRect(x, 0, 2, 16); const t = new THREE.CanvasTexture(c); t.wrapS = t.wrapT = THREE.RepeatWrapping; t.repeat.set(3, 1); t.colorSpace = THREE.SRGBColorSpace; return t; })();
+    const contMat = new THREE.MeshStandardMaterial({ map: ribbed, roughness: 0.7, metalness: 0.2 });
+    const container = (lx, lz, y0 = 0, yaw = 0) => solid(site, lx, y0, lz, 2.4, 2.6, 6, contMat, yaw);
+    container(-17, 3); container(-17, 3, 2.6); container(-13.8, 3.6, 0, 0.08); container(10, 15.5, 0, Math.PI / 2); container(4, 17, 0, Math.PI / 2);
+    out.crateSpots.push(P(-15.4, 7.2));
+    for (const [x, z] of [[9.4, -14], [10.4, -14], [11.4, -14]]) {
+      const st = new THREE.Mesh(new THREE.CylinderGeometry(0.4, 0.4, 4, 10), m.steel); decor(site, st, x, 2, z); solidify(st); cyl(site, x, z, 0.42, 0, 4);
+    }
+    { const duct = new THREE.Mesh(new THREE.CylinderGeometry(0.5, 0.5, 9, 10), m.steel); duct.rotation.z = Math.PI / 2; decor(site, duct, -13, 0.6, -3.2, 0.2); }
+    // heliporto, ninhos de sacos de areia e bandeira
+    const pad = new THREE.Mesh(new THREE.CylinderGeometry(4, 4, 0.06, 32), m.concreteDark); decor(site, pad, 5, 0.03, 6);
+    for (const [w, l, x] of [[0.35, 2.4, -0.7], [0.35, 2.4, 0.7], [1.4, 0.35, 0]]) { const h = new THREE.Mesh(boxGeo(w, 0.02, l), m.sandbag); decor(site, h, 5 + x, 0.08, 6); }
+    sandbags(site, -8, 16.5, -4.5, 18.5, 3); sandbags(site, 4.5, 18.5, 8, 16.5, 3); sandbags(site, -3, 2, 0, 0.6, 3);
+    for (const [x, z] of [[-10, -1], [-9, -1.6], [12, 1]]) ammoCrate(site, x, z);
+    barrel(site, -6.6, 12); barrel(site, -7.2, 12.6); barrel(site, 16.5, -2);
+    flag(site, 0, -1.6, 7.5);
+    out.yard = P(0, 6); out.fire = P(-5, 9);
     // caixotes: arsenal e garagem (térreo)
     out.crateSpots.push(P(1.2, -4.6, B.yaw, B.x, B.z), P(-6.9, -3.6, B.yaw, B.x, B.z));
     // cômodos do térreo (para a IA achar as portas) — o andar de cima é de "posto"
@@ -401,7 +483,7 @@ export function buildCamp(type, ctx) {
     // pontos de inimigo: térreo (andam) e 1º andar (posto, atiram pela janela/porta)
     for (const [x, z] of [[-5.5, -3], [-3.2, 4.2], [-0.4, 2], [4, 3.6], [0.8, -2.6], [5.6, -2.4]]) spot(B, x, z);
     for (const [x, z] of [[-5.4, -3.6], [0, -3.6], [5.4, -3.6], [-4.5, 3.2], [2.5, 3.6], [-3, -0.45]]) spot(B, x, z, UP, true);
-    spot(site, -1.6, 7.4); spot(site, 2.2, 7.2);
+    for (const [x, z] of [[-6, 17], [6, 17], [-2, 3], [12, 4], [-11, 9], [16, -4]]) spot(site, x, z);
   } else {
     // paliçada quadrada com portão na frente (+Z)
     const S = 5.4, gate = 1.4;

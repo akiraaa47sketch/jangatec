@@ -4,7 +4,7 @@
 import * as THREE from '../three.js';
 import { mulberry32, hash2, rot } from '../core/util.js';
 import { CFG } from '../config.js';
-import { LOOT_CONFIG, generateCrateLoot, wreckFor, seabedCratesFor, seaSiteFor, WORLD_LOOT_PARAMS } from '../systems/loot.js';
+import { LOOT_CONFIG, generateCrateLoot, wreckFor, seabedCratesFor, seaSiteFor, chunkHasIsland, WORLD_LOOT_PARAMS } from '../systems/loot.js';
 import { seabedHeight, makeSeabedChunk, makeFarSeabed, patchVortexDip } from './seabed.js';
 import { bakeStatic } from '../core/bake.js';
 import { buildCamp } from './camp.js';
@@ -462,19 +462,27 @@ export class World {
       [['bunker', 0.7], ['fort', 0.4], ['militar', 2.4]],
     ][diff];
     const MIN_R = { scrap: 11.5, militar: 12, bunker: 10 };
-    const options = SITES.filter(([t]) => R0 >= (MIN_R[t] || 0)), totalW = options.reduce((a, [, w]) => a + w, 0);
+    // o complexo militar ocupa ~40 m de raio: só em chunk sem ilha nos vizinhos
+    const cm = /^i(-?\d+),(-?\d+)$/.exec(id), lonely = !!cm && [-1, 0, 1].every((i) => [-1, 0, 1].every((j) => (!i && !j) || !chunkHasIsland(this.seed, +cm[1] + i, +cm[2] + j)));
+    const options = SITES.filter(([t]) => R0 >= (MIN_R[t] || 0) && (t !== 'militar' || lonely)), totalW = options.reduce((a, [, w]) => a + w, 0);
     let siteType = null;
     if (!starterIsland) { let roll = siteRoll * totalW; for (const [t, w] of options) { roll -= w; if (roll <= 0) { siteType = t; break; } } siteType = siteType || options[options.length - 1][0]; }
-    const R = siteType === 'militar' ? Math.max(R0, 19) : R0; // a base militar (prédio de 16 × 12 m + pátio) pede ilha grande
+    const R = siteType === 'militar' ? 37 : R0; // complexo militar: muralha de 44 m, radomes, antenas — ilha enorme
     const group = new THREE.Group(); group.position.set(x, islandElevation, z);
     const set = { x, z, yaw: 0, y: islandElevation, radius: R + 8, items: [] };
     const solids = [];
     const addSolid = (m) => { group.add(m); solids.push(m); };
     const landLayers = [];
     // O terreno é composto por patamares baixos que podem desaparecer sob a maré.
-    for (const [dr, top] of [[7.5, -1.55], [6, -1.2], [4.5, -0.85], [3, -0.5], [1.5, -0.15], [0.5, 0.2], [0, 0.55]]) {
+    // Ilha inicial: patamares baixos que a inundação cobre aos poucos. Demais ilhas: só uma praia
+    // curta e íngreme (antes um anel de 7,5 m de degraus onde a jangada enroscava); a faixa de
+    // fora desce até o fundo do mar para a ilha não "flutuar" na seca.
+    const LAYERS = starterIsland
+      ? [[7.5, -1.55], [6, -1.2], [4.5, -0.85], [3, -0.5], [1.5, -0.15], [0.5, 0.2], [0, 0.55]]
+      : [[2.2, -2.4], [1.1, -1.25], [0.4, -0.3], [0, 0.55]];
+    for (const [dr, top] of LAYERS) {
       const worldTop = islandElevation + top;
-      const radius = R + dr, thickness = 0.35;
+      const radius = R + dr, thickness = !starterIsland && dr === LAYERS[0][0] ? worldTop + 7 : 0.35;
       const sand = new THREE.Mesh(
         new THREE.CylinderGeometry(radius, radius, thickness, 40),
         M(SAND[dr], { map: repeated(sandTexture(), radius * 0.45), bumpMap: repeated(sandBump(), radius * 0.45), bumpScale: 1.4 })
@@ -501,7 +509,7 @@ export class World {
       ? [[-R * 0.78, 0], [R * 0.78, -R * 0.22], [0, R * 0.78]]
       : [];
     // acampamento (cabana ou forte) perto do meio; ruínas ficam longe dele
-    const CAMP_R = { hut: 5, tendas: 5.6, vigia: 6, fort: 7.9, bunker: 6, scrap: 8.6, militar: 12.5 };
+    const CAMP_R = { hut: 5, tendas: 5.6, vigia: 6, fort: 7.9, bunker: 6, scrap: 8.6, militar: 33 };
     const campR = CAMP_R[siteType] || 5;
     const campA = r() * 6.28, campD = r() * Math.max(0, R - campR - 1.4);
     const campC = [Math.cos(campA) * campD, Math.sin(campA) * campD];
@@ -895,7 +903,11 @@ export class World {
       let reach = 0;
       for (const [i, layer] of isl.landLayers.entries()) if (layer.top > level && layer.dr != null) reach = Math.max(reach, layer.dr);
       const min = isl.R + Math.min(2.5, reach * 0.45 + 0.5) + boatR;
-      if (d < min) { boat.x = isl.x + (dx / d) * min; boat.z = isl.z + (dz / d) * min; boat.speed *= 0.9; }
+      if (d < min) {
+        // contorna a ilha em vez de travar de frente: escorrega para o lado em que a proa já aponta
+        const tx = -dz / d, tz = dx / d, side = Math.sign(Math.sin(boat.yaw) * tx + Math.cos(boat.yaw) * tz) || 1;
+        boat.x = isl.x + (dx / d) * min + tx * side * 0.05; boat.z = isl.z + (dz / d) * min + tz * side * 0.05; boat.speed *= 0.97;
+      }
     }
   }
 
