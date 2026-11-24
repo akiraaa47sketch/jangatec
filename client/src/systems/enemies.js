@@ -36,6 +36,11 @@ export const ENEMY_TYPES = {
   escafandrista: { nome: 'Escafandrista amaldiçoado', hp: 320, speed: 2.4, dmg: 15, range: 2.3, cd: 1.6, cor: 0x4d5d62, scale: 1.3, boss: 'mini', ring: 2.5, hitR: 0.35 },
   // chefe das bases militares: gira a minigun (aviso), solta uma rajada longa e superaquece
   metralhador: { nome: 'Metralhador', hp: 700, speed: 1.7, dmg: 5, range: 30, cd: 4.2, cor: 0x3a4226, scale: 1.35, ranged: true, boss: 'minigun', burst: 34, burstGap: 0.07, acc: 0.4, spinUp: 1.2, hitR: 0.4 },
+  // chefes da plataforma Leviatã (evento SOS) — habilidades em bossskills.js
+  soldador:   { nome: 'O Soldador', hp: 650, speed: 2.8, dmg: 16, range: 2.4, cd: 1.4, cor: 0xd8731a, scale: 1.4, boss: 'solda', hitR: 0.4 },
+  quimico:    { nome: 'Dr. Gás', hp: 620, speed: 2.7, dmg: 13, range: 2.2, cd: 1.2, cor: 0x5f8a2a, scale: 1.3, boss: 'gas', hitR: 0.35 },
+  perfurador: { nome: 'O Perfurador', hp: 1000, speed: 2.1, dmg: 26, range: 2.9, cd: 1.8, cor: 0x8a6a2a, scale: 1.6, boss: 'broca', hitR: 0.55 },
+  faisca:     { nome: 'Faísca', hp: 820, speed: 3.7, dmg: 14, range: 2.0, cd: 1.0, cor: 0x3a6ad8, scale: 1.3, boss: 'raio', hitR: 0.35 },
   fantasma: { nome: 'Pirata fantasma', hp: 80, speed: 4.6, dmg: 6, range: 1.8, cd: 1.5, cor: 0x8fe8d8, scale: 1.05 }, // fraco, mas atravessa a névoa
 };
 // Quem aparece onde (por dificuldade = distância na rota):
@@ -81,6 +86,7 @@ const between = ([a, b]) => a + Math.random() * (b - a);
 function bossLoot(kind) {
   const r = Math.random();
   if (kind === 'minigun') return { arma_minigun: 140, municao: 20, kit: 1, bandagem: 2 }; // a minigun vem com 140 balas
+  if (['solda', 'gas', 'broca', 'raio'].includes(kind)) return { municao: 25, cartucho: 8, kit: 1, bandagem: 2, energetico: 1 }; // chefes da Leviatã
   const loot = { municao: 10, bandagem: 2, chocolate: 1 };
   if (r < 0.35) loot['arma_' + ['revolver', 'facao', 'martelo'][(Math.random() * 3) | 0]] = 1;
   else if (r < 0.7) loot.kit = 1;
@@ -330,8 +336,8 @@ export class Enemies {
       } else this.G.hud.msg(`${e.def.nome} derrotado`);
       if (e.def.boss && G.drops) { // chefe: saco de loot no chão para quem pegar primeiro
         G.drops.dropAt(e.body.pos, bossLoot(e.def.boss));
-        G.hud.msg(e.def.boss === 'minigun' ? 'O Metralhador caiu! Pegue o saco de loot' : 'O escafandrista caiu e largou um saco de loot');
-        if (G.enemyNet) G.enemyNet.banner(e.def.boss === 'minigun' ? 'METRALHADOR DERROTADO' : 'ESCAFANDRISTA DERROTADO', 'O loot ficou no chão — pegue com E.', 'good');
+        G.hud.msg(`${e.def.nome} caiu! Pegue o saco de loot`);
+        if (G.enemyNet) G.enemyNet.banner(`${e.def.nome.toUpperCase()} DERROTADO`, 'O loot ficou no chão — pegue com E.', 'good');
       }
       if (G.net.online) {
         G.net.send({ t: 'edie', id: e.id, side: e.deathSide, to: by === 'L' ? null : by, loot: loot ? { ...loot, ...(sabre ? { arma_sabre: 1 } : {}) } : sabre ? { arma_sabre: 1 } : null });

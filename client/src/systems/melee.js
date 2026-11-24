@@ -34,12 +34,17 @@ const MOVES = {
   lanceiro: [{ wind: 0.45, mult: 1, w: 3 }, { wind: 0.35, mult: 0.8, hits: 2, w: 2 }, { wind: 0.7, mult: 1.6, heavy: true, w: 1 }], // estocadas de longe
   esquivo: [{ wind: 0.26, mult: 0.9, hits: 2, w: 3 }, { wind: 0.4, mult: 0.5, kick: true, w: 1 }],
   duelista: [{ wind: 0.3, mult: 1, hits: 2, w: 3 }, { wind: 0.26, mult: 0.9, hits: 3, w: 2 }, { wind: 0.55, mult: 1.6, heavy: true, w: 1 }],
+  // chefes da Leviatã: golpes próprios (as habilidades especiais ficam em bossskills.js)
+  soldador: [{ wind: 0.5, mult: 1.2, hits: 2, w: 3 }, { wind: 0.8, mult: 1.9, heavy: true, aoe: 3.2, w: 2 }, { wind: 0.45, mult: 0.7, kick: true, w: 1 }],
+  quimico: [{ wind: 0.34, mult: 0.9, hits: 3, w: 3 }, { wind: 0.4, mult: 0.6, kick: true, w: 2 }],
+  perfurador: [{ wind: 0.95, mult: 2.0, heavy: true, aoe: 3.8, w: 3 }, { wind: 0.55, mult: 1.1, hits: 2, w: 2 }],
+  faisca: [{ wind: 0.22, mult: 0.8, hits: 3, w: 3 }, { wind: 0.3, mult: 1.2, hits: 2, w: 2 }, { wind: 0.55, mult: 1.7, heavy: true, w: 1 }],
   pirata: [{ wind: 0.32, mult: 1, hits: 2, w: 3 }, { wind: 0.28, mult: 0.9, hits: 3, w: 1 }, { wind: 0.6, mult: 1.8, heavy: true, w: 1 }, { wind: 0.4, mult: 0.5, kick: true, w: 1.5 }],
 };
 const LIGHT_POSES = ['slashR', 'slashL', 'thrust', 'uppercut'];
-const GUARD_CHANCE = { lanceiro: 0.3, esquivo: 0.1, duelista: 0.45, melee: 0.4, pesado: 0.45, pirata: 0.5, rapido: 0.15, fantasma: 0.35, escafandrista: 0.35 };
+const GUARD_CHANCE = { soldador: 0.35, quimico: 0.2, perfurador: 0.5, faisca: 0.3, lanceiro: 0.3, esquivo: 0.1, duelista: 0.45, melee: 0.4, pesado: 0.45, pirata: 0.5, rapido: 0.15, fantasma: 0.35, escafandrista: 0.35 };
 const RIPOSTE_CHANCE = { lanceiro: 0.2, esquivo: 0.3, duelista: 0.7, melee: 0.3, pesado: 0.15, pirata: 0.55, rapido: 0.2, escafandrista: 0.2 }; // contra-ataque depois de defender
-const EVADE_CHANCE = { melee: 0.12, pesado: 0, pirata: 0.18, rapido: 0.3 }; // desviam do seu golpe
+const EVADE_CHANCE = { melee: 0.12, pesado: 0, pirata: 0.18, rapido: 0.3, faisca: 0.35, quimico: 0.15 }; // desviam do seu golpe
 
 let bangTex = {}, starTex = null;
 function bang(text, color) {
@@ -167,7 +172,7 @@ export class Melee {
     // ataque: o clique já golpeia (sem esperar soltar). Clicar durante um golpe guarda o próximo
     // do combo. Segurar o botão depois do golpe leve carrega o pesado; soltar descarrega.
     if (!this.blocking) {
-      if (inp.mouse.leftPressed) this.buffer = 0.34;
+      if (inp.mouse.leftPressed) this.buffer = 0.45; // clique guardado dura mais: o combo não "engole" cliques
       if (this.charging) {
         this.holdT += dt;
         if (!inp.mouse.left) { this.charging = false; this.attack(true, clamp(this.holdT / MELEE.heavy.maxCharge, 0, 1)); this.holdT = 0; }
@@ -208,12 +213,21 @@ export class Melee {
     G.combat.swing = G.combat.swingDuration = dur;
     // pode emendar o próximo golpe logo depois do impacto (o resto da animação é cancelável)
     // o próximo golpe só sai depois da animação inteira + um respiro (o final do combo segura mais)
-    G.combat.cooldown = heavy ? Math.max(impact + 0.06, dur * 0.9) : dur * 0.95 + (finisher ? MELEE.light.finisherRecover : MELEE.light.recover);
+    // mais responsivo: o resto da animação do golpe leve é cancelável (o próximo sai mais cedo)
+    G.combat.cooldown = heavy ? Math.max(impact + 0.06, dur * 0.82) : Math.max(impact + 0.07, dur * 0.72) + (finisher ? MELEE.light.finisherRecover : MELEE.light.recover * 0.45);
     const [fx, fz] = pl.forward(); pl.yaw = Math.atan2(fx, fz);
     this.swingPose = { heavy, pose, t: 0, dur };
-    if (!heavy) { pl.body.vel.x += fx * 2.2; pl.body.vel.z += fz * 2.2; } // passinho à frente no golpe
-    else { pl.body.vel.x += fx * 3.5; pl.body.vel.z += fz * 3.5; }
-    this.pending = { w, heavy, mult, finisher, t: impact, knock: heavy ? MELEE.heavy.knock : MELEE.light.knock[step] };
+    // ímã de alvo: o inimigo mais perto num cone à frente (~60°) puxa o golpe — vira para ele e dá
+    // um passo até o alcance da arma (o golpe acerta mesmo com a mira um pouco fora)
+    const near = this.targets(w.range + 1.8, 0.5).filter((t) => !t.e.creature).sort((a, b) => a.d - b.d)[0];
+    let lx = fx, lz = fz, step2 = heavy ? 3.5 : 2.2;
+    if (near) {
+      lx = near.dx / near.d; lz = near.dz / near.d; pl.yaw = Math.atan2(lx, lz);
+      const gap = near.d - (near.e.def.hitR || 0) - w.range * 0.7;
+      step2 = clamp(gap * 3.4, 1.2, heavy ? 6.5 : 5.5);
+    }
+    pl.body.vel.x += lx * step2; pl.body.vel.z += lz * step2; // passo à frente no golpe
+    this.pending = { w, heavy, mult, finisher, t: impact, knock: heavy ? MELEE.heavy.knock : MELEE.light.knock[step], magnet: near ? near.e : null };
     sfx.swing(pl.body.pos, heavy);
     G.combat._useDurability(w);
   }
@@ -262,12 +276,17 @@ export class Melee {
   }
 
   // Aplica o golpe do jogador nos inimigos no arco à frente.
-  strike({ w, heavy, mult, finisher, knock }) {
+  strike({ w, heavy, mult, finisher, knock, magnet }) {
     const G = this.G, pl = G.player, p = pl.body.pos;
     const spin = this.swingPose && this.swingPose.pose === 'spin';
     const range = w.range * (heavy ? 1.2 : finisher ? 1.1 : 1), arc = spin ? -1.01 : heavy ? -0.1 : 0.25;
     let hits = 0, clashed = false;
-    for (const t of this.targets(range, arc)) {
+    const list = this.targets(range, arc);
+    // o alvo do ímã conta mesmo se saiu um pouco do arco (ele se mexeu durante o golpe)
+    if (magnet && magnet.state !== 'dead' && !list.some((t) => t.e === magnet)) {
+      const extra = this.targets(range + 0.9, -0.2).find((t) => t.e === magnet); if (extra) list.push(extra);
+    }
+    for (const t of list) {
       const { e, dx, dz, d, front, ms } = t;
       if (ms.state === 'evade') { this.say(e.body.pos, 'DESVIOU', '#c8d2da'); continue; }
       hits++;

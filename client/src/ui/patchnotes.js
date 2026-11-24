@@ -5,6 +5,21 @@
 // Nos textos, **assim** vira negrito.
 export const PATCH_NOTES = [
   {
+    id: '0.17', versao: 'v0.17', data: '24/11/2026', titulo: 'Leviatã: quatro andares, quatro chefes',
+    destaques: [
+      { tag: 'Fim da jornada', titulo: 'Plataforma Leviatã', texto: 'O SOS agora leva a uma **plataforma colossal de 4 andares** (48 × 48 m). Cada andar tem um **chefe com tema e habilidades próprias**, e a escada para o próximo andar só abre quando o chefe cai. Derrote os quatro e o arsenal deles é seu.' },
+      { tag: 'Combate', titulo: 'Golpes mais responsivos', texto: 'O golpe agora **puxa você até o inimigo da frente** e acerta mesmo com a mira um pouco fora. O combo **emenda mais rápido** e os cliques guardados não se perdem.' },
+    ],
+    secoes: [
+      { icone: '🔥', nome: '1º andar · O Soldador', itens: ['**Maçarico**: cone de fogo marcado no chão — saia dele.', '**Respingo de solda**: poças de metal derretido que queimam.'] },
+      { icone: '☣', nome: '2º andar · Dr. Gás', itens: ['**Nuvem tóxica**: dói e embaça a vista.', '**Válvulas**: três faixas no chão soltam jatos de gás — fique entre elas.'] },
+      { icone: '⛏', nome: '3º andar · O Perfurador', itens: ['**Investida da broca**: ele dispara pela faixa vermelha.', '**Tremor triplo**: pule as três ondas de choque.'] },
+      { icone: '⚡', nome: 'Topo · Faísca', itens: ['**Arco elétrico**: raios caem nos anéis azuis.', '**Salto relâmpago**: reaparece nas suas costas com um choque.'] },
+      { icone: '⚔', nome: 'Combate', itens: ['**Ímã de alvo** e passo até o inimigo ao golpear.', 'Combo **mais rápido**; clique guardado por mais tempo.', 'A barra de chefe mostra o chefe **do seu andar**.'] },
+      { icone: '🛠', nome: 'Correções', itens: ['O SOS agora **aparece para todos** no multiplayer.'] },
+    ],
+  },
+  {
     id: '0.16', versao: 'v0.16', data: '24/11/2026', titulo: 'Abordagem de verdade',
     destaques: [
       { tag: 'Batalha naval', titulo: 'Navio pirata sólido e invadível', texto: 'O navio pirata agora tem **colisão de verdade**: dá para andar no convés, subir pelas **escadas de corda** (até nadando) e o navio te leva junto. O de abordagem **encosta de lado e baixa uma prancha** em vez de atravessar a jangada. Invadiu? A **tripulação larga a abordagem e defende o convés**.' },

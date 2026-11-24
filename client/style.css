@@ -617,6 +617,7 @@ body.bossfight #msgs { top: 96px; } body.touch.bossfight #msgs { top: 84px; }
 #blind { position: absolute; inset: 0; pointer-events: none; z-index: 2; }
 #blind.agua { background: radial-gradient(ellipse at 50% 45%, rgba(170, 220, 255, 0.96), rgba(40, 120, 200, 0.98) 70%),
   repeating-linear-gradient(100deg, rgba(255, 255, 255, 0.18) 0 3px, transparent 3px 40px); }
+#blind.gas { background: radial-gradient(ellipse at 50% 50%, rgba(150, 230, 90, 0.35), rgba(70, 140, 40, 0.75) 75%); }
 #blind.tinta { background: radial-gradient(ellipse at 50% 50%, rgba(10, 4, 18, 0.93), rgba(0, 0, 0, 0.99) 70%); }
 
 /* ---------- aba Novidades (patch notes) ---------- */
