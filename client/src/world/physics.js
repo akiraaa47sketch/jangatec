@@ -1,7 +1,7 @@
 import * as CANNON from 'cannon-es';
 import * as THREE from '../three.js';
 import { rot, clamp } from '../core/util.js';
-import { waveHeight } from './ocean.js';
+import { waveHeight, sea } from './ocean.js';
 
 const FIXED_STEP = 1 / 60;
 const SIM_R2 = 70 * 70; // raio (m²) em volta dos jogadores/jangada onde os destroços são simulados
@@ -549,6 +549,24 @@ export class Physics {
     }
   }
 
+  // Destroço dormindo (longe de todos) não simula, mas acompanha o nível do mar de forma barata:
+  // boia na altura da água ou, com o mar seco, desce até o fundo — antes ficava parado no ar.
+  _settleFrozen(record, dt) {
+    const obj = record.obj, b = record.body, world = this.G.world;
+    if (!world || (obj.placed && !obj.placedOnWater)) return;
+    record.settleAcc = (record.settleAcc || 0) + dt;
+    if (record.settleAcc < 0.2) return;
+    const step = record.settleAcc; record.settleAcc = 0;
+    const half = record.size.y * 0.5, floor = world.seabedHeight(b.position.x, b.position.z) + half;
+    const sinks = obj.def && obj.def.sinks;
+    const rest = sinks ? floor : Math.max(floor, sea.level - half * 0.4);
+    const dy = rest - b.position.y;
+    if (Math.abs(dy) < 0.02) return;
+    b.position.y += Math.sign(dy) * Math.min(Math.abs(dy), 6 * step);
+    b.aabbNeedsUpdate = true;
+    this._syncMesh(record);
+  }
+
   update(dt, t) {
     // Destroços longe de todos (> 70 m) dormem: não flutuam, não colidem, não custam nada.
     const G = this.G, pp = G.player && G.player.body.pos, others = G.net ? [...G.net.remotes.values()] : [];
@@ -564,6 +582,7 @@ export class Physics {
       if (!record.holdTarget && !record.kinematic && !near(b.position.x, b.position.z)) {
         if (b.sleepState !== CANNON.Body.SLEEPING) b.sleep();
         record.frozen = true;
+        this._settleFrozen(record, dt);
         continue;
       }
       if (record.frozen) { record.frozen = false; b.wakeUp(); }

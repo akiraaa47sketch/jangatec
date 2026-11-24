@@ -103,12 +103,15 @@ export const DEBRIS = [
   { nome: 'Boia', w: 1, real: true, pieceType: 'bloco', size: [1.1, 1.1, 1.1], make: () => { const g = new THREE.Group(); const b = new THREE.Mesh(new THREE.SphereGeometry(0.55, 16, 12), M(0xf07a1e, { roughness: 0.6 })); g.add(b); const band = new THREE.Mesh(new THREE.TorusGeometry(0.55, 0.045, 6, 20), M(0xf3efe6)); band.rotation.x = Math.PI / 2; g.add(band); return g; } },
   { nome: 'Palete', w: 2, real: true, pieceType: 'piso', size: [1.6, 0.2, 1.3], make: (r) => { const g = new THREE.Group(), m = plankMat(WOOD[(r() * 4) | 0]); for (let i = -2; i <= 2; i++) { const s = box(1.6, 0.04, 0.2, m); s.position.set(0, 0.08, i * 0.27); g.add(s); } for (const x of [-0.7, 0, 0.7]) { const run = box(0.14, 0.13, 1.3, plankMat(WOOD[3])); run.position.set(x, -0.03, 0); g.add(run); } return g; } },
 ];
-// Paredes, vigas, guarda-corpo e escada um pouquinho maiores (+8%): colisão e modelo crescem juntos.
+// Paredes bem maiores (largura × 1,45, altura × 1,35); vigas, guarda-corpo e escada +8%.
+// Colisão e modelo crescem juntos (escala no modelo + size).
+const WALL_TYPES = ['parede', 'parede_plastico', 'parede_ferro'];
 for (const d of DEBRIS) {
-  if (!['parede', 'parede_plastico', 'parede_ferro', 'suporte', 'escada'].includes(d.pieceType)) continue;
-  const k = 1.08, make = d.make;
-  d.size = d.size.map((v) => v * k);
-  d.make = (r) => { const g = new THREE.Group(), m = make(r); m.scale.multiplyScalar(k); g.add(m); return g; };
+  if (![...WALL_TYPES, 'suporte', 'escada'].includes(d.pieceType)) continue;
+  const wall = WALL_TYPES.includes(d.pieceType) && d.nome !== 'Guarda-corpo';
+  const k = wall ? [1.45, 1.35, 1.15] : [1.08, 1.08, 1.08], make = d.make;
+  d.size = d.size.map((v, i) => v * k[i]);
+  d.make = (r) => { const g = new THREE.Group(), m = make(r); m.scale.set(k[0], k[1], k[2]); g.add(m); return g; };
 }
 const DEBRIS_W = DEBRIS.reduce((s, d) => s + d.w, 0);
 // Props que vêm do loot (não aparecem soltos no mar): carregue e solde na jangada como qualquer peça.
@@ -238,7 +241,7 @@ export class World {
         if (starterIsland) this.addStarterDeckParts(ch);
       }
     }
-    const n = 4 + ((r() * 4) | 0);
+    const n = 1 + ((r() * 3) | 0); // mar escasso: 1–3 destroços por chunk (era 4–7)
     ch.seabed = makeSeabedChunk(this.seed, cx, cz);
     { const terrain = ch.seabed.children[0]; bakeStatic(ch.seabed, { keep: (o) => o === terrain }); }
     ch.seabed.traverse((o) => { if (o.isMesh) patchVortexDip(o.material); }); // fundo afunda sob o redemoinho

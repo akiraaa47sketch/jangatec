@@ -130,7 +130,7 @@ export class Events {
     if (G.enemies.list.some((e) => e.pirate && e.state !== 'dead')) { this.timer = 15; return; }
     if (G.naval && G.naval.active) { this.timer = 30; return; } // nada de onda/furacão no meio da batalha naval
     const tide = G.startup.tide.state; // só com o mar cheio e longe da próxima seca
-    if (G.startup.waterLevel < 0.5 || (tide && (tide.phase.id === 'seco' || tide.nextIn < 75))) { this.timer = 15; return; }
+    if (G.startup.waterLevel < 0.5 || (tide && (tide.phase.id === 'seco' || tide.nextIn < 50))) { this.timer = 15; return; }
     // quase nunca repete o mesmo tipo em seguida; às vezes o mar simplesmente fica quieto
     if (Math.random() < 0.18) { this.timer = between([90, 200]); return; }
     // chefes do mar (kraken, navio-fantasma) só do meio da rota em diante

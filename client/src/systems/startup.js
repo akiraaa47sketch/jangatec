@@ -9,6 +9,8 @@ const CALM_DURATION = 7;
 const STORM_DURATION = 13;
 const FLOOD_DURATION = 34;
 const FLOOD_LEVEL = 0.9;
+const CLOCK_WRAP = 100000;
+const clockNow = () => (Date.now() / 1000) % CLOCK_WRAP; // o mesmo relógio comum de main.js
 
 export class Startup {
   constructor(G, { sun, hemisphere }) {
@@ -23,6 +25,7 @@ export class Startup {
     this.syncTimer = 0;
     this.floodTier = null;
     this.departT = 0;
+    this.departAt = null; // relógio comum no momento da partida (a maré conta a partir dele)
     this.tide = new Tide(G);
     this.clearSky = new THREE.Color(0x9fd3ee);
     this.stormSky = new THREE.Color(0x536273);
@@ -33,6 +36,12 @@ export class Startup {
   }
 
   get departed() { return this.phase === 'depart'; }
+
+  // segundos desde a partida no relógio comum (que dá a volta em 100000 s)
+  sinceDepart(t) {
+    if (this.departAt === null) return 0;
+    return (((t - this.departAt) % CLOCK_WRAP) + CLOCK_WRAP) % CLOCK_WRAP;
+  }
 
   _makeClouds() {
     const material = new THREE.MeshStandardMaterial({
@@ -99,6 +108,7 @@ export class Startup {
     if (this.phase === phase) return;
     this.phase = phase;
     this.elapsed = 0;
+    if (phase === 'depart') this.departAt = clockNow();
     if (message) this.G.hud.msg(message);
   }
 
@@ -123,6 +133,7 @@ export class Startup {
     if (!state || !PHASES.has(state.phase)) return;
     this.phase = state.phase;
     this.elapsed = Number.isFinite(state.elapsed) ? Math.max(0, state.elapsed) : 0;
+    if (Number.isFinite(state.departAt)) this.departAt = state.departAt;
     if (state.phase !== 'depart' || this.phase !== 'depart') {
       this.waterLevel = Number.isFinite(state.waterLevel) ? clamp(state.waterLevel, 0, FLOOD_LEVEL) : 0;
     }
@@ -146,6 +157,7 @@ export class Startup {
       phase: this.phase,
       elapsed: this.elapsed,
       waterLevel: this.waterLevel,
+      departAt: this.departAt,
       sailInstalled: this.G.boat.sailInstalled,
       sailUp: this.G.boat.sailUp,
       anchor: this.anchor ? [this.anchor.x, this.anchor.z] : [0, 0],
@@ -195,7 +207,10 @@ export class Startup {
     }
 
     // Depois da partida a maré segue o ciclo (calculado localmente pelo relógio comum).
-    if (this.departed) this.waterLevel = this.tide.level(t, dt, FLOOD_LEVEL);
+    if (this.departed) {
+      if (this.departAt === null) this.departAt = t;
+      this.waterLevel = this.tide.level(this.sinceDepart(t), dt, FLOOD_LEVEL);
+    }
     sea.level = this.waterLevel;
     this.G.world.updateFloodLevel(this.waterLevel);
     // Depois da partida o céu abre aos poucos (mar mais calmo = eventos se destacam).

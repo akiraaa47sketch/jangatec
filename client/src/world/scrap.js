@@ -68,7 +68,7 @@ export function mats() {
 export function buildScrapCamp(ctx) {
   const m = mats(), { group, set, TOP, r } = ctx;
   const P = (lx, lz) => { const [x, z] = rot(lx, lz, ctx.yaw); return [ctx.cx + x, ctx.cz + z]; };
-  const rooms = [], towers = [], spawns = [];
+  const rooms = [], towers = [], spawns = [], ladders = [];
   const pick = (list) => list[(r() * list.length) | 0];
   const boxG = (w, h, l) => new THREE.BoxGeometry(w, h, l);
   // sólido visível + colisor (bloqueia tiro e visão)
@@ -196,7 +196,9 @@ export function buildScrapCamp(ctx) {
     }
     // plataforma e parapeito blindado de chapas
     part(new THREE.Mesh(boxG(2 * S + 0.6, 0.12, 2 * S + 0.6), m.rust), 0, top + 0.06, 0);
-    for (const [px, pz, w, l] of [[0, S + 0.28, 2 * S + 0.6, 0.06], [0, -S - 0.28, 2 * S + 0.6, 0.06], [S + 0.28, 0, 0.06, 2 * S + 0.6], [-S - 0.28, 0, 0.06, 2 * S + 0.6]]) {
+    // do lado da escada (-z) o parapeito tem um vão para entrar na plataforma
+    const W2 = 2 * S + 0.6, gap = 1.0, sideW = (W2 - gap) / 2;
+    for (const [px, pz, w, l] of [[0, S + 0.28, W2, 0.06], [S + 0.28, 0, 0.06, W2], [-S - 0.28, 0, 0.06, W2], [-(gap + sideW) / 2, -S - 0.28, sideW, 0.06], [(gap + sideW) / 2, -S - 0.28, sideW, 0.06]]) {
       part(new THREE.Mesh(boxG(w, 0.95, l), pick(m.sheets)), px, top + 0.6, pz);
     }
     // morteiro: tubo inclinado sobre base
@@ -205,9 +207,11 @@ export function buildScrapCamp(ctx) {
     const base = new THREE.Mesh(boxG(0.4, 0.06, 0.4), m.dark); mortar.add(base);
     for (const s of [-1, 1]) { const leg = new THREE.Mesh(new THREE.CylinderGeometry(0.02, 0.02, 0.5, 5), m.dark); leg.position.set(s * 0.13, 0.2, 0.38); leg.rotation.x = 0.5; mortar.add(leg); }
     mortar.position.set(0.35, top + 0.12, 0.2); tg.add(mortar); meshes.push(mortar);
-    // escada (decorativa) e caixa de munição
-    const ammo = part(new THREE.Mesh(boxG(0.5, 0.3, 0.35), m.containerRed), -0.5, top + 0.27, -0.45); void ammo;
+    // escada de verdade (sobe com W) e caixa de munição
+    const ammo = part(new THREE.Mesh(boxG(0.5, 0.3, 0.35), m.containerRed), 0.5, top + 0.27, 0.45); void ammo;
     for (let i = 0; i < 9; i++) part(new THREE.Mesh(boxG(0.5, 0.04, 0.04), m.pipe), 0, 0.4 + i * 0.7, -S - 0.05);
+    for (const sx of [-0.27, 0.27]) part(new THREE.Mesh(new THREE.CylinderGeometry(0.03, 0.03, top + 0.9, 5), m.pipe), sx, (top + 0.9) / 2, -S - 0.05);
+    { const [ox, oz] = rot(0, -S - 0.3, ctx.yaw); ladders.push({ x: wx + ox, z: wz + oz, top: top + 0.14, yaw: ctx.yaw, dir: -1, towerId: id }); }
     // colisores: pernas, plataforma e parapeitos (no espaço da ilha)
     const add = (lx2, y, lz2, hx, hy, hz, type = 'box') => {
       const [ox, oz] = rot(lx2, lz2, ctx.yaw), it = { type, x: wx + ox, y: TOP + y, z: wz + oz, hx, hy, hz, yaw: ctx.yaw };
@@ -215,7 +219,8 @@ export function buildScrapCamp(ctx) {
     };
     for (const sx of [-S, S]) for (const sz of [-S, S]) add(sx, (top + 0.1) / 2, sz, 0.09, (top + 0.1) / 2, 0.09, 'cyl');
     add(0, top + 0.06, 0, S + 0.3, 0.06, S + 0.3);
-    add(0, top + 0.6, S + 0.28, S + 0.3, 0.48, 0.05); add(0, top + 0.6, -S - 0.28, S + 0.3, 0.48, 0.05);
+    add(0, top + 0.6, S + 0.28, S + 0.3, 0.48, 0.05);
+    add(-(gap + sideW) / 2, top + 0.6, -S - 0.28, sideW / 2, 0.48, 0.05); add((gap + sideW) / 2, top + 0.6, -S - 0.28, sideW / 2, 0.48, 0.05);
     add(S + 0.28, top + 0.6, 0, 0.05, 0.48, S + 0.3); add(-S - 0.28, top + 0.6, 0, 0.05, 0.48, S + 0.3);
     // pernas também servem de alvo para os tiros (raycast)
     const solids = [];
@@ -225,5 +230,5 @@ export function buildScrapCamp(ctx) {
   // ---------- tralha: tambores, pneus, sucata ----------
   drum(5.2, 0.6); drum(5.6, -0.1); drum(-5.4, -0.4); tires(-5.1, 1.2); tires(1.8, -5.5);
   for (let i = 0; i < 5; i++) { const junk = new THREE.Mesh(boxG(0.6 + r(), 0.05, 0.5 + r()), pick(m.sheets)); junk.rotation.set(r() * 0.5, r() * 6, r() * 0.5); decor(junk, (r() - 0.5) * 9, 0.08, (r() - 0.5) * 8); }
-  return { rooms, towers, spawns, crateSpots: [P(-2.6 - 2.0, -3.6)], yard: P(0, 1.2), fire: P(0, 1.2) };
+  return { rooms, towers, spawns, ladders, crateSpots: [P(-2.6 - 2.0, -3.6)], yard: P(0, 1.2), fire: P(0, 1.2) };
 }

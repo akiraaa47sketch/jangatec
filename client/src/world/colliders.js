@@ -160,3 +160,35 @@ export function boxesOverlap(a, b, m = 0) {
   }
   return true;
 }
+
+// Colisor de uma caixa girada em QUALQUER eixo (Euler 'YXZ': yaw, rotX, rotZ — a mesma ordem das
+// peças). Os colisores só giram em Y, então uma peça tombada (parede deitada, tábua em pé…) vira a
+// caixa alinhada ao seu eixo mais vertical que a envolve. Sem inclinação, devolve a caixa original.
+export function orientedBox(x, y, z, hx, hy, hz, yaw = 0, rotX = 0, rotZ = 0, type = 'box') {
+  const tilt = (a) => { const m = Math.abs(a) % Math.PI; return Math.min(m, Math.PI - m); };
+  if (tilt(rotX) < 0.02 && tilt(rotZ) < 0.02 && (type !== 'ramp' || (Math.abs(rotX) < 0.02 && Math.abs(rotZ) < 0.02))) {
+    // 180° em X/Z (de cabeça para baixo) mantém a mesma caixa; rampa só sem giro
+    return { type: type === 'cyl' ? 'cyl' : type, x, y, z, hx, hy, hz, yaw };
+  }
+  // eixos locais da caixa no espaço do pai: R = Ry(yaw)·Rx(rotX)·Rz(rotZ)
+  const cy = Math.cos(yaw), sy = Math.sin(yaw), cx = Math.cos(rotX), sx = Math.sin(rotX), cz = Math.cos(rotZ), sz = Math.sin(rotZ);
+  const R = [
+    [cy * cz + sy * sx * sz, -cy * sz + sy * sx * cz, sy * cx],
+    [cx * sz, cx * cz, -sx],
+    [-sy * cz + cy * sx * sz, sy * sz + cy * sx * cz, cy * cx],
+  ];
+  const axes = [0, 1, 2].map((i) => [R[0][i], R[1][i], R[2][i]]);
+  const half = [hx, hy, hz];
+  // eixo mais vertical = "altura"; dos outros dois, o de maior projeção horizontal define o yaw
+  let up = 0; for (let i = 1; i < 3; i++) if (Math.abs(axes[i][1]) > Math.abs(axes[up][1])) up = i;
+  let ref = -1, best = -1;
+  for (let i = 0; i < 3; i++) {
+    if (i === up) continue;
+    const hl = Math.hypot(axes[i][0], axes[i][2]) * half[i];
+    if (hl > best) { best = hl; ref = i; }
+  }
+  const a = Math.atan2(-axes[ref][2], axes[ref][0]); // eixo local X do colisor = (cos a, -sin a)
+  const ex = [Math.cos(a), 0, -Math.sin(a)], ez = [Math.sin(a), 0, Math.cos(a)];
+  const proj = (e) => axes.reduce((acc, v, i) => acc + Math.abs(v[0] * e[0] + v[1] * e[1] + v[2] * e[2]) * half[i], 0);
+  return { type: 'box', x, y, z, hx: proj(ex), hy: proj([0, 1, 0]), hz: proj(ez), yaw: a };
+}

@@ -501,12 +501,13 @@ export class Enemies {
   // ---------- piratas no seco ----------
   isDry(x, z) { return sea.level < this.G.world.seabedHeight(x, z) + 0.3; }
   // Pirata vira "andarilho": anda pelo fundo seco atrás dos jogadores (IA de terra numa arena de areia).
-  toLand(e, x = e.body.pos.x, z = e.body.pos.z) {
-    const G = this.G, gy = G.world.seabedHeight(x, z);
+  // keepY: caiu da jangada — continua caindo de onde está (gravidade), sem pular para o chão
+  toLand(e, x = e.body.pos.x, z = e.body.pos.z, keepY = false) {
+    const G = this.G, gy = G.world.seabedHeight(x, z), fromY = e.body.pos.y;
     this._removeRaft(e); this._removeHook(e);
     e.pirate = false; e.walker = true; e.ship = null; e.grapple = null;
     e.isl = { id: `seco-${e.id}`, x, z, R: 90, rooms: [], enemies: [], minY: gy - 6, set: { y: gy - 0.6 } };
-    e.body.pos.set(x, gy + 0.4, z); e.body.vel.set(0, 0, 0); e.body.grounded = false; e.body.groundSet = null;
+    e.body.pos.set(x, keepY ? Math.max(fromY, gy) : gy + 0.4, z); e.body.vel.set(0, keepY ? e.body.vel.y : 0, 0); e.body.grounded = false; e.body.groundSet = null;
     e.mesh.rotation.set(0, e.yaw, 0);
     e.state = 'chase'; e.timer = 0; e.cd = 0.5; e.m = { state: 'idle', t: 0 };
   }
@@ -522,8 +523,11 @@ export class Enemies {
     const G = this.G, boat = G.boat, p = e.body.pos;
     if (!this.isDry(p.x, p.z)) { this.toSea(e); return true; }
     const T = e.tgt;
-    if (T && T.aboard && Math.hypot(boat.x - p.x, boat.z - p.z) < boat.set.radius + 5) {
-      e.walker = false; e.pirate = true; e.isl = null; this._startPirateGrapple(e); return true;
+    const bd = Math.hypot(boat.x - p.x, boat.z - p.z);
+    if (T && T.aboard && bd < boat.set.radius + 5) {
+      // colado na jangada: pula e escala a borda (parkour); mais longe: lança o gancho
+      e.walker = false; e.pirate = true; e.isl = null;
+      this._startPirateGrapple(e, this._findPirateLanding(p, boat), bd < boat.set.radius + 2); return true;
     }
     return false;
   }
@@ -670,7 +674,8 @@ export class Enemies {
     return best;
   }
 
-  _startPirateGrapple(e, landing = this._findPirateLanding(e.body.pos, this.G.boat)) {
+  // parkour = pulo curto até a borda da jangada (sem gancho), usado por quem está a pé ao lado dela
+  _startPirateGrapple(e, landing = this._findPirateLanding(e.body.pos, this.G.boat), parkour = false) {
     const boat = this.G.boat, p = e.body.pos;
     const [lx, lz] = boat.toLocal(p.x, p.z);
     const length = Math.hypot(lx, lz) || 1;
@@ -681,9 +686,11 @@ export class Enemies {
         ? { x: landing.x, z: landing.z, y: landing.y }
         : { x: lx / length * targetRadius, z: lz / length * targetRadius, y: 0.3 },
       elapsed: 0,
-      duration: 0.72,
+      duration: parkour ? 0.55 : 0.72,
+      arc: parkour ? 1.1 : 2.4,
     };
     e.state = 'grapple';
+    if (parkour) return; // sem corda nem gancho
 
     const positions = new Float32Array(6);
     const geometry = new THREE.BufferGeometry();
@@ -781,7 +788,7 @@ export class Enemies {
       const targetY = boat.set.y + action.local.y;
       p.set(
         action.from.x + (x - action.from.x) * progress,
-        action.from.y + (targetY - action.from.y) * progress + Math.sin(progress * Math.PI) * 2.4,
+        action.from.y + (targetY - action.from.y) * progress + Math.sin(progress * Math.PI) * (action.arc ?? 2.4),
         action.from.z + (z - action.from.z) * progress
       );
       this._updateHookVisual(e, progress);
@@ -834,6 +841,16 @@ export class Enemies {
         if (d > 0.001 && d < 1.2) { e.local.x += ox / d * (1.2 - d) * 3 * dt; e.local.z += oz / d * (1.2 - d) * 3 * dt; }
       }
     }
+    // Barreira invisível (só para piratas): com água embaixo, não saem do convés — antes caíam com
+    // o empurrão e "teleportavam" para uma balsa nova. Com o mar seco podem cair e voltar a pé.
+    if (!this.isDry(boat.x, boat.z)) {
+      if (this._deckUnder(e.local.x, e.local.z, e.local.y)) e.safeLocal = { x: e.local.x, z: e.local.z };
+      else {
+        if (e.safeLocal) { e.local.x = e.safeLocal.x; e.local.z = e.safeLocal.z; }
+        else { e.local.x *= 0.9; e.local.z *= 0.9; }
+        e.knock = null;
+      }
+    }
     const [x, z] = boat.toWorld(e.local.x, e.local.z);
     const previousY = p.y;
     p.set(x, boat.set.y + e.local.y, z);
@@ -843,7 +860,7 @@ export class Enemies {
     [e.local.x, e.local.z] = boat.toLocal(p.x, p.z);
     e.local.y = p.y - boat.set.y;
     if (p.y < boat.set.y - 0.5) {
-      if (this.isDry(p.x, p.z)) { this.toLand(e); return; } // caiu no fundo seco: anda a pé
+      if (this.isDry(p.x, p.z)) { this.toLand(e, p.x, p.z, true); return; } // caiu no fundo seco: anda a pé
       e.state = 'approach';
       p.y = G.startup.waterLevel + 0.55;
       b.vel.set(0, 0, 0);
@@ -863,6 +880,19 @@ export class Enemies {
     e.netPose = mres ? mres.pose : 'walk'; e.netProg = mres ? mres.progress || 0 : 0; e.netSpd = dt > 0 ? moved / dt : 0;
     this._animateHit(e, dt);
     if (e.swing > 0) e.swing = Math.max(0, e.swing - dt);
+  }
+
+  // Tem piso da jangada embaixo deste ponto (coordenadas locais do barco; ly = altura dos pés)?
+  _deckUnder(lx, lz, ly, margin = 0.25) {
+    for (const c of this.G.boat.set.items) {
+      let x = lx - c.x, z = lz - c.z;
+      if (c.yaw) [x, z] = rot(x, z, -c.yaw);
+      if (c.type === 'cyl') { if (Math.hypot(x, z) > c.hx) continue; }
+      else if (Math.abs(x) > c.hx - margin || Math.abs(z) > c.hz - margin) continue;
+      const top = c.y + c.hy;
+      if (top <= ly + 0.6 && top >= ly - 1.5) return true;
+    }
+    return false;
   }
 
   // Linha de visão do olho do inimigo até o peito do jogador (paredes, troncos, terreno bloqueiam)

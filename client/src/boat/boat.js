@@ -6,6 +6,7 @@
 import * as THREE from '../three.js';
 import { rot, clamp, lerpAngle } from '../core/util.js';
 import { CFG } from '../config.js';
+import { orientedBox } from '../world/colliders.js';
 import { sea, waveHeight } from '../world/ocean.js';
 import { PIECES, STARTER_PLATFORM_SIZE, makePieceMesh } from './pieces.js';
 import { woodTexture, woodBump, metalTexture, clothTexture, repeated } from '../world/textures.js';
@@ -122,7 +123,7 @@ export class Boat {
     mesh.rotation.order = 'YXZ';
     mesh.rotation.set(p.rotX || 0, p.yaw, p.rotZ || 0);
     this.group.add(mesh);
-    const col = { type: def.col || 'box', x: p.x, y: p.y, z: p.z, hx: w / 2, hy: h / 2, hz: l / 2, yaw: p.yaw };
+    const col = orientedBox(p.x, p.y, p.z, w / 2, h / 2, l / 2, p.yaw, p.rotX || 0, p.rotZ || 0, def.col || 'box');
     this.set.items.push(col);
     const piece = {
       ...p, mesh, col,

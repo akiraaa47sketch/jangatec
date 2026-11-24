@@ -4,7 +4,6 @@
 //     AFOGA (sem loot); se você matar, larga um saco com loot.
 // Só o host sorteia e simula (os outros recebem réplicas como qualquer inimigo).
 import { sea } from '../world/ocean.js';
-import { TIDE } from './tide.js';
 
 export const BOSSES = {
   runLength: 1280,      // m até a dificuldade máxima (world.difficulty chega a 4)
@@ -32,7 +31,7 @@ export class Bosses {
     if (!E.auth) return;
     const st = G.startup.tide.state;
     if (!st || st.phase.id !== 'seco' || st.changing || st.nextIn < 40) return;
-    const cycle = Math.floor(t / TIDE.period);
+    const cycle = st.cycle;
     if (this.cycle === cycle) return;
     this.cycle = cycle; // uma tentativa por seca
     if (G.events.current || (G.naval && G.naval.active)) return;
