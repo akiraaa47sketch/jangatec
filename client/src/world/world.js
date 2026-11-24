@@ -260,6 +260,7 @@ export class World {
       const id = `d${cx},${cz},${i}`;
       if (ch.island && Math.hypot(x - ch.island.x, z - ch.island.z) < ch.island.R + 9) continue;
       if (ch.site && Math.hypot(x - ch.site.x, z - ch.site.z) < 16) continue;
+      if (this.islands.some((isl) => isl.R > 30 && Math.hypot(x - isl.x, z - isl.z) < isl.R + 9)) continue; // complexo militar invade os vizinhos
       this.spawnDebris(ch, id, def, x, z, lr);
     }
     return ch;
@@ -467,7 +468,7 @@ export class World {
     const options = SITES.filter(([t]) => R0 >= (MIN_R[t] || 0) && (t !== 'militar' || lonely)), totalW = options.reduce((a, [, w]) => a + w, 0);
     let siteType = null;
     if (!starterIsland) { let roll = siteRoll * totalW; for (const [t, w] of options) { roll -= w; if (roll <= 0) { siteType = t; break; } } siteType = siteType || options[options.length - 1][0]; }
-    const R = siteType === 'militar' ? 37 : R0; // complexo militar: muralha de 44 m, radomes, antenas — ilha enorme
+    const R = siteType === 'militar' ? 47 : R0; // complexo militar: muralha de 60 m, torre-espiral com a esfera — ilha enorme
     const group = new THREE.Group(); group.position.set(x, islandElevation, z);
     const set = { x, z, yaw: 0, y: islandElevation, radius: R + 8, items: [] };
     const solids = [];
@@ -509,7 +510,7 @@ export class World {
       ? [[-R * 0.78, 0], [R * 0.78, -R * 0.22], [0, R * 0.78]]
       : [];
     // acampamento (cabana ou forte) perto do meio; ruínas ficam longe dele
-    const CAMP_R = { hut: 5, tendas: 5.6, vigia: 6, fort: 7.9, bunker: 6, scrap: 8.6, militar: 33 };
+    const CAMP_R = { hut: 5, tendas: 5.6, vigia: 6, fort: 7.9, bunker: 6, scrap: 8.6, militar: 44 };
     const campR = CAMP_R[siteType] || 5;
     const campA = r() * 6.28, campD = r() * Math.max(0, R - campR - 1.4);
     const campC = [Math.cos(campA) * campD, Math.sin(campA) * campD];
@@ -613,12 +614,12 @@ export class World {
       }
       if (tufts.length) group.add(makeGrassTufts(dec, tufts));
     }
-    let siteCenter = [0, 0], rooms = [], towers = [], spawnSpots = [], ladders = [];
+    let siteCenter = [0, 0], rooms = [], towers = [], spawnSpots = [], ladders = [], bossSpot = null, towerFrame = null;
     let fireRef = null;
     if (!starterIsland) {
       const campCtx = { group, set, addSolid, solidOnly: (m) => solids.push(m), TOP, cx: campC[0], cz: campC[1], yaw: r() * 6.28, r, shared: shared(), id, destroyed: this.collected };
       const camp = siteType === 'scrap' ? buildScrapCamp(campCtx) : buildCamp(siteType, campCtx);
-      siteCenter = camp.yard; rooms = camp.rooms; towers = camp.towers || [];
+      siteCenter = camp.yard; rooms = camp.rooms; towers = camp.towers || []; bossSpot = camp.bossSpot || null; towerFrame = camp.towerFrame || null;
       spawnSpots = (camp.spawns || []).map((p) => (Array.isArray(p) ? { x: p[0], z: p[1], y: 0, high: false } : p));
       ladders = (camp.ladders || []).map((l) => ({ ...l, x: l.x + x, z: l.z + z, y0: islandElevation + TOP, top: islandElevation + TOP + l.top }));
       for (const spot of camp.crateSpots) crates.push(spot);
@@ -647,7 +648,7 @@ export class World {
     }
     const isl = {
       id, x, z, R, diff, group, set, solids, crates: [], enemies: [], palms: palmList,
-      starter: starterIsland, siteType, siteCenter, rooms, towers, spawnSpots, ladders, landLayers, allItems: set.items.slice(),
+      starter: starterIsland, siteType, siteCenter, rooms, towers, spawnSpots, ladders, bossSpot, towerFrame, landLayers, allItems: set.items.slice(),
       maxGround: islandElevation + 0.61, floodTier: null,
       fire: fireRef,
     };

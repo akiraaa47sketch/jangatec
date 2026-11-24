@@ -171,13 +171,15 @@ export class Enemies {
     const spots = (isl.spawnSpots || []).slice();
     for (let i = spots.length - 1; i > 0; i--) { const j = (r() * (i + 1)) | 0; [spots[i], spots[j]] = [spots[j], spots[i]]; }
     const military = isl.siteType === 'militar';
-    if (military) { // prédio: alterna térreo e 1º andar para espalhar pelas salas
-      const hi = spots.filter((p) => p.high), lo = spots.filter((p) => !p.high);
+    if (military) { // salas da torre-espiral: sempre ocupadas; resto (prédio, pátio, torres) alternando térreo/alto
+      const keep = spots.filter((p) => p.keep), hi = spots.filter((p) => !p.keep && p.high), lo = spots.filter((p) => !p.keep && !p.high);
       spots.length = 0;
-      while (hi.length || lo.length) { if (lo.length) spots.push(lo.shift()); if (hi.length) spots.push(hi.shift()); }
+      const rest = [];
+      while (hi.length || lo.length) { if (lo.length) rest.push(lo.shift()); if (hi.length) rest.push(hi.shift()); }
+      spots.push(...keep, ...rest.slice(0, 3 + isl.diff));
     } else spots.sort((a, b) => (b.high ? 1 : 0) - (a.high ? 1 : 0)); // torres primeiro (sempre ocupadas)
     // base militar: um inimigo por ponto (espalhados pelas salas), sem amontoar
-    const count = military ? Math.min(spots.length, 5 + isl.diff) : Math.max(n, Math.min(spots.length, n + 1));
+    const count = military ? spots.length : Math.max(n, Math.min(spots.length, n + 1));
     for (let i = 0; i < count; i++) {
       const id = `${isl.id}e${i}`, sp = spots.length ? spots[i % spots.length] : null;
       let type = pool[(r() * pool.length) | 0];
@@ -192,12 +194,19 @@ export class Enemies {
       }
       if (G.world.collected.has(id)) continue;
       const e = this.spawn(id, type, isl, isl.x + lx, isl.z + lz);
-      if (sp && sp.high && i < spots.length) { e.body.pos.y = isl.set.y + 0.55 + sp.y + 0.1; e.post = true; } // fica no posto
+      if (sp && sp.keep) { // sala da torre-espiral: nasce na altura da sala e não sai dela
+        e.body.pos.y = isl.set.y + 0.55 + sp.y + 0.3;
+        if (sp.zone) e.zone = { ...sp.zone, x: isl.x + sp.zone.x, z: isl.z + sp.zone.z };
+      } else if (sp && sp.high && i < spots.length) { e.body.pos.y = isl.set.y + 0.55 + sp.y + 0.1; e.post = true; } // fica no posto
       e.yaw = r() * 6.28;
     }
     // base militar: o chefe com a minigun fica no pátio
     // chefe forte: só nas bases militares do meio/fim da rota (dificuldade 2+) e nem sempre
-    if (military && isl.diff >= 2 && r() < 0.6 && !G.world.collected.has(`${isl.id}boss`)) {
+    if (military && isl.bossSpot && !G.world.collected.has(`${isl.id}boss`)) { // dentro da esfera, no alto da torre-espiral
+      const sp = isl.bossSpot, b = this.spawn(`${isl.id}boss`, 'metralhador', isl, isl.x + sp.x, isl.z + sp.z);
+      b.body.pos.y = isl.set.y + 0.55 + sp.y + 0.3; b.yaw = r() * 6.28;
+      b.zone = { x: isl.x + sp.x, z: isl.z + sp.z, yaw: 0, hw: 9, hd: 6 };
+    } else if (military && isl.diff >= 2 && r() < 0.6 && !G.world.collected.has(`${isl.id}boss`)) {
       const b = this.spawn(`${isl.id}boss`, 'metralhador', isl, isl.x + isl.siteCenter[0], isl.z + isl.siteCenter[1]);
       b.yaw = r() * 6.28;
     }
@@ -1018,8 +1027,9 @@ export class Enemies {
         if (alive && ((dist < sight && e.los && facing > FOV_COS) || dist < HEAR)) { this.alert(e); break; }
         if (e.state === 'patrol') { if (!e.goal || Math.hypot(e.goal[0] - e.body.pos.x, e.goal[1] - e.body.pos.z) < 1) { e.state = 'idle'; e.timer = 2 + Math.random() * 3; } }
         else if (e.timer <= 0 && !e.post) {
-          const a = Math.random() * 6.28, d = Math.random() * (e.isl.R - 2);
-          e.goal = [e.isl.x + Math.cos(a) * d, e.isl.z + Math.sin(a) * d]; e.state = 'patrol';
+          if (e.zone) { const zn = e.zone, [gx, gz] = rot((Math.random() * 2 - 1) * zn.hw, (Math.random() * 2 - 1) * zn.hd, zn.yaw); e.goal = [zn.x + gx, zn.z + gz]; }
+          else { const a = Math.random() * 6.28, d = Math.random() * (e.isl.R - 2); e.goal = [e.isl.x + Math.cos(a) * d, e.isl.z + Math.sin(a) * d]; }
+          e.state = 'patrol';
         } else if (e.post && e.timer <= 0) { e.timer = 2 + Math.random() * 3; e.lookYaw = Math.random() * 6.28; } // vigia olhando em volta
         break;
       }
@@ -1126,6 +1136,13 @@ export class Enemies {
       const icx = e.isl.cx ?? e.isl.x, icz = e.isl.cz ?? e.isl.z; // estruturas do mar: presos na sala/pontão
       const ix = p.x - icx, iz = p.z - icz, il = Math.hypot(ix, iz), maxR = e.isl.R - 0.6;
       if (il > maxR) { p.x = icx + (ix / il) * maxR; p.z = icz + (iz / il) * maxR; }
+      if (e.zone) { // guarda de sala: persegue, mas não sai do próprio cômodo
+        const zn = e.zone; let [zx, zz] = rot(p.x - zn.x, p.z - zn.z, -zn.yaw);
+        if (Math.abs(zx) > zn.hw || Math.abs(zz) > zn.hd) {
+          zx = clamp(zx, -zn.hw, zn.hw); zz = clamp(zz, -zn.hd, zn.hd);
+          const [wx, wz] = rot(zx, zz, zn.yaw); p.x = zn.x + wx; p.z = zn.z + wz;
+        }
+      }
       G.colliders.resolve(b, prevY);
       if (p.y < (e.isl.minY ?? -3)) { p.y = (e.isl.minY != null ? e.isl.set.y + 1 : 1.5); b.vel.y = 0; }
 
