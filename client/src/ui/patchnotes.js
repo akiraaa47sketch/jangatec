@@ -5,103 +5,27 @@
 // Nos textos, **assim** vira negrito.
 export const PATCH_NOTES = [
   {
-    id: '0.23', versao: 'v0.23', data: '24/11/2026', titulo: '30 ilhas diferentes e ilhas de verdade',
+    id: '0.16', versao: 'v0.16', data: '24/11/2026', titulo: 'BIG UPDATE: Zonas, Leviatã, Twins e 30 ilhas novas',
     destaques: [
-      { tag: 'Ilhas', titulo: 'Morro no lugar dos discos', texto: 'As ilhas agora são um **morro contínuo**: platô plano no alto, dunas na beira e uma **encosta suave até o fundo do mar**. Cada uma tem um **formato próprio** (alongada, com lóbulos, rochosa). Na **seca dá para subir a pé** da areia até o topo.' },
-      { tag: 'Mundo', titulo: '10 modelos por zona', texto: 'Cada zona tem **10 tipos de ilha** com construções, cômodos e tamanhos diferentes — farol, navio encalhado, taverna, vila, Ilha da Caveira, bateria de canhões, radar, heliponto, quartel, contêineres, trincheiras, artilharia, OVNI, observatório, criogenia, reator, monólito e mais.' },
-      { tag: 'Zona Pirata', titulo: 'Tralha no meio do mar', texto: '**Torres de tralha** e **barracos de sucata sobre palafitas** aparecem fora d\'água na zona pirata, com **poucos inimigos** (1–2) e um caixote de loot.' },
+      { tag: 'Mundo', titulo: 'Três zonas e 30 ilhas', texto: '**Zona Pirata** (fácil), **Zona Militar** (médio) e **Zona 51** (difícil), cada uma com **10 modelos de ilha** — construções, cômodos, tamanhos, cores e inimigos próprios. As ilhas agora são **morros de verdade**: dá para **subir a pé na seca** e a jangada **desvia sozinha** em vez de atolar.' },
+      { tag: 'Fim da jornada', titulo: 'Plataforma Leviatã', texto: 'O SOS leva a uma **plataforma gigantesca de 4 andares** (topo a 53 m da água). Cada andar tem um **chefe com tema e habilidades próprias**; a escada do próximo andar só abre quando ele cai.' },
+      { tag: 'Fim de jogo', titulo: 'Coordenadas do abrigo e os Twins', texto: 'Vencida a Leviatã, o rádio revela **o abrigo**: navegação **360°**, marcador na tela e o mar **não seca mais**. No caminho, **dois navios lendários** cercam a jangada pelos dois lados — afunde os dois para atracar.' },
+      { tag: 'Batalha naval', titulo: 'Navio pirata invadível', texto: 'Navios com **colisão de verdade**: anda no convés, sobe pelas **escadas de corda** e o navio te leva junto. O de abordagem **encosta e baixa uma prancha**. Novo **canhão de ferro** e canhão improvisado bem mais cedo.' },
+      { tag: 'Inimigos', titulo: 'Estilo e chefes furiosos', texto: 'Roupas e acessórios com **variações por tipo**, 4 inimigos novos na Zona 51, chefes com **mira preditiva**, **fúria abaixo de 50%** e combos. Efeitos de acerto, estouro e poeira por toda parte.' },
+      { tag: 'Mar', titulo: 'Mar bem mais movimentado', texto: 'Eventos **a cada ~1–2 min**, tempestade com **ondas de 7–11 m**, seca de **55 s** e, na zona pirata, **torres de tralha e barracos de sucata** no meio do mar.' },
     ],
     secoes: [
-      { icone: '🏝', nome: 'Zona Pirata (fácil)', itens: ['**Ilha da Cabana**, **Acampamento Pirata**, **Vila dos Piratas** (3 casebres, poço, varal, canoa), **Taverna do Caolho** (salão com balcão e mesas lá fora).', '**Rochedo do Farol** (dá para subir na galeria), **Praia do Naufrágio** (casco encalhado com rombo para entrar), **Ilha da Caveira** (rocha-caveira, cova do tesouro, totens).', '**Forte de Troncos**, **Bateria de Canhões** e **Forte de Sucata** (só depois do comecinho).'] },
-      { icone: '🪖', nome: 'Zona Militar (médio)', itens: ['**Posto de Vigia**, **Bunker Costeiro**, **Estação de Radar**, **Heliponto** (helicóptero estacionado), **Quartel** (alojamento com beliches + escritório).', '**Depósito de Munição** (contêineres para entrar), **Linha de Trincheiras** (ninho de metralhadora), **Posto de Artilharia** (obuseiro sob rede de camuflagem), **Torre de Comunicações** e a **Base Militar** gigante.'] },
-      { icone: '👽', nome: 'Zona 51 (difícil)', itens: ['**Laboratório Secreto**, **Cratera do OVNI**, **Observatório** (cúpula e telescópio), **Centro de Criogenia** (cápsulas com gente congelada), **Campo de Antenas**.', '**Reator Experimental** (núcleo verde e torres de resfriamento), **Zona de Quarentena**, **Campo do Monólito** (agroglifo e a van dos agentes), **Bunker Restrito** e a **Base da Zona 51**.'] },
-      { icone: '⛵', nome: 'Jangada', itens: ['A jangada **desvia aos poucos** da ilha antes de chegar no raso — escorrega para o lado em vez de atolar ou enroscar.', 'Parada perto da praia ela não é empurrada (dá para descer e nadar).', 'Tralha na praia de cada ilha: troncos, botes virados, barris, ouriços tcheco, placas e cristais.'] },
-    ],
-  },
-  {
-    id: '0.22', versao: 'v0.22', data: '24/11/2026', titulo: 'Mar mais movimentado',
-    secoes: [
-      { icone: '🌊', nome: 'Mais eventos', itens: ['Eventos do mar **bem mais frequentes**: o primeiro em 20–40 s e depois a cada **~1–2 min**.', '"Mar quieto" quase nunca (3%).', '**Seca mais curta: 55 s** (mar cheio continua 2 min 30 s).', 'O **escafandrista** surge assim que a água termina de baixar (quando o sorteio dá certo) — **nunca na primeira seca**.', 'Depois das **coordenadas do abrigo**, o mar **não seca mais**.', '**Kraken e navio-fantasma** já a partir de ~700 m.', '**SOS** com mais chance e até **3 por partida**.'] },
-      { icone: '☠', nome: 'Mais ação', itens: ['Invasões piratas **mais frequentes** (e 60% de chance de navio de abordagem).', 'Batalhas navais **mais cedo e mais seguidas**.', 'Escafandrista aparece em **38%** das secas (até 60% da rota).'] },
-      { icone: '🛠', nome: 'Correções', itens: ['Inimigos **não te perseguem mais através do chão/teto** (Leviatã, torre-espiral, prédios) — só os atiradores de torre atiram para baixo.', 'O alerta de um inimigo não acorda os do andar de cima/baixo.'] },
-    ],
-  },
-  {
-    id: '0.21', versao: 'v0.21', data: '24/11/2026', titulo: 'Três zonas: Pirata, Militar e Zona 51',
-    destaques: [
-      { tag: 'Mundo', titulo: 'O mar agora tem zonas', texto: '**Zona Pirata** (fácil) no começo, **Zona Militar** (médio) no meio e **Zona 51** (difícil) no fim, onde fica a Leviatã. Cada zona tem **ilhas, acampamentos, inimigos e céu próprios**, e um aviso aparece quando você entra numa nova.' },
-      { tag: 'Zona 51', titulo: 'Laboratórios secretos', texto: 'Ilhas cinzentas e sem palmeiras com **laboratórios cercados**, radome, **tanques de contenção brilhando** e um **OVNI caído**. Quem guarda: **agentes** de terno, **cientistas loucos** com bombas de gás, **mutantes** brilhando e **ciborgues** blindados.' },
-    ],
-    secoes: [
-      { icone: '🏴‍☠️', nome: 'Zona Pirata · fácil', itens: ['Até ~1,7 km.', 'Ilhas tropicais: **cabanas, tendas e fortes de tronco**.', 'Piratas, duelistas, pistoleiros e bombardeiros.'] },
-      { icone: '🪖', nome: 'Zona Militar · médio', itens: ['~1,7 a 2,55 km.', 'Ilhas mais secas, poucas palmeiras: **vigias, bunkers e a base militar**.', 'Soldados, escopeteiros, elites e brutamontes.'] },
-      { icone: '👽', nome: 'Zona 51 · difícil', itens: ['A partir de ~2,55 km.', 'Ilhas cinzentas sem palmeiras, **laboratórios secretos** e névoa esverdeada.', '**4 inimigos novos**: Agente, Cientista louco, Mutante e Ciborgue (com variações).', 'A **plataforma Leviatã** (SOS) só aparece aqui.'] },
-      { icone: '🧭', nome: 'Interface', itens: ['**Zona e dificuldade** no topo da tela.', '**Aviso grande** ao entrar numa zona nova.'] },
-    ],
-  },
-  {
-    id: '0.20', versao: 'v0.20', data: '24/11/2026', titulo: 'Inimigos com estilo e chefes furiosos',
-    destaques: [
-      { tag: 'Inimigos', titulo: 'Cada um com a sua roupa', texto: 'Os inimigos agora usam **roupas, chapéus e acessórios** com **variações temáticas por tipo**: bucaneiros com papagaio, grumetes de marinheiro, fuzileiros de boina, atiradores camuflados de capuz, cavalheiros de cartola, catadores de mochila e muito mais.' },
-      { tag: 'Chefes', titulo: 'Fúria e mira esperta', texto: 'Os chefes **miram onde você vai estar** e, abaixo de **50% de vida, ficam enfurecidos**: aura vermelha, habilidades mais rápidas, **combos** e versões mais fortes dos ataques.' },
-    ],
-    secoes: [
-      { icone: '🎭', nome: 'Visual dos inimigos', itens: ['**2 a 4 variações** por tipo (pirata, soldado, duelista, saqueador, atirador, fantasma...).', 'Chapéus novos: **boina** e **capuz**.', 'Coletes táticos, casacos, jalecos, capas, mochilas, bandoleiras e papagaios.'] },
-      { icone: '👑', nome: 'Chefes mais detalhados', itens: ['**Soldador**: avental de couro, ombreiras, mangueira e faíscas no maçarico.', '**Dr. Gás**: jaleco, frascos brilhando e vazamento de gás.', '**Perfurador**: colete refletivo, **broca girando** e fumaça no escapamento.', '**Faísca**: casaco escuro, **arcos elétricos** na bobina e visor piscando.', '**Metralhador**: colete, caixa de munição e fita de balas.', '**Escafandrista**: cilindros de ar, cinto de chumbo e bolhas.'] },
-      { icone: '🧠', nome: 'IA dos chefes', itens: ['**Mira preditiva** nas habilidades de longe.', '**Fúria** abaixo de 50%: maçarico que **varre**, mais poças e raios, mais válvulas, **investida e salto em dobro**, tremor com mais ondas.', '**Combos**: uma habilidade emenda na outra quando furioso.'] },
-      { icone: '✨', nome: 'Efeitos visuais', itens: ['**Faíscas e pedacinhos** da cor do inimigo a cada acerto.', '**Estouro** com clarão e anel quando um inimigo cai.', '**Poeira** na esquiva e nas quedas.', 'Brasas, ondas de choque, raios e anéis em todas as habilidades dos chefes.'] },
-    ],
-  },
-  {
-    id: '0.19', versao: 'v0.19', data: '24/11/2026', titulo: 'Mar bravo e canhão de ferro',
-    destaques: [
-      { tag: 'Evento', titulo: 'Tempestade de ondas gigantescas', texto: 'As ondas desse evento agora têm **7 a 11 m** — maiores que a onda gigante — e vêm com **chuva forte e raios**. A jangada **sobe e desce a montanha inteira** com todo mundo a bordo (acabou o "segure no mastro").' },
-      { tag: 'Multiplayer', titulo: 'Armas dos parceiros', texto: 'Agora você **vê a arma na mão de cada parceiro**, ela troca quando ele troca de arma, some no modo construção e **pisca no tiro**.' },
-    ],
-    secoes: [
-      { icone: '💣', nome: 'Canhões', itens: ['**Canhão improvisado bem mais cedo** (~24% das caixas e ~50% dos naufrágios logo no começo).', 'Novo **canhão de ferro** do meio do jogo: **recarga 4,5 s** e bala **~2× mais forte**.', 'Os Twins agora deixam um canhão de ferro.'] },
-      { icone: '🌊', nome: 'Mar', itens: ['Mar ensolarado **mais agitado**: ondulação maior e mais frequente, jangada balança mais.', 'Ondas grandes **não arrastam** mais ninguém para fora da jangada.'] },
-      { icone: '🪵', nome: 'Destroços', itens: ['**Plataforma 6 × 6** bem menos rara.', 'Um pouco **mais de paredes** boiando.'] },
-      { icone: '👥', nome: 'Multiplayer', itens: ['Modelo da **arma do parceiro** na mão (e o banjo no peito).', '**Clarão** na arma do parceiro quando ele atira.'] },
-    ],
-  },
-  {
-    id: '0.18', versao: 'v0.18', data: '24/11/2026', titulo: 'Rumo ao abrigo: os Twins',
-    destaques: [
-      { tag: 'Fim de jogo', titulo: 'Coordenadas do abrigo', texto: 'Derrubando os quatro chefes da Leviatã, o rádio do topo revela **as coordenadas de um abrigo**. A jangada ganha **navegação 360°** (a vela vira o leme) e um **marcador no topo da tela** mostra direção e distância.' },
-      { tag: 'Chefe naval', titulo: 'Os Twins', texto: 'Perto do abrigo, **dois navios lendários** fecham o caminho. Eles **cercam a jangada pelos dois lados** e disparam **bordadas juntos**; enquanto trocam de posição, atacam com **morteiro**. Afunde os dois para poder atracar.' },
-    ],
-    secoes: [
-      { icone: '⚓', nome: 'Os Twins', itens: ['**Twin Rubro** e **Twin Abissal**: velas brilhando, casco escuro com friso dourado.', 'Tentam ficar **em lados opostos** da jangada; trocam de posição só de tempos em tempos.', 'Reposicionando: **morteiro** (anel vermelho onde vai cair).', 'Em posição: **bordada dupla** sincronizada.', 'Sobrou um? Ele fica **furioso** e ataca mais rápido.', 'Deixam **loot lendário** boiando.'] },
-      { icone: '🧭', nome: 'Navegação', itens: ['**Controle 360°** só no fim de jogo (antes abria sozinho aos 2,1 km).', 'Marcador do **abrigo** com seta e distância.', '**Ilha de resgate** com farol girando, posto de resgate, heliporto e cais.'] },
-      { icone: '💥', nome: 'Efeitos navais', itens: ['Impacto na água com **coluna alta, coroa de borrifo e anel de espuma**.', 'Navios com **esteira e borrifo de proa**.', 'Navio afundando com **explosões e chamas** no convés.', '**Números de dano** quando seu tiro de canhão acerta.', 'Bordada **aderna o navio** com o coice.'] },
-    ],
-  },
-  {
-    id: '0.17', versao: 'v0.17', data: '24/11/2026', titulo: 'Leviatã: quatro andares, quatro chefes',
-    destaques: [
-      { tag: 'Fim da jornada', titulo: 'Plataforma Leviatã', texto: 'O SOS agora leva a uma **plataforma gigantesca de 4 andares** (~82 × 82 m, topo a 53 m da água e torre de perfuração de ~110 m). Cada andar tem um **chefe com tema e habilidades próprias**, e a escada para o próximo andar só abre quando o chefe cai. Derrote os quatro e o arsenal deles é seu.' },
-      { tag: 'Combate', titulo: 'Golpes mais responsivos', texto: 'O golpe agora **puxa você até o inimigo da frente** e acerta mesmo com a mira um pouco fora. O combo **emenda mais rápido** e os cliques guardados não se perdem.' },
-    ],
-    secoes: [
-      { icone: '🔥', nome: '1º andar · O Soldador', itens: ['**Maçarico**: cone de fogo marcado no chão — saia dele.', '**Respingo de solda**: poças de metal derretido que queimam.'] },
-      { icone: '☣', nome: '2º andar · Dr. Gás', itens: ['**Nuvem tóxica**: dói e embaça a vista.', '**Válvulas**: três faixas no chão soltam jatos de gás — fique entre elas.'] },
-      { icone: '⛏', nome: '3º andar · O Perfurador', itens: ['**Investida da broca**: ele dispara pela faixa vermelha.', '**Tremor triplo**: pule as três ondas de choque.'] },
-      { icone: '⚡', nome: 'Topo · Faísca', itens: ['**Arco elétrico**: raios caem nos anéis azuis.', '**Salto relâmpago**: reaparece nas suas costas com um choque.'] },
-      { icone: '⚔', nome: 'Combate', itens: ['**Ímã de alvo** e passo até o inimigo ao golpear.', 'Combo **mais rápido**; clique guardado por mais tempo.', 'A barra de chefe mostra o chefe **do seu andar**.'] },
-      { icone: '🛠', nome: 'Correções', itens: ['O SOS agora **aparece para todos** no multiplayer.'] },
-    ],
-  },
-  {
-    id: '0.16', versao: 'v0.16', data: '24/11/2026', titulo: 'Abordagem de verdade',
-    destaques: [
-      { tag: 'Batalha naval', titulo: 'Navio pirata sólido e invadível', texto: 'O navio pirata agora tem **colisão de verdade**: dá para andar no convés, subir pelas **escadas de corda** (até nadando) e o navio te leva junto. O de abordagem **encosta de lado e baixa uma prancha** em vez de atravessar a jangada. Invadiu? A **tripulação larga a abordagem e defende o convés**.' },
-      { tag: 'Eventos', titulo: 'Mar mais agitado, sem furacão', texto: 'Os **eventos aleatórios aparecem bem mais vezes**. O furacão saiu: ficou só o **redemoinho na água**, que puxa a jangada mas **não empurra nem arremessa você**.' },
-    ],
-    secoes: [
-      { icone: '⚓', nome: 'Navio pirata', itens: ['Casco, convés, castelo, mastros e amuradas **com colisão**.', '**Escadas de corda** nos dois costados.', 'Quem está no convés **vai junto** com o navio.', 'Colide com a **jangada**, com **ilhas** e com **outros navios**.', 'Abordagem: encosta **de lado, com folga**, e baixa a **prancha**.', 'Continua **destrutível**: afunda e leva quem estiver em cima.'] },
-      { icone: '🌊', nome: 'Eventos', itens: ['Primeiro evento em **30–60 s**; depois a cada **~2–3 min**.', '**Furacão virou redemoinho**: sem vento, sem tornado, sem raios.', 'Ser engolido pelo redemoinho só gira e cospe a jangada (ninguém voa).'] },
-      { icone: '💣', nome: 'Canhão', itens: ['Aparece **desde o começo**: ~13% das caixas, ~40% dos naufrágios e às vezes **enterrado na seca**.'] },
+      { icone: '🗺', nome: 'Zonas', itens: ['**Zona Pirata · fácil** (até ~1,7 km): piratas, duelistas, pistoleiros e bombardeiros.', '**Zona Militar · médio** (~1,7 a 2,55 km): soldados, escopeteiros, elites e brutamontes.', '**Zona 51 · difícil** (a partir de ~2,55 km): **Agente, Cientista louco, Mutante e Ciborgue**; a Leviatã só aparece aqui.', 'Zona e dificuldade no topo da tela, **aviso grande** ao entrar e céu/neblina com tom próprio.'] },
+      { icone: '🏝', nome: 'Ilhas novas', itens: ['Ilhas viraram **morro contínuo**: platô, dunas na beira e encosta suave até o fundo (acabaram os discos). Formatos variados: alongada, com lóbulos, rochosa.', '**Pirata**: Cabana, Acampamento, **Vila** (3 casebres, poço, varal, canoa), **Taverna do Caolho**, **Rochedo do Farol** (sobe na galeria), **Praia do Naufrágio** (entra pelo rombo), **Ilha da Caveira**, Forte de Troncos, **Bateria de Canhões** e Forte de Sucata.', '**Militar**: Vigia, Bunker, **Radar**, **Heliponto**, **Quartel** (beliches), **Depósito** (contêineres), **Trincheiras** (ninho de metralhadora), **Artilharia**, **Torre de Comunicações** e a **Base Militar** gigante com a torre-espiral.', '**Zona 51**: Laboratório, **Cratera do OVNI**, **Observatório**, **Criogenia**, **Campo de Antenas**, **Reator**, **Quarentena**, **Monólito**, Bunker Restrito e a Base da Zona 51.', 'Tralha na praia de cada ilha: troncos, botes virados, barris, ouriços tcheco, placas e cristais.', 'Zona Pirata: **torres de tralha** e **barracos sobre palafitas** no meio do mar, com 1–2 inimigos e um caixote.'] },
+      { icone: '⛵', nome: 'Jangada e navegação', itens: ['A jangada **desvia aos poucos** antes do raso (escorrega para o lado, não atola); parada perto da praia não é empurrada.', '**Controle 360°** no fim de jogo, com **marcador do abrigo** (seta e distância).', '**Ilha de resgate** com farol, posto de resgate, heliporto e cais.'] },
+      { icone: '🛢', nome: 'Leviatã · 4 chefes', itens: ['**Soldador** (1º andar): maçarico em cone e poças de metal derretido.', '**Dr. Gás** (2º): nuvem tóxica e válvulas que soltam jatos.', '**Perfurador** (3º): investida da broca e tremor triplo.', '**Faísca** (topo): raios nos anéis azuis e salto relâmpago nas suas costas.', 'A barra de chefe mostra o chefe **do seu andar**.'] },
+      { icone: '⚓', nome: 'Batalha naval', itens: ['Navio pirata com **colisão**, escadas de corda nos dois costados e convés que te leva junto; colide com jangada, ilhas e outros navios.', 'Abordagem **encosta de lado e baixa a prancha**; invadiu, a tripulação defende o convés.', '**Twins** (Rubro e Abissal): ficam em lados opostos, **bordada dupla**, **morteiro** ao trocar de posição, o que sobra fica furioso; deixam **loot lendário** e um canhão de ferro.', 'Efeitos: coluna d\'água, coroa de borrifo, esteira, navio afundando em chamas e **números de dano**.'] },
+      { icone: '💣', nome: 'Canhões e destroços', itens: ['**Canhão improvisado bem mais cedo** (~24% das caixas, ~50% dos naufrágios, às vezes enterrado na seca).', 'Novo **canhão de ferro**: recarga 4,5 s e bala **~2× mais forte**.', '**Plataforma 6 × 6** bem menos rara e um pouco mais de paredes boiando.'] },
+      { icone: '🌊', nome: 'Mar e eventos', itens: ['Primeiro evento em **20–40 s**, depois a cada **~1–2 min**; "mar quieto" quase nunca.', 'O furacão saiu: ficou o **redemoinho**, que gira e cospe a jangada (ninguém voa).', '**Tempestade de ondas gigantescas** (7–11 m) com chuva e raios — a jangada sobe a montanha com todo mundo a bordo.', 'Mar ensolarado mais agitado; ondas grandes não arrastam ninguém para fora.', '**Seca de 55 s** (mar cheio 2 min 30 s). O **escafandrista** (38% das secas) surge quando a água termina de baixar, **nunca na primeira seca**.', 'Kraken e navio-fantasma a partir de ~700 m; **SOS** com mais chance (até 3 por partida); invasões e batalhas navais mais frequentes.'] },
+      { icone: '🎭', nome: 'Inimigos e chefes', itens: ['**2 a 4 variações** de roupa por tipo; chapéus novos (boina e capuz), coletes, jalecos, capas, mochilas e papagaios.', 'Chefes mais detalhados (maçarico com faíscas, frascos brilhando, broca girando, bobina com arcos, fita de balas, cilindros com bolhas).', 'Chefes com **mira preditiva**, **fúria** abaixo de 50% e **combos**.'] },
+      { icone: '⚔', nome: 'Combate e efeitos', itens: ['Golpe com **ímã de alvo** e passo até o inimigo; combo mais rápido e clique guardado por mais tempo.', '**Faíscas e pedacinhos** da cor do inimigo a cada acerto, estouro com clarão ao cair e poeira na esquiva.'] },
+      { icone: '👥', nome: 'Multiplayer', itens: ['Você **vê a arma de cada parceiro** na mão, trocando junto, com **clarão** no tiro.', 'O SOS agora aparece **para todos**.'] },
+      { icone: '🛠', nome: 'Correções', itens: ['Inimigos **não perseguem mais através do chão/teto**; o alerta de um não acorda os de outro andar.', 'Depois das coordenadas do abrigo o mar **não seca mais** (nada de batalha interrompida).'] },
     ],
   },
   {
