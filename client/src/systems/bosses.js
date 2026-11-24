@@ -4,9 +4,10 @@
 //     AFOGA (sem loot); se você matar, larga um saco com loot.
 // Só o host sorteia e simula (os outros recebem réplicas como qualquer inimigo).
 import { sea } from '../world/ocean.js';
+import { WORLD_LOOT_PARAMS } from './loot.js';
 
 export const BOSSES = {
-  runLength: 1280,      // m até a dificuldade máxima (world.difficulty chega a 4)
+  runLength: 4 * WORLD_LOOT_PARAMS.diffStep, // m até a dificuldade máxima (world.difficulty chega a 4)
   miniChance: 0.22,     // por seca: evento raro (não toda seca, para não ficar previsível)
   miniMaxProgress: 0.5, // miniboss fraco: só na primeira metade da rota
   dist: [26, 40],       // m da jangada até onde o chefe surge

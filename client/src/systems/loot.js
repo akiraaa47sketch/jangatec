@@ -1,6 +1,7 @@
 import { hash2, mulberry32 } from '../core/util.js';
 
-export const WORLD_LOOT_PARAMS = { chunkSize: 90, islandChance: 0.07, wreckChance: 0.3 };
+// diffStep = metros por nível de dificuldade (0–4): progressão lenta, mar grande e vazio entre ilhas
+export const WORLD_LOOT_PARAMS = { chunkSize: 90, islandChance: 0.04, wreckChance: 0.22, diffStep: 850 };
 
 // Ilha no chunk? (mesma regra/ordem de RNG que World.makeChunk)
 export function chunkHasIsland(seed, cx, cz) {
@@ -35,11 +36,11 @@ export function seabedCratesFor(seed, cx, cz) {
 // Estruturas no MEIO DO MAR (sem ilha): torre de sucata com morteiro (derrubável a canhão) ou
 // prédio afundado e inclinado (sobe pela face torta; às vezes tem inimigos; caixotes p<cx>,<cz>c<n>).
 // RNG próprio; nunca no mesmo chunk de ilha ou naufrágio.
-export const SEA_SITES = { predio: 0.055, torre: 0.03, torrePerDiff: 0.008 };
+export const SEA_SITES = { predio: 0.035, torre: 0.02, torrePerDiff: 0.006 }; // mar mais vazio
 export function seaSiteFor(seed, cx, cz) {
   if (Math.abs(cx) + Math.abs(cz) <= 2 || chunkHasIsland(seed, cx, cz) || wreckFor(seed, cx, cz)) return null;
   const r = mulberry32(hash2(seed ^ 0x2f6b91d3, cx, cz)), S = WORLD_LOOT_PARAMS.chunkSize;
-  const diff = Math.min(4, Math.floor(Math.hypot(cx * S, cz * S) / 320)), roll = r();
+  const diff = Math.min(4, Math.floor(Math.hypot(cx * S, cz * S) / WORLD_LOOT_PARAMS.diffStep)), roll = r();
   let kind = null;
   if (roll < SEA_SITES.predio) kind = 'predio';
   else if (diff >= 1 && roll < SEA_SITES.predio + SEA_SITES.torre + diff * SEA_SITES.torrePerDiff) kind = 'torre';
@@ -199,7 +200,7 @@ export function difficultyForCrateId(id) {
   if (!match) return 0;
   const x = Number(match[1]) * WORLD_LOOT_PARAMS.chunkSize;
   const z = Number(match[2]) * WORLD_LOOT_PARAMS.chunkSize;
-  return Math.min(4, Math.floor(Math.hypot(x, z) / 320));
+  return Math.min(4, Math.floor(Math.hypot(x, z) / WORLD_LOOT_PARAMS.diffStep));
 }
 
 export function isGeneratedCrate(seed, id) {

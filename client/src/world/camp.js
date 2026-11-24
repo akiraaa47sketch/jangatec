@@ -302,22 +302,106 @@ export function buildCamp(type, ctx) {
     spot(site, -1.8, 2.4); spot(site, 1.8, 2.6); spot(site, 0, 3.6); spot(site, -3.3, 0); spot(site, 3.3, 0);
     rooms.push({ x: ctx.cx, z: ctx.cz, yaw: ctx.yaw, hw: RR * 0.9, hd: RR * 0.9, door: [P(0, RR - 1.2), P(0, RR + 1.4)], fort: true });
   } else if (type === 'militar') {
-    // base militar: muro de sacos de areia com portão, arame farpado, duas torres de soldado,
-    // alojamento de concreto, tenda de comando, caixas de munição e mastro com bandeira
-    const S = 8;
-    sandbags(site, -S, -S, S, -S, 4); sandbags(site, -S, -S, -S, S, 4); sandbags(site, S, -S, S, S, 4);
-    sandbags(site, -S, S, -1.6, S, 4); sandbags(site, 1.6, S, S, S, 4);
-    barbed(site, -S - 0.8, S + 0.8, -1.8, S + 0.8); barbed(site, 1.8, S + 0.8, S + 0.8, S + 0.8);
-    watchTower(site, -S + 1.3, S - 1.3, 5, m.olive, m.canvas, 0.9); watchTower(site, S - 1.3, -S + 1.3, 5, m.olive, m.canvas, 0.9);
-    const bar = concrete({ x: P(-2, -S + 2.6)[0], z: P(-2, -S + 2.6)[1], yaw: ctx.yaw }, 7, 3.6, 2.8);
-    out.crateSpots.push(bar.inside);
-    tent(site, S - 2.6, 2.2, -Math.PI / 2, m.canvas, 3.6, 2.8, 2.1);
-    for (const [x, z] of [[3.2, -4.6], [4.2, -4.4], [3.6, -3.6], [-5.4, 2.2], [-5.4, 3.0]]) ammoCrate(site, x, z);
-    for (const [x, z] of [[5.6, -5.6], [6.3, -5.2]]) barrel(site, x, z);
-    flag(site, 0, 0, 5.4);
-    out.yard = P(0, 2); out.fire = P(-2.4, 3.2);
-    for (const [x, z] of [[-4, 5.5], [4, 5.5], [0, 4.2], [-6, -1], [6, 3.5], [2.5, -2], [-1.5, 1.2], [5, -1]]) spot(site, x, z);
-    rooms.push({ x: ctx.cx, z: ctx.cz, yaw: ctx.yaw, hw: S * 0.95, hd: S * 0.95, door: [P(0, S - 1.4), P(0, S + 1.6)], fort: true });
+    // BASE MILITAR: prédio de concreto fechado de 2 andares (16 × 12 m) com garagem (jipe e portão
+    // largo), saguão com escada até o 1º andar, arsenal e alojamento no térreo; corredor e cinco
+    // salas em cima. Pátio na frente com sacos de areia, caixas de munição e a bandeira.
+    // Inimigos ficam espalhados pelas salas (os de cima ficam de posto e atiram pelas janelas).
+    const B = { x: P(0, -2)[0], z: P(0, -2)[1], yaw: ctx.yaw }; // frame do prédio (frente = +Z)
+    const HW = 8, HD = 6, T = 0.3, FH = 3.0, SL = 0.25, UP = FH + SL, TOPY = 2 * FH + SL;
+    // parede ao longo de u (u0..u1) na altura y0..y1, com vãos [a, b, lo, hi] (porta/janela)
+    const wall = (along, at, u0, u1, y0, y1, holes = [], mat = m.concrete, t = T) => {
+      const cuts = [u0, u1]; for (const [a, b] of holes) cuts.push(a, b);
+      const us = [...new Set(cuts)].sort((a, b) => a - b);
+      const box = (ua, ub, ya, yb) => {
+        if (ub - ua < 0.02 || yb - ya < 0.02) return;
+        if (along === 'x') solid(B, (ua + ub) / 2, ya, at, ub - ua, yb - ya, t, mat);
+        else solid(B, at, ya, (ua + ub) / 2, t, yb - ya, ub - ua, mat);
+      };
+      for (let i = 0; i < us.length - 1; i++) {
+        const ua = us[i], ub = us[i + 1], mid = (ua + ub) / 2;
+        const h = holes.find(([a, b]) => mid > a && mid < b);
+        if (!h) box(ua, ub, y0, y1);
+        else { box(ua, ub, y0, Math.max(y0, h[2])); box(ua, ub, Math.min(y1, h[3]), y1); }
+      }
+    };
+    // piso do térreo (só visual: o chão é o da ilha) e faixas de garagem
+    decor(B, new THREE.Mesh(boxGeo(2 * HW, 0.04, 2 * HD), m.concreteDark), 0, 0.02, 0);
+    for (const x of [-6.2, -3.8]) decor(B, new THREE.Mesh(boxGeo(0.1, 0.01, 5), m.sandbag), x, 0.045, 2);
+    // paredes externas (os dois andares de uma vez) com portão, porta e janelas
+    const winG = (a, b) => [a, b, 1.2, 2.2], winU = (a, b) => [a, b, UP + 1.0, UP + 2.0];
+    wall('x', HD, -HW, HW, 0, TOPY, [[-7.2, -2.8, 0, 2.9], [0.8, 2.2, 0, 2.3], winG(3.4, 4.8), winU(-6.5, -5), winU(-3, -1.5), winU(1, 2.5), winU(3.5, 5), winU(6.4, 7.4)]);
+    wall('x', -HD, -HW, HW, 0, TOPY, [winG(0, 1.4), winG(5, 6.4), winU(-6, -4.6), winU(-0.7, 0.7), winU(4.6, 6)]);
+    wall('z', -HW, -HD, HD, 0, TOPY, [winG(-3, -1.6), winU(-4.5, -3.1), winU(2, 3.4)]);
+    wall('z', HW, -HD, HD, 0, TOPY, [winG(-3.5, -2.1), winU(-4.5, -3.1), winU(-1, 0)]);
+    // térreo: garagem | saguão (frente) + arsenal e alojamento (fundos)
+    wall('z', -2, -HD, HD, 0, FH, [[2.2, 3.4, 0, 2.3]], m.concrete, 0.22);
+    wall('x', 0, -2, HW, 0, FH, [[-0.2, 1.0, 0, 2.3], [4.4, 5.4, 0, 2.3]], m.concrete, 0.22);
+    wall('z', 3, -HD, 0, 0, FH, [], m.concrete, 0.22);
+    // laje do 1º andar com o vão da escada (x 5,8..8 / z 0,15..6)
+    solid(B, (-HW + 5.8) / 2, FH, 0, 5.8 + HW, SL, 2 * HD, m.concreteDark);
+    solid(B, (5.8 + HW) / 2, FH, (-HD + 0.15) / 2, HW - 5.8, SL, HD + 0.15, m.concreteDark);
+    // escada (rampa sólida com degraus) subindo de z 4,6 (térreo) até z 0,15 (1º andar)
+    {
+      const sx = 6.9, sw = 1.8, z0 = 4.6, z1 = 0.15, run = z0 - z1, hy = UP / 2, steps = 13; // patamar de 1,2 m antes do 1º degrau
+      const [x, z] = P(sx, (z0 + z1) / 2, B.yaw, B.x, B.z);
+      set.items.push({ type: 'ramp', x, y: TOP + hy, z, hx: sw / 2, hy, hz: run / 2, yaw: B.yaw + Math.PI });
+      for (let i = 0; i < steps; i++) {
+        const h = UP * (i + 1) / steps, d = run / steps, st = new THREE.Mesh(boxGeo(sw, h, d), i % 2 ? m.concrete : m.concreteDark);
+        const [mx, mz] = P(sx, z0 - d * (i + 0.5), B.yaw, B.x, B.z);
+        st.position.set(mx, TOP + h / 2, mz); st.rotation.y = B.yaw; st.castShadow = st.receiveShadow = true; ctx.addSolid(st);
+      }
+      // guarda-corpo do vão no 1º andar
+      wall('z', 5.8, 0.35, HD, UP, UP + 1.0, [], m.steel, 0.08);
+    }
+    // 1º andar: corredor no meio, três salas no fundo, duas na frente
+    wall('x', -1.5, -HW, HW, UP, TOPY - SL, [[-6, -5, 0, UP + 2.2], [-0.5, 0.5, 0, UP + 2.2], [4.5, 5.5, 0, UP + 2.2]], m.concrete, 0.22);
+    wall('z', -2.7, -HD, -1.5, UP, TOPY - SL, [], m.concrete, 0.22); wall('z', 2.7, -HD, -1.5, UP, TOPY - SL, [], m.concrete, 0.22);
+    wall('x', 0.6, -HW, 5.8, UP, TOPY - SL, [[-5, -4, 0, UP + 2.2], [1, 2, 0, UP + 2.2]], m.concrete, 0.22);
+    wall('z', -1, 0.6, HD, UP, TOPY - SL, [], m.concrete, 0.22);
+    // teto e platibanda
+    solid(B, 0, TOPY - SL, 0, 2 * HW + 0.3, SL, 2 * HD + 0.3, m.concreteDark);
+    for (const [ox, oz, w, l] of [[0, HD + 0.1, 2 * HW + 0.3, 0.2], [0, -HD - 0.1, 2 * HW + 0.3, 0.2], [HW + 0.1, 0, 0.2, 2 * HD + 0.3], [-HW - 0.1, 0, 0.2, 2 * HD + 0.3]]) decor(B, new THREE.Mesh(boxGeo(w, 0.6, l), m.concreteDark), ox, TOPY + 0.3, oz);
+    // placa e luzes na fachada
+    decor(B, new THREE.Mesh(boxGeo(3.2, 0.6, 0.08), m.olive), 1.5, 2.75, HD + 0.2);
+    for (const lx of [-5, 1.5]) lantern(B, lx, 2.6, HD + 0.25);
+    // garagem: jipe militar (sólido), tambores, prateleira
+    {
+      const jeep = new THREE.Group();
+      const body = new THREE.Mesh(boxGeo(1.9, 0.8, 3.6), m.olive); body.position.y = 0.75; jeep.add(body);
+      const cab = new THREE.Mesh(boxGeo(1.8, 0.7, 1.6), m.olive); cab.position.set(0, 1.5, -0.4); jeep.add(cab);
+      const glass = new THREE.Mesh(boxGeo(1.6, 0.5, 0.05), m.glass); glass.position.set(0, 1.55, 0.42); jeep.add(glass);
+      for (const wx of [-0.95, 0.95]) for (const wz of [-1.2, 1.2]) { const w = new THREE.Mesh(new THREE.CylinderGeometry(0.38, 0.38, 0.3, 12), m.cloth); w.rotation.z = Math.PI / 2; w.position.set(wx, 0.38, wz); jeep.add(w); }
+      decor(B, jeep, -5, 0, 1.2);
+      const [x, z] = P(-5, 1.2, B.yaw, B.x, B.z);
+      set.items.push({ type: 'box', x, y: TOP + 0.9, z, hx: 0.95, hy: 0.9, hz: 1.8, yaw: B.yaw });
+      barrel(B, -7.4, -5.3); barrel(B, -6.7, -5.4); barrel(B, -7.4, -4.6);
+      solid(B, -2.6, 0, -4, 0.6, 1.8, 2.6, m.steel); // prateleira
+    }
+    // móveis: arsenal (caixas de munição), alojamento (beliches), salas de cima (mesas)
+    for (const [x, z] of [[-1.2, -5.2], [-0.1, -5.3], [2.2, -4.8]]) ammoCrate(B, x, z);
+    for (const x of [4.2, 6.8]) solid(B, x, 0, -4.6, 0.9, 1.6, 2.0, m.olive);
+    for (const [x, z] of [[-5.4, -5.1], [0, -5.1], [5.4, -5.1], [-4.5, 5.2], [2.5, 5.2]]) {
+      const desk = new THREE.Mesh(boxGeo(1.4, 0.78, 0.7), m.plankDark); decor(B, desk, x, UP + 0.39, z);
+    }
+    // pátio na frente: sacos de areia, caixas, barris e bandeira
+    sandbags(site, -6, 8.4, -2.4, 8.4, 3); sandbags(site, 2.4, 8.4, 6, 8.4, 3);
+    for (const [x, z] of [[6.6, 5.4], [7.2, 6.2]]) ammoCrate(site, x, z);
+    barrel(site, -7, 5.4); barrel(site, -7.6, 6.1);
+    flag(site, -4.4, 6.2, 6.2);
+    out.yard = P(0, 6.3); out.fire = P(3.6, 6.8);
+    // caixotes: arsenal e garagem (térreo)
+    out.crateSpots.push(P(1.2, -4.6, B.yaw, B.x, B.z), P(-6.9, -3.6, B.yaw, B.x, B.z));
+    // cômodos do térreo (para a IA achar as portas) — o andar de cima é de "posto"
+    const room = (cx, cz, hw, hd, din, dout) => rooms.push({ x: P(cx, cz, B.yaw, B.x, B.z)[0], z: P(cx, cz, B.yaw, B.x, B.z)[1], yaw: B.yaw, hw, hd,
+      door: [P(din[0], din[1], B.yaw, B.x, B.z), P(dout[0], dout[1], B.yaw, B.x, B.z)] });
+    room(-5, 0, 3, HD, [-5, 4.6], [-5, 7.6]);       // garagem (portão largo na frente)
+    room(3, 3, 5, 3, [1.5, 5.0], [1.5, 7.6]);       // saguão
+    room(0.5, -3, 2.5, 3, [0.4, -0.9], [0.4, 1.1]); // arsenal
+    room(5.5, -3, 2.5, 3, [4.9, -0.9], [4.9, 1.1]); // alojamento
+    // pontos de inimigo: térreo (andam) e 1º andar (posto, atiram pela janela/porta)
+    for (const [x, z] of [[-5.5, -3], [-3.2, 4.2], [-0.4, 2], [4, 3.6], [0.8, -2.6], [5.6, -2.4]]) spot(B, x, z);
+    for (const [x, z] of [[-5.4, -3.6], [0, -3.6], [5.4, -3.6], [-4.5, 3.2], [2.5, 3.6], [-3, -0.45]]) spot(B, x, z, UP, true);
+    spot(site, -1.6, 7.4); spot(site, 2.2, 7.2);
   } else {
     // paliçada quadrada com portão na frente (+Z)
     const S = 5.4, gate = 1.4;

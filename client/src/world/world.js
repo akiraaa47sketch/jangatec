@@ -4,7 +4,7 @@
 import * as THREE from '../three.js';
 import { mulberry32, hash2, rot } from '../core/util.js';
 import { CFG } from '../config.js';
-import { LOOT_CONFIG, generateCrateLoot, wreckFor, seabedCratesFor, seaSiteFor } from '../systems/loot.js';
+import { LOOT_CONFIG, generateCrateLoot, wreckFor, seabedCratesFor, seaSiteFor, WORLD_LOOT_PARAMS } from '../systems/loot.js';
 import { seabedHeight, makeSeabedChunk, makeFarSeabed, patchVortexDip } from './seabed.js';
 import { bakeStatic } from '../core/bake.js';
 import { buildCamp } from './camp.js';
@@ -152,7 +152,7 @@ export class World {
     }
   }
   seabedHeight(x, z) { return seabedHeight(this.seed, x, z); }
-  difficulty(x, z) { return Math.min(4, Math.floor(Math.hypot(x, z) / 320)); }
+  difficulty(x, z) { return Math.min(4, Math.floor(Math.hypot(x, z) / WORLD_LOOT_PARAMS.diffStep)); }
 
   ensureStarterIsland() {
     const key = '0,1';
@@ -449,7 +449,7 @@ export class World {
   }
 
   makeIsland(id, x, z, r, starterIsland = false) {
-    const G = this.G, R = starterIsland ? 15 + r() * 3 : 9 + r() * 6, diff = this.difficulty(x, z);
+    const G = this.G, R0 = starterIsland ? 15 + r() * 3 : 9 + r() * 6, diff = this.difficulty(x, z);
     const islandElevation = starterIsland ? 0 : 2.7;
     // acampamento: forte de troncos, cabana, ou (ilhas grandes) forte de SUCATA com torres de morteiro
     const siteRoll = r();
@@ -462,9 +462,10 @@ export class World {
       [['bunker', 0.7], ['fort', 0.4], ['militar', 2.4]],
     ][diff];
     const MIN_R = { scrap: 11.5, militar: 12, bunker: 10 };
-    const options = SITES.filter(([t]) => R >= (MIN_R[t] || 0)), totalW = options.reduce((a, [, w]) => a + w, 0);
+    const options = SITES.filter(([t]) => R0 >= (MIN_R[t] || 0)), totalW = options.reduce((a, [, w]) => a + w, 0);
     let siteType = null;
     if (!starterIsland) { let roll = siteRoll * totalW; for (const [t, w] of options) { roll -= w; if (roll <= 0) { siteType = t; break; } } siteType = siteType || options[options.length - 1][0]; }
+    const R = siteType === 'militar' ? Math.max(R0, 19) : R0; // a base militar (prédio de 16 × 12 m + pátio) pede ilha grande
     const group = new THREE.Group(); group.position.set(x, islandElevation, z);
     const set = { x, z, yaw: 0, y: islandElevation, radius: R + 8, items: [] };
     const solids = [];
@@ -500,7 +501,7 @@ export class World {
       ? [[-R * 0.78, 0], [R * 0.78, -R * 0.22], [0, R * 0.78]]
       : [];
     // acampamento (cabana ou forte) perto do meio; ruínas ficam longe dele
-    const CAMP_R = { hut: 5, tendas: 5.6, vigia: 6, fort: 7.9, bunker: 6, scrap: 8.6, militar: 9.6 };
+    const CAMP_R = { hut: 5, tendas: 5.6, vigia: 6, fort: 7.9, bunker: 6, scrap: 8.6, militar: 12.5 };
     const campR = CAMP_R[siteType] || 5;
     const campA = r() * 6.28, campD = r() * Math.max(0, R - campR - 1.4);
     const campC = [Math.cos(campA) * campD, Math.sin(campA) * campD];

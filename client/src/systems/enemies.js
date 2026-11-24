@@ -170,9 +170,14 @@ export class Enemies {
     // torres); os pontos altos ficam com quem atira
     const spots = (isl.spawnSpots || []).slice();
     for (let i = spots.length - 1; i > 0; i--) { const j = (r() * (i + 1)) | 0; [spots[i], spots[j]] = [spots[j], spots[i]]; }
-    spots.sort((a, b) => (b.high ? 1 : 0) - (a.high ? 1 : 0)); // torres primeiro (sempre ocupadas)
     const military = isl.siteType === 'militar';
-    const count = military ? Math.max(n + 2, Math.min(spots.length, 6 + isl.diff)) : Math.max(n, Math.min(spots.length, n + 1));
+    if (military) { // prédio: alterna térreo e 1º andar para espalhar pelas salas
+      const hi = spots.filter((p) => p.high), lo = spots.filter((p) => !p.high);
+      spots.length = 0;
+      while (hi.length || lo.length) { if (lo.length) spots.push(lo.shift()); if (hi.length) spots.push(hi.shift()); }
+    } else spots.sort((a, b) => (b.high ? 1 : 0) - (a.high ? 1 : 0)); // torres primeiro (sempre ocupadas)
+    // base militar: um inimigo por ponto (espalhados pelas salas), sem amontoar
+    const count = military ? Math.min(spots.length, 4 + isl.diff) : Math.max(n, Math.min(spots.length, n + 1));
     for (let i = 0; i < count; i++) {
       const id = `${isl.id}e${i}`, sp = spots.length ? spots[i % spots.length] : null;
       let type = pool[(r() * pool.length) | 0];

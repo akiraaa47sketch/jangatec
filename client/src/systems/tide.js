@@ -6,10 +6,10 @@
 import { clamp } from '../core/util.js';
 
 export const TIDE = {
-  period: 200,          // segundos por ciclo (cheio + seco)
+  period: 240,          // segundos por ciclo (cheio + seco)
   full: 0.9,            // nível com o mar cheio (o mesmo da inundação inicial)
   dry: -7.2,            // nível com o mar seco: abaixo de todo o fundo (mín. -6,4)
-  dryShare: 0.4,        // fração do ciclo com o mar seco (80 s); o resto é mar cheio (120 s)
+  dryShare: 0.375,      // fração do ciclo com o mar seco (90 s); o resto é mar cheio (150 s)
   transition: 14,       // segundos que o mar leva para secar ou encher
   blendIn: 6,           // s para entrar no ciclo depois da partida
 };
