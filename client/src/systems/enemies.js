@@ -246,6 +246,14 @@ export class Enemies {
       for (let i = 0; i < n && i < spots.length; i++) put(`${isl.id}e${i}`, isl.diff >= 2 && r() < 0.5 ? 'soldado' : r() < 0.5 ? 'pistoleiro' : 'atirador', spots[i], isl.set.y + 0.75);
       return;
     }
+    if (isl.siteType === 'tralha' || isl.siteType === 'barraco') { // zona pirata: poucos inimigos (1, às vezes 2)
+      const pool = ZONES.pirata.enemies, n = r() < 0.3 ? 2 : 1;
+      for (let i = 0; i < n && i < spots.length; i++) {
+        const sp = spots[i], e = put(`${isl.id}e${i}`, sp.high ? 'pistoleiro' : pool[(r() * pool.length) | 0], sp, isl.set.y + 0.75 + (sp.y || 0));
+        if (e && sp.high) e.post = true;
+      }
+      return;
+    }
     if (r() >= 0.55) return;
     const pool = BY_DIFF[isl.diff], n = Math.min(spots.length, 1 + ((r() * 2) | 0) + (isl.diff >= 2 ? 1 : 0));
     for (let i = 0; i < n; i++) put(`${isl.id}e${i}`, pool[(r() * pool.length) | 0], spots[i], isl.set.y + 0.75);

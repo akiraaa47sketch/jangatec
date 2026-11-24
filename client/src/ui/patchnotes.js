@@ -5,6 +5,20 @@
 // Nos textos, **assim** vira negrito.
 export const PATCH_NOTES = [
   {
+    id: '0.23', versao: 'v0.23', data: '24/11/2026', titulo: '30 ilhas diferentes e ilhas de verdade',
+    destaques: [
+      { tag: 'Ilhas', titulo: 'Morro no lugar dos discos', texto: 'As ilhas agora são um **morro contínuo**: platô plano no alto, dunas na beira e uma **encosta suave até o fundo do mar**. Cada uma tem um **formato próprio** (alongada, com lóbulos, rochosa). Na **seca dá para subir a pé** da areia até o topo.' },
+      { tag: 'Mundo', titulo: '10 modelos por zona', texto: 'Cada zona tem **10 tipos de ilha** com construções, cômodos e tamanhos diferentes — farol, navio encalhado, taverna, vila, Ilha da Caveira, bateria de canhões, radar, heliponto, quartel, contêineres, trincheiras, artilharia, OVNI, observatório, criogenia, reator, monólito e mais.' },
+      { tag: 'Zona Pirata', titulo: 'Tralha no meio do mar', texto: '**Torres de tralha** e **barracos de sucata sobre palafitas** aparecem fora d\'água na zona pirata, com **poucos inimigos** (1–2) e um caixote de loot.' },
+    ],
+    secoes: [
+      { icone: '🏝', nome: 'Zona Pirata (fácil)', itens: ['**Ilha da Cabana**, **Acampamento Pirata**, **Vila dos Piratas** (3 casebres, poço, varal, canoa), **Taverna do Caolho** (salão com balcão e mesas lá fora).', '**Rochedo do Farol** (dá para subir na galeria), **Praia do Naufrágio** (casco encalhado com rombo para entrar), **Ilha da Caveira** (rocha-caveira, cova do tesouro, totens).', '**Forte de Troncos**, **Bateria de Canhões** e **Forte de Sucata** (só depois do comecinho).'] },
+      { icone: '🪖', nome: 'Zona Militar (médio)', itens: ['**Posto de Vigia**, **Bunker Costeiro**, **Estação de Radar**, **Heliponto** (helicóptero estacionado), **Quartel** (alojamento com beliches + escritório).', '**Depósito de Munição** (contêineres para entrar), **Linha de Trincheiras** (ninho de metralhadora), **Posto de Artilharia** (obuseiro sob rede de camuflagem), **Torre de Comunicações** e a **Base Militar** gigante.'] },
+      { icone: '👽', nome: 'Zona 51 (difícil)', itens: ['**Laboratório Secreto**, **Cratera do OVNI**, **Observatório** (cúpula e telescópio), **Centro de Criogenia** (cápsulas com gente congelada), **Campo de Antenas**.', '**Reator Experimental** (núcleo verde e torres de resfriamento), **Zona de Quarentena**, **Campo do Monólito** (agroglifo e a van dos agentes), **Bunker Restrito** e a **Base da Zona 51**.'] },
+      { icone: '⛵', nome: 'Jangada', itens: ['A jangada **desvia aos poucos** da ilha antes de chegar no raso — escorrega para o lado em vez de atolar ou enroscar.', 'Parada perto da praia ela não é empurrada (dá para descer e nadar).', 'Tralha na praia de cada ilha: troncos, botes virados, barris, ouriços tcheco, placas e cristais.'] },
+    ],
+  },
+  {
     id: '0.22', versao: 'v0.22', data: '24/11/2026', titulo: 'Mar mais movimentado',
     secoes: [
       { icone: '🌊', nome: 'Mais eventos', itens: ['Eventos do mar **bem mais frequentes**: o primeiro em 20–40 s e depois a cada **~1–2 min**.', '"Mar quieto" quase nunca (3%).', '**Seca mais curta: 55 s** (mar cheio continua 2 min 30 s).', 'O **escafandrista** surge assim que a água termina de baixar (quando o sorteio dá certo) — **nunca na primeira seca**.', 'Depois das **coordenadas do abrigo**, o mar **não seca mais**.', '**Kraken e navio-fantasma** já a partir de ~700 m.', '**SOS** com mais chance e até **3 por partida**.'] },

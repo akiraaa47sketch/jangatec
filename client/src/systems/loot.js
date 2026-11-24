@@ -36,18 +36,21 @@ export function seabedCratesFor(seed, cx, cz) {
 // Estruturas no MEIO DO MAR (sem ilha): torre de sucata com morteiro (derrubável a canhão) ou
 // prédio afundado e inclinado (sobe pela face torta; às vezes tem inimigos; caixotes p<cx>,<cz>c<n>).
 // RNG próprio; nunca no mesmo chunk de ilha ou naufrágio.
-export const SEA_SITES = { predio: 0.035, torre: 0.02, torrePerDiff: 0.006 }; // mar mais vazio
+// mar mais vazio; na ZONA PIRATA (dif. 0–1) aparecem as tralhas: torre de tralha e barraco de sucata
+export const SEA_SITES = { predio: 0.035, torre: 0.02, torrePerDiff: 0.006, tralha: 0.05, barraco: 0.045 };
 export function seaSiteFor(seed, cx, cz) {
   if (Math.abs(cx) + Math.abs(cz) <= 2 || chunkHasIsland(seed, cx, cz) || wreckFor(seed, cx, cz)) return null;
   const r = mulberry32(hash2(seed ^ 0x2f6b91d3, cx, cz)), S = WORLD_LOOT_PARAMS.chunkSize;
   const diff = Math.min(4, Math.floor(Math.hypot(cx * S, cz * S) / WORLD_LOOT_PARAMS.diffStep)), roll = r();
-  let kind = null;
-  if (roll < SEA_SITES.predio) kind = 'predio';
-  else if (diff >= 1 && roll < SEA_SITES.predio + SEA_SITES.torre + diff * SEA_SITES.torrePerDiff) kind = 'torre';
+  let kind = null, acc = SEA_SITES.predio;
+  if (roll < acc) kind = 'predio';
+  else if (diff >= 1 && roll < (acc += SEA_SITES.torre + diff * SEA_SITES.torrePerDiff)) kind = 'torre';
+  else if (diff <= 1 && roll < (acc += SEA_SITES.tralha)) kind = 'tralha';
+  else if (diff <= 1 && roll < (acc += SEA_SITES.barraco)) kind = 'barraco';
   if (!kind) return null;
   return {
     kind, cx, cz, diff, x: cx * S + (r() - 0.5) * 36, z: cz * S + (r() - 0.5) * 36, yaw: r() * Math.PI * 2,
-    crates: kind === 'predio' ? (r() < 0.4 ? 2 : 1) : 0, rng: r,
+    crates: kind === 'predio' ? (r() < 0.4 ? 2 : 1) : kind === 'torre' ? 0 : 1, rng: r,
   };
 }
 

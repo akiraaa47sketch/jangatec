@@ -627,7 +627,7 @@ export class Naval {
       if (dd < 9) { s.x += dx / dd * (9 - dd) * 0.5; s.z += dz / dd * (9 - dd) * 0.5; }
     }
     for (const isl of G.world.islands) { // ilhas e estruturas: contorna
-      const r = (isl.R || 15) + 9, dx = s.x - isl.x, dz = s.z - isl.z, dd = Math.hypot(dx, dz) || 1;
+      const r = isl.avoidR || (isl.R || 15) + 9, dx = s.x - isl.x, dz = s.z - isl.z, dd = Math.hypot(dx, dz) || 1;
       if (dd < r) { s.x += dx / dd * (r - dd); s.z += dz / dd * (r - dd); s.speed *= 0.9; }
     }
   }

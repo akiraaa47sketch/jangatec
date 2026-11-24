@@ -38,6 +38,45 @@ function mats(shared) {
   return MATS;
 }
 
+// materiais dos acampamentos novos (modelos de ilha)
+let XM = null;
+function canvasMap(draw, w = 64, h = 256) { const c = document.createElement('canvas'); c.width = w; c.height = h; draw(c.getContext('2d'), w, h); const t = new THREE.CanvasTexture(c); t.colorSpace = THREE.SRGBColorSpace; t.wrapS = t.wrapT = THREE.RepeatWrapping; return t; }
+function extraMats() {
+  if (XM) return XM;
+  const M = (color, extra = {}) => new THREE.MeshStandardMaterial({ color, roughness: 0.85, ...extra });
+  const E = (color, emissive, k = 2) => new THREE.MeshStandardMaterial({ color, emissive, emissiveIntensity: k, roughness: 0.4 });
+  XM = {
+    rock: M(0x7a7368, { flatShading: true, roughness: 0.95 }), rockDark: M(0x4f4b45, { flatShading: true, roughness: 0.95 }), rockPale: M(0xb9ae94, { flatShading: true, roughness: 0.95 }),
+    dirt: M(0x7a6244, { roughness: 1 }), white: M(0xe6e7e2, { side: THREE.DoubleSide, roughness: 0.55 }), whiteCanvas: M(0xeeeeea, { side: THREE.DoubleSide, roughness: 0.95 }),
+    concreteDS: M(0xa3a49e, { side: THREE.DoubleSide, roughness: 0.95 }),
+    yellow: M(0xe8b828, { roughness: 0.6 }), orange: M(0xf07a22, { roughness: 0.8 }), black: M(0x0b0b0e, { roughness: 0.3, metalness: 0.4 }),
+    redRoof: M(0xa8342a, { roughness: 0.7 }), bottle: M(0x2f6a34, { roughness: 0.2, metalness: 0.2 }), sailcloth: M(0xd9cfb3, { side: THREE.DoubleSide, roughness: 1 }),
+    contRed: M(0x9a3b2a, { metalness: 0.4, roughness: 0.6 }), contBlue: M(0x2f5a86, { metalness: 0.4, roughness: 0.6 }), contGreen: M(0x3f6a3c, { metalness: 0.4, roughness: 0.6 }),
+    heliOlive: M(0x55603a, { metalness: 0.3, roughness: 0.6 }), gunmetal: M(0x2c3034, { metalness: 0.7, roughness: 0.4 }), rubber: M(0x1d1d1f, { roughness: 0.9 }),
+    brass: M(0xb08a3a, { metalness: 0.7, roughness: 0.35 }),
+    glassDark: new THREE.MeshStandardMaterial({ color: 0x1a2a33, roughness: 0.1, metalness: 0.5 }),
+    glass: new THREE.MeshStandardMaterial({ color: 0xbfe8ff, transparent: true, opacity: 0.28, roughness: 0.05, side: THREE.DoubleSide, depthWrite: false }),
+    plastic: new THREE.MeshStandardMaterial({ color: 0xdfe8ea, transparent: true, opacity: 0.35, roughness: 0.2, side: THREE.DoubleSide, depthWrite: false }),
+    glowG: E(0x9cff7a, 0x5cff3a, 2.4), glowGdim: E(0x7dff8a, 0x5cff3a, 0.6), glowB: E(0x9fe6ff, 0x3ab8ff, 2), glowR: E(0xff5a4a, 0xff2010, 3), glowY: E(0xffe08a, 0xffb040, 2.2),
+    frozen: M(0x5a6a7a, { roughness: 0.6 }),
+    liquidB: new THREE.MeshStandardMaterial({ color: 0x6ad8ff, emissive: 0x2a8ac0, emissiveIntensity: 1.1, transparent: true, opacity: 0.55, depthWrite: false }),
+    liquidG: new THREE.MeshStandardMaterial({ color: 0x7dff7a, emissive: 0x2acc3a, emissiveIntensity: 1.6, transparent: true, opacity: 0.8 }),
+    ufoHull: new THREE.MeshStandardMaterial({ color: 0xa8b0b8, metalness: 0.9, roughness: 0.25 }),
+    ufoDome: new THREE.MeshStandardMaterial({ color: 0x8affc0, emissive: 0x2a8a5a, emissiveIntensity: 1, transparent: true, opacity: 0.7 }),
+    scorch: new THREE.MeshBasicMaterial({ color: 0x1b1a17, transparent: true, opacity: 0.8, depthWrite: false }),
+    cropRing: new THREE.MeshBasicMaterial({ color: 0x2c3322, transparent: true, opacity: 0.55, depthWrite: false, side: THREE.DoubleSide }),
+    camo: new THREE.MeshStandardMaterial({ side: THREE.DoubleSide, transparent: true, alphaTest: 0.4, roughness: 1, map: canvasMap((g, w, h) => {
+      for (let i = 0; i < 260; i++) { g.fillStyle = ['#4b5530', '#5f6b3e', '#3b4026', '#7a7444'][i % 4]; g.beginPath(); g.arc(Math.random() * w, Math.random() * h, 4 + Math.random() * 10, 0, 6.3); g.fill(); }
+    }, 128, 128) }),
+    stripe: new THREE.MeshStandardMaterial({ roughness: 0.6, map: canvasMap((g, w, h) => { for (let i = 0; i < 6; i++) { g.fillStyle = i % 2 ? '#f1efe8' : '#c0392b'; g.fillRect(0, i * h / 6, w, h / 6); } }) }),
+    helipad: new THREE.MeshStandardMaterial({ roughness: 0.9, map: canvasMap((g, w, h) => {
+      g.fillStyle = '#5b5e5a'; g.fillRect(0, 0, w, h); g.strokeStyle = '#e8e3cf'; g.lineWidth = 10; g.beginPath(); g.arc(w / 2, h / 2, w * 0.4, 0, 6.3); g.stroke();
+      g.fillStyle = '#e8e3cf'; g.fillRect(w * 0.33, h * 0.28, w * 0.08, h * 0.44); g.fillRect(w * 0.59, h * 0.28, w * 0.08, h * 0.44); g.fillRect(w * 0.33, h * 0.46, w * 0.34, h * 0.08);
+    }, 256, 256) }),
+  };
+  return XM;
+}
+
 const boxGeo = (w, h, l) => scaleBoxUVs(new THREE.BoxGeometry(w, h, l), w, h, l);
 
 // ctx: { group, set, addSolid(mesh), TOP, cx, cz, yaw, r, shared }
@@ -96,13 +135,23 @@ export function buildCamp(type, ctx) {
     g.add(cage, glow, cap);
     decor(frame, g, lx, y, lz);
   };
-  const flag = (frame, lx, lz, h) => {
-    const pole = cylY(0.05, h, m.log, 6); decor(frame, pole, lx, h / 2, lz);
+  const flag = (frame, lx, lz, h, style = 'pirate') => { // pirate (caveira) | mil (estrela) | z51 (alienígena)
+    const pole = cylY(0.05, h, style === 'pirate' ? m.log : m.steel, 6); decor(frame, pole, lx, h / 2, lz);
     const c = document.createElement('canvas'); c.width = 128; c.height = 80;
-    const g = c.getContext('2d'); g.fillStyle = '#141416'; g.fillRect(0, 0, 128, 80);
-    g.fillStyle = '#eee'; g.beginPath(); g.arc(64, 32, 16, 0, 6.3); g.fill(); g.fillRect(55, 40, 18, 12);
-    g.fillStyle = '#141416'; g.beginPath(); g.arc(58, 32, 4.5, 0, 6.3); g.arc(70, 32, 4.5, 0, 6.3); g.fill();
-    g.strokeStyle = '#eee'; g.lineWidth = 6; g.beginPath(); g.moveTo(36, 56); g.lineTo(92, 74); g.moveTo(92, 56); g.lineTo(36, 74); g.stroke();
+    const g = c.getContext('2d');
+    if (style === 'mil') {
+      g.fillStyle = '#4b5530'; g.fillRect(0, 0, 128, 80); g.fillStyle = '#e8c341'; g.beginPath();
+      for (let i = 0; i < 10; i++) { const a = -Math.PI / 2 + i * Math.PI / 5, rr = i % 2 ? 9 : 22; g.lineTo(64 + Math.cos(a) * rr, 40 + Math.sin(a) * rr); }
+      g.fill();
+    } else if (style === 'z51') {
+      g.fillStyle = '#101418'; g.fillRect(0, 0, 128, 80); g.fillStyle = '#7dff8a'; g.beginPath(); g.ellipse(64, 38, 18, 24, 0, 0, 6.3); g.fill();
+      g.fillStyle = '#101418'; g.beginPath(); g.ellipse(56, 36, 6, 9, 0.5, 0, 6.3); g.ellipse(72, 36, 6, 9, -0.5, 0, 6.3); g.fill();
+    } else {
+      g.fillStyle = '#141416'; g.fillRect(0, 0, 128, 80);
+      g.fillStyle = '#eee'; g.beginPath(); g.arc(64, 32, 16, 0, 6.3); g.fill(); g.fillRect(55, 40, 18, 12);
+      g.fillStyle = '#141416'; g.beginPath(); g.arc(58, 32, 4.5, 0, 6.3); g.arc(70, 32, 4.5, 0, 6.3); g.fill();
+      g.strokeStyle = '#eee'; g.lineWidth = 6; g.beginPath(); g.moveTo(36, 56); g.lineTo(92, 74); g.moveTo(92, 56); g.lineTo(36, 74); g.stroke();
+    }
     const tex = new THREE.CanvasTexture(c); tex.colorSpace = THREE.SRGBColorSpace;
     const cloth = new THREE.Mesh(new THREE.PlaneGeometry(0.9, 0.56, 6, 1), new THREE.MeshStandardMaterial({ map: tex, side: THREE.DoubleSide, roughness: 0.9 }));
     const pos = cloth.geometry.attributes.position;
@@ -263,6 +312,74 @@ export function buildCamp(type, ctx) {
     for (let i = 0; i <= n; i++) { const t = i / n, a = t * len * 7; pts.push(new THREE.Vector3(Math.cos(a) * 0.25, 0.3 + Math.sin(a) * 0.25, 0).add(new THREE.Vector3(0, 0, 0))); pts[i].x += 0; pts[i].z = t * len; }
     const g = new THREE.Mesh(new THREE.TubeGeometry(new THREE.CatmullRomCurve3(pts), n * 2, 0.012, 4), m.wire);
     decor(frame, g, x0, 0, z0, Math.atan2(x1 - x0, z1 - z0));
+  };
+  // ---------- peças dos acampamentos novos (modelos de ilha) ----------
+  const X = extraMats();
+  const sub = (lx, lz, yo = 0) => { const [x, z] = P(lx, lz); return { x, z, yaw: ctx.yaw + yo }; };
+  // parede reta de (x0,z0) a (x1,z1) no frame
+  const seg = (frame, x0, z0, x1, z1, h, mat, T = 0.22, y0 = 0) => solid(frame, (x0 + x1) / 2, y0, (z0 + z1) / 2, T, h, Math.hypot(x1 - x0, z1 - z0), mat, Math.atan2(x1 - x0, z1 - z0));
+  const cylSolid = (frame, lx, lz, rad, h, mat, y0 = 0, n = 14) => {
+    decor(frame, new THREE.Mesh(new THREE.CylinderGeometry(rad, rad, h, n), mat), lx, y0 + h / 2, lz);
+    const [x, z] = P(lx, lz, frame.yaw, frame.x, frame.z); set.items.push({ type: 'cyl', x, y: TOP + y0 + h / 2, z, hx: rad, hy: h / 2, hz: rad });
+  };
+  const hidden = (frame, lx, y0, lz, w, h, l, extraYaw = 0) => { solid(frame, lx, y0, lz, w, h, l, m.steel, extraYaw).visible = false; };
+  const boulder = (frame, lx, lz, s, mat = X.rock) => {
+    const g = new THREE.Mesh(new THREE.DodecahedronGeometry(s, 1), mat); g.scale.set(1, 0.72, 0.9);
+    decor(frame, g, lx, s * 0.42, lz, r() * 3); g.rotation.x = (r() - 0.5) * 0.5;
+    const [x, z] = P(lx, lz, frame.yaw, frame.x, frame.z); set.items.push({ type: 'cyl', x, y: TOP + s * 0.55, z, hx: s * 0.85, hy: s * 0.55, hz: s * 0.85 });
+  };
+  // contêiner de carga: aberto na frente (+Z) vira um cômodo
+  const container = (frame, L = 6, W = 2.4, H = 2.5, mat = X.contRed, open = true) => {
+    const T = 0.1, hw = W / 2, hl = L / 2;
+    for (const sx of [-1, 1]) solid(frame, sx * (hw - T / 2), 0, 0, T, H, L, mat);
+    solid(frame, 0, 0, -hl + T / 2, W, H, T, mat);
+    solid(frame, 0, H, 0, W + 0.06, 0.12, L + 0.06, mat);
+    for (const sx of [-1, 1]) for (let i = 0; i <= Math.floor((L - 0.3) / 0.6); i++) decor(frame, new THREE.Mesh(boxGeo(0.06, H - 0.12, 0.14), mat), sx * (hw + 0.02), H / 2, -hl + 0.15 + i * 0.6);
+    for (const sx of [-1, 1]) for (const sz of [-1, 1]) decor(frame, new THREE.Mesh(boxGeo(0.14, H + 0.12, 0.14), m.steel), sx * hw, H / 2, sz * hl);
+    if (!open) { solid(frame, 0, 0, hl - T / 2, W, H, T, mat); return null; }
+    for (const sx of [-1, 1]) { const d = new THREE.Mesh(boxGeo(hw, H - 0.12, 0.06), mat); d.geometry.translate(-sx * hw / 2, 0, 0); decor(frame, d, sx * hw, H / 2, hl + 0.04, sx * 1.95); }
+    rooms.push({ ...roomOf(frame, hw, hl), door: [P(0, hl - 0.8, frame.yaw, frame.x, frame.z), P(0, hl + 1.3, frame.yaw, frame.x, frame.z)] });
+    spot(frame, 0, -hl + 0.8);
+    return { inside: P(0, -hl * 0.4, frame.yaw, frame.x, frame.z) };
+  };
+  // antena parabólica sobre pedestal (tilt inclina a boca para +Z do frame)
+  const dish = (frame, lx, lz, R = 2, tilt = 0.9, face = 0) => {
+    cylSolid(frame, lx, lz, 0.35, 1.6, m.concrete);
+    const g = new THREE.Group();
+    const geo = new THREE.SphereGeometry(R, 22, 8, 0, Math.PI * 2, 0, 0.75); geo.rotateX(Math.PI); geo.translate(0, R, 0);
+    g.add(new THREE.Mesh(geo, X.white));
+    const rod = new THREE.Mesh(new THREE.CylinderGeometry(0.03, 0.03, R * 0.62, 5), m.steel); rod.position.y = R * 0.31; g.add(rod);
+    const horn = new THREE.Mesh(new THREE.ConeGeometry(0.1, 0.25, 8), m.steel); horn.position.y = R * 0.62; horn.rotation.x = Math.PI; g.add(horn);
+    g.rotation.x = tilt; decor(frame, g, lx, 1.7, lz, face);
+  };
+  const ufo = (frame, lx, y, lz, s = 1, rz = 0.32, ry = 0.6) => {
+    const g = new THREE.Group();
+    const disc = new THREE.Mesh(new THREE.SphereGeometry(2.4, 28, 12), X.ufoHull); disc.scale.y = 0.22; g.add(disc);
+    const dome = new THREE.Mesh(new THREE.SphereGeometry(0.95, 18, 10, 0, Math.PI * 2, 0, Math.PI / 2), X.ufoDome); dome.position.y = 0.4; g.add(dome);
+    for (let i = 0; i < 12; i++) { const a = i / 12 * Math.PI * 2, l = new THREE.Mesh(new THREE.SphereGeometry(0.11, 8, 6), i % 2 ? X.glowG : X.glowGdim); l.position.set(Math.cos(a) * 2.25, -0.05, Math.sin(a) * 2.25); g.add(l); }
+    g.scale.setScalar(s); g.rotation.z = rz; g.rotation.x = -0.12; decor(frame, g, lx, y, lz, ry);
+  };
+  const floodlight = (frame, lx, lz, h = 3.6, toward = 0) => {
+    decor(frame, cylY(0.07, h, m.steel, 6), lx, h / 2, lz);
+    const lamp = new THREE.Mesh(boxGeo(0.6, 0.32, 0.3), X.glowY); lamp.rotation.x = 0.5; decor(frame, lamp, lx, h, lz, toward);
+  };
+  const sign = (frame, lx, lz, mat = X.yellow) => {
+    decor(frame, cylY(0.04, 1.4, m.steel, 5), lx, 0.7, lz);
+    const s = new THREE.Mesh(new THREE.CircleGeometry(0.4, 3), mat); s.rotation.z = Math.PI / 2; s.material.side = THREE.DoubleSide; decor(frame, s, lx, 1.6, lz);
+  };
+  const drum = (frame, lx, lz, mat = X.contRed, glow = null) => {
+    cylSolid(frame, lx, lz, 0.3, 0.88, mat, 0, 12);
+    if (glow) decor(frame, new THREE.Mesh(new THREE.CylinderGeometry(0.24, 0.24, 0.03, 12), glow), lx, 0.9, lz);
+  };
+  const jeep = (frame, lx, lz, yo = 0, mat = m.olive) => {
+    const g = new THREE.Group();
+    const body = new THREE.Mesh(boxGeo(1.6, 0.7, 3.0), mat); body.position.y = 0.75; g.add(body);
+    const hood = new THREE.Mesh(boxGeo(1.5, 0.25, 1.0), mat); hood.position.set(0, 1.2, 1.0); g.add(hood);
+    const shield = new THREE.Mesh(boxGeo(1.5, 0.55, 0.05), X.glassDark); shield.position.set(0, 1.45, 0.45); shield.rotation.x = -0.25; g.add(shield);
+    for (const sx of [-1, 1]) for (const sz of [-1, 1]) { const w = new THREE.Mesh(new THREE.CylinderGeometry(0.36, 0.36, 0.28, 14), X.rubber); w.rotation.z = Math.PI / 2; w.position.set(sx * 0.82, 0.36, sz * 1.0); g.add(w); }
+    const spare = new THREE.Mesh(new THREE.CylinderGeometry(0.34, 0.34, 0.22, 14), X.rubber); spare.rotation.x = Math.PI / 2; spare.position.set(0, 0.95, -1.62); g.add(spare);
+    decor(frame, g, lx, 0, lz, yo);
+    hidden(frame, lx, 0, lz, 1.7, 1.3, 3.2, yo);
   };
   const site = { x: ctx.cx, z: ctx.cz, yaw: ctx.yaw };
   if (type === 'hut') {
@@ -621,6 +738,393 @@ export function buildCamp(type, ctx) {
     for (const [x, z] of [[-5.5, -3], [-3.2, 4.2], [-0.4, 2], [4, 3.6], [0.8, -2.6], [5.6, -2.4]]) spot(B, x, z);
     for (const [x, z] of [[-5.4, -3.6], [0, -3.6], [5.4, -3.6], [-4.5, 3.2], [2.5, 3.6], [-3, -0.45]]) spot(B, x, z, UP, true);
     for (const [x, z] of [[-6, 22], [6, 22], [0, 14], [14, 6], [-10, 8], [20, -4]]) spot(site, x, z);
+  } else if (type === 'farol') {
+    // FAROL: torre listrada alta com galeria lá em cima (escada por fora), lanterna acesa no topo e a
+    // casinha do faroleiro do lado; boias, barris e cordas no pátio
+    const H = 7.4, tz = -1.4;
+    decor(site, new THREE.Mesh(new THREE.CylinderGeometry(0.85, 1.12, H, 20), X.stripe), 0, H / 2, tz);
+    { const [x, z] = P(0, tz); set.items.push({ type: 'cyl', x, y: TOP + (H - 0.3) / 2, z, hx: 1.12, hy: (H - 0.3) / 2, hz: 1.12 }); }
+    watchTower(site, 0, tz, H, m.steel, X.redRoof, 1.25, 1);
+    decor(site, new THREE.Mesh(new THREE.CylinderGeometry(0.5, 0.5, 1.1, 14, 1, true), X.glass), 0, H + 0.7, tz);
+    decor(site, new THREE.Mesh(new THREE.SphereGeometry(0.3, 12, 10), X.glowY), 0, H + 0.75, tz);
+    { const [x, z] = P(0, tz); set.items.push({ type: 'cyl', x, y: TOP + H + 0.7, z, hx: 0.52, hy: 0.56, hz: 0.52 }); }
+    const keeper = cabin(sub(3.4, 2.4, -0.6), 3.6, 3.0, 2.2);
+    out.crateSpots.push(keeper.inside);
+    barrel(site, -2.4, 0.9); barrel(site, -2.8, 1.6); crateStack(site, 1.6, 1.2);
+    for (const [lx, lz] of [[-1.8, 2.8], [-3.2, -2.6]]) { const buoy = new THREE.Mesh(new THREE.TorusGeometry(0.32, 0.1, 8, 16), X.redRoof); buoy.rotation.x = Math.PI / 2; decor(site, buoy, lx, 0.1, lz); }
+    flag(site, -3.4, -0.6, 3.2);
+    out.yard = P(-1.2, 3.4); out.fire = P(-1.6, 3.8);
+    spot(site, -2.2, 2.2); spot(site, 2.0, 4.6);
+  } else if (type === 'naufragio') {
+    // NAVIO ENCALHADO: casco de madeira cravado na areia (entra pelo rombo do costado), convés quebrado
+    // por cima da popa, costelas expostas na proa, mastro caído com a vela rasgada e carga espalhada
+    const hull = sub(0, -0.6, 0.35), B2 = 2.2, Hh = 2.3, sz0 = -4.4, sz1 = 2.0, bow = 5.0, W2 = m.plankDark;
+    seg(hull, -B2, sz0, B2, sz0, Hh + 0.5, W2, 0.24);
+    seg(hull, -B2, sz0, -B2, sz1, Hh, W2, 0.24);
+    seg(hull, B2, sz0, B2, -1.3, Hh, W2, 0.24); seg(hull, B2, 0.3, B2, sz1, Hh, W2, 0.24);
+    seg(hull, B2, -1.3, B2, 0.3, Hh - 1.9, W2, 0.24, 1.9); // verga do rombo
+    seg(hull, -B2, sz1, -0.25, bow, Hh, W2, 0.24); seg(hull, B2, sz1, 0.25, bow, Hh * 0.6, W2, 0.24);
+    solid(hull, 0, 0, -1.2, 2 * B2 - 0.1, 0.12, 6.2, m.floor);
+    solid(hull, 0, Hh, -3.0, 2 * B2 + 0.25, 0.16, 3.0, m.floor); // convés da popa (o resto desabou)
+    for (const sx of [-1, 1]) for (const y of [0.45, 1.15, 1.85]) decor(hull, new THREE.Mesh(boxGeo(0.06, 0.14, 6.5), m.plank), sx * (B2 + 0.14), y, -1.2);
+    for (const [bx, bz, h] of [[-1.7, 2.8, 3.1], [1.4, 3.0, 2.0], [-1.0, 3.8, 2.8], [0.7, 4.0, 1.6]]) { const rib = new THREE.Mesh(boxGeo(0.16, h, 0.16), m.log); rib.rotation.z = bx > 0 ? -0.18 : 0.18; decor(hull, rib, bx, h / 2, bz); }
+    const bowsprit = cylY(0.1, 3.2, m.log, 7); bowsprit.rotation.x = 1.1; decor(hull, bowsprit, 0, Hh + 0.4, bow + 0.6);
+    const mast = cylY(0.18, 7.2, m.log, 8); mast.rotation.z = Math.PI / 2 - 0.08; decor(site, mast, -4.2, 0.3, 0.8, 0.25);
+    { const sail = new THREE.Mesh(new THREE.PlaneGeometry(3.2, 2.2, 6, 4), X.sailcloth); const p = sail.geometry.attributes.position; for (let i = 0; i < p.count; i++) p.setZ(i, Math.sin(p.getX(i) * 1.7) * 0.25 + (r() - 0.5) * 0.12); sail.geometry.computeVertexNormals(); sail.rotation.x = -1.35; decor(site, sail, -3.8, 0.25, 2.4, 0.3); }
+    { const anchor = new THREE.Group(); const shank = cylY(0.07, 1.6, m.iron, 6); shank.position.y = 0.8; anchor.add(shank); const arm = new THREE.Mesh(new THREE.TorusGeometry(0.55, 0.07, 6, 12, Math.PI), m.iron); arm.rotation.z = Math.PI; arm.position.y = 0.3; anchor.add(arm); anchor.rotation.z = 1.2; decor(site, anchor, 4.2, 0.25, -2.6); }
+    barrel(site, 3.6, 2.6); barrel(site, 4.4, 3.0); crateStack(site, -3.4, -2.4); crateStack(site, 3.2, -1.0);
+    const [rx, rz] = P(0, -1.2, hull.yaw, hull.x, hull.z);
+    rooms.push({ x: rx, z: rz, yaw: hull.yaw, hw: B2, hd: 3.2, door: [P(B2 - 0.7, -0.5, hull.yaw, hull.x, hull.z), P(B2 + 1.3, -0.5, hull.yaw, hull.x, hull.z)] });
+    out.crateSpots.push(P(-1.1, -3.4, hull.yaw, hull.x, hull.z));
+    spot(hull, 0, -2.2); spot(hull, -0.8, 0.8); spot(site, 4.4, 0.6); spot(site, -3.0, 3.6);
+    out.yard = P(4.4, 2.0); out.fire = P(4.6, 1.4);
+  } else if (type === 'taverna') {
+    // TAVERNA: casarão de tábuas grande (balcão com garrafas lá dentro), mesas e bancos no terreiro,
+    // pirâmide de barris de rum, placa pendurada e lanternas em postes
+    const hall = sub(0, -1.8), Wt = 6.6, Dt = 4.6;
+    const c = cabin(hall, Wt, Dt, 2.6);
+    out.crateSpots.push(c.inside);
+    solid(hall, 2.3, 0.18, -1.7, 1.6, 1.0, 0.5, m.plankDark);
+    for (let i = 0; i < 5; i++) decor(hall, new THREE.Mesh(new THREE.CylinderGeometry(0.05, 0.06, 0.3, 6), X.bottle), 1.7 + i * 0.28, 1.33, -1.7);
+    spot(hall, -2.2, 0.8);
+    for (const sx of [-1, 1]) {
+      solid(site, sx * 2.0, 0, 2.7, 1.1, 0.75, 0.75, m.plankDark);
+      for (const sz of [-1, 1]) decor(site, new THREE.Mesh(boxGeo(1.0, 0.08, 0.3), m.plank), sx * 2.0, 0.42, 2.7 + sz * 0.62);
+      decor(site, new THREE.Mesh(new THREE.CylinderGeometry(0.07, 0.06, 0.16, 8), m.plank), sx * 2.0 + 0.2, 0.83, 2.7);
+      decor(site, cylY(0.06, 2.2, m.log, 6), sx * 3.4, 1.1, 3.6); lantern(site, sx * 3.4, 2.25, 3.6);
+    }
+    barrel(site, 3.9, 0.4); barrel(site, 3.9, 1.1); barrel(site, 4.5, 0.75);
+    decor(site, cylY(0.07, 2.6, m.log, 6), -3.6, 1.3, 1.0);
+    { const board = new THREE.Mesh(boxGeo(1.1, 0.6, 0.06), m.plank); board.geometry.translate(0.6, 0, 0); decor(site, board, -3.6, 2.2, 1.0, 0.3); }
+    out.yard = P(0, 4.0); out.fire = P(0, 4.6);
+    spot(site, -1.0, 2.0); spot(site, 1.2, 3.6);
+  } else if (type === 'vila') {
+    // VILA: três casebres de tamanhos diferentes virados para a fogueira, poço de pedra, varal com
+    // roupas, canoa na areia e tocos de lenha
+    const huts = [[0.2, 4.6, 4.2, 3.4, 2.3], [2.3, 4.4, 3.4, 3.0, 2.1], [4.2, 4.5, 3.2, 2.8, 2.0]];
+    huts.forEach(([a, d, W, D, H], i) => { const c = cabin(sub(Math.sin(a) * d, Math.cos(a) * d, a + Math.PI), W, D, H); if (i < 2) out.crateSpots.push(c.inside); });
+    { const wx = Math.sin(3.25) * 3.3, wz = Math.cos(3.25) * 3.3; cylSolid(site, wx, wz, 0.7, 0.8, X.rock, 0, 12);
+      for (const sx of [-1, 1]) decor(site, cylY(0.06, 1.6, m.log, 6), wx + sx * 0.6, 0.8, wz);
+      const roof = new THREE.Mesh(new THREE.ConeGeometry(0.95, 0.5, 4), m.thatch); roof.rotation.y = Math.PI / 4; decor(site, roof, wx, 1.85, wz); }
+    { const ax = Math.sin(5.25) * 3.8, az = Math.cos(5.25) * 3.8;
+      for (const s of [-1.2, 1.2]) decor(site, cylY(0.05, 1.8, m.log, 6), ax + s * 0.6, 0.9, az + s * 0.9);
+      const line = new THREE.Mesh(new THREE.CylinderGeometry(0.01, 0.01, 3.0, 4), m.rope); line.rotation.z = Math.PI / 2; decor(site, line, ax, 1.7, az, -Math.atan2(0.9, 0.6) + Math.PI / 2);
+      [0xc94b3a, 0xe0d6b8, 0x3f6f9a].forEach((col, k) => { const cl = new THREE.Mesh(new THREE.PlaneGeometry(0.5, 0.6), new THREE.MeshStandardMaterial({ color: col, side: THREE.DoubleSide, roughness: 0.95 })); decor(site, cl, ax + (k - 1) * 0.36, 1.38, az + (k - 1) * 0.54, Math.atan2(0.6, 0.9)); }); }
+    { const canoe = new THREE.Mesh(new THREE.CapsuleGeometry(0.4, 2.6, 4, 10), m.plankDark); canoe.rotation.x = Math.PI / 2; canoe.scale.set(1, 1, 0.5); decor(site, canoe, Math.sin(1.25) * 5.2, 0.18, Math.cos(1.25) * 5.2, 1.25); }
+    for (let i = 0; i < 3; i++) decor(site, cylY(0.22, 0.4, m.log, 8), 1.8 + i * 0.5, 0.2, -1.2 + (i % 2) * 0.4);
+    out.yard = P(0, 0); out.fire = P(0, 0);
+    spot(site, 1.5, -1.0); spot(site, -1.6, 0.8); spot(site, 0.6, 1.8);
+  } else if (type === 'tesouro') {
+    // ILHA DA CAVEIRA: rocha enorme em forma de caveira, anel de pedras em volta da cova do tesouro,
+    // totens de tiki, pá fincada na terra e a barraquinha dos escavadores
+    const skull = new THREE.Group();
+    const head = new THREE.Mesh(new THREE.IcosahedronGeometry(2.0, 1), X.rockPale); head.scale.set(1, 0.95, 0.9); skull.add(head);
+    const brow = new THREE.Mesh(boxGeo(2.4, 0.35, 0.5), X.rockPale); brow.position.set(0, 0.62, 1.25); skull.add(brow);
+    const jaw = new THREE.Mesh(boxGeo(2.2, 0.9, 1.6), X.rockPale); jaw.position.set(0, -1.3, 0.55); skull.add(jaw);
+    for (const sx of [-1, 1]) { const eye = new THREE.Mesh(new THREE.SphereGeometry(0.48, 12, 10), X.black); eye.position.set(sx * 0.72, 0.1, 1.5); eye.scale.z = 0.6; skull.add(eye); }
+    const nose = new THREE.Mesh(new THREE.ConeGeometry(0.25, 0.5, 3), X.black); nose.position.set(0, -0.55, 1.66); nose.rotation.x = Math.PI; skull.add(nose);
+    for (let i = 0; i < 4; i++) { const t = new THREE.Mesh(boxGeo(0.34, 0.4, 0.2), X.rockPale); t.position.set(-0.6 + i * 0.4, -1.0, 1.36); skull.add(t); }
+    decor(site, skull, 0, 1.95, -3.6);
+    { const [x, z] = P(0, -3.6); set.items.push({ type: 'cyl', x, y: TOP + 1.9, z, hx: 2.0, hy: 1.9, hz: 2.0 }); }
+    for (const a of [0.9, 1.7, 2.5, 3.8, 4.6, 5.4]) boulder(site, Math.sin(a) * 3.1, 1.0 + Math.cos(a) * 3.1, 0.5 + r() * 0.35);
+    decor(site, new THREE.Mesh(new THREE.CircleGeometry(1.3, 20).rotateX(-Math.PI / 2), X.scorch), 0, 0.03, 1.0);
+    for (const sx of [-1, 1]) { const mound = new THREE.Mesh(new THREE.SphereGeometry(0.7, 10, 6, 0, Math.PI * 2, 0, Math.PI / 2), X.dirt); mound.scale.y = 0.5; decor(site, mound, sx * 1.9, 0, 1.4); }
+    for (const sx of [-1, 1]) {
+      const tx = sx * 2.4, tz = -1.3;
+      for (let k = 0; k < 2; k++) decor(site, cylY(0.32, 1.0, k ? m.plankDark : m.log, 8), tx, 0.5 + k, tz);
+      for (let k = 0; k < 2; k++) { for (const ex of [-0.12, 0.12]) decor(site, new THREE.Mesh(boxGeo(0.1, 0.12, 0.06), X.black), tx + ex, 0.7 + k, tz + 0.31); decor(site, new THREE.Mesh(boxGeo(0.34, 0.08, 0.06), X.redRoof), tx, 0.42 + k, tz + 0.31); }
+      decor(site, new THREE.Mesh(new THREE.ConeGeometry(0.4, 0.5, 8), m.thatch), tx, 2.25, tz);
+      const [x, z] = P(tx, tz); set.items.push({ type: 'cyl', x, y: TOP + 1, z, hx: 0.34, hy: 1, hz: 0.34 });
+    }
+    { const shovel = new THREE.Group(); const h = cylY(0.03, 1.2, m.log, 5); h.position.y = 0.6; shovel.add(h); const blade = new THREE.Mesh(boxGeo(0.26, 0.32, 0.03), m.iron); shovel.add(blade); shovel.rotation.z = 0.3; decor(site, shovel, 1.2, 0.1, 2.4); }
+    tent(site, 3.8, 2.6, -0.9, m.canvasTan, 2.6, 2.0, 1.5);
+    flag(site, -3.4, 3.0, 3.4);
+    out.crateSpots.push(P(0, 1.0));
+    out.yard = P(-1.6, 4.2); out.fire = P(-2.2, 4.0);
+    spot(site, 1.5, 3.8); spot(site, -1.8, -1.0); spot(site, 2.6, -0.4);
+  } else if (type === 'canhoneira') {
+    // BATERIA DE CANHÕES: muro baixo de troncos em arco virado para o mar, três canhões antigos em
+    // carretas de madeira, pirâmides de balas, barris de pólvora, paiol e bandeira
+    const RR = 5.2;
+    for (let i = 0; i < 6; i++) { const a0 = -1.15 + i * 0.383, a1 = a0 + 0.383; seg(site, Math.sin(a0) * RR, Math.cos(a0) * RR, Math.sin(a1) * RR, Math.cos(a1) * RR, 0.9, m.log, 0.42); }
+    for (let a = -1.15; a <= 1.15; a += 0.085) decor(site, cylY(0.2, 1.15 + r() * 0.2, m.log, 7), Math.sin(a) * (RR + 0.05), 0.55, Math.cos(a) * (RR + 0.05));
+    const cannon = (lx, lz, yo) => {
+      const g = new THREE.Group();
+      const carriage = new THREE.Mesh(boxGeo(0.9, 0.45, 1.4), m.plankDark); carriage.position.y = 0.42; g.add(carriage);
+      for (const sx of [-1, 1]) for (const sz of [-0.45, 0.45]) { const w = new THREE.Mesh(new THREE.CylinderGeometry(0.28, 0.28, 0.12, 12), m.plankDark); w.rotation.z = Math.PI / 2; w.position.set(sx * 0.5, 0.28, sz); g.add(w); }
+      const tube = new THREE.Mesh(new THREE.CylinderGeometry(0.15, 0.24, 2.0, 12), m.iron); tube.rotation.x = Math.PI / 2 - 0.1; tube.position.set(0, 0.86, 0.45); g.add(tube);
+      const lip = new THREE.Mesh(new THREE.TorusGeometry(0.16, 0.05, 6, 12), m.iron); lip.position.set(0, 0.96, 1.44); g.add(lip);
+      decor(site, g, lx, 0, lz, yo);
+      const [x, z] = P(lx, lz); set.items.push({ type: 'box', x, y: TOP + 0.5, z, hx: 0.5, hy: 0.5, hz: 0.75, yaw: ctx.yaw + yo });
+    };
+    for (const a of [-0.65, 0, 0.65]) cannon(Math.sin(a) * (RR - 2.0), Math.cos(a) * (RR - 2.0), a);
+    for (const [px, pz] of [[-1.6, 1.4], [1.6, 1.5]]) {
+      for (let k = 0; k < 4; k++) decor(site, new THREE.Mesh(new THREE.SphereGeometry(0.14, 10, 8), m.iron), px + (k % 2 - 0.5) * 0.29, 0.14, pz + ((k >> 1) - 0.5) * 0.29);
+      decor(site, new THREE.Mesh(new THREE.SphereGeometry(0.14, 10, 8), m.iron), px, 0.36, pz);
+    }
+    const shed = cabin(sub(0, -2.8), 3.4, 2.8, 2.1); out.crateSpots.push(shed.inside);
+    barrel(site, 2.6, -1.2); barrel(site, -2.6, -1.0); barrel(site, -2.9, -0.4);
+    flag(site, 3.0, -2.8, 4.0);
+    out.yard = P(0, 0.6); out.fire = P(2.4, 0.4);
+    for (const a of [-0.65, 0, 0.65]) spot(site, Math.sin(a) * (RR - 3.3), Math.cos(a) * (RR - 3.3));
+  } else if (type === 'radar') {
+    // ESTAÇÃO DE RADAR: parabólica grande sobre pedestal, sala de controle de concreto, gerador com
+    // escapamento, mastros com luz vermelha e meia-lua de sacos de areia na frente
+    decor(site, new THREE.Mesh(new THREE.CylinderGeometry(3.4, 3.5, 0.08, 24), m.concreteDark), 0, 0.04, 1.6);
+    dish(site, 0, 1.6, 2.3, 0.75, 0);
+    const ctrl = concrete(sub(0, -2.8), 4.4, 3.0, 2.4); out.crateSpots.push(ctrl.inside);
+    solid(site, 3.1, 0, -2.6, 1.4, 1.0, 0.9, m.olive);
+    decor(site, cylY(0.06, 1.2, m.steel, 6), 3.4, 1.6, -2.4);
+    for (const [lx, lz, h] of [[-2.7, -0.9, 5.5], [2.8, -0.5, 4.2]]) { decor(site, cylY(0.05, h, m.steel, 6), lx, h / 2, lz); decor(site, new THREE.Mesh(new THREE.SphereGeometry(0.09, 8, 6), X.glowR), lx, h + 0.05, lz); }
+    for (let i = 0; i < 4; i++) { const a0 = -0.95 + i * 0.48, a1 = a0 + 0.48, RR = 5; sandbags(site, Math.sin(a0) * RR, Math.cos(a0) * RR + 1, Math.sin(a1) * RR, Math.cos(a1) * RR + 1, 3); }
+    ammoCrate(site, -3.3, 2.4); ammoCrate(site, 3.5, 2.2);
+    flag(site, -3.6, -2.6, 4.0, 'mil');
+    out.yard = P(1.6, 4.0); out.fire = P(2.4, 4.2);
+    spot(site, -2.2, 4.4); spot(site, 1.2, 5.0); spot(site, -3.8, 0.8);
+  } else if (type === 'heliponto') {
+    // HELIPONTO: plataforma com o "H", helicóptero de transporte estacionado, hangar de concreto,
+    // tambores de combustível, biruta e sacos de areia
+    decor(site, new THREE.Mesh(new THREE.CylinderGeometry(3.4, 3.4, 0.06, 28), [m.concreteDark, X.helipad, m.concreteDark]), 0, 0.03, 1.4);
+    const heli = new THREE.Group();
+    const body = new THREE.Mesh(new THREE.CapsuleGeometry(0.85, 2.4, 6, 12), X.heliOlive); body.rotation.x = Math.PI / 2; body.position.y = 1.35; heli.add(body);
+    const nose = new THREE.Mesh(new THREE.SphereGeometry(0.72, 14, 10), X.glassDark); nose.scale.set(1, 0.8, 0.9); nose.position.set(0, 1.45, 1.7); heli.add(nose);
+    const tail = new THREE.Mesh(new THREE.CylinderGeometry(0.16, 0.32, 3.4, 8), X.heliOlive); tail.rotation.x = Math.PI / 2; tail.position.set(0, 1.7, -3.2); heli.add(tail);
+    const fin = new THREE.Mesh(boxGeo(0.08, 0.9, 0.6), X.heliOlive); fin.position.set(0, 2.15, -4.8); heli.add(fin);
+    for (let k = 0; k < 2; k++) { const tb = new THREE.Mesh(boxGeo(0.03, 0.12, 1.1), m.steel); tb.rotation.x = k * Math.PI / 2; tb.position.set(0.12, 2.15, -4.85); heli.add(tb); }
+    const mastH = cylY(0.1, 0.4, m.steel, 8); mastH.position.y = 2.35; heli.add(mastH);
+    for (let k = 0; k < 4; k++) { const bl = new THREE.Mesh(boxGeo(0.25, 0.04, 4.6), m.steel); bl.rotation.y = k * Math.PI / 2 + 0.4; bl.position.y = 2.56; heli.add(bl); }
+    for (const sx of [-1, 1]) { const sk = new THREE.Mesh(boxGeo(0.08, 0.08, 3.2), m.steel); sk.position.set(sx * 0.85, 0.08, 0.2); heli.add(sk); for (const sz of [-0.6, 1.0]) { const st = new THREE.Mesh(boxGeo(0.06, 0.6, 0.06), m.steel); st.position.set(sx * 0.75, 0.4, sz); heli.add(st); } }
+    const hf = sub(0.2, 1.4, Math.PI + 0.4);
+    decor(hf, heli, 0, 0, 0);
+    hidden(hf, 0, 0.2, 0, 1.8, 2.0, 3.6); hidden(hf, 0, 1.4, -3.2, 0.5, 0.6, 3.0);
+    const hangar = concrete(sub(-0.6, -4.0), 5.0, 3.2, 2.7); out.crateSpots.push(hangar.inside);
+    for (let i = 0; i < 3; i++) drum(site, 4.0, -1.4 + i * 0.7, X.contRed);
+    decor(site, cylY(0.05, 3.2, m.steel, 6), -3.8, 1.6, 3.4);
+    { const sock = new THREE.Mesh(new THREE.ConeGeometry(0.22, 0.9, 10, 1, true), X.orange); sock.rotation.z = Math.PI / 2; sock.material.side = THREE.DoubleSide; decor(site, sock, -3.4, 3.0, 3.4, 0.6); }
+    sandbags(site, 2.0, -2.0, 3.2, -2.0, 2); sandbags(site, -3.4, -2.1, -4.2, -1.0, 2);
+    out.yard = P(-2.8, 1.0); out.fire = P(-3.2, 0.4);
+    spot(site, -2.4, 2.6); spot(site, 2.8, 2.2); spot(site, 1.0, -1.8);
+  } else if (type === 'quartel') {
+    // QUARTEL: alojamento comprido de concreto (beliches lá dentro), escritório separado, mastro com a
+    // bandeira, sacos de areia na porta e um jipe estacionado
+    const barr = sub(0, -2.2), BD = 3.8;
+    const b = concrete(barr, 8.4, BD, 2.7); out.crateSpots.push(b.inside);
+    for (const bx of [-3.2, -0.3]) {
+      solid(barr, bx, 0, -BD / 2 + 0.55, 1.9, 0.5, 0.85, m.olive);
+      decor(barr, new THREE.Mesh(boxGeo(1.9, 0.12, 0.85), m.olive), bx, 1.35, -BD / 2 + 0.55);
+      for (const sx of [-1, 1]) decor(barr, new THREE.Mesh(boxGeo(0.06, 1.5, 0.06), m.steel), bx + sx * 0.92, 0.75, -BD / 2 + 0.95);
+    }
+    const office = concrete(sub(-3.8, 2.7, Math.PI / 2), 3.0, 2.6, 2.4); out.crateSpots.push(office.inside);
+    flag(site, 2.6, 3.6, 5.0, 'mil');
+    jeep(site, 3.4, 0.8, 0.3);
+    sandbags(site, -2.3, 0.4, -1.0, 0.4, 2); sandbags(site, 1.0, 0.4, 2.3, 0.4, 2);
+    out.yard = P(0.4, 2.6); out.fire = P(0.9, 3.4);
+    spot(site, -0.6, 1.6); spot(site, 1.8, 2.2); spot(site, 0, 4.2);
+  } else if (type === 'deposito') {
+    // DEPÓSITO DE MUNIÇÃO: contêineres de carga (dois abertos com loot e inimigos dentro, um fechado
+    // atrás), empilhadeira, paletes de caixas de munição e arame farpado
+    const c1 = container(sub(-1.7, -0.6), 6, 2.4, 2.5, X.contRed), c2 = container(sub(1.7, -1.0), 6, 2.4, 2.5, X.contBlue);
+    out.crateSpots.push(c1.inside, c2.inside);
+    container(sub(0, -5.4, Math.PI / 2), 6, 2.4, 2.5, X.contGreen, false);
+    { const fl = new THREE.Group(); const b2 = new THREE.Mesh(boxGeo(1.1, 1.0, 1.6), X.yellow); b2.position.y = 0.8; fl.add(b2);
+      const cab = new THREE.Mesh(boxGeo(1.0, 0.08, 1.0), m.steel); cab.position.set(0, 2.1, -0.1); fl.add(cab);
+      for (const sx of [-1, 1]) { const p2 = new THREE.Mesh(boxGeo(0.06, 1.8, 0.06), m.steel); p2.position.set(sx * 0.45, 1.2, -0.55); fl.add(p2); const ms = new THREE.Mesh(boxGeo(0.08, 2.2, 0.08), m.steel); ms.position.set(sx * 0.3, 1.1, 0.85); fl.add(ms); const fk = new THREE.Mesh(boxGeo(0.1, 0.05, 1.0), m.steel); fk.position.set(sx * 0.3, 0.12, 1.4); fl.add(fk); }
+      for (const sx of [-1, 1]) for (const sz of [-0.5, 0.5]) { const w = new THREE.Mesh(new THREE.CylinderGeometry(0.28, 0.28, 0.2, 12), X.rubber); w.rotation.z = Math.PI / 2; w.position.set(sx * 0.58, 0.28, sz); fl.add(w); }
+      decor(site, fl, 4.0, 0, 2.4, -0.5); hidden(site, 4.0, 0, 2.4, 1.2, 1.6, 2.2, -0.5); }
+    for (const [px, pz] of [[-3.9, 2.4], [-3.6, 3.4]]) { decor(site, new THREE.Mesh(boxGeo(1.2, 0.14, 1.0), m.plank), px, 0.07, pz); }
+    ammoCrate(site, -3.9, 2.4); ammoCrate(site, -3.6, 3.4);
+    barbed(site, -4.6, 4.4, 4.6, 4.4);
+    flag(site, 4.4, -2.6, 4.2, 'mil');
+    out.yard = P(0, 3.4); out.fire = P(-0.8, 3.8);
+    spot(site, 0, 2.6); spot(site, -3.6, 0.2); spot(site, 3.7, 0.4);
+  } else if (type === 'trincheira') {
+    // TRINCHEIRAS: sacos de areia em zigue-zague virados para o mar, ninho de metralhadora fechado,
+    // duas barracas de lona atrás, arame farpado e caixas de munição
+    const zz = [[-5.4, 1.2], [-2.7, 3.0], [0, 1.4], [2.7, 3.0], [5.4, 1.2]];
+    for (let i = 0; i < zz.length - 1; i++) sandbags(site, zz[i][0], zz[i][1], zz[i + 1][0], zz[i + 1][1], 4);
+    const NR = 1.7, nz = -1.4;
+    for (let i = 0; i < 8; i++) { if (i === 4) continue; const a0 = i * Math.PI / 4 - Math.PI / 8, a1 = a0 + Math.PI / 4; sandbags(site, Math.sin(a0) * NR, nz + Math.cos(a0) * NR, Math.sin(a1) * NR, nz + Math.cos(a1) * NR, 4); }
+    { const mg = new THREE.Group(); for (let k = 0; k < 3; k++) { const leg = new THREE.Mesh(boxGeo(0.04, 1.0, 0.04), m.steel); leg.position.set(Math.sin(k * 2.1) * 0.25, 0.45, Math.cos(k * 2.1) * 0.25); leg.rotation.set(Math.cos(k * 2.1) * 0.4, 0, -Math.sin(k * 2.1) * 0.4); mg.add(leg); }
+      const gun = new THREE.Mesh(boxGeo(0.14, 0.18, 1.0), X.gunmetal); gun.position.y = 1.0; mg.add(gun); const bar = cylY(0.035, 0.8, X.gunmetal, 6); bar.rotation.x = Math.PI / 2; bar.position.set(0, 1.02, 0.85); mg.add(bar);
+      decor(site, mg, 0, 0, nz + 0.8); }
+    rooms.push({ ...roomOf(sub(0, nz), NR * 0.9, NR * 0.9), door: [P(0, nz - NR + 0.8), P(0, nz - NR - 1.2)], fort: true });
+    tent(site, -3.6, -3.8, 0, m.canvas, 3, 2.2, 1.7); tent(site, 3.6, -4.0, 0.2, m.canvasTan, 3, 2.2, 1.7);
+    barbed(site, -5, 4.6, 5, 4.6);
+    ammoCrate(site, -1.8, 0.2); ammoCrate(site, 1.9, 0.4);
+    flag(site, 5.0, -1.6, 3.8, 'mil');
+    out.crateSpots.push(P(0, nz - 0.4));
+    out.yard = P(0, -4.0); out.fire = P(0, -4.4);
+    spot(site, -2.7, 2.1); spot(site, 2.7, 2.1); spot(site, -5.0, 0.4); spot(site, 5.0, 0.4); spot(site, 0.5, nz + 0.1);
+  } else if (type === 'artilharia') {
+    // ARTILHARIA: obuseiro pesado (cano longo apontado para o mar) dentro de um anel de sacos de areia,
+    // rede de camuflagem por cima, pilhas de granadas de latão e paiol de concreto atrás
+    const RR = 4.2;
+    for (let i = 0; i < 10; i++) { if (i === 5) continue; const a0 = i / 10 * Math.PI * 2 - Math.PI / 10, a1 = a0 + Math.PI / 5; sandbags(site, Math.sin(a0) * RR, Math.cos(a0) * RR, Math.sin(a1) * RR, Math.cos(a1) * RR, 3); }
+    { const gun = new THREE.Group();
+      for (const sx of [-1, 1]) { const trail = new THREE.Mesh(boxGeo(0.2, 0.2, 2.4), m.olive); trail.position.set(sx * 0.5, 0.25, -1.3); trail.rotation.y = sx * 0.25; gun.add(trail);
+        const w = new THREE.Mesh(new THREE.CylinderGeometry(0.55, 0.55, 0.28, 16), X.rubber); w.rotation.z = Math.PI / 2; w.position.set(sx * 0.95, 0.55, 0.1); gun.add(w); }
+      const cradle = new THREE.Mesh(boxGeo(1.4, 0.5, 1.4), m.olive); cradle.position.y = 0.9; gun.add(cradle);
+      const shieldP = new THREE.Mesh(boxGeo(2.0, 1.1, 0.08), m.olive); shieldP.position.set(0, 1.25, 0.75); shieldP.rotation.x = -0.15; gun.add(shieldP);
+      const barrelG = new THREE.Mesh(new THREE.CylinderGeometry(0.13, 0.2, 4.4, 12), X.gunmetal); barrelG.geometry.translate(0, 2.2, 0); barrelG.rotation.x = Math.PI / 2 - 0.35; barrelG.position.set(0, 1.15, -0.2); gun.add(barrelG);
+      const brake = new THREE.Mesh(new THREE.CylinderGeometry(0.2, 0.2, 0.4, 10), X.gunmetal); brake.rotation.x = Math.PI / 2 - 0.35; brake.position.set(0, 1.15 + Math.cos(Math.PI / 2 - 0.35) * 4.3, -0.2 + Math.sin(Math.PI / 2 - 0.35) * 4.3); gun.add(brake);
+      decor(site, gun, 0, 0, 0.2); hidden(site, 0, 0, 0, 2.0, 1.5, 2.6); }
+    { const net = new THREE.Mesh(new THREE.PlaneGeometry(6.4, 6.4, 8, 8), X.camo); const p = net.geometry.attributes.position; for (let i = 0; i < p.count; i++) p.setZ(i, -0.25 * (1 - (p.getX(i) / 3.2) ** 2) * (1 - (p.getY(i) / 3.2) ** 2)); net.geometry.computeVertexNormals(); net.rotation.x = -Math.PI / 2; decor(site, net, 0, 2.9, 0);
+      for (const sx of [-1, 1]) for (const sz of [-1, 1]) decor(site, cylY(0.05, 2.9, m.log, 6), sx * 2.9, 1.45, sz * 2.9); }
+    for (const [px, pz] of [[-2.2, -1.6], [2.3, -1.4]]) for (let k = 0; k < 6; k++) decor(site, cylY(0.09, 0.55, X.brass, 8), px + (k % 3) * 0.2, 0.28, pz + ((k / 3) | 0) * 0.2);
+    const shed = concrete(sub(0, -5.6), 3.4, 2.6, 2.3); out.crateSpots.push(shed.inside);
+    ammoCrate(site, 2.6, 1.0);
+    flag(site, -3.0, -4.8, 4.0, 'mil');
+    rooms.push({ ...roomOf(site, RR * 0.9, RR * 0.9), door: [P(0, -RR + 1.2), P(0, -RR - 1.4)], fort: true });
+    out.yard = P(0, -1.8); out.fire = P(1.2, -2.6);
+    spot(site, -1.9, 1.4); spot(site, 1.9, 1.6); spot(site, -0.6, -2.4);
+  } else if (type === 'comunicacoes') {
+    // TORRE DE COMUNICAÇÕES: torre de aço com plataforma (atirador lá em cima), mastro de antena com
+    // luz vermelha no alto, parabólica pequena, casa de rádio, gerador e bobina de cabo
+    const H = 6.2;
+    watchTower(site, 0, -0.8, H, m.steel, m.steel, 1.0, 1);
+    decor(site, cylY(0.07, 6.0, m.steel, 6), 0, H + 2.4 + 3.0, -0.8);
+    decor(site, new THREE.Mesh(new THREE.SphereGeometry(0.12, 8, 6), X.glowR), 0, H + 8.5, -0.8);
+    for (const y of [H + 3.6, H + 5.4]) { const arm = new THREE.Mesh(boxGeo(1.4, 0.05, 0.05), m.steel); decor(site, arm, 0, y, -0.8); }
+    for (const sx of [-1, 1]) { const d2 = new THREE.Mesh(new THREE.SphereGeometry(0.4, 12, 6, 0, Math.PI * 2, 0, 0.9), X.white); d2.rotation.z = sx * 1.3; decor(site, d2, sx * 0.4, H + 4.4, -0.8); }
+    const hut = concrete(sub(3.6, 1.4, -Math.PI / 2), 3.6, 2.8, 2.4); out.crateSpots.push(hut.inside);
+    solid(site, -3.0, 0, 1.0, 1.4, 1.0, 0.9, m.olive);
+    cylSolid(site, -2.8, -2.8, 0.6, 0.9, m.plankDark, 0, 12);
+    dish(site, -3.3, 3.2, 1.2, 0.5, 0.8);
+    flag(site, 2.8, -3.0, 3.8, 'mil');
+    out.yard = P(-0.6, 3.0); out.fire = P(0.2, 3.6);
+    spot(site, -1.6, 1.8); spot(site, 1.0, 3.8);
+  } else if (type === 'ovni') {
+    // CRATERA DO OVNI: disco voador enorme cravado no meio de uma cratera chamuscada, pedaços
+    // brilhando espalhados, barracas brancas de quarentena, holofotes e fita de isolamento
+    decor(site, new THREE.Mesh(new THREE.CircleGeometry(5.6, 32).rotateX(-Math.PI / 2), X.scorch), 0, 0.03, 0.4);
+    for (let i = 0; i < 10; i++) { const a = i / 10 * Math.PI * 2 + r() * 0.3, d = 5.2 + r() * 0.5, s = 0.8 + r() * 0.5; const mound = new THREE.Mesh(new THREE.SphereGeometry(s, 10, 6, 0, Math.PI * 2, 0, Math.PI / 2), X.rockDark); mound.scale.y = 0.45; decor(site, mound, Math.sin(a) * d, 0, 0.4 + Math.cos(a) * d, r() * 3); }
+    ufo(site, 0, 0.6, 0.4, 1.55, 0.38, 0.4);
+    hidden(site, 0, 0, 0.4, 5.6, 1.9, 5.6);
+    for (let i = 0; i < 8; i++) { const a = r() * 6.28, d = 3.4 + r() * 1.6, sh = new THREE.Mesh(new THREE.TetrahedronGeometry(0.2 + r() * 0.25), X.glowG); sh.rotation.set(r() * 3, 0, r() * 3); decor(site, sh, Math.sin(a) * d, 0.12, 0.4 + Math.cos(a) * d); }
+    tent(site, -4.8, -4.0, 0.9, X.whiteCanvas, 3.2, 2.4, 1.9); tent(site, 4.8, -4.2, -0.9, X.whiteCanvas, 3.2, 2.4, 1.9);
+    for (const [lx, lz] of [[-4.6, 4.8], [4.8, 4.4], [0, -6.0]]) floodlight(site, lx, lz, 3.6, Math.atan2(-lx, 0.4 - lz));
+    for (let i = 0; i < 6; i++) { const a0 = 0.5 + i * 0.5, a1 = a0 + 0.5, d = 6.6; const len = 2 * d * Math.sin(0.25); const tape = new THREE.Mesh(boxGeo(0.02, 0.08, len), X.yellow); decor(site, tape, Math.sin(a0 + 0.25) * d * Math.cos(0.25), 1.0, 0.4 + Math.cos(a0 + 0.25) * d * Math.cos(0.25), a0 + 0.25 + Math.PI / 2); decor(site, cylY(0.04, 1.1, m.steel, 5), Math.sin(a1) * d, 0.55, 0.4 + Math.cos(a1) * d); }
+    out.crateSpots.push(P(-4.0, -1.4), P(3.6, 3.8));
+    out.yard = P(-2.0, 5.8); out.fire = P(-2.6, 6.0);
+    spot(site, -3.6, 3.4); spot(site, 3.8, -1.2); spot(site, -1.6, -4.4);
+  } else if (type === 'domo') {
+    // OBSERVATÓRIO: sala redonda de concreto (octógono) com a cúpula branca e a fresta aberta, um
+    // telescópio enorme lá dentro, painel de controle e uma parabólica do lado de fora
+    const OR = 3.4, oc = -0.6, WHt = 2.7;
+    for (let i = 0; i < 8; i++) {
+      const a0 = (i - 0.5) / 8 * Math.PI * 2, a1 = (i + 0.5) / 8 * Math.PI * 2;
+      const p0 = [Math.sin(a0) * OR, oc + Math.cos(a0) * OR], p1 = [Math.sin(a1) * OR, oc + Math.cos(a1) * OR];
+      if (i === 0) {
+        const L = (t) => [p0[0] + (p1[0] - p0[0]) * t, p0[1] + (p1[1] - p0[1]) * t], q0 = L(0.27), q1 = L(0.73);
+        seg(site, p0[0], p0[1], q0[0], q0[1], WHt, m.concrete); seg(site, q1[0], q1[1], p1[0], p1[1], WHt, m.concrete);
+        seg(site, q0[0], q0[1], q1[0], q1[1], WHt - 2.1, m.concrete, 0.22, 2.1);
+      } else seg(site, p0[0], p0[1], p1[0], p1[1], WHt, m.concrete);
+    }
+    decor(site, new THREE.Mesh(new THREE.SphereGeometry(OR + 0.15, 28, 12, 0, Math.PI * 2, 0, Math.PI / 2), X.white), 0, WHt, oc);
+    { const slit = new THREE.Mesh(boxGeo(0.8, 0.06, 2.4), X.black); slit.rotation.x = -0.75; decor(site, slit, 0, WHt + OR * 0.68, oc + OR * 0.6); }
+    blocker(site, 0, WHt, oc, OR * 1.4, 1.6, OR * 1.4);
+    cylSolid(site, 0, oc - 0.6, 0.45, 1.2, m.steel);
+    { const tube = new THREE.Mesh(new THREE.CylinderGeometry(0.32, 0.45, 3.0, 14), X.brass); tube.rotation.x = 0.85; decor(site, tube, 0, 1.9, oc - 0.1); }
+    solid(site, -1.9, 0, oc - 1.2, 1.2, 0.9, 0.5, m.steel, 0.6);
+    decor(site, new THREE.Mesh(boxGeo(0.9, 0.5, 0.05), X.glowB), -1.95, 1.2, oc - 1.3, 0.6);
+    rooms.push({ x: P(0, oc)[0], z: P(0, oc)[1], yaw: ctx.yaw, hw: OR * 0.72, hd: OR * 0.72, door: [P(0, oc + OR - 0.9), P(0, oc + OR + 1.3)] });
+    out.crateSpots.push(P(1.6, oc - 1.0));
+    dish(site, 4.6, 2.8, 1.4, 0.6, -0.4);
+    sign(site, -1.6, 3.6); sign(site, 1.6, 3.6);
+    spot(site, -1.3, oc + 1.0); spot(site, 2.6, 4.4); spot(site, -3.4, 3.6);
+    out.yard = P(0, 4.4); out.fire = P(-1.0, 4.8);
+  } else if (type === 'criogenia') {
+    // CRIOGENIA: laboratório comprido com uma fileira de cápsulas de vidro (gente congelada lá dentro,
+    // luz azul), tanques de nitrogênio deitados lá fora, canos e placas de perigo
+    const labF = sub(0, -1.6), LD = 4.0;
+    const lab = concrete(labF, 8.0, LD, 2.9); out.crateSpots.push(lab.inside);
+    for (const px of [-3.0, -1.4, 0.2]) {
+      decor(labF, new THREE.Mesh(new THREE.CylinderGeometry(0.45, 0.45, 2.0, 16, 1, true), X.glass), px, 1.15, -1.4);
+      decor(labF, new THREE.Mesh(new THREE.CylinderGeometry(0.42, 0.42, 1.9, 16), X.liquidB), px, 1.1, -1.4);
+      decor(labF, new THREE.Mesh(new THREE.CapsuleGeometry(0.17, 0.9, 4, 8), X.frozen), px, 1.1, -1.4);
+      for (const y of [0.08, 2.2]) decor(labF, cylY(0.5, 0.16, m.steel, 16), px, y, -1.4);
+      const [x, z] = P(px, -1.4, labF.yaw, labF.x, labF.z); set.items.push({ type: 'cyl', x, y: TOP + 1.15, z, hx: 0.5, hy: 1.15, hz: 0.5 });
+    }
+    for (const sx of [-1, 1]) {
+      const tank = new THREE.Mesh(new THREE.CapsuleGeometry(0.7, 1.8, 6, 14), X.white); tank.rotation.z = Math.PI / 2; decor(site, tank, sx * 3.2, 1.05, 2.4);
+      for (const k of [-0.7, 0.7]) decor(site, new THREE.Mesh(boxGeo(0.2, 0.5, 1.2), m.steel), sx * 3.2 + k, 0.25, 2.4);
+      decor(site, new THREE.Mesh(new THREE.SphereGeometry(0.1, 8, 6), X.glowB), sx * 3.2, 1.85, 2.4);
+      hidden(site, sx * 3.2, 0, 2.4, 3.1, 1.8, 1.5);
+      const pipe = cylY(0.07, 2.4, m.steel, 6); pipe.rotation.x = Math.PI / 2; decor(site, pipe, sx * 2.4, 0.4, 1.0);
+    }
+    sign(site, -0.9, 0.9); sign(site, 0.9, 0.9, X.glowB);
+    out.yard = P(0, 3.2); out.fire = P(0, 4.2);
+    spot(site, -1.0, 2.2); spot(site, 1.4, 4.0); spot(site, 4.7, -1.0);
+  } else if (type === 'antenas') {
+    // CAMPO DE ANTENAS: três parabólicas grandes apontadas para o mesmo ponto do céu, bandejas de cabo
+    // até a casa de controle, gerador e placas
+    for (const [lx, lz, R2] of [[-4.0, -1.4, 1.9], [0, -3.8, 2.3], [4.0, -1.4, 1.9]]) {
+      dish(site, lx, lz, R2, 0.45, 0.3);
+      const len = Math.hypot(lx, lz - 2.6) - 2.2, tray = new THREE.Mesh(boxGeo(0.3, 0.08, len), m.steel); decor(site, tray, lx * 0.5, 0.06, (lz + 2.6) * 0.5 - 0.4, Math.atan2(lx, lz - 2.6));
+    }
+    const hut = concrete(sub(0, 2.6, Math.PI), 3.8, 2.8, 2.4); out.crateSpots.push(hut.inside);
+    solid(site, 3.2, 0, 2.8, 1.4, 1.0, 0.9, m.steel);
+    sign(site, -3.2, 3.4); sign(site, -2.2, 4.2);
+    flag(site, 3.6, 4.0, 3.8, 'z51');
+    out.yard = P(0, -0.6); out.fire = P(1.4, 0.4);
+    spot(site, -2.2, 0.4); spot(site, 2.4, -0.2); spot(site, -4.2, 2.2);
+  } else if (type === 'reator') {
+    // REATOR EXPERIMENTAL: núcleo cilíndrico brilhando verde com anéis de contenção, duas torres de
+    // resfriamento, sala de controle, barris radioativos e placas de perigo
+    const rz = -0.6;
+    cylSolid(site, 0, rz, 1.9, 0.8, m.concreteDark, 0, 20);
+    decor(site, new THREE.Mesh(new THREE.CylinderGeometry(1.1, 1.1, 3.2, 20), X.liquidG), 0, 2.4, rz);
+    for (const y of [1.3, 2.4, 3.5]) { const ring = new THREE.Mesh(new THREE.TorusGeometry(1.22, 0.12, 8, 24), m.steel); ring.rotation.x = Math.PI / 2; decor(site, ring, 0, y, rz); }
+    for (let k = 0; k < 4; k++) { const a = k * Math.PI / 2 + 0.4, post = new THREE.Mesh(boxGeo(0.12, 3.3, 0.12), m.steel); decor(site, post, Math.sin(a) * 1.24, 2.45, rz + Math.cos(a) * 1.24); }
+    decor(site, cylY(1.35, 0.3, m.steel, 20), 0, 4.15, rz);
+    { const [x, z] = P(0, rz); set.items.push({ type: 'cyl', x, y: TOP + 2.5, z, hx: 1.3, hy: 1.7, hz: 1.3 }); }
+    const towerGeo = new THREE.LatheGeometry([new THREE.Vector2(1.7, 0), new THREE.Vector2(1.35, 1.5), new THREE.Vector2(1.12, 3.0), new THREE.Vector2(1.22, 4.2), new THREE.Vector2(1.4, 4.9)], 22);
+    for (const [lx, lz] of [[-4.2, -2.6], [4.2, -2.8]]) {
+      const t = new THREE.Mesh(towerGeo, X.concreteDS); decor(site, t, lx, 0, lz);
+      const [x, z] = P(lx, lz); set.items.push({ type: 'cyl', x, y: TOP + 2.45, z, hx: 1.55, hy: 2.45, hz: 1.55 });
+    }
+    const control = concrete(sub(0, 3.6, Math.PI), 3.8, 2.8, 2.4); out.crateSpots.push(control.inside);
+    for (const [lx, lz] of [[2.6, 1.6], [3.1, 2.2], [-2.8, 1.8]]) drum(site, lx, lz, X.yellow, X.glowG);
+    sign(site, -1.8, 1.6); sign(site, 1.8, -3.4);
+    out.yard = P(-2.6, 2.4); out.fire = P(-3.4, 2.8);
+    spot(site, 2.4, 0.6); spot(site, -2.2, 0.8); spot(site, 0, -3.4);
+  } else if (type === 'quarentena') {
+    // ZONA DE QUARENTENA: barracas brancas de isolamento, contêiner de descontaminação (dá para entrar),
+    // macas, cortinas de plástico, barris de risco biológico e fita de isolamento
+    tent(site, -4.2, -2.0, 0.5, X.whiteCanvas, 3.4, 2.6, 2.0); tent(site, 0, -4.2, 0, X.whiteCanvas, 3.4, 2.6, 2.0); tent(site, 4.2, -2.0, -0.5, X.whiteCanvas, 3.4, 2.6, 2.0);
+    const dc = container(sub(0, 3.0, Math.PI / 2), 5, 2.4, 2.5, X.white); out.crateSpots.push(dc.inside);
+    for (const sx of [-1, 1]) {
+      decor(site, new THREE.Mesh(boxGeo(0.7, 0.08, 1.9), X.whiteCanvas), sx * 1.6, 0.62, -0.4, sx * 0.2);
+      for (const k of [-0.8, 0.8]) decor(site, new THREE.Mesh(boxGeo(0.6, 0.6, 0.05), m.steel), sx * 1.6 + Math.sin(sx * 0.2) * k, 0.3, -0.4 + Math.cos(sx * 0.2) * k, sx * 0.2);
+      hidden(site, sx * 1.6, 0, -0.4, 0.7, 0.66, 1.9, sx * 0.2);
+      const curtain = new THREE.Mesh(new THREE.PlaneGeometry(2.0, 2.0), X.plastic); decor(site, curtain, sx * 2.8, 1.0, -0.2, sx * 1.1);
+    }
+    for (const [lx, lz] of [[3.6, 1.4], [4.2, 1.9], [-3.8, 1.6]]) drum(site, lx, lz, X.yellow);
+    for (const [lx, lz] of [[-5.6, 0.2], [5.6, 0.2], [-5.6, 4.6], [5.6, 4.6]]) decor(site, cylY(0.04, 1.1, m.steel, 5), lx, 0.55, lz);
+    for (const [lx, lz, len, yo] of [[0, 4.6, 11.2, Math.PI / 2], [-5.6, 2.4, 4.4, 0], [5.6, 2.4, 4.4, 0]]) decor(site, new THREE.Mesh(boxGeo(0.02, 0.08, len), X.yellow), lx, 1.0, lz, yo);
+    out.crateSpots.push(P(-1.4, -2.0));
+    out.yard = P(0, 0.9); out.fire = P(1.0, 1.2);
+    spot(site, -2.3, 0.8); spot(site, 2.4, -0.2);
+  } else if (type === 'monolito') {
+    // CAMPO DO MONÓLITO: círculos marcados na grama (agroglifo) em volta de um monólito preto que brilha
+    // nas bordas, a van dos agentes, mesa com equipamento, holofotes e uma barraca
+    for (const [r0, r1] of [[1.6, 1.9], [3.0, 3.35], [4.6, 5.0]]) decor(site, new THREE.Mesh(new THREE.RingGeometry(r0, r1, 40).rotateX(-Math.PI / 2), X.cropRing), 0, 0.03, 0);
+    for (let k = 0; k < 6; k++) { const line = new THREE.Mesh(boxGeo(0.18, 0.01, 3.0), X.cropRing); decor(site, line, Math.sin(k * 1.047) * 3.4, 0.035, Math.cos(k * 1.047) * 3.4, k * 1.047); }
+    solid(site, 0, 0, 0, 1.1, 4.4, 0.4, X.black);
+    for (const sx of [-1, 1]) for (const sz of [-1, 1]) decor(site, new THREE.Mesh(boxGeo(0.05, 4.42, 0.05), X.glowG), sx * 0.55, 2.2, sz * 0.2);
+    decor(site, new THREE.Mesh(boxGeo(1.14, 0.05, 0.44), X.glowG), 0, 4.42, 0);
+    { const van = new THREE.Group(); const vb = new THREE.Mesh(boxGeo(2.0, 1.9, 4.4), X.white); vb.position.y = 1.3; van.add(vb);
+      const ws = new THREE.Mesh(boxGeo(1.8, 0.7, 0.05), X.glassDark); ws.position.set(0, 1.75, 2.21); van.add(ws);
+      for (const sx of [-1, 1]) for (const sz of [-1.4, 1.4]) { const w = new THREE.Mesh(new THREE.CylinderGeometry(0.38, 0.38, 0.26, 14), X.rubber); w.rotation.z = Math.PI / 2; w.position.set(sx * 1.0, 0.38, sz); van.add(w); }
+      const vd = new THREE.Mesh(new THREE.SphereGeometry(0.5, 12, 6, 0, Math.PI * 2, 0, 0.9), X.white); vd.rotation.x = 0.6; vd.position.set(0, 2.4, -1.2); van.add(vd);
+      decor(site, van, -4.2, 0, -2.0, 0.5); hidden(site, -4.2, 0, -2.0, 2.1, 2.3, 4.5, 0.5); }
+    solid(site, 3.2, 0, -2.4, 1.6, 0.8, 0.8, m.steel);
+    decor(site, new THREE.Mesh(boxGeo(0.4, 0.03, 0.3), X.gunmetal), 3.1, 0.82, -2.4); { const scr = new THREE.Mesh(boxGeo(0.4, 0.28, 0.02), X.glowB); scr.rotation.x = -0.3; decor(site, scr, 3.1, 0.98, -2.55); }
+    floodlight(site, 4.4, 1.6, 3.4, Math.atan2(-4.4, -1.6)); floodlight(site, -3.4, 3.4, 3.4, Math.atan2(3.4, -3.4));
+    tent(site, 3.8, 3.2, -2.4, m.canvasTan, 2.8, 2.2, 1.7);
+    out.crateSpots.push(P(-2.6, 2.6));
+    out.yard = P(1.4, 2.4); out.fire = P(1.8, 4.8);
+    spot(site, -1.8, -1.6); spot(site, 1.6, 1.4); spot(site, -1.2, 3.2);
   } else {
     // paliçada quadrada com portão na frente (+Z)
     const S = 5.4, gate = 1.4;
