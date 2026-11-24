@@ -31,13 +31,11 @@ export class Bosses {
     }
     if (!E.auth) return;
     const st = G.startup.tide.state;
-    if (!st || st.phase.id !== 'seco' || st.changing || st.nextIn < 20) return; // seca curta (40 s): ainda dá tempo
+    if (!st || st.phase.id !== 'seco') return;
     const cycle = st.cycle;
-    if (this.cycle === cycle) return;
-    this.cycle = cycle; // uma tentativa por seca
-    if (G.events.current || (G.naval && G.naval.active)) return;
-    const prog = this.progress();
-    if (prog < BOSSES.miniMaxProgress && Math.random() < BOSSES.miniChance) this.spawn('escafandrista', cycle);
+    // a seca começou: sorteia UMA vez; se der certo, o chefe surge assim que a água termina de descer
+    if (this.cycle !== cycle) { this.cycle = cycle; this.pending = this.progress() < BOSSES.miniMaxProgress && Math.random() < BOSSES.miniChance; }
+    if (this.pending && !st.changing) { this.pending = false; this.spawn('escafandrista', cycle); }
   }
 
   // Surge no fundo seco a uns 30 m da jangada (fora das ilhas). isl = "arena" de areia para a IA.
@@ -47,7 +45,7 @@ export class Bosses {
     for (let k = 0; k < 16 && !ok; k++) {
       const a = Math.random() * Math.PI * 2, d = BOSSES.dist[0] + Math.random() * (BOSSES.dist[1] - BOSSES.dist[0]);
       x = base.x + Math.cos(a) * d; z = base.z + Math.sin(a) * d; gy = G.world.seabedHeight(x, z);
-      ok = gy < -3.6; // longe das encostas das ilhas
+      ok = gy < (k < 10 ? -3.6 : -2.4); // longe das encostas das ilhas (se não achar, aceita um pouco mais raso)
     }
     if (!ok) return null;
     const isl = { id: `sb${cycle}`, x, z, R: 34, rooms: [], enemies: [], minY: gy - 6, set: { y: gy - 0.6 } };
