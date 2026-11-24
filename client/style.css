@@ -618,3 +618,21 @@ body.bossfight #msgs { top: 96px; } body.touch.bossfight #msgs { top: 84px; }
 #blind.agua { background: radial-gradient(ellipse at 50% 45%, rgba(170, 220, 255, 0.96), rgba(40, 120, 200, 0.98) 70%),
   repeating-linear-gradient(100deg, rgba(255, 255, 255, 0.18) 0 3px, transparent 3px 40px); }
 #blind.tinta { background: radial-gradient(ellipse at 50% 50%, rgba(10, 4, 18, 0.93), rgba(0, 0, 0, 0.99) 70%); }
+
+/* ---------- aba Novidades (patch notes) ---------- */
+.menu-nav b.news-badge { background: rgba(224, 172, 76, 0.2); color: var(--brass-2); }
+.news-hero { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; margin-bottom: 18px; }
+.news-big { position: relative; padding: 18px 20px; border-radius: 6px; border: 1px solid rgba(224, 172, 76, 0.45);
+  background: linear-gradient(160deg, rgba(224, 172, 76, 0.16), rgba(10, 30, 43, 0.6)); }
+.news-big h3 { font: 400 26px/1.05 var(--display) !important; letter-spacing: 0.01em !important; text-transform: none !important; color: var(--brass-2) !important; margin: 8px 0 8px !important; }
+.news-big p { margin: 0; color: var(--ink-dim); line-height: 1.5; }
+.news-big strong { color: var(--ink); }
+.news-tag { display: inline-block; padding: 3px 8px; border-radius: 3px; background: var(--brass); color: #10222c; font: 800 10px var(--ui); letter-spacing: 0.14em; text-transform: uppercase; }
+.news-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; }
+.news-grid section { padding: 14px 16px; border-radius: 6px; background: rgba(0, 0, 0, 0.22); border: 1px solid rgba(255, 255, 255, 0.08); }
+.news-grid h3 { font-size: 12.5px !important; margin-bottom: 8px !important; }
+.news-grid ul { margin: 0; padding-left: 17px; color: var(--ink-dim); font-size: 13px; line-height: 1.45; }
+.news-grid li { margin: 3px 0; }
+.news-grid li b { color: var(--ink); font-weight: 800; }
+@media (max-width: 1100px) { .news-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+@media (max-width: 760px) { .news-hero, .news-grid { grid-template-columns: 1fr; } .news-big h3 { font-size: 22px !important; } }
