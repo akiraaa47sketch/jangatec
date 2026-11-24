@@ -111,6 +111,7 @@ export class Sos {
       const dead = rig.seen[f] && !alive;
       if (dead) { down++; if (f < 3) this._openGate(f); }
     }
+    if (down === 4) G.endgame.reveal(rig); // rádio do topo: coordenadas do abrigo (todos os clientes)
     if (down !== rig.floor) { rig.floor = down; if (down > 0 && down < 4) G.hud.msg(`☠ ${down}/4 chefes da Leviatã derrotados`); }
     // os quatro chefes caíram: recompensa na sala de rádio (host cria os sacos, a rede espalha)
     if (G.enemies.auth && rig.spawned && !rig.rewarded && down === 4) {

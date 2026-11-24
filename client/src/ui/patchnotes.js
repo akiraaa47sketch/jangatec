@@ -5,6 +5,18 @@
 // Nos textos, **assim** vira negrito.
 export const PATCH_NOTES = [
   {
+    id: '0.18', versao: 'v0.18', data: '24/11/2026', titulo: 'Rumo ao abrigo: os Twins',
+    destaques: [
+      { tag: 'Fim de jogo', titulo: 'Coordenadas do abrigo', texto: 'Derrubando os quatro chefes da Leviatã, o rádio do topo revela **as coordenadas de um abrigo**. A jangada ganha **navegação 360°** (a vela vira o leme) e um **marcador no topo da tela** mostra direção e distância.' },
+      { tag: 'Chefe naval', titulo: 'Os Twins', texto: 'Perto do abrigo, **dois navios lendários** fecham o caminho. Eles **cercam a jangada pelos dois lados** e disparam **bordadas juntos**; enquanto trocam de posição, atacam com **morteiro**. Afunde os dois para poder atracar.' },
+    ],
+    secoes: [
+      { icone: '⚓', nome: 'Os Twins', itens: ['**Twin Rubro** e **Twin Abissal**: velas brilhando, casco escuro com friso dourado.', 'Tentam ficar **em lados opostos** da jangada; trocam de posição só de tempos em tempos.', 'Reposicionando: **morteiro** (anel vermelho onde vai cair).', 'Em posição: **bordada dupla** sincronizada.', 'Sobrou um? Ele fica **furioso** e ataca mais rápido.', 'Deixam **loot lendário** boiando.'] },
+      { icone: '🧭', nome: 'Navegação', itens: ['**Controle 360°** só no fim de jogo (antes abria sozinho aos 2,1 km).', 'Marcador do **abrigo** com seta e distância.', '**Ilha de resgate** com farol girando, posto de resgate, heliporto e cais.'] },
+      { icone: '💥', nome: 'Efeitos navais', itens: ['Impacto na água com **coluna alta, coroa de borrifo e anel de espuma**.', 'Navios com **esteira e borrifo de proa**.', 'Navio afundando com **explosões e chamas** no convés.', '**Números de dano** quando seu tiro de canhão acerta.', 'Bordada **aderna o navio** com o coice.'] },
+    ],
+  },
+  {
     id: '0.17', versao: 'v0.17', data: '24/11/2026', titulo: 'Leviatã: quatro andares, quatro chefes',
     destaques: [
       { tag: 'Fim da jornada', titulo: 'Plataforma Leviatã', texto: 'O SOS agora leva a uma **plataforma gigantesca de 4 andares** (~82 × 82 m, topo a 53 m da água e torre de perfuração de ~110 m). Cada andar tem um **chefe com tema e habilidades próprias**, e a escada para o próximo andar só abre quando o chefe cai. Derrote os quatro e o arsenal deles é seu.' },

@@ -40,6 +40,7 @@ import { Bosses } from './systems/bosses.js';
 import { BossSkills } from './systems/bossskills.js';
 import { SeaEvents } from './systems/seaevents.js';
 import { Sos } from './systems/sos.js';
+import { Endgame } from './systems/endgame.js';
 import { Inventory } from './ui/inventory.js';
 
 const $ = (id) => document.getElementById(id);
@@ -104,6 +105,7 @@ G.bosses = new Bosses(G);   // chefe da seca (escafandrista)
 G.enemyNet = new EnemyNet(G); // inimigos sincronizados (host simula, os outros veem réplicas)
 G.seaEvents = new SeaEvents(G); // kraken, tubarões, peixes voadores e raios
 G.sos = new Sos(G); // plataforma de petróleo do SOS (fim da jornada)
+G.endgame = new Endgame(G); // coordenadas do abrigo, navegação 360° e os Twins
 G.inventory = new Inventory(G); // tela de inventário (Tab)
 const atmo = new Atmosphere(renderer, scene, { sun, hemisphere }); // céu, IBL e sombras
 const ocean = new Ocean(scene, atmo);
@@ -303,6 +305,7 @@ function frame() {
   G.drops.update(dt);
   G.seaEvents.tick(dt, t);
   G.sos.update(dt, t);
+  G.endgame.update(dt, t);
   if (G.bench) G.bench.update(dt);
   G.interact.update(dt);
   G.combat.update(dt);

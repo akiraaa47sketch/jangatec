@@ -40,7 +40,7 @@ export class Navigation {
   unlockFree() {
     if (this.mode === NAV_MODE.FREE) return;
     this.mode = NAV_MODE.FREE;
-    this.G.hud.msg('⚓ CONTROLE LIVRE DESBLOQUEADO — Enfrente o chefe!');
+    this.G.hud.msg('⚓ NAVEGAÇÃO LIVRE: a vela agora é o leme — gire para qualquer direção.');
   }
 
   // Atualiza o segmento da rota com base na posição do barco
@@ -50,9 +50,7 @@ export class Navigation {
         this.segment = i;
         this.routeYaw = ROUTE_YAWS[i] || 0;
         // Batalha final: segmento boss
-        if (ROUTE[i].phase === 'boss' && this.mode !== NAV_MODE.FREE) {
-          this.unlockFree();
-        }
+        // (a navegação livre só abre no fim de jogo: coordenadas do abrigo — systems/endgame.js)
         break;
       }
     }
