@@ -55,9 +55,10 @@ export class Interact {
       const boat = G.boat, [plx, plz] = boat.toLocal(p.x, p.z);
       for (const c of naval.turrets) {
         const d = Math.hypot(c.x - plx, c.z - plz);
-        if (d < 1.9) consider(d + 0.2, { label: c.type === 'gancho' ? 'Usar torreta-arpão' : 'Usar canhão', run: () => naval.man(c) });
+        if (d < 1.9) consider(d + 0.2, { label: c.type === 'gancho' ? 'Usar torreta-arpão' : c.type === 'canhao_ferro' ? 'Usar canhão de ferro' : 'Usar canhão', run: () => naval.man(c) });
       }
       if (G.survival.inv.canhao > 0 && naval.canInstallHere('canhao')) consider(1.6, { label: 'Instalar canhão aqui', run: () => naval.install('canhao') });
+      if (G.survival.inv.canhao_ferro > 0 && naval.canInstallHere('canhao_ferro')) consider(1.55, { label: 'Instalar canhão de ferro aqui', run: () => naval.install('canhao_ferro') });
       let dmg = null, dd = 2.2;
       for (const piece of boat.pieces.values()) {
         if (!naval.destructible(piece)) continue;
@@ -65,7 +66,7 @@ export class Interact {
         if (hp < max - 0.5 && d < dd) { dd = d; dmg = { piece, pct: Math.round(100 * hp / max) }; }
       }
       if (dmg) { // dica: o conserto é com o martelo
-        const nome = dmg.piece.physObj ? dmg.piece.physObj.def.nome : (dmg.piece.type === 'canhao' ? 'canhão' : 'peça');
+        const nome = dmg.piece.physObj ? dmg.piece.physObj.def.nome : (dmg.piece.type === 'canhao' ? 'canhão' : dmg.piece.type === 'canhao_ferro' ? 'canhão de ferro' : 'peça');
         const hammer = G.combat.weaponId === 'martelo';
         consider(dd + 0.6, { label: `${nome} ${dmg.pct}% — ${hammer ? 'martele para consertar' : 'use o martelo para consertar'}` });
       }

@@ -230,3 +230,113 @@ export function buildLeaningBuilding(ctx) {
     block: { x: ctx.x + bx, z: ctx.z + bzw, yaw: ctx.yaw, hx: W / 2 + 0.2, hz: (bz1 - bz0) / 2 },
   };
 }
+
+// ---------- ZONA PIRATA: torre de tralha ----------
+// Jangadão de paletes e tambores amarrados sobre estacas, com uma torre torta de troncos e canos
+// cheia de tralha pendurada (pneus, chapas, lona, bandeira). Escada da água até o deque e do deque
+// até o cesto lá em cima. Poucos inimigos (1–2) e um caixote.
+export const JUNK = { deck: 2.0, half: 2.4, top: 5.4 };
+export function buildJunkTower(ctx) {
+  const m = scrapMats(), r = ctx.r, deckY = JUNK.deck, H = JUNK.half, TT = JUNK.top;
+  const B = base(ctx, deckY), { set, P, solid, decor } = B;
+  const bedY = ctx.seabed(ctx.x, ctx.z) - deckY, ladders = [];
+  const sheet = () => m.sheets[(r() * m.sheets.length) | 0];
+  solid(0, -0.3, 0, 2 * H, 0.3, 2 * H, m.plank);
+  for (let i = 0; i < 7; i++) { const p = new THREE.Mesh(new THREE.BoxGeometry(2 * H + 0.1, 0.04, 0.5), m.plank); p.rotation.y = (r() - 0.5) * 0.06; decor(p, 0, 0.02, -H + 0.35 + i * 0.68); }
+  for (const sx of [-1, 1]) for (const sz of [-1, 1]) {
+    const len = -bedY + 0.4, pile = new THREE.Mesh(new THREE.CylinderGeometry(0.15, 0.19, len, 8), r() < 0.5 ? m.pipe : m.plank);
+    decor(pile, sx * (H - 0.3), -len / 2, sz * (H - 0.3));
+    const [x, z] = P(sx * (H - 0.3), sz * (H - 0.3)); set.items.push({ type: 'cyl', x, y: TOP - len / 2, z, hx: 0.2, hy: len / 2, hz: 0.2 });
+  }
+  for (let i = 0; i < 6; i++) { const a = i / 6 * Math.PI * 2 + r() * 0.4, drum = new THREE.Mesh(new THREE.CylinderGeometry(0.29, 0.29, 0.88, 12), r() < 0.5 ? m.drumBlue : m.drumRed); drum.rotation.z = Math.PI / 2; decor(drum, Math.cos(a) * (H - 0.6), -0.62, Math.sin(a) * (H - 0.6), a); }
+  // escada da água até o deque
+  for (let y = bedY + 0.3; y < 0; y += 0.4) { const rung = new THREE.Mesh(new THREE.BoxGeometry(0.55, 0.04, 0.04), m.pipe); decor(rung, 1.4, y, -H - 0.08); }
+  for (const sx of [1.1, 1.7]) { const rail = new THREE.Mesh(new THREE.CylinderGeometry(0.03, 0.03, -bedY + 0.9, 5), m.pipe); decor(rail, sx, (bedY + 0.9) / 2, -H - 0.08); }
+  { const [x, z] = P(1.4, -H - 0.35); ladders.push({ x: ctx.x + x, z: ctx.z + z, y0: deckY + bedY, top: deckY + 0.05, yaw: ctx.yaw, dir: -1 }); }
+  // torre torta: quatro pernas (troncos e canos), travessas, prateleira no meio e o cesto no alto
+  const S = 1.15;
+  for (const sx of [-S, S]) for (const sz of [-S, S]) {
+    const leg = new THREE.Mesh(new THREE.CylinderGeometry(0.08, 0.11, TT + 0.1, 7), r() < 0.5 ? m.pipe : m.plank); leg.rotation.z = (r() - 0.5) * 0.05; decor(leg, sx, (TT + 0.1) / 2, sz);
+    const [x, z] = P(sx, sz); set.items.push({ type: 'cyl', x, y: TOP + TT / 2, z, hx: 0.11, hy: TT / 2, hz: 0.11 });
+  }
+  for (const y of [1.4, 3.0, 4.6]) for (const [ax, az, len, ry] of [[0, S, 2 * S, 0], [S, 0, 2 * S, Math.PI / 2], [-S, 0, 2 * S, Math.PI / 2]]) {
+    const b = new THREE.Mesh(new THREE.BoxGeometry(len, 0.08, 0.08), m.plank); b.rotation.y = ry + (r() - 0.5) * 0.08; decor(b, ax, y, az);
+  }
+  solid(0.45, 2.7, 0.45, 1.3, 0.1, 1.3, m.plank); // prateleira com tralha
+  for (let i = 0; i < 3; i++) { const t = new THREE.Mesh(new THREE.TorusGeometry(0.3, 0.12, 8, 14), m.tire); t.rotation.x = Math.PI / 2; decor(t, 0.5, 2.88 + i * 0.22, 0.5); }
+  solid(0, TT, 0, 2 * S + 0.5, 0.14, 2 * S + 0.5, m.plank);
+  const W2 = 2 * S + 0.5, gap = 0.8, sideW = (W2 - gap) / 2;
+  for (const [px, pz, w, l] of [[0, S + 0.22, W2, 0.06], [S + 0.22, 0, 0.06, W2], [-S - 0.22, 0, 0.06, W2], [-(gap + sideW) / 2, -S - 0.22, sideW, 0.06], [(gap + sideW) / 2, -S - 0.22, sideW, 0.06]]) solid(px, TT + 0.14, pz, w, 0.85, l, sheet());
+  for (let i = 0; i < Math.floor(TT / 0.42); i++) { const rung = new THREE.Mesh(new THREE.BoxGeometry(0.5, 0.05, 0.05), m.plank); decor(rung, 0, 0.35 + i * 0.42, -S - 0.08); }
+  for (const sx of [-0.25, 0.25]) { const rail = new THREE.Mesh(new THREE.BoxGeometry(0.06, TT + 0.4, 0.06), m.plank); decor(rail, sx, (TT + 0.4) / 2, -S - 0.08); }
+  { const [x, z] = P(0, -S - 0.35); ladders.push({ x: ctx.x + x, z: ctx.z + z, y0: deckY, top: deckY + TT + 0.14, yaw: ctx.yaw, dir: -1 }); }
+  // mastro com bandeira pirata, lona pendurada, pneus e chapas encostadas
+  { const pole = new THREE.Mesh(new THREE.CylinderGeometry(0.05, 0.05, 2.6, 6), m.plank); decor(pole, S, TT + 1.3, S);
+    const flag = new THREE.Mesh(new THREE.PlaneGeometry(0.9, 0.55), new THREE.MeshStandardMaterial({ color: 0x141416, side: THREE.DoubleSide })); flag.geometry.translate(0.45, 0, 0); decor(flag, S + 0.05, TT + 2.3, S, 0.3);
+    const skull = new THREE.Mesh(new THREE.CircleGeometry(0.12, 12), new THREE.MeshStandardMaterial({ color: 0xeeeeee, side: THREE.DoubleSide })); decor(skull, S + 0.5, TT + 2.3, S + 0.02, 0.3); }
+  { const tarp = new THREE.Mesh(new THREE.PlaneGeometry(1.8, 1.4, 4, 3), new THREE.MeshStandardMaterial({ color: 0x2f5a86, side: THREE.DoubleSide, roughness: 0.95 })); const p = tarp.geometry.attributes.position; for (let i = 0; i < p.count; i++) p.setZ(i, Math.sin(p.getX(i) * 2) * 0.12); tarp.geometry.computeVertexNormals(); decor(tarp, S + 0.05, 3.6, 0, Math.PI / 2); }
+  for (const [lx, lz] of [[1.7, 1.5], [-1.7, -1.4]]) { for (let i = 0; i < 2; i++) { const t = new THREE.Mesh(new THREE.TorusGeometry(0.34, 0.13, 8, 14), m.tire); t.rotation.x = Math.PI / 2; decor(t, lx, 0.13 + i * 0.25, lz); } const [x, z] = P(lx, lz); set.items.push({ type: 'cyl', x, y: TOP + 0.25, z, hx: 0.45, hy: 0.25, hz: 0.45 }); }
+  for (let i = 0; i < 3; i++) { const sh = new THREE.Mesh(new THREE.BoxGeometry(1.0, 1.6, 0.03), sheet()); sh.rotation.x = 0.25; decor(sh, -1.8 + i * 0.25, 0.75, 1.9 + i * 0.05, (r() - 0.5) * 0.3); }
+  { const drum = new THREE.Mesh(new THREE.CylinderGeometry(0.29, 0.29, 0.88, 12), m.drumRed); decor(drum, 1.8, 0.44, -1.0); const [x, z] = P(1.8, -1.0); set.items.push({ type: 'cyl', x, y: TOP + 0.44, z, hx: 0.3, hy: 0.44, hz: 0.3 }); }
+  { const lamp = new THREE.Mesh(new THREE.SphereGeometry(0.1, 8, 6), m.glow); decor(lamp, -S, 4.9, S); }
+  const spawnSpots = [{ ...xz(P(1.9, 0.3)), y: 0, high: false }, { ...xz(P(0.3, -0.2)), y: TT + 0.14, high: true }];
+  return {
+    ...B, kind: 'tralha', floorY: deckY, R: H - 0.3, ladders, towers: [], spawnSpots, rooms: [], crateSpots: [P(-1.9, 0.3)], debrisSpots: [],
+    block: { x: ctx.x, z: ctx.z, yaw: ctx.yaw, hx: H + 0.1, hz: H + 0.4 },
+  };
+}
+const xz = ([x, z]) => ({ x, z });
+
+// ---------- ZONA PIRATA: barraco de sucata sobre palafitas ----------
+// Deque de tábuas sobre estacas com um barraco de chapas (porta, janela, telhado torto), varanda com
+// lanterna, píer comprido com a escada para a água, rede de pesca, tambores e pneus.
+export const SHACK = { deck: 2.0, hx: 2.8, hz: 2.3, dock: 3.0 };
+export function buildScrapShack(ctx) {
+  const m = scrapMats(), r = ctx.r, deckY = SHACK.deck, HX = SHACK.hx, HZ = SHACK.hz, DL = SHACK.dock;
+  const B = base(ctx, deckY), { set, P, solid, decor } = B;
+  const bed = (lx, lz) => { const [x, z] = P(lx, lz); return ctx.seabed(ctx.x + x, ctx.z + z) - deckY; };
+  const ladders = [], sheet = () => m.sheets[(r() * m.sheets.length) | 0];
+  solid(0, -0.3, 0, 2 * HX, 0.3, 2 * HZ, m.plank);
+  const dx = HX - 0.6, dz0 = -HZ, dz1 = -HZ - DL;
+  solid(dx, -0.3, (dz0 + dz1) / 2, 1.1, 0.3, DL, m.plank);
+  const pile = (lx, lz) => {
+    const by = bed(lx, lz), len = -by + 0.4, p = new THREE.Mesh(new THREE.CylinderGeometry(0.14, 0.18, len, 7), m.plank);
+    decor(p, lx, -len / 2, lz); const [x, z] = P(lx, lz); set.items.push({ type: 'cyl', x, y: TOP - len / 2, z, hx: 0.18, hy: len / 2, hz: 0.18 });
+  };
+  for (const sx of [-1, 1]) for (const sz of [-1, 1]) pile(sx * (HX - 0.25), sz * (HZ - 0.25));
+  pile(dx - 0.45, dz1 + 0.2); pile(dx + 0.45, dz1 + 0.2);
+  // escada no fim do píer
+  { const by = bed(dx, dz1 - 0.1); for (let y = by + 0.3; y < 0; y += 0.4) { const rung = new THREE.Mesh(new THREE.BoxGeometry(0.55, 0.04, 0.04), m.pipe); decor(rung, dx, y, dz1 - 0.08); }
+    for (const sx of [-0.3, 0.3]) { const rail = new THREE.Mesh(new THREE.CylinderGeometry(0.03, 0.03, -by + 0.9, 5), m.pipe); decor(rail, dx + sx, (by + 0.9) / 2, dz1 - 0.08); }
+    const [x, z] = P(dx, dz1 - 0.35); ladders.push({ x: ctx.x + x, z: ctx.z + z, y0: deckY + by, top: deckY + 0.05, yaw: ctx.yaw, dir: -1 }); }
+  // barraco (frente/porta para +z)
+  const SX = 1.8, SZ0 = -2.0, SZ1 = 1.0, WH = 2.3, T = 0.06, cz = (SZ0 + SZ1) / 2, D = SZ1 - SZ0;
+  solid(-1.15, 0, SZ1, 1.3, WH, T, sheet()); solid(1.15, 0, SZ1, 1.3, WH, T, sheet()); solid(0, 1.95, SZ1, 1.0, WH - 1.95, T, sheet());
+  solid(0, 0, SZ0, 2 * SX, WH + 0.2, T, sheet());
+  solid(SX, 0, cz, T, WH, D, sheet());
+  solid(-SX, 0, SZ0 + 0.5, T, WH, 1.0, sheet()); solid(-SX, 0, SZ1 - 0.5, T, WH, 1.0, sheet());
+  solid(-SX, 0, cz, T, 0.9, 1.0, sheet()); solid(-SX, 1.6, cz, T, WH - 1.6, 1.0, sheet());
+  { const roof = new THREE.Mesh(new THREE.BoxGeometry(2 * SX + 0.6, 0.05, D + 1.0), sheet()); roof.rotation.x = 0.14; decor(roof, 0, WH + 0.12, cz + 0.2); }
+  solid(0, WH, cz, 2 * SX, 0.3, D, m.plank, { visible: false });
+  { const door = new THREE.Mesh(new THREE.BoxGeometry(0.95, 1.85, 0.04), sheet()); door.geometry.translate(0.47, 0, 0); decor(door, -0.5, 0.93, SZ1 + 0.04, -1.7); }
+  // dentro: mesa, rede de dormir, fogareiro de tambor
+  solid(-1.0, 0, -1.4, 1.0, 0.75, 0.7, m.plank);
+  { const stove = new THREE.Mesh(new THREE.CylinderGeometry(0.28, 0.28, 0.7, 10), m.rust); decor(stove, 1.3, 0.35, -1.5); const fire = new THREE.Mesh(new THREE.SphereGeometry(0.12, 8, 6), m.glow); decor(fire, 1.3, 0.72, -1.5); }
+  { const ham = new THREE.Mesh(new THREE.CylinderGeometry(0.4, 0.4, 1.8, 10, 1, true, Math.PI * 0.6, Math.PI * 0.8), new THREE.MeshStandardMaterial({ color: 0xb59b6a, side: THREE.DoubleSide })); ham.rotation.z = Math.PI / 2; decor(ham, 0.3, 1.5, -0.2, Math.PI / 2); }
+  // varanda: lanterna, rede de pesca, tambores, pneus e um varal de peixes
+  { const post = new THREE.Mesh(new THREE.CylinderGeometry(0.05, 0.05, 2.4, 6), m.plank); decor(post, -2.4, 1.2, 2.0); const lamp = new THREE.Mesh(new THREE.SphereGeometry(0.1, 8, 6), m.glow); decor(lamp, -2.4, 2.35, 2.0); }
+  { const net = new THREE.Mesh(new THREE.PlaneGeometry(1.6, 1.2, 8, 6), new THREE.MeshStandardMaterial({ color: 0x8a7a5a, wireframe: true })); decor(net, SX + 0.05, 1.2, cz, Math.PI / 2); }
+  for (const [lx, lz, c] of [[2.3, 1.6, m.drumBlue], [2.3, 0.9, m.drumRed]]) { const d = new THREE.Mesh(new THREE.CylinderGeometry(0.29, 0.29, 0.88, 12), c); decor(d, lx, 0.44, lz); const [x, z] = P(lx, lz); set.items.push({ type: 'cyl', x, y: TOP + 0.44, z, hx: 0.3, hy: 0.44, hz: 0.3 }); }
+  for (let i = 0; i < 2; i++) { const t = new THREE.Mesh(new THREE.TorusGeometry(0.34, 0.13, 8, 14), m.tire); t.rotation.x = Math.PI / 2 - 0.3; decor(t, -2.3 + i * 0.1, 0.15 + i * 0.25, -1.6); }
+  for (let i = 0; i < 4; i++) { const fish = new THREE.Mesh(new THREE.ConeGeometry(0.07, 0.32, 6), new THREE.MeshStandardMaterial({ color: 0x8fa3ad, metalness: 0.4, roughness: 0.4 })); fish.rotation.z = Math.PI; decor(fish, 1.0 + i * 0.25, 1.55, SZ1 + 0.4); }
+  { const antenna = new THREE.Mesh(new THREE.CylinderGeometry(0.02, 0.02, 1.8, 4), m.pipe); decor(antenna, 1.4, WH + 1.0, SZ0 + 0.3); }
+  const [rcx, rcz] = P(0, cz);
+  const rooms = [{ x: rcx, z: rcz, yaw: ctx.yaw, hw: SX - 0.1, hd: D / 2 - 0.1, door: [P(0, SZ1 - 0.7), P(0, SZ1 + 1.1)] }];
+  const spawnSpots = [{ ...xz(P(0.6, -0.8)), y: 0, high: false }, { ...xz(P(-1.6, 1.7)), y: 0, high: false }, { ...xz(P(dx, dz0 - 1.4)), y: 0, high: false }];
+  const debrisSpots = [P(-0.9, 1.75)].map(([x, z]) => [ctx.x + x, ctx.z + z]);
+  const [bx, bz] = P(0, (HZ + dz1) / 2);
+  return {
+    ...B, kind: 'barraco', floorY: deckY, R: Math.min(HX, HZ) - 0.3, ladders, towers: [], spawnSpots, rooms, crateSpots: [P(-1.1, -0.6)], debrisSpots,
+    block: { x: ctx.x + bx, z: ctx.z + bz, yaw: ctx.yaw, hx: HX + 0.15, hz: (HZ - dz1) / 2 + 0.3 },
+  };
+}

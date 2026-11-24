@@ -313,7 +313,7 @@ export class Boat {
         this.yaw += this.spin.rate * dt;
         this.spin.t -= dt; if (this.spin.t <= 0) this.spin = null;
       }
-      if (startup && startup.departed) this.G.world.pushBoat(this);
+      if (startup && startup.departed) this.G.world.pushBoat(this, dt);
     }
 
     this.sailT += ((this.sailUp ? 1 : 0) - this.sailT) * (1 - Math.exp(-3.2 * dt));

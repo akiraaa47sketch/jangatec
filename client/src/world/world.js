@@ -9,16 +9,21 @@ import { seabedHeight, makeSeabedChunk, makeFarSeabed, patchVortexDip } from './
 import { bakeStatic } from '../core/bake.js';
 import { buildCamp } from './camp.js';
 import { buildScrapCamp } from './scrap.js';
-import { buildSeaTower, buildLeaningBuilding } from './seasites.js';
+import { buildSeaTower, buildLeaningBuilding, buildJunkTower, buildScrapShack } from './seasites.js';
 import { makePieceMesh, PIECES } from '../boat/pieces.js';
 import { makeHookTurretMesh } from './navalmodels.js';
 import { makePalm, makeRock, makeBush, makeGrassTufts } from './models.js';
 import { buildHeliWreck, wreckSpot } from './helicopter.js';
+import { ZONES, zoneOf } from '../systems/zones.js';
+import { IslandHill, makeHillMesh } from './islandterrain.js';
+import { ZONE_PAL, pickIslandType } from './islandtypes.js';
 import { woodTexture, woodBump, sandTexture, sandBump, grassTexture, thatchTexture, logWallTexture, metalTexture, clothTexture as clothTex, repeated, scaleBoxUVs } from './textures.js';
 
 const M = (color, extra = {}) => new THREE.MeshStandardMaterial({ color, roughness: 0.9, ...extra });
 const WOOD = [0x9b7242, 0x86623a, 0xb08a55, 0x6f5231];
 // Areia em gradiente: molhada/escura perto da água, seca/clara no alto (chave = dr do patamar).
+// desvio das ilhas: profundidade mínima sob a quilha, faixa de desvio suave (m), forças
+export const ISLAND_AVOID = { fullLevel: 0.9, depth: 1.25, soft: 10, push: 3.2, slide: 0.9 };
 const SAND = { 7.5: 0x9a8d68, 6: 0xab9c72, 4.5: 0xbcab7c, 3: 0xcdb986, 2.2: 0xb3a275, 1.5: 0xd8c48e, 1.1: 0xcdb986, 0.5: 0xe0cc96, 0.4: 0xd8c48e, 0: 0xdcc891 };
 // UVs em escala de mundo: texturas mantêm o mesmo tamanho em qualquer caixa.
 const box = (w, h, l, mat) => new THREE.Mesh(scaleBoxUVs(new THREE.BoxGeometry(w, h, l), w, h, l), mat);
@@ -69,8 +74,8 @@ function plankFloor(w, l, r) {
   return g;
 }
 export const DEBRIS = [
-  { nome: 'Parede de madeira', w: 6, real: true, pieceType: 'parede', size: [2, 2, 0.14], make: (r) => plankWall(2, 2, 0.14, WOOD[0], r) },
-  { nome: 'Meia parede de madeira', w: 3, real: true, pieceType: 'parede', size: [2, 1, 0.14], make: (r) => plankWall(2, 1, 0.14, WOOD[1], r) },
+  { nome: 'Parede de madeira', w: 8, real: true, pieceType: 'parede', size: [2, 2, 0.14], make: (r) => plankWall(2, 2, 0.14, WOOD[0], r) },
+  { nome: 'Meia parede de madeira', w: 4, real: true, pieceType: 'parede', size: [2, 1, 0.14], make: (r) => plankWall(2, 1, 0.14, WOOD[1], r) },
   { nome: 'Parede de plástico', w: 4, real: true, pieceType: 'parede_plastico', size: [1, 2, 0.06], make: (r) => {
     const g = new THREE.Group(), c = [0x3c8fd6, 0xe8e6df, 0x3ca35a, 0xe2a23a][(r() * 4) | 0];
     const panel = box(1, 2, 0.04, new THREE.MeshPhysicalMaterial({ color: c, roughness: 0.35, clearcoat: 0.4, transparent: true, opacity: 0.92 })); g.add(panel);
@@ -84,7 +89,7 @@ export const DEBRIS = [
   { nome: 'Chão de madeira', w: 6, real: true, pieceType: 'piso', size: [2, 0.15, 2], make: (r) => plankFloor(2, 2, r) },
   { nome: 'Chão grande de madeira', w: 2, real: true, pieceType: 'piso', size: [3, 0.15, 3], make: (r) => plankFloor(3, 3, r) },
   // a mesma plataforma grande da ilha inicial (6 × 6 m, encaixa nos espaços do convés): rara no mar
-  { nome: 'Plataforma de madeira', w: 2, real: true, pieceType: 'piso', size: PIECES.piso.size, make: () => makePieceMesh('piso') },
+  { nome: 'Plataforma de madeira', w: 5, real: true, pieceType: 'piso', size: PIECES.piso.size, make: () => makePieceMesh('piso') },
   { nome: 'Chão de metal', w: 2, real: true, sinks: true, pieceType: 'chapa', size: [2, 0.08, 2], make: () => {
     const geo = new THREE.BoxGeometry(2, 0.06, 2); const m = new THREE.Mesh(scaleBoxUVs(geo, 2, 0.06, 2), ironMat());
     const g = new THREE.Group(); g.add(m); for (let i = -4; i <= 4; i++) { const ridge = box(0.04, 0.02, 1.9, ironMat()); ridge.position.set(i * 0.22, 0.04, 0); g.add(ridge); } return g; } },
@@ -136,6 +141,7 @@ export class World {
     this.placedStates = new Map();
     this.remoteCarries = new Map();
     this.weldedStates = new Map();
+    this.hills = []; // morros das ilhas carregadas (entram no chão do fundo do mar)
   }
 
   updateFloodLevel(level) {
@@ -157,7 +163,15 @@ export class World {
       this.G.physics.addStaticSet(island.set);
     }
   }
-  seabedHeight(x, z) { return seabedHeight(this.seed, x, z); }
+  // chão do fundo: o terreno do mar + os morros das ilhas (na seca dá para subir a pé até o topo)
+  seabedHeight(x, z) {
+    let h = seabedHeight(this.seed, x, z);
+    for (const hl of this.hills) {
+      if (Math.abs(x - hl.x) > hl.maxR || Math.abs(z - hl.z) > hl.maxR) continue;
+      const v = hl.height(x, z); if (v > h) h = v;
+    }
+    return h;
+  }
   difficulty(x, z) { return Math.min(4, Math.floor(Math.hypot(x, z) / WORLD_LOOT_PARAMS.diffStep)); }
 
   ensureStarterIsland() {
@@ -427,11 +441,11 @@ export class World {
   makeSeaSite(ch, st) {
     const G = this.G, id = `${st.kind === 'predio' ? 'p' : 'q'}${st.cx},${st.cz}`;
     const ctx = { x: st.x, z: st.z, yaw: st.yaw, r: st.rng, id, destroyed: this.collected, seabed: (x, z) => this.seabedHeight(x, z) };
-    const b = st.kind === 'predio' ? buildLeaningBuilding(ctx) : buildSeaTower(ctx);
+    const b = st.kind === 'predio' ? buildLeaningBuilding(ctx) : st.kind === 'tralha' ? buildJunkTower(ctx) : st.kind === 'barraco' ? buildScrapShack(ctx) : buildSeaTower(ctx);
     const { group, set, solids } = b;
     const isl = {
       id, x: st.x, z: st.z, R: b.R, diff: st.diff, group, set, solids, crates: [], enemies: [], palms: [],
-      seaSite: st.kind, siteType: st.kind === 'predio' ? 'predio' : 'seatower', siteCenter: b.center || [0, 0],
+      seaSite: st.kind, siteType: st.kind === 'predio' ? 'predio' : st.kind === 'torre' ? 'seatower' : st.kind, zone: zoneOf(st.diff).id, siteCenter: b.center || [0, 0],
       cx: b.center ? st.x + b.center[0] : st.x, cz: b.center ? st.z + b.center[1] : st.z,
       rooms: b.rooms, towers: b.towers, spawnSpots: b.spawnSpots, ladders: b.ladders, landLayers: [], allItems: set.items.slice(),
       maxGround: Infinity, floodTier: null, minY: set.y - 2.5, block: b.block,
@@ -440,7 +454,7 @@ export class World {
       const c = this._crate(group, `${id.replace('q', 'p')}c${i}`, lx, 0.55, lz, st.x, set.y, st.z, st.diff, st.rng() * 3);
       if (c) isl.crates.push(c);
     });
-    if (st.kind === 'predio') b.debrisSpots.forEach(([x, z], i) => { // peças para a jangada largadas na sala
+    if (st.kind === 'predio' || st.kind === 'barraco') b.debrisSpots.forEach(([x, z], i) => { // peças para a jangada largadas na sala
       let pick = st.rng() * DEBRIS_W, def = DEBRIS[0];
       for (const d of DEBRIS) { pick -= d.w; if (pick <= 0) { def = d; break; } }
       if (i < 1 || st.rng() < 0.7) this.spawnDebris(ch, `${id}d${i}`, def, x, z, mulberry32(hash2(this.seed ^ 0x1d, st.cx * 53 + i, st.cz)), b.floorY + 0.35);
@@ -460,58 +474,95 @@ export class World {
     return isl;
   }
 
+  // Encosta da ilha: pedras grandes (ilhas rochosas) e a tralha da praia de cada modelo (troncos,
+  // botes virados, barris, ouriços tcheco, placas, cristais…). Só decoração (sem colisão).
+  _beachDecor(group, hill, itype, dec, gy) {
+    const BM = this._beachMats || (this._beachMats = {
+      log: M(0x8a6f50), dark: M(0x4a3a2a), iron: M(0x34363a, { metalness: 0.6, roughness: 0.5 }), steel: M(0x6a6f73, { metalness: 0.6, roughness: 0.45 }),
+      rubber: M(0x1c1c1e), yellow: M(0xe8b828), boat: M(0x9b5a3a), drum: M(0x9a3b2a, { metalness: 0.4, roughness: 0.6 }),
+      shard: new THREE.MeshStandardMaterial({ color: 0x9cff7a, emissive: 0x5cff3a, emissiveIntensity: 1.8, roughness: 0.3 }),
+    });
+    // ponto na encosta: s = distância a partir da beira do platô (m)
+    const at = (a, s) => { const d = hill.plateau(a) + s, lx = Math.cos(a) * d, lz = Math.sin(a) * d; return [lx, hill.height(hill.x + lx, hill.z + lz) - gy, lz]; };
+    const put = (mesh, a, s, dy = 0, tilt = 0.25) => { const [lx, ly, lz] = at(a, s); mesh.position.set(lx, ly + dy, lz); mesh.rotation.order = 'YXZ'; mesh.rotation.y = dec() * 6.28; mesh.rotation.x += (dec() - 0.5) * tilt; group.add(mesh); return mesh; };
+    for (let i = 0, n = itype.boulders || 0; i < n; i++) { // pedras grandes cravadas na encosta
+      const rock = makeRock(dec, 0.9 + dec() * 1.3); put(rock, dec() * 6.28, hill.W * (0.12 + dec() * 0.45), -0.2, 0.5);
+    }
+    const W = hill.W, n = 3 + ((dec() * 4) | 0);
+    for (let i = 0; i < n; i++) {
+      const a = dec() * 6.28, s = W * (0.06 + dec() * 0.26);
+      switch (itype.beach) {
+        case 'drift': { const l = new THREE.Mesh(new THREE.CylinderGeometry(0.12, 0.16, 1.6 + dec() * 2, 7), dec() < 0.5 ? BM.log : BM.dark); l.rotation.z = Math.PI / 2; put(l, a, s, 0.1, 0.1); break; }
+        case 'boats': { if (i > 1) break; const b = new THREE.Mesh(new THREE.CylinderGeometry(0.55, 0.55, 2.6, 12, 1, true, 0, Math.PI), BM.boat); b.material.side = THREE.DoubleSide; b.rotation.z = Math.PI / 2; put(b, a, s, 0.02, 0.1); break; }
+        case 'barrels': { const b = new THREE.Mesh(new THREE.CylinderGeometry(0.3, 0.3, 0.88, 12), dec() < 0.5 ? BM.drum : BM.dark); b.rotation.z = Math.PI / 2; put(b, a, s, 0.28, 0.1); break; }
+        case 'rocks': { put(makeRock(dec, 0.4 + dec() * 0.6), a, s, 0, 0.4); break; }
+        case 'balls': { const g = new THREE.Group(); for (let k = 0; k < 3; k++) { const b = new THREE.Mesh(new THREE.SphereGeometry(0.15, 10, 8), BM.iron); b.position.set((dec() - 0.5) * 0.8, 0.13, (dec() - 0.5) * 0.8); g.add(b); }
+          if (i === 0) { const c = new THREE.Mesh(new THREE.CylinderGeometry(0.16, 0.24, 1.9, 10), BM.iron); c.rotation.z = Math.PI / 2 - 0.1; c.position.y = 0.2; g.add(c); } put(g, a, s, 0, 0.1); break; }
+        case 'junk': { const t = new THREE.Mesh(new THREE.TorusGeometry(0.35, 0.13, 8, 14), BM.rubber); t.rotation.x = Math.PI / 2 - 0.2; put(t, a, s, 0.12, 0.2);
+          const sh = new THREE.Mesh(new THREE.BoxGeometry(1.2, 0.03, 0.8), BM.drum); put(sh, a + 0.15, s + 1, 0.05, 0.4); break; }
+        case 'hedgehog': { const g = new THREE.Group(); for (let k = 0; k < 3; k++) { const b = new THREE.Mesh(new THREE.BoxGeometry(0.14, 1.5, 0.14), BM.steel); b.rotation.set(k === 0 ? 0.95 : 0, 0, k === 1 ? 0.95 : k === 2 ? -0.95 : 0); if (k === 2) b.rotation.y = Math.PI / 2; g.add(b); }
+          put(g, a, W * (0.25 + dec() * 0.3), 0.45, 0.2); break; }
+        case 'signs': { if (i > 2) break; const g = new THREE.Group(); const p = new THREE.Mesh(new THREE.CylinderGeometry(0.04, 0.04, 1.4, 5), BM.steel); p.position.y = 0.7; g.add(p);
+          const t = new THREE.Mesh(new THREE.CircleGeometry(0.38, 3), BM.yellow); t.material.side = THREE.DoubleSide; t.rotation.z = Math.PI / 2; t.position.y = 1.55; g.add(t); put(g, a, s, 0, 0.1); break; }
+        case 'shards': { const c = new THREE.Mesh(new THREE.OctahedronGeometry(0.25 + dec() * 0.3), BM.shard); c.scale.y = 1.8; put(c, a, s, 0.25, 0.6); break; }
+        default: break;
+      }
+    }
+  }
+
   makeIsland(id, x, z, r, starterIsland = false) {
     const G = this.G, R0 = starterIsland ? 15 + r() * 3 : 9 + r() * 6, diff = this.difficulty(x, z);
     const islandElevation = starterIsland ? 0 : 2.7;
-    // acampamento: forte de troncos, cabana, ou (ilhas grandes) forte de SUCATA com torres de morteiro
     const siteRoll = r();
-    // mais longe na rota = bases mais perigosas; base militar só no fim (dificuldade 3+) em ilha grande
-    const SITES = [
-      [['hut', 1], ['tendas', 1]],
-      [['hut', 1], ['tendas', 1], ['fort', 1], ['vigia', 1]],
-      [['fort', 1], ['vigia', 1], ['bunker', 1.2]],          // sucata agora fica no meio do mar (seasites.js)
-      [['bunker', 1], ['vigia', 0.6], ['fort', 0.6], ['militar', 1.6]],
-      [['bunker', 0.7], ['fort', 0.4], ['militar', 2.4]],
-    ][diff];
-    const MIN_R = { scrap: 11.5, militar: 12, bunker: 10 };
+    // ZONAS (systems/zones.js) e MODELOS DE ILHA (world/islandtypes.js): 10 por zona, cada um com
+    // formato, cores, vegetação, tralhas da praia e acampamento próprios
+    const zone = starterIsland ? ZONES.pirata : zoneOf(diff);
     // o complexo militar ocupa ~40 m de raio: só em chunk sem ilha nos vizinhos
     const cm = /^i(-?\d+),(-?\d+)$/.exec(id), lonely = !!cm && [-1, 0, 1].every((i) => [-1, 0, 1].every((j) => (!i && !j) || !chunkHasIsland(this.seed, +cm[1] + i, +cm[2] + j)));
-    const options = SITES.filter(([t]) => R0 >= (MIN_R[t] || 0) && (t !== 'militar' || lonely)), totalW = options.reduce((a, [, w]) => a + w, 0);
-    let siteType = null;
-    if (!starterIsland) { let roll = siteRoll * totalW; for (const [t, w] of options) { roll -= w; if (roll <= 0) { siteType = t; break; } } siteType = siteType || options[options.length - 1][0]; }
-    const R = siteType === 'militar' ? 47 : R0; // complexo militar: muralha de 60 m, torre-espiral com a esfera — ilha enorme
+    const itype = starterIsland ? null : pickIslandType(zone.id, diff, siteRoll, lonely);
+    const siteType = itype ? itype.site : null;
+    // forma/visual com RNG próprio (não muda a ordem do `r` da ilha)
+    const vr = mulberry32(hash2(this.seed ^ 0x51a7c3, Math.round(x * 3), Math.round(z * 3)));
+    const span = (a, f = 1) => (a ? a[0] + (a[1] - a[0]) * vr() : 0) * f;
+    const CAMP_R = { hut: 5, tendas: 5.6, vigia: 6, fort: 7.9, bunker: 6, scrap: 8.6, militar: 44, lab: 8.2,
+      farol: 6.6, naufragio: 6.8, taverna: 6.6, vila: 7.4, tesouro: 6.4, canhoneira: 6.2,
+      radar: 6.8, heliponto: 7.4, quartel: 7.0, deposito: 7.6, trincheira: 6.8, artilharia: 7.2, comunicacoes: 6.6,
+      ovni: 8.2, domo: 6.8, criogenia: 6.4, antenas: 6.6, reator: 7.0, quarentena: 6.8, monolito: 7.0 };
+    const campR = CAMP_R[siteType] || 5;
+    const R = starterIsland ? R0 : Math.max(span(itype.R), campR + 2.2);
     const group = new THREE.Group(); group.position.set(x, islandElevation, z);
-    const set = { x, z, yaw: 0, y: islandElevation, radius: R + 8, items: [] };
     const solids = [];
     const addSolid = (m) => { group.add(m); solids.push(m); };
     const landLayers = [];
-    // O terreno é composto por patamares baixos que podem desaparecer sob a maré.
-    // Ilha inicial: patamares baixos que a inundação cobre aos poucos. Demais ilhas: só uma praia
-    // curta e íngreme (antes um anel de 7,5 m de degraus onde a jangada enroscava); a faixa de
-    // fora desce até o fundo do mar para a ilha não "flutuar" na seca.
-    const LAYERS = starterIsland
-      ? [[7.5, -1.55], [6, -1.2], [4.5, -0.85], [3, -0.5], [1.5, -0.15], [0.5, 0.2], [0, 0.55]]
-      : [[2.2, -2.4], [1.1, -1.25], [0.4, -0.3], [0, 0.55]];
-    for (const [dr, top] of LAYERS) {
-      const worldTop = islandElevation + top;
-      const radius = R + dr, thickness = !starterIsland && dr === LAYERS[0][0] ? worldTop + 7 : 0.35;
-      const sand = new THREE.Mesh(
-        new THREE.CylinderGeometry(radius, radius, thickness, 40),
-        M(SAND[dr], { map: repeated(sandTexture(), radius * 0.45), bumpMap: repeated(sandBump(), radius * 0.45), bumpScale: 1.4 })
-      );
-      sand.position.y = top - thickness / 2;
-      addSolid(sand);
-      const collider = {
-        type: 'cyl', x: 0, y: top - thickness / 2, z: 0,
-        hx: radius, hy: thickness / 2, hz: radius, floodTop: worldTop,
-      };
-      set.items.push(collider);
-      landLayers.push({ mesh: sand, top: worldTop, dr });
+    // MORRO: platô plano (construções) + encosta suave até o fundo do mar, com contorno irregular
+    const pal = { ...ZONE_PAL[zone.id], ...((itype && itype.pal) || {}) };
+    const hill = new IslandHill(starterIsland
+      ? { x, z, R, top: 0.55, bed: -2.4, W: 9.5, prof: [[0, 0.55], [0.5, 0.02], [1.5, -0.32], [3, -0.67], [4.5, -1.02], [6, -1.37], [7.5, -1.72], [9.5, -2.4]], e: 0, la: 0.04, lk: 3, lp: vr() * 6.28, wa: 0, wp: 0 }
+      : { x, z, R, top: islandElevation + 0.55, bed: -7.4, W: span(itype.W), e: span(itype.e), ea: vr() * 6.28, la: span(itype.la), lk: itype.lk || 2 + ((vr() * 3) | 0), lp: vr() * 6.28, wa: 0.04 + vr() * 0.05, wp: vr() * 6.28,
+          mA: siteType === 'militar' ? 0.6 : (itype.rocky || 0) > 0.4 ? 1.2 + vr() * 1.0 : 0.45 + vr() * 0.65, mk: 2 + ((vr() * 4) | 0), mp: vr() * 6.28 });
+    const set = { x, z, yaw: 0, y: islandElevation, radius: starterIsland ? R + 8 : hill.maxR, items: [] };
+    {
+      const mesh = makeHillMesh(hill, pal, { grassK: (itype && itype.grassK) || (starterIsland ? 0.62 : { pirata: 0.8, militar: 0.74, z51: 0.7 }[zone.id]), rocky: (itype && itype.rocky) || 0, gy: islandElevation, seed: vr() * 10 });
+      addSolid(mesh); // tiro acerta o chão da ilha
     }
-    const grass = new THREE.Mesh(new THREE.CylinderGeometry(R * 0.7, R * 0.72, 0.06, 32), M(0x6f9d4c, { map: repeated(grassTexture(), R * 0.35) }));
-    grass.position.y = 0.58; group.add(grass);
+    if (starterIsland) {
+      // Ilha inicial: os patamares continuam como COLISÃO (a inundação do começo cobre aos poucos),
+      // mas o visual é o morro liso
+      for (const [dr, top] of [[7.5, -1.55], [6, -1.2], [4.5, -0.85], [3, -0.5], [1.5, -0.15], [0.5, 0.2], [0, 0.55]]) {
+        const radius = R + dr;
+        set.items.push({ type: 'cyl', x: 0, y: top - 0.175, z: 0, hx: radius, hy: 0.175, hz: radius, floodTop: islandElevation + top });
+        landLayers.push({ mesh: { visible: true }, top: islandElevation + top, dr });
+      }
+    } else {
+      // núcleo do platô: bloqueia tiro/visão através da ilha (o chão em si é o morro, no fundo do mar)
+      set.items.push({ type: 'cyl', x: 0, y: (0.53 - 4) / 2, z: 0, hx: R, hy: (0.53 + 4) / 2, hz: R });
+      this.hills.push(hill);
+      // caixotes do fundo de chunks vizinhos que ficaram embaixo da encosta sobem para a superfície dela
+      for (const c of this.crates) if (c.sea && Math.abs(c.x - x) < hill.maxR && Math.abs(c.z - z) < hill.maxR) {
+        const hy = hill.height(c.x, c.z); if (hy > c.y) { c.y = hy; c.mesh.position.y = hy; }
+      }
+    }
     const TOP = 0.55;
-    landLayers.push({ mesh: grass, top: islandElevation + 0.61 });
     const addBox = (lx, lz, w, h, l, yaw, mat) => {
       const m = box(w, h, l, mat); m.position.set(lx, TOP + h / 2, lz); m.rotation.y = yaw; addSolid(m);
       set.items.push({ type: 'box', x: lx, y: TOP + h / 2, z: lz, hx: w / 2, hy: h / 2, hz: l / 2, yaw });
@@ -521,12 +572,10 @@ export class World {
       ? [[-R * 0.78, 0], [R * 0.78, -R * 0.22], [0, R * 0.78]]
       : [];
     // acampamento (cabana ou forte) perto do meio; ruínas ficam longe dele
-    const CAMP_R = { hut: 5, tendas: 5.6, vigia: 6, fort: 7.9, bunker: 6, scrap: 8.6, militar: 44 };
-    const campR = CAMP_R[siteType] || 5;
     const campA = r() * 6.28, campD = r() * Math.max(0, R - campR - 1.4);
     const campC = [Math.cos(campA) * campD, Math.sin(campA) * campD];
     const nearCamp = (lx, lz, pad = 0) => !starterIsland && Math.hypot(lx - campC[0], lz - campC[1]) < campR + pad;
-    const houses = r() < 0.6 ? 1 : 0, wallMat = shared().plaster, crates = [];
+    const houses = r() < (itype && itype.ruins != null ? itype.ruins : 0.6) ? 1 : 0, wallMat = shared().plaster, crates = [];
     const houseCenters = [];
     for (let hI = 0; hI < houses; hI++) {
       let hx, hz;
@@ -573,7 +622,8 @@ export class World {
     const wreckAt = starterIsland ? wreckSpot(R) : null;
     const nearWreck = (lx, lz, pad) => !!wreckAt && Math.hypot(lx - wreckAt.x, lz - wreckAt.z) < 5.2 + pad;
     // Palmeiras.
-    const palms = 2 + ((r() * 3) | 0);
+    const areaK = starterIsland ? 1 : Math.min(2.2, Math.max(0.8, (R / 11) ** 1.6)); // ilhas maiores = mais vegetação
+    const palms = Math.round((2 + ((r() * 3) | 0)) * (itype && itype.palms != null ? itype.palms : zone.palms) * areaK); // Zona 51: sem palmeiras; militar: poucas
     const palmList = []; // palmeiras que balançam com o vento (ver update)
     const palmCenters = [];
     for (let i = 0; i < palms; i++) {
@@ -615,19 +665,20 @@ export class World {
       for (let i = 0, n = 6 + ((dec() * 5) | 0); i < n; i++) {
         const a = dec() * 6.283, d = R * (0.76 + dec() * 0.22), lx = Math.cos(a) * d, lz = Math.sin(a) * d, sz = 0.28 + dec() * 0.5;
         if (!free(lx, lz, 0.6)) continue;
-        const rock = makeRock(dec, sz); rock.position.set(lx, TOP + 0.02, lz); group.add(rock);
+        const rock = makeRock(dec, sz); rock.position.set(lx, Math.max(TOP, hill.height(x + lx, z + lz) - islandElevation) + 0.02, lz); group.add(rock);
       }
-      for (let i = 0, n = 2 + ((dec() * 3) | 0); i < n; i++) {
+      for (let i = 0, n = Math.round((3 + ((dec() * 4) | 0)) * (itype && itype.bushes != null ? itype.bushes : zone.bushes) * areaK); i < n; i++) {
         const a = dec() * 6.283, d = R * (0.3 + dec() * 0.4), lx = Math.cos(a) * d, lz = Math.sin(a) * d, rad = 0.35 + dec() * 0.3;
         if (!free(lx, lz, 1.2)) continue;
         const bush = makeBush(dec, rad); bush.position.set(lx, TOP + 0.05, lz); bush.rotation.y = dec() * 6.28; group.add(bush);
       }
       const tufts = [];
-      for (let i = 0, n = Math.round(R * R * 0.8); i < n; i++) {
+      for (let i = 0, n = Math.round(R * R * 0.8 * (itype && itype.tufts != null ? itype.tufts : zone.tufts) * (itype && itype.palms === 0 && itype.tufts == null ? 0 : 1)); i < n; i++) {
         const a = dec() * 6.283, d = Math.sqrt(dec()) * R * 0.68, lx = Math.cos(a) * d, lz = Math.sin(a) * d;
         if (free(lx, lz, 0.5)) tufts.push([lx, TOP + 0.06, lz]);
       }
       if (tufts.length) group.add(makeGrassTufts(dec, tufts));
+      if (itype) this._beachDecor(group, hill, itype, dec, islandElevation);
     }
     let siteCenter = [0, 0], rooms = [], towers = [], spawnSpots = [], ladders = [], bossSpot = null, towerFrame = null;
     let fireRef = null;
@@ -670,9 +721,12 @@ export class World {
     }
     const isl = {
       id, x, z, R, diff, group, set, solids, crates: [], enemies: [], palms: palmList, wreck,
-      starter: starterIsland, siteType, siteCenter, rooms, towers, spawnSpots, ladders, bossSpot, towerFrame, landLayers, allItems: set.items.slice(),
+      starter: starterIsland, zone: zone.id, siteType, siteCenter, rooms, towers, spawnSpots, ladders, bossSpot, towerFrame, landLayers, allItems: set.items.slice(),
       maxGround: islandElevation + 0.61, floodTier: null,
-      fire: fireRef,
+      fire: fireRef, hill: starterIsland ? null : hill, model: itype ? itype.id : 'inicial', modelName: itype ? itype.nome : 'Ilha inicial',
+      // orla (espuma/água rasa) e distância que navios mantêm
+      shoreR: Math.min(...[0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11].map((k) => hill.radiusAt(k * Math.PI / 6, 0.9))), // contorno irregular: usa o lado mais curto (a espuma do resto fica sob a areia)
+      avoidR: Math.max(...[0, 1, 2, 3, 4, 5, 6, 7].map((k) => hill.radiusAt(k * Math.PI / 4, -1.5))) + 6,
     };
     crates.forEach(([cx2, cz2], i) => {
       const c = this._crate(group, `${id}c${i}`, cx2, TOP, cz2, x, islandElevation, z, diff, r() * 3);
@@ -862,6 +916,7 @@ export class World {
     for (const m of isl.solids) { const i = G.solids.indexOf(m); if (i >= 0) G.solids.splice(i, 1); }
     for (const c of isl.crates) { const i = this.crates.indexOf(c); if (i >= 0) this.crates.splice(i, 1); }
     this.islands.splice(this.islands.indexOf(isl), 1);
+    if (isl.hill) { const i = this.hills.indexOf(isl.hill); if (i >= 0) this.hills.splice(i, 1); }
     G.enemies.removeIsland(isl);
     if (G.siege) G.siege.removeIsland(isl);
   }
@@ -908,7 +963,7 @@ export class World {
   }
 
   // O barco encalha na parte rasa em vez de atravessar a ilha.
-  pushBoat(boat) {
+  pushBoat(boat, dt = 1 / 60) {
     const level = this.G.startup.waterLevel, boatR = Math.min(boat.set.radius, 7) * 0.75;
     for (const isl of this.islands) {
       if (isl.block) { // estrutura do mar: retângulo orientado (encosta, não atravessa)
@@ -922,6 +977,27 @@ export class World {
       }
       if (isl.flooded) continue;
       const dx = boat.x - isl.x, dz = boat.z - isl.z, d = Math.hypot(dx, dz) || 1;
+      if (isl.hill) { // morro: a jangada desvia AOS POUCOS antes de chegar no raso (não atola nem enrosca)
+        const h = isl.hill;
+        if (d > h.maxR + boatR + ISLAND_AVOID.soft) continue;
+        // linha onde o fundo fica raso demais para a quilha (com a maré cheia, mesmo na seca: assim a
+        // jangada nunca fica parada em cima da encosta quando a água volta)
+        const a = Math.atan2(dz, dx), safe = h.radiusAt(a, Math.max(level, ISLAND_AVOID.fullLevel) - ISLAND_AVOID.depth) + boatR;
+        const nx = dx / d, nz = dz / d;
+        if (d < safe + ISLAND_AVOID.soft) {
+          const k = Math.min(1, 1 - (d - safe) / ISLAND_AVOID.soft), hx = Math.sin(boat.yaw), hz = Math.cos(boat.yaw);
+          const inward = -(hx * nx + hz * nz); // > 0: a proa aponta para a ilha
+          const tx = -nz, tz = nx, side = Math.sign(hx * tx + hz * tz) || 1, sp = Math.abs(boat.speed) + 0.6;
+          // empurrão suave para fora + escorregar para o lado em que a proa já aponta
+          const heading = Math.max(0, inward) * Math.min(1, Math.abs(boat.speed) / 2); // parada perto da praia não é empurrada
+          const out = k * k * ISLAND_AVOID.push * heading * dt, slide = Math.max(0, inward) * k * sp * ISLAND_AVOID.slide * dt;
+          boat.x += nx * out + tx * side * slide; boat.z += nz * out + tz * side * slide;
+          if (inward > 0 && !boat.stranded) boat.speed *= 1 - Math.min(0.5, k * inward * 0.6 * dt);
+        }
+        const d2 = Math.hypot(boat.x - isl.x, boat.z - isl.z);
+        if (d2 < safe) { boat.x = isl.x + nx * safe; boat.z = isl.z + nz * safe; }
+        continue;
+      }
       // Faixas ainda fora d'água definem até onde a jangada chega (maré cheia = chega mais perto).
       let reach = 0;
       for (const [i, layer] of isl.landLayers.entries()) if (layer.top > level && layer.dr != null) reach = Math.max(reach, layer.dr);

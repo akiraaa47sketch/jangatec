@@ -43,7 +43,8 @@ function chunkIsland(seed, cx, cz) {
   let isl = null;
   if (cx !== 0 || cz !== 0) {
     const r = mulberry32(hash2(seed, cx, cz)), roll = r(), starter = cx === 0 && cz === 1;
-    if (starter || roll < WORLD_LOOT_PARAMS.islandChance) {
+    // só a ilha inicial ainda levanta o fundo em volta (as outras têm o próprio morro: World.seabedHeight)
+    if (starter) {
       const x = cx * S + (r() - 0.5) * 30, z = cz * S + (r() - 0.5) * 30;
       const R = starter ? 15 + r() * 3 : 9 + r() * 6;
       isl = { x, z, R: R + (starter ? 7.5 : 2.2), edge: starter ? SEABED.starterEdge : SEABED.islandEdge };

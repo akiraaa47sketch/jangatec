@@ -39,7 +39,10 @@ import { EnemyNet } from './systems/enemynet.js';
 import { Bosses } from './systems/bosses.js';
 import { BossSkills } from './systems/bossskills.js';
 import { SeaEvents } from './systems/seaevents.js';
+import { VFX } from './core/vfx.js';
+import { Zones } from './systems/zones.js';
 import { Sos } from './systems/sos.js';
+import { Endgame } from './systems/endgame.js';
 import { Inventory } from './ui/inventory.js';
 import { clock } from './core/util.js';
 import { Intro } from './systems/intro.js';
@@ -103,10 +106,13 @@ G.siege = new Siege(G);   // torres de sucata (derrubar com canhão) e morteiros
 G.tools = new Tools(G);     // banjo (música que cura) e gancho
 G.drops = new Drops(G);     // itens largados no mundo
 G.bossSkills = new BossSkills(G); // habilidades especiais dos chefes
+G.vfx = new VFX(scene); // faíscas, lascas, poeira, anéis de choque e clarões
+G.zones = new Zones(G); // zona pirata / militar / Zona 51 (aviso, HUD e tom do céu)
 G.bosses = new Bosses(G);   // chefe da seca (escafandrista)
 G.enemyNet = new EnemyNet(G); // inimigos sincronizados (host simula, os outros veem réplicas)
 G.seaEvents = new SeaEvents(G); // kraken, tubarões, peixes voadores e raios
 G.sos = new Sos(G); // plataforma de petróleo do SOS (fim da jornada)
+G.endgame = new Endgame(G); // coordenadas do abrigo, navegação 360° e os Twins
 G.inventory = new Inventory(G); // tela de inventário (Tab)
 G.zoneTitle = new ZoneTitle(G); // nome da zona ao entrar numa zona nova
 const atmo = new Atmosphere(renderer, scene, { sun, hemisphere }); // céu, IBL e sombras
@@ -276,7 +282,7 @@ function frame() {
   if (G.hitStop > 0) { G.hitStop -= dt; dt *= 0.08; }
   last = ms;
   const { boat, player } = G;
-  if (G.started) G.startup.update(dt, t);
+  if (G.started) { G.startup.update(dt, t); G.zones.update(dt); }
   boat.update(dt, t);
   if (!G.started) {
     // Fundo do menu: câmera orbitando a jangada.
@@ -317,8 +323,10 @@ function frame() {
   G.siege.update(dt, t);
   G.tools.update(dt, t);
   G.drops.update(dt);
+  G.vfx.update(dt);
   G.seaEvents.tick(dt, t);
   G.sos.update(dt, t);
+  G.endgame.update(dt, t);
   if (G.bench) G.bench.update(dt);
   if (!cut) {
     G.interact.update(dt);

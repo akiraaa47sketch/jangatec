@@ -68,6 +68,33 @@ export function makeCannonMesh() {
   return g;
 }
 
+// Canhão de FERRO (meio do jogo): carreta de madeira escura com rodas, cano de ferro fundido longo
+// com anéis de reforço e culatra. Mesma estrutura de nós do improvisado (mira e recuo iguais).
+export function makeIronCannonMesh() {
+  const g = new THREE.Group();
+  const wood = std(0x4a3020, { map: repeated(woodTexture(), 0.6, 0.6), bumpMap: repeated(woodBump(), 0.6, 0.6), bumpScale: 1.4 });
+  const iron = std(0x2a2d31, { map: metalTexture(), metalness: 0.85, roughness: 0.38 });
+  const brass = std(0xb08a3a, { metalness: 0.9, roughness: 0.3 });
+  const sled = new THREE.Mesh(new THREE.BoxGeometry(1.05, 0.18, 1.6), wood); sled.position.y = -0.37; g.add(sled);
+  for (const x of [-0.56, 0.56]) for (const z of [-0.5, 0.5]) {
+    const wheel = new THREE.Mesh(new THREE.CylinderGeometry(0.22, 0.22, 0.1, 16), wood); wheel.rotation.z = Math.PI / 2; wheel.position.set(x, -0.3, z); g.add(wheel);
+    const hub = new THREE.Mesh(new THREE.CylinderGeometry(0.07, 0.07, 0.12, 10), iron); hub.rotation.z = Math.PI / 2; hub.position.set(x, -0.3, z); g.add(hub);
+  }
+  const yawNode = new THREE.Group(); yawNode.position.y = -0.27; g.add(yawNode);
+  yawNode.add(new THREE.Mesh(new THREE.CylinderGeometry(0.48, 0.5, 0.07, 22), iron));
+  for (const x of [-0.36, 0.36]) { const cheek = new THREE.Mesh(new THREE.BoxGeometry(0.1, 0.55, 0.75), wood); cheek.position.set(x, 0.28, -0.05); yawNode.add(cheek); }
+  const pitchNode = new THREE.Group(); pitchNode.position.set(0, 0.45, 0); yawNode.add(pitchNode);
+  const barrel = new THREE.Mesh(new THREE.CylinderGeometry(0.13, 0.2, 1.7, 18), iron); barrel.rotation.x = Math.PI / 2; barrel.position.z = 0.45; pitchNode.add(barrel);
+  const breech = new THREE.Mesh(new THREE.SphereGeometry(0.21, 16, 10), iron); breech.position.z = -0.42; pitchNode.add(breech);
+  const knob = new THREE.Mesh(new THREE.SphereGeometry(0.07, 10, 8), iron); knob.position.z = -0.66; pitchNode.add(knob);
+  for (const [z, r] of [[-0.25, 0.21], [0.2, 0.19], [0.75, 0.16], [1.26, 0.15]]) { const ring = new THREE.Mesh(new THREE.TorusGeometry(r, 0.03, 6, 22), z > 1 ? brass : iron); ring.position.z = z; pitchNode.add(ring); }
+  const trun = new THREE.Mesh(new THREE.CylinderGeometry(0.06, 0.06, 0.82, 10), iron); trun.rotation.z = Math.PI / 2; pitchNode.add(trun);
+  const bore = new THREE.Mesh(new THREE.CircleGeometry(0.1, 14), new THREE.MeshBasicMaterial({ color: 0x050505 })); bore.position.z = 1.31; pitchNode.add(bore);
+  const muzzle = new THREE.Object3D(); muzzle.position.z = 1.36; pitchNode.add(muzzle);
+  g.userData.cannon = { yawNode, pitchNode, muzzle, barrel, recoil: 0, base: 0.45 };
+  return g;
+}
+
 // ---------- torreta-arpão (soldada no convés) ----------
 // Mesma estrutura do canhão (yawNode → pitchNode → muzzle), então mira e câmera são as mesmas.
 export function makeHookTurretMesh() {

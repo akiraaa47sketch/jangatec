@@ -341,7 +341,7 @@ export class Ocean {
       .sort((a, b) => a.d - b.d).slice(0, 6);
     for (let k = 0; k < 6; k++) {
       const s = near[k];
-      if (s) u.uIsl.value[k].set(s.i.x, s.i.z, s.i.R + 7.5); else u.uIsl.value[k].set(0, 0, -1e4);
+      if (s) u.uIsl.value[k].set(s.i.x, s.i.z, s.i.shoreR || s.i.R + 7.5); else u.uIsl.value[k].set(0, 0, -1e4);
       const v = u.uIsl.value[k]; SHORE[k][0] = v.x; SHORE[k][1] = v.y; SHORE[k][2] = v.z;
     }
   }

@@ -1,29 +1,14 @@
-// Nome da zona: quando o jogador entra numa zona nova, o nome aparece no meio da tela, na fonte do
-// logo do Jangatec, com fade in → pausa → fade out. Não existe indicador fixo de zona.
-// Zonas: cada ilha/estrutura (pelo tipo de acampamento), a plataforma do SOS, o leito seco do mar
-// na maré baixa e o mar aberto, que muda de nome conforme a distância da origem (dificuldade).
-import { WORLD_LOOT_PARAMS } from '../systems/loot.js';
+// Nome da zona: quando o jogador entra numa zona nova (Zona Pirata, Zona Militar, Zona 51 — ver
+// systems/zones.js), o nome aparece no meio da tela, na fonte do logo do Jangatec, com fade in →
+// pausa → fade out. Não existe indicador fixo de zona. Também aparece ao acordar na cutscene.
+import { zoneOf, ZONES } from '../systems/zones.js';
 
-const SITE_NAMES = {
-  starter: ['Ilha do Naufrágio', 'onde o voo 47 caiu'],
-  hut: ['Ilha da Cabana', 'sobreviventes'],
-  tendas: ['Acampamento das Tendas', 'sobreviventes'],
-  fort: ['Forte de Troncos', 'território hostil'],
-  vigia: ['Ilha da Vigia', 'território hostil'],
-  bunker: ['Bunker Abandonado', 'soldados'],
-  militar: ['Complexo Militar', 'soldados'],
-  scrap: ['Forte de Sucata', 'sucateiros'],
-  predio: ['Prédio Afundado', 'ruínas'],
-  seatower: ['Torre de Sucata', 'sucateiros'],
-};
-const SEA_NAMES = ['Águas Rasas', 'Mar Aberto', 'Mar das Correntes', 'Águas Profundas', 'Abismo do Norte'];
-
-const HOLD = 0.7; // s que o jogador precisa ficar na zona nova antes do nome aparecer (evita pisca-pisca na borda)
+const HOLD = 0.7; // s que o jogador precisa ficar na zona nova antes do nome aparecer (evita pisca-pisca na divisa)
 
 export class ZoneTitle {
   constructor(G) {
     this.G = G;
-    this.current = null; this.pending = null; this.pendingT = 0; this.enabled = true;
+    this.current = null; this.pending = null; this.pendingT = 0;
     const el = document.createElement('div');
     el.id = 'zoneTitle';
     el.innerHTML = '<span class="zt-line"></span><b class="zt-name"></b><small class="zt-sub"></small>';
@@ -31,22 +16,11 @@ export class ZoneTitle {
     this.el = el; this.nameEl = el.querySelector('.zt-name'); this.subEl = el.querySelector('.zt-sub');
   }
 
-  // zona em que o jogador está agora: { id, name, sub }
+  // zona em que o jogador está agora: { id, name, sub }. A ilha inicial fica na Zona Pirata.
   zoneAt() {
     const G = this.G, p = G.player.body.pos;
-    const rig = G.sos && G.sos.rig && G.sos.rig.isl;
-    if (rig && Math.hypot(p.x - rig.x, p.z - rig.z) < (rig.R || 30) + 4) return { id: 'sos', name: 'Plataforma de Petróleo', sub: 'pedido de socorro' };
-    for (const isl of G.world.islands) {
-      const cx = isl.cx ?? isl.x, cz = isl.cz ?? isl.z;
-      if (Math.hypot(p.x - cx, p.z - cz) > isl.R + 3) continue;
-      const key = isl.starter ? 'starter' : isl.siteType;
-      const [name, sub] = SITE_NAMES[key] || ['Ilha Desconhecida', ''];
-      return { id: 'isl:' + isl.id, name, sub };
-    }
-    const seaDry = G.startup && G.startup.departed && G.startup.waterLevel < -2 && !G.player.aboard && !G.player.swimming;
-    if (seaDry) return { id: 'seco', name: 'Leito Seco', sub: 'o mar recuou' };
-    const d = Math.min(SEA_NAMES.length - 1, Math.floor(Math.hypot(p.x, p.z) / WORLD_LOOT_PARAMS.diffStep));
-    return { id: 'mar:' + d, name: SEA_NAMES[d], sub: 'mar' };
+    const z = G.world && G.world.difficulty ? zoneOf(G.world.difficulty(p.x, p.z)) : ZONES.pirata;
+    return { id: z.id, name: z.nome, sub: z.nivel ? `dificuldade ${z.nivel.toLowerCase()}` : '' };
   }
 
   show(name, sub = '') {
@@ -57,11 +31,11 @@ export class ZoneTitle {
   }
 
   // marca a zona atual como "já vista" (sem mostrar), ex.: logo depois da cutscene
-  sync() { const z = this.zoneAt(); this.current = z.id; this.pending = null; }
+  sync() { this.current = this.zoneAt().id; this.pending = null; }
 
   update(dt) {
     const G = this.G;
-    if (!G.started || !this.enabled || G.cutscene) return;
+    if (!G.started || G.cutscene) return;
     const z = this.zoneAt();
     if (z.id === this.current) { this.pending = null; return; }
     if (!this.pending || this.pending.id !== z.id) { this.pending = z; this.pendingT = 0; }
