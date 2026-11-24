@@ -11,6 +11,7 @@ import { inRoom } from '../world/camp.js';
 import { SHIP } from '../world/navalmodels.js';
 import { SIEGE } from './siege.js';
 const SIEGE_MORTAR = () => SIEGE.mortar;
+import { ZONES, zoneOf } from './zones.js';
 import { sfx } from '../core/sfx.js';
 
 export const ENEMY_TYPES = {
@@ -36,6 +37,11 @@ export const ENEMY_TYPES = {
   escafandrista: { nome: 'Escafandrista amaldiçoado', hp: 320, speed: 2.4, dmg: 15, range: 2.3, cd: 1.6, cor: 0x4d5d62, scale: 1.3, boss: 'mini', ring: 2.5, hitR: 0.35 },
   // chefe das bases militares: gira a minigun (aviso), solta uma rajada longa e superaquece
   metralhador: { nome: 'Metralhador', hp: 700, speed: 1.7, dmg: 5, range: 30, cd: 4.2, cor: 0x3a4226, scale: 1.35, ranged: true, boss: 'minigun', burst: 34, burstGap: 0.07, acc: 0.4, spinUp: 1.2, hitR: 0.4 },
+  // --- Zona 51 (fim de jogo): agentes de terno, cientistas com gás, mutantes e ciborgues ---
+  agente:   { nome: 'Agente', hp: 125, speed: 3.5, dmg: 9, range: 26, cd: 1.5, cor: 0x1a1a1e, scale: 1.02, ranged: true, burst: 2, acc: 0.74, keep: 7, dodge: { cd: 4, chance: 0.5 } },
+  cientista: { nome: 'Cientista louco', hp: 85, speed: 3.0, dmg: 0, range: 15, cd: 99, cor: 0xe8e4d6, scale: 1, ranged: true, burst: 0, skill: 'bomb', keep: 8 },
+  mutante:  { nome: 'Mutante', hp: 150, speed: 4.6, dmg: 14, range: 1.9, cd: 0.9, cor: 0x5aff6a, scale: 1.1 },
+  ciborgue: { nome: 'Ciborgue', hp: 280, speed: 2.3, dmg: 24, range: 2.4, cd: 1.6, cor: 0x7a8088, scale: 1.3, hitR: 0.35 },
   // chefes da plataforma Leviatã (evento SOS) — habilidades em bossskills.js
   soldador:   { nome: 'O Soldador', hp: 650, speed: 2.8, dmg: 16, range: 2.4, cd: 1.4, cor: 0xd8731a, scale: 1.4, boss: 'solda', hitR: 0.4 },
   quimico:    { nome: 'Dr. Gás', hp: 620, speed: 2.7, dmg: 13, range: 2.2, cd: 1.2, cor: 0x5f8a2a, scale: 1.3, boss: 'gas', hitR: 0.35 },
@@ -155,7 +161,8 @@ export class Enemies {
     if (isl.starter || !this.auth) return;
     const G = this.G, r = mulberry32(hash2(G.world.seed, Math.round(isl.x) + 9, Math.round(isl.z) - 9));
     if (isl.seaSite) { this._spawnSeaSite(isl, r); return; }
-    const pool = BY_DIFF[isl.diff];
+    const Z = ZONES[isl.zone] || zoneOf(isl.diff); // zona da ilha: quem vive nela
+    const pool = Z.enemies || BY_DIFF[isl.diff];
     const baseCount = isl.diff === 0 ? (r() < 0.5 ? 1 : 0) : 1 + isl.diff + ((r() * 2) | 0);
     const n = Math.max(isl.siteType === 'fort' ? 3 : 2, baseCount);
     // não nasce dentro de parede/móvel (tenta alguns pontos em volta do pátio)
@@ -189,8 +196,8 @@ export class Enemies {
     for (let i = 0; i < count; i++) {
       const id = `${isl.id}e${i}`, sp = spots.length ? spots[i % spots.length] : null;
       let type = pool[(r() * pool.length) | 0];
-      if (military || isl.siteType === 'bunker') type = SOLDIERS(r, sp && sp.high, isl.diff); // soldados: a maioria atira
-      else if (sp && sp.high) type = isl.diff >= 3 && r() < 0.5 ? 'soldado' : 'atirador';
+      if (military || isl.siteType === 'bunker' || Z.id === 'militar') type = SOLDIERS(r, sp && sp.high, isl.diff); // soldados: a maioria atira
+      else if (sp && sp.high) type = Z.high ? Z.high[(r() * Z.high.length) | 0] : isl.diff >= 3 && r() < 0.5 ? 'soldado' : 'atirador';
       let lx = sp ? sp.x : isl.siteCenter[0], lz = sp ? sp.z : isl.siteCenter[1];
       if (i >= spots.length || !sp) { // mais inimigos que pontos: em volta de um ponto livre
         for (let k = 0; k < 12; k++) {

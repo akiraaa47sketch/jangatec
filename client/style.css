@@ -651,8 +651,13 @@ body.bossfight #msgs { top: 96px; } body.touch.bossfight #msgs { top: 84px; }
 @media (max-width: 760px) { .news-hero, .news-grid { grid-template-columns: 1fr; } .news-big h3 { font-size: 22px !important; } .news-patch > summary { flex-wrap: wrap; gap: 4px 10px; } .news-title { font-size: 18px; } .news-date { order: 3; } }
 
 /* marcador do abrigo (fim de jogo) */
-#shelterMark { position: absolute; top: 58px; left: 50%; transform: translateX(-50%); display: flex; align-items: center; gap: 8px;
+#shelterMark { position: absolute; top: 76px; left: 50%; transform: translateX(-50%); display: flex; align-items: center; gap: 8px;
   padding: 5px 12px; border-radius: 4px; background: rgba(8, 24, 32, 0.62); border: 1px solid rgba(98, 238, 145, 0.45); pointer-events: none;
   font: 800 12px var(--ui); letter-spacing: 0.08em; text-transform: uppercase; color: var(--ink); text-shadow: 0 1px 2px #000; }
 #shelterMark .arrow { display: inline-block; color: var(--green); font-size: 16px; transition: transform 0.12s linear; }
 #shelterMark .dist { color: var(--green); }
+
+/* zona atual (pirata / militar / Zona 51) */
+#zoneTag { position: absolute; top: 44px; left: 50%; transform: translateX(-50%); display: flex; gap: 8px; align-items: baseline; pointer-events: none;
+  padding: 3px 10px; border-radius: 3px; background: rgba(8, 24, 32, 0.5); font: 800 11px var(--ui); letter-spacing: 0.14em; text-transform: uppercase; text-shadow: 0 1px 2px #000; }
+#zoneTag span { color: var(--ink-dim); font-size: 10px; }

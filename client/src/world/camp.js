@@ -301,6 +301,55 @@ export function buildCamp(type, ctx) {
     out.yard = P(0, 1.6); out.fire = P(0.2, 1.9);
     spot(site, -1.8, 2.4); spot(site, 1.8, 2.6); spot(site, 0, 3.6); spot(site, -3.3, 0); spot(site, 3.3, 0);
     rooms.push({ x: ctx.cx, z: ctx.cz, yaw: ctx.yaw, hw: RR * 0.9, hd: RR * 0.9, door: [P(0, RR - 1.2), P(0, RR + 1.4)], fort: true });
+  } else if (type === 'lab') {
+    // ZONA 51: laboratório secreto cercado — prédio de concreto com janelas verdes, radome, tanques de
+    // contenção com líquido brilhando (e algo boiando dentro), um OVNI caído meio enterrado, placas de
+    // aviso, holofotes e cerca de arame com portão.
+    const S = 7.2, gate = 1.6;
+    const steelM = m.steel, glowG = new THREE.MeshStandardMaterial({ color: 0x9cff7a, emissive: 0x5cff3a, emissiveIntensity: 2 });
+    const wireM = new THREE.MeshStandardMaterial({ color: 0x9aa0a4, metalness: 0.7, roughness: 0.4, transparent: true, opacity: 0.45, side: THREE.DoubleSide, wireframe: true });
+    const fence = (x0, z0, x1, z1) => {
+      const len = Math.hypot(x1 - x0, z1 - z0), yaw = Math.atan2(x1 - x0, z1 - z0);
+      const panel = new THREE.Mesh(new THREE.PlaneGeometry(len, 2.2, Math.round(len * 4), 9), wireM); panel.rotation.y = Math.PI / 2;
+      const g2 = new THREE.Group(); g2.add(panel); decor(site, g2, (x0 + x1) / 2, 1.1, (z0 + z1) / 2, yaw);
+      for (let i = 0; i <= Math.round(len / 2.4); i++) { const t = i / Math.round(len / 2.4); decor(site, cylY(0.05, 2.5, steelM, 6), x0 + (x1 - x0) * t, 1.25, z0 + (z1 - z0) * t); }
+      blocker(site, (x0 + x1) / 2, 0, (z0 + z1) / 2, Math.abs(x1 - x0) + 0.1, 2.2, Math.abs(z1 - z0) + 0.1);
+    };
+    fence(-S, -S, S, -S); fence(-S, -S, -S, S); fence(S, -S, S, S); fence(-S, S, -gate, S); fence(gate, S, S, S);
+    const lab = concrete({ x: P(0, -3.4)[0], z: P(0, -3.4)[1], yaw: ctx.yaw }, 6.4, 4.2, 3.0);
+    out.crateSpots.push(lab.inside);
+    for (const [lx, lz, ry] of [[-3.25, -3.4, Math.PI / 2], [3.25, -3.4, Math.PI / 2]]) decor(site, new THREE.Mesh(boxGeo(0.06, 0.6, 1.0), glowG), lx, 1.6, lz, ry); // janelas verdes
+    decor(site, new THREE.Mesh(boxGeo(1.6, 0.4, 0.05), new THREE.MeshStandardMaterial({ color: 0xd8b04a, emissive: 0x5a4a10 })), 0, 2.6, -1.25); // placa "ÁREA RESTRITA"
+    // radome pequeno
+    { const base = new THREE.Mesh(new THREE.CylinderGeometry(1.1, 1.15, 1.2, 18), m.concrete); decor(site, base, -5, 0.6, -4.6); solid(site, -5, 0, -4.6, 2.2, 1.2, 2.2, m.concrete);
+      const dome = new THREE.Mesh(new THREE.IcosahedronGeometry(1.5, 2), new THREE.MeshStandardMaterial({ color: 0xf2f2ee, roughness: 0.55, flatShading: true })); decor(site, dome, -5, 2.4, -4.6); }
+    // tanques de contenção com algo boiando
+    for (const [lx, lz] of [[4.6, 2.6], [5.4, 0.4]]) {
+      const glass = new THREE.Mesh(new THREE.CylinderGeometry(0.6, 0.6, 2.2, 18, 1, true), new THREE.MeshStandardMaterial({ color: 0xbfffd0, transparent: true, opacity: 0.25, roughness: 0.05, side: THREE.DoubleSide, depthWrite: false }));
+      decor(site, glass, lx, 1.3, lz);
+      decor(site, new THREE.Mesh(new THREE.CylinderGeometry(0.56, 0.56, 1.7, 18), new THREE.MeshStandardMaterial({ color: 0x5aff6a, emissive: 0x2aaa3a, emissiveIntensity: 1.2, transparent: true, opacity: 0.55, depthWrite: false })), lx, 1.1, lz);
+      decor(site, new THREE.Mesh(new THREE.SphereGeometry(0.28, 12, 10), new THREE.MeshStandardMaterial({ color: 0x2a3a2a, roughness: 0.6 })), lx, 1.3, lz);
+      for (const y of [0.15, 2.45]) decor(site, cylY(0.66, 0.2, steelM, 18), lx, y, lz);
+      const [x, z] = P(lx, lz); set.items.push({ type: 'cyl', x, y: TOP + 1.25, z, hx: 0.66, hy: 1.25, hz: 0.66 });
+    }
+    // OVNI caído, meio enterrado e inclinado
+    { const ufo = new THREE.Group();
+      const disc = new THREE.Mesh(new THREE.SphereGeometry(2.4, 28, 12), new THREE.MeshStandardMaterial({ color: 0xa8b0b8, metalness: 0.9, roughness: 0.25 })); disc.scale.y = 0.22; ufo.add(disc);
+      const dome = new THREE.Mesh(new THREE.SphereGeometry(0.95, 18, 10, 0, Math.PI * 2, 0, Math.PI / 2), new THREE.MeshStandardMaterial({ color: 0x8affc0, emissive: 0x2a8a5a, emissiveIntensity: 1, transparent: true, opacity: 0.7 })); dome.position.y = 0.4; ufo.add(dome);
+      for (let i = 0; i < 10; i++) { const a = i / 10 * Math.PI * 2, l = new THREE.Mesh(new THREE.SphereGeometry(0.11, 8, 6), new THREE.MeshStandardMaterial({ color: 0x7dff8a, emissive: 0x5cff3a, emissiveIntensity: i % 2 ? 3 : 0.6 })); l.position.set(Math.cos(a) * 2.25, -0.05, Math.sin(a) * 2.25); ufo.add(l); }
+      ufo.rotation.z = 0.32; ufo.rotation.x = -0.12; decor(site, ufo, -3.6, 0.35, 3.4, 0.6);
+      solid(site, -3.6, 0, 3.4, 3.2, 1.1, 3.2, m.concreteDark, 0.6).visible = false;
+      for (let i = 0; i < 6; i++) { const ch = new THREE.Mesh(boxGeo(0.4 + r() * 0.4, 0.15, 0.3), m.concreteDark); decor(site, ch, -3.6 + (r() - 0.5) * 5, 0.07, 3.4 + (r() - 0.5) * 5, r() * 3); } // terra revirada
+    }
+    // placas de aviso e holofotes
+    for (const [lx, lz] of [[-2.4, S - 0.2], [2.4, S - 0.2], [S - 0.2, -2]]) {
+      const sign = new THREE.Mesh(new THREE.CircleGeometry(0.4, 3), new THREE.MeshStandardMaterial({ color: 0xf2c230, side: THREE.DoubleSide })); sign.rotation.z = Math.PI / 2;
+      decor(site, cylY(0.04, 1.4, steelM, 5), lx, 0.7, lz); decor(site, sign, lx, 1.6, lz);
+    }
+    for (const [lx, lz] of [[-S + 0.4, -S + 0.4], [S - 0.4, S - 0.4]]) { decor(site, cylY(0.07, 4, steelM, 6), lx, 2, lz); decor(site, new THREE.Mesh(boxGeo(0.6, 0.3, 0.3), glowG), lx, 4, lz); }
+    out.yard = P(0, 3); out.fire = P(1.6, 4.6);
+    for (const [x, z] of [[-1.5, 1.5], [2.2, 2.4], [-5, 0.5], [5, -2.6], [0, 5], [-2.4, -5.2]]) spot(site, x, z);
+    rooms.push({ ...roomOf(site, S, S), door: [P(0, S - 1.2), P(0, S + 1.4)], fort: true });
   } else if (type === 'militar') {
     // BASE MILITAR: prédio de concreto fechado de 2 andares (16 × 12 m) com garagem (jipe e portão
     // largo), saguão com escada até o 1º andar, arsenal e alojamento no térreo; corredor e cinco

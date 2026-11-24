@@ -5,6 +5,19 @@
 // Nos textos, **assim** vira negrito.
 export const PATCH_NOTES = [
   {
+    id: '0.21', versao: 'v0.21', data: '24/11/2026', titulo: 'Três zonas: Pirata, Militar e Zona 51',
+    destaques: [
+      { tag: 'Mundo', titulo: 'O mar agora tem zonas', texto: '**Zona Pirata** (fácil) no começo, **Zona Militar** (médio) no meio e **Zona 51** (difícil) no fim, onde fica a Leviatã. Cada zona tem **ilhas, acampamentos, inimigos e céu próprios**, e um aviso aparece quando você entra numa nova.' },
+      { tag: 'Zona 51', titulo: 'Laboratórios secretos', texto: 'Ilhas cinzentas e sem palmeiras com **laboratórios cercados**, radome, **tanques de contenção brilhando** e um **OVNI caído**. Quem guarda: **agentes** de terno, **cientistas loucos** com bombas de gás, **mutantes** brilhando e **ciborgues** blindados.' },
+    ],
+    secoes: [
+      { icone: '🏴‍☠️', nome: 'Zona Pirata · fácil', itens: ['Até ~1,7 km.', 'Ilhas tropicais: **cabanas, tendas e fortes de tronco**.', 'Piratas, duelistas, pistoleiros e bombardeiros.'] },
+      { icone: '🪖', nome: 'Zona Militar · médio', itens: ['~1,7 a 2,55 km.', 'Ilhas mais secas, poucas palmeiras: **vigias, bunkers e a base militar**.', 'Soldados, escopeteiros, elites e brutamontes.'] },
+      { icone: '👽', nome: 'Zona 51 · difícil', itens: ['A partir de ~2,55 km.', 'Ilhas cinzentas sem palmeiras, **laboratórios secretos** e névoa esverdeada.', '**4 inimigos novos**: Agente, Cientista louco, Mutante e Ciborgue (com variações).', 'A **plataforma Leviatã** (SOS) só aparece aqui.'] },
+      { icone: '🧭', nome: 'Interface', itens: ['**Zona e dificuldade** no topo da tela.', '**Aviso grande** ao entrar numa zona nova.'] },
+    ],
+  },
+  {
     id: '0.20', versao: 'v0.20', data: '24/11/2026', titulo: 'Inimigos com estilo e chefes furiosos',
     destaques: [
       { tag: 'Inimigos', titulo: 'Cada um com a sua roupa', texto: 'Os inimigos agora usam **roupas, chapéus e acessórios** com **variações temáticas por tipo**: bucaneiros com papagaio, grumetes de marinheiro, fuzileiros de boina, atiradores camuflados de capuz, cavalheiros de cartola, catadores de mochila e muito mais.' },

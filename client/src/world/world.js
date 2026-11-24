@@ -13,6 +13,7 @@ import { buildSeaTower, buildLeaningBuilding } from './seasites.js';
 import { makePieceMesh, PIECES } from '../boat/pieces.js';
 import { makeHookTurretMesh } from './navalmodels.js';
 import { makePalm, makeRock, makeBush, makeGrassTufts } from './models.js';
+import { ZONES, zoneOf } from '../systems/zones.js';
 import { woodTexture, woodBump, sandTexture, sandBump, grassTexture, thatchTexture, logWallTexture, metalTexture, clothTexture as clothTex, repeated, scaleBoxUVs } from './textures.js';
 
 const M = (color, extra = {}) => new THREE.MeshStandardMaterial({ color, roughness: 0.9, ...extra });
@@ -457,14 +458,11 @@ export class World {
     // acampamento: forte de troncos, cabana, ou (ilhas grandes) forte de SUCATA com torres de morteiro
     const siteRoll = r();
     // mais longe na rota = bases mais perigosas; base militar só no fim (dificuldade 3+) em ilha grande
-    const SITES = [
-      [['hut', 1], ['tendas', 1]],
-      [['hut', 1], ['tendas', 1], ['fort', 1], ['vigia', 1]],
-      [['fort', 1], ['vigia', 1], ['bunker', 1.2]],          // sucata agora fica no meio do mar (seasites.js)
-      [['bunker', 1], ['vigia', 0.6], ['fort', 0.6], ['militar', 1.6]],
-      [['bunker', 0.7], ['fort', 0.4], ['militar', 2.4]],
-    ][diff];
-    const MIN_R = { scrap: 11.5, militar: 12, bunker: 10 };
+    // ZONAS (systems/zones.js): pirata (fácil), militar (médio) e Zona 51 (difícil) — cada uma com os
+    // seus acampamentos, vegetação e cores
+    const zone = starterIsland ? ZONES.pirata : zoneOf(diff);
+    const SITES = diff === 0 ? [['hut', 1], ['tendas', 1]] : zone.sites;
+    const MIN_R = { scrap: 11.5, militar: 12, bunker: 10, lab: 11 };
     // o complexo militar ocupa ~40 m de raio: só em chunk sem ilha nos vizinhos
     const cm = /^i(-?\d+),(-?\d+)$/.exec(id), lonely = !!cm && [-1, 0, 1].every((i) => [-1, 0, 1].every((j) => (!i && !j) || !chunkHasIsland(this.seed, +cm[1] + i, +cm[2] + j)));
     const options = SITES.filter(([t]) => R0 >= (MIN_R[t] || 0) && (t !== 'militar' || lonely)), totalW = options.reduce((a, [, w]) => a + w, 0);
@@ -488,7 +486,7 @@ export class World {
       const radius = R + dr, thickness = !starterIsland && dr === LAYERS[0][0] ? worldTop + 7 : 0.35;
       const sand = new THREE.Mesh(
         new THREE.CylinderGeometry(radius, radius, thickness, 40),
-        M(SAND[dr], { map: repeated(sandTexture(), radius * 0.45), bumpMap: repeated(sandBump(), radius * 0.45), bumpScale: 1.4 })
+        M(new THREE.Color(SAND[dr]).lerp(new THREE.Color(0x77756c), 1 - zone.sand).getHex(), { map: repeated(sandTexture(), radius * 0.45), bumpMap: repeated(sandBump(), radius * 0.45), bumpScale: 1.4 })
       );
       sand.position.y = top - thickness / 2;
       addSolid(sand);
@@ -499,7 +497,7 @@ export class World {
       set.items.push(collider);
       landLayers.push({ mesh: sand, top: worldTop, dr });
     }
-    const grass = new THREE.Mesh(new THREE.CylinderGeometry(R * 0.7, R * 0.72, 0.06, 32), M(0x6f9d4c, { map: repeated(grassTexture(), R * 0.35) }));
+    const grass = new THREE.Mesh(new THREE.CylinderGeometry(R * 0.7, R * 0.72, 0.06, 32), M(zone.grass, { map: repeated(grassTexture(), R * 0.35) }));
     grass.position.y = 0.58; group.add(grass);
     const TOP = 0.55;
     landLayers.push({ mesh: grass, top: islandElevation + 0.61 });
@@ -512,7 +510,7 @@ export class World {
       ? [[-R * 0.78, 0], [R * 0.78, -R * 0.22], [0, R * 0.78]]
       : [];
     // acampamento (cabana ou forte) perto do meio; ruínas ficam longe dele
-    const CAMP_R = { hut: 5, tendas: 5.6, vigia: 6, fort: 7.9, bunker: 6, scrap: 8.6, militar: 44 };
+    const CAMP_R = { hut: 5, tendas: 5.6, vigia: 6, fort: 7.9, bunker: 6, scrap: 8.6, militar: 44, lab: 8.2 };
     const campR = CAMP_R[siteType] || 5;
     const campA = r() * 6.28, campD = r() * Math.max(0, R - campR - 1.4);
     const campC = [Math.cos(campA) * campD, Math.sin(campA) * campD];
@@ -561,7 +559,7 @@ export class World {
       crates.splice(0, crates.length, ...starterCratePositions);
     }
     // Palmeiras.
-    const palms = 2 + ((r() * 3) | 0);
+    const palms = Math.round((2 + ((r() * 3) | 0)) * zone.palms); // Zona 51: sem palmeiras; militar: poucas
     const palmList = []; // palmeiras que balançam com o vento (ver update)
     const palmCenters = [];
     for (let i = 0; i < palms; i++) {
@@ -604,13 +602,13 @@ export class World {
         if (!free(lx, lz, 0.6)) continue;
         const rock = makeRock(dec, sz); rock.position.set(lx, TOP + 0.02, lz); group.add(rock);
       }
-      for (let i = 0, n = 2 + ((dec() * 3) | 0); i < n; i++) {
+      for (let i = 0, n = Math.round((2 + ((dec() * 3) | 0)) * zone.bushes); i < n; i++) {
         const a = dec() * 6.283, d = R * (0.3 + dec() * 0.4), lx = Math.cos(a) * d, lz = Math.sin(a) * d, rad = 0.35 + dec() * 0.3;
         if (!free(lx, lz, 1.2)) continue;
         const bush = makeBush(dec, rad); bush.position.set(lx, TOP + 0.05, lz); bush.rotation.y = dec() * 6.28; group.add(bush);
       }
       const tufts = [];
-      for (let i = 0, n = Math.round(R * R * 0.8); i < n; i++) {
+      for (let i = 0, n = Math.round(R * R * 0.8 * zone.tufts); i < n; i++) {
         const a = dec() * 6.283, d = Math.sqrt(dec()) * R * 0.68, lx = Math.cos(a) * d, lz = Math.sin(a) * d;
         if (free(lx, lz, 0.5)) tufts.push([lx, TOP + 0.06, lz]);
       }
@@ -650,7 +648,7 @@ export class World {
     }
     const isl = {
       id, x, z, R, diff, group, set, solids, crates: [], enemies: [], palms: palmList,
-      starter: starterIsland, siteType, siteCenter, rooms, towers, spawnSpots, ladders, bossSpot, towerFrame, landLayers, allItems: set.items.slice(),
+      starter: starterIsland, zone: zone.id, siteType, siteCenter, rooms, towers, spawnSpots, ladders, bossSpot, towerFrame, landLayers, allItems: set.items.slice(),
       maxGround: islandElevation + 0.61, floodTier: null,
       fire: fireRef,
     };

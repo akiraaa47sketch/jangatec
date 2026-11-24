@@ -10,7 +10,8 @@ import { buildOilRig, RIG } from '../world/oilrig.js';
 import { bakeStatic } from '../core/bake.js';
 import { sfx } from '../core/sfx.js';
 
-export const SOS = { minProgress: 0.7, ahead: 230, side: 90, keepDist: 800 };
+export const SOS = { minProgress: 0.78, // só na Zona 51
+  ahead: 230, side: 90, keepDist: 800 };
 const TYPES = [['soldado', 4], ['escopeteiro', 2], ['pesado', 2], ['melee', 2]];
 const FLOOR_NAMES = ['Convés de carga', 'Refinaria', 'Casa de perfuração', 'Heliporto'];
 const pickType = (r) => { let x = r() * 10; for (const [t, w] of TYPES) { x -= w; if (x <= 0) return t; } return 'soldado'; };

@@ -20,6 +20,11 @@ const LOOKS = {
   bombardeiro: { capHex: 0x2a2a2a, baseHex: 0x7a6a4a, gloveHex: 0x4a2a1a, bootHex: 0x2a1f1a, face: 'louco', hat: 'bandana', hatColor: 0x8b1d1d, boots: 'botas' },
   escopeteiro: { capHex: 0x4b5530, baseHex: 0x3a3f2a, gloveHex: 0x1f2219, bootHex: 0x1f1c18, face: 'bravo', hat: 'militar', boots: 'botas', gun: 'escopeta' },
   elite: { capHex: 0x3f4a2a, baseHex: 0x5a5a40, gloveHex: 0x1f2219, bootHex: 0x1f1c18, face: 'bravo', hat: 'bone', hatColor: 7, boots: 'botas', gun: 'rifle_precisao' },
+  // Zona 51
+  agente: { capHex: 0x15151a, baseHex: 0x22222a, gloveHex: 0x0e0e10, bootHex: 0x0e0e10, face: 'oculos', hat: 'nenhum', boots: 'botas', gun: 'pistola', outfit: 'casaco', outfitHex: 0x15151a },
+  cientista: { capHex: 0xd8d4c0, baseHex: 0xe8e4d6, gloveHex: 0x7ab0d8, bootHex: 0x2a2a2a, face: 'louco', hat: 'nenhum', boots: 'galochas', outfit: 'jaleco', outfitHex: 0xf2f0ea, gear: 'gas' },
+  mutante: { capHex: 0x3aa84a, baseHex: 0x2a5a2a, gloveHex: 0x5aff6a, bootHex: 0x1a2a1a, face: 'louco', hat: 'nenhum', boots: 'chinelo', spikes: true, gear: 'mutante' },
+  ciborgue: { capHex: 0x5a6068, baseHex: 0x3a3f45, gloveHex: 0x8a9098, bootHex: 0x2a2d31, face: 'bravo', hat: 'nenhum', boots: 'botas', blade: 'cano', gear: 'ciborgue' },
   // chefes da Leviatã (acessórios próprios em addBossGear)
   soldador: { capHex: 0x8a4a1a, baseHex: 0x3a3430, gloveHex: 0x6a3a1a, bootHex: 0x2a1f1a, face: 'bravo', hat: 'nenhum', boots: 'botas', blade: 'cano', gear: 'solda', outfit: 'jaleco', outfitHex: 0x5a3a1a },
   quimico: { capHex: 0x4a6a2a, baseHex: 0xd8d4c0, gloveHex: 0x2f5a2a, bootHex: 0x2a2a22, face: 'louco', hat: 'nenhum', boots: 'galochas', blade: 'faca_manteiga', gear: 'gas', outfit: 'jaleco', outfitHex: 0xe8e4d6 },
@@ -46,6 +51,10 @@ const VARIANTS = {
   soldado: [V('infante', { hat: 'militar', back: 'mochila', backHex: 0x4b5530 }), V('fuzileiro', { hat: 'boina', hatColor: 0x2a4a1a, outfit: 'colete', outfitHex: 0x4b5530 }), V('patrulheiro', { hat: 'militar', outfit: 'casaco', outfitHex: 0x3f4a2a, back: 'explorador', backHex: 0x3f4a2a }), V('boina vermelha', { hat: 'boina', hatColor: 0x7a1414, outfit: 'colete', outfitHex: 0x2a2a2a })],
   escopeteiro: [V('assalto', { hat: 'militar', outfit: 'colete', outfitHex: 0x4b5530 }), V('guarda', { hat: 'bone', hatColor: 7, outfit: 'casaco', outfitHex: 0x2a2a2a, back: 'mochila', backHex: 0x2a2a2a }), V('comando', { hat: 'boina', hatColor: 0x1a1a1a })],
   elite: [V('atirador', { hat: 'bone', hatColor: 7 }), V('camuflado', { hat: 'capuz', hatColor: 0x3a4a2a, outfit: 'casaco', outfitHex: 0x3a4a2a, back: 'capa', backHex: 0x3a4a2a }), V('oficial', { hat: 'boina', hatColor: 0x2a3a5a, outfit: 'colete', outfitHex: 0x2a2a2a })],
+  agente: [V('agente', {}), V('agente de campo', { outfit: 'casaco', outfitHex: 0x2a2a30, hat: 'bone', hatColor: 7 }), V('segurança', { outfit: 'colete', outfitHex: 0x1a1a1a, hat: 'militar', face: 'bravo' })],
+  cientista: [V('pesquisador', {}), V('técnico', { hat: 'bone', hatColor: 8, back: 'mochila', backHex: 0xd8d4c0 }), V('chefe do laboratório', { hat: 'capuz', hatColor: 0xf2f0ea })],
+  mutante: [V('verde', {}), V('roxo', { capHex: 0x7a3aa8, baseHex: 0x3a1a5a, gloveHex: 0xc05aff }), V('tóxico', { capHex: 0xb8c82a, baseHex: 0x5a6a1a, gloveHex: 0xeaff3a })],
+  ciborgue: [V('modelo T', {}), V('dourado', { capHex: 0x8a7a3a, gloveHex: 0xc9a03a }), V('furtivo', { capHex: 0x22262a, baseHex: 0x15181b })],
   fantasma: [V('afogado', { hat: 'pirata', hatColor: 8 }), V('espectro', { hat: 'capuz', hatColor: 0x6a8a84, outfit: 'pirata', outfitHex: 0x6a8a84, back: 'capa', backHex: 0x4a6a64 }), V('marujo perdido', { hat: 'bandana', hatColor: 0x6a8a84, outfit: 'marinheiro', outfitHex: 0x6a8a84 })],
 };
 
@@ -164,6 +173,19 @@ function addBossGear(kind, pp) {
       visor.material.emissiveIntensity = 2 + Math.random() * 2.5; const G = W();
       if (G && G.vfx && Math.random() < dt * 10) { orb.getWorldPosition(wp); G.vfx.sparks(wp, 3, 0x8fd0ff, 4, 0.25); }
     });
+  } else if (kind === 'mutante') { // pústulas brilhando e gotas radioativas pingando
+    const gl = glow(pp.gloveMat ? pp.gloveMat.color.getHex() : 0x5aff6a, 1.6);
+    for (let i = 0; i < 9; i++) { const a = i * 2.39, y = -0.4 + (i % 5) * 0.22, rr = 0.5; add(body, new THREE.Mesh(new THREE.SphereGeometry(0.05 + (i % 3) * 0.025, 8, 6), gl), Math.sin(a) * rr, y, Math.cos(a) * rr); }
+    anim.push((dt) => { const G = W(); if (G && G.vfx && Math.random() < dt * 4) { body.getWorldPosition(wp); G.vfx.glow.emit(wp.x + (Math.random() - 0.5) * 0.6, wp.y + 0.2, wp.z + (Math.random() - 0.5) * 0.6, 0, -1.5, 0, 0.6, 0.12, gl.color.getHex(), 6, 0); } });
+  } else if (kind === 'ciborgue') { // placas de armadura, visor vermelho, luz no peito e antena
+    const metal = M(0x9aa0a8, { metalness: 0.9, roughness: 0.3 });
+    pads(0x6a7078);
+    add(body, new THREE.Mesh(new THREE.BoxGeometry(0.6, 0.12, 0.08), glow(0xff2a1a, 3)), 0, 0.64, 0.5);
+    const core = add(body, new THREE.Mesh(new THREE.CircleGeometry(0.1, 16), glow(0x4ab0ff, 2.5)), 0, -0.05, 0.56);
+    for (const y of [-0.3, 0.2]) { const plate = add(body, new THREE.Mesh(new THREE.BoxGeometry(0.75, 0.16, 0.06), metal), 0, y, 0.5); plate.rotation.x = -0.15; }
+    add(body, new THREE.Mesh(new THREE.CylinderGeometry(0.015, 0.015, 0.5, 5), metal), 0.2, 1.0, -0.1);
+    add(body, new THREE.Mesh(new THREE.SphereGeometry(0.04, 8, 6), glow(0xff2a1a, 3)), 0.2, 1.26, -0.1);
+    anim.push(() => { core.material.emissiveIntensity = 1.8 + Math.sin(performance.now() * 0.006) * 1.2; });
   } else if (kind === 'municao') { // metralhador: caixa de munição nas costas com fita até a arma, ombreiras
     const box = add(body, new THREE.Mesh(new THREE.BoxGeometry(0.55, 0.55, 0.35), M(0x3a4226, { metalness: 0.3 })), 0, 0.1, -0.62);
     add(box, new THREE.Mesh(new THREE.BoxGeometry(0.2, 0.06, 0.04), M(0xd8b04a)), 0, 0.12, -0.18);

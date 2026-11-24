@@ -40,6 +40,7 @@ import { Bosses } from './systems/bosses.js';
 import { BossSkills } from './systems/bossskills.js';
 import { SeaEvents } from './systems/seaevents.js';
 import { VFX } from './core/vfx.js';
+import { Zones } from './systems/zones.js';
 import { Sos } from './systems/sos.js';
 import { Endgame } from './systems/endgame.js';
 import { Inventory } from './ui/inventory.js';
@@ -103,6 +104,7 @@ G.tools = new Tools(G);     // banjo (música que cura) e gancho
 G.drops = new Drops(G);     // itens largados no mundo
 G.bossSkills = new BossSkills(G); // habilidades especiais dos chefes
 G.vfx = new VFX(scene); // faíscas, lascas, poeira, anéis de choque e clarões
+G.zones = new Zones(G); // zona pirata / militar / Zona 51 (aviso, HUD e tom do céu)
 G.bosses = new Bosses(G);   // chefe da seca (escafandrista)
 G.enemyNet = new EnemyNet(G); // inimigos sincronizados (host simula, os outros veem réplicas)
 G.seaEvents = new SeaEvents(G); // kraken, tubarões, peixes voadores e raios
@@ -267,7 +269,7 @@ function frame() {
   if (G.hitStop > 0) { G.hitStop -= dt; dt *= 0.08; }
   last = ms;
   const { boat, player } = G;
-  if (G.started) G.startup.update(dt, t);
+  if (G.started) { G.startup.update(dt, t); G.zones.update(dt); }
   boat.update(dt, t);
   if (!G.started) {
     // Fundo do menu: câmera orbitando a jangada.

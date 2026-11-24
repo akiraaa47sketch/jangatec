@@ -34,6 +34,8 @@ const MOVES = {
   lanceiro: [{ wind: 0.45, mult: 1, w: 3 }, { wind: 0.35, mult: 0.8, hits: 2, w: 2 }, { wind: 0.7, mult: 1.6, heavy: true, w: 1 }], // estocadas de longe
   esquivo: [{ wind: 0.26, mult: 0.9, hits: 2, w: 3 }, { wind: 0.4, mult: 0.5, kick: true, w: 1 }],
   duelista: [{ wind: 0.3, mult: 1, hits: 2, w: 3 }, { wind: 0.26, mult: 0.9, hits: 3, w: 2 }, { wind: 0.55, mult: 1.6, heavy: true, w: 1 }],
+  mutante: [{ wind: 0.22, mult: 0.8, hits: 3, w: 3 }, { wind: 0.4, mult: 1.4, w: 1 }],
+  ciborgue: [{ wind: 0.8, mult: 1.7, heavy: true, aoe: 3.2, w: 2 }, { wind: 0.45, mult: 1, hits: 2, w: 2 }],
   // chefes da Leviatã: golpes próprios (as habilidades especiais ficam em bossskills.js)
   soldador: [{ wind: 0.5, mult: 1.2, hits: 2, w: 3 }, { wind: 0.8, mult: 1.9, heavy: true, aoe: 3.2, w: 2 }, { wind: 0.45, mult: 0.7, kick: true, w: 1 }],
   quimico: [{ wind: 0.34, mult: 0.9, hits: 3, w: 3 }, { wind: 0.4, mult: 0.6, kick: true, w: 2 }],
@@ -42,7 +44,7 @@ const MOVES = {
   pirata: [{ wind: 0.32, mult: 1, hits: 2, w: 3 }, { wind: 0.28, mult: 0.9, hits: 3, w: 1 }, { wind: 0.6, mult: 1.8, heavy: true, w: 1 }, { wind: 0.4, mult: 0.5, kick: true, w: 1.5 }],
 };
 const LIGHT_POSES = ['slashR', 'slashL', 'thrust', 'uppercut'];
-const GUARD_CHANCE = { soldador: 0.35, quimico: 0.2, perfurador: 0.5, faisca: 0.3, lanceiro: 0.3, esquivo: 0.1, duelista: 0.45, melee: 0.4, pesado: 0.45, pirata: 0.5, rapido: 0.15, fantasma: 0.35, escafandrista: 0.35 };
+const GUARD_CHANCE = { ciborgue: 0.5, mutante: 0, soldador: 0.35, quimico: 0.2, perfurador: 0.5, faisca: 0.3, lanceiro: 0.3, esquivo: 0.1, duelista: 0.45, melee: 0.4, pesado: 0.45, pirata: 0.5, rapido: 0.15, fantasma: 0.35, escafandrista: 0.35 };
 const RIPOSTE_CHANCE = { lanceiro: 0.2, esquivo: 0.3, duelista: 0.7, melee: 0.3, pesado: 0.15, pirata: 0.55, rapido: 0.2, escafandrista: 0.2 }; // contra-ataque depois de defender
 const EVADE_CHANCE = { melee: 0.12, pesado: 0, pirata: 0.18, rapido: 0.3, faisca: 0.35, quimico: 0.15 }; // desviam do seu golpe
 
