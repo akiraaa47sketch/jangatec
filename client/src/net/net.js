@@ -5,6 +5,8 @@ import * as THREE from '../three.js';
 import { lerpAngle } from '../core/util.js';
 import { makeHumanoid, animateHumanoid } from '../player/model.js';
 import { makePill, animatePill, disposePill, decodePill, encodePill, PILL_SCALE } from '../player/pill.js';
+import { buildWeapon } from '../player/viewmodel-parts.js';
+import { fitWeaponToHand } from '../player/pillhands.js';
 
 const COLORS = [0xd1a02f, 0x3fae5a, 0xb84fc9, 0xd1552f, 0x2f8fd1, 0xd12f8a];
 
@@ -144,7 +146,34 @@ export class Net {
       const pill = makePill(decodePill(ap.slice(2))), holder = new THREE.Group();
       holder.add(pill); holder.scale.setScalar(PILL_SCALE);
       r.mesh.add(holder); r.pill = holder; rig.visible = false;
+      r.wId = undefined; // remonta a arma na mão da pílula nova
+      pill.userData.onHands = () => { r.wId = undefined; }; // as mãos 3D chegaram depois: reencaixa
     } else rig.visible = true;
+  }
+
+  // Arma do aliado na mão (mesmo modelo e pegada da 3ª pessoa do jogador local); banjo vai no peito.
+  _remoteWeapon(r, s) {
+    const id = typeof s.w === 'string' ? s.w : '';
+    if (r.wId === id || !r.pill) return;
+    r.wId = id;
+    if (r.wMesh) { r.wMesh.parent && r.wMesh.parent.remove(r.wMesh); r.wMesh = null; }
+    if (!id) return;
+    let model = null; try { model = buildWeapon(id); } catch { model = null; }
+    if (!model) return;
+    if (model.flashMesh) model.flashMesh.visible = false;
+    const pill = r.pill.children[0], parts = pill.userData.parts, holder = new THREE.Group();
+    holder.add(model.group); r.wMesh = holder; r.wFlash = model.muzzle ? model.flashMesh : null;
+    if (id === 'banjo') {
+      parts.body.add(holder); holder.position.set(0.05, -0.45, 0.62); holder.rotation.set(0.15, Math.PI, 0); holder.scale.setScalar(1.15 / PILL_SCALE);
+    } else {
+      parts.hand.add(holder);
+      if (!fitWeaponToHand(pill, holder, model)) { holder.rotation.set(-Math.PI / 2, 0, Math.PI); holder.scale.setScalar(1.5 / PILL_SCALE); }
+    }
+  }
+  // clarão na boca da arma do aliado (o tiro dele chega pela rede)
+  remoteMuzzle(from) {
+    const r = this.remotes.get(from); if (!r || !r.wFlash) return;
+    r.wFlash.visible = true; r.flashT = 0.06;
   }
 
   // Código de aparência enviado junto com o estado do jogador local.
@@ -168,7 +197,7 @@ export class Net {
       let x = b.pos.x, y = b.pos.y, z = b.pos.z, yaw = pl.yaw;
       if (pl.aboard) { [x, z] = boat.toLocal(x, z); y -= boat.set.y; yaw -= boat.yaw; }
       const r2 = (v) => Math.round(v * 100) / 100;
-      this.send({ t: 'state', s: { p: [r2(x), r2(y), r2(z)], yaw: r2(yaw), ab: pl.aboard ? 1 : 0, sw: pl.swimming ? 1 : 0, sp: r2(Math.hypot(b.vel.x, b.vel.z)), dead: pl.dead ? 1 : 0, dn: pl.downed ? 1 : 0, mu: G.tools && G.tools.playT > 0 ? 1 : 0, vc: G.voice && G.voice.on ? 1 : 0, po: pl.anim ? pl.anim.pose : 'walk', pp: pl.anim ? Math.round(pl.anim.progress * 100) / 100 : 0, ar: pl.anim ? pl.anim.armed : 'none', tk: G.voice && G.voice.talking ? 1 : 0, ap: this.localLook() } });
+      this.send({ t: 'state', s: { p: [r2(x), r2(y), r2(z)], yaw: r2(yaw), ab: pl.aboard ? 1 : 0, sw: pl.swimming ? 1 : 0, sp: r2(Math.hypot(b.vel.x, b.vel.z)), dead: pl.dead ? 1 : 0, dn: pl.downed ? 1 : 0, mu: G.tools && G.tools.playT > 0 ? 1 : 0, vc: G.voice && G.voice.on ? 1 : 0, po: pl.anim ? pl.anim.pose : 'walk', pp: pl.anim ? Math.round(pl.anim.progress * 100) / 100 : 0, ar: pl.anim ? pl.anim.armed : 'none', tk: G.voice && G.voice.talking ? 1 : 0, ap: this.localLook(), w: G.combat.weaponId || '', bm: G.combat.buildMode || G.build.active ? 1 : 0 } });
       if (this.isHost) this.send({ t: 'boat', b: { x: r2(boat.x), z: r2(boat.z), yaw: Math.round(boat.yaw * 1000) / 1000, speed: r2(boat.speed), up: boat.sailUp, angle: boat.sailAngle } });
     }
     // Interpola os aliados.
@@ -192,6 +221,9 @@ export class Net {
         pd.armed = typeof s.ar === 'string' ? s.ar : 'none'; pd.gunType = pd.armed === 'long' ? 'long' : 'pistol';
         const remotePose = s.sw ? 'swim' : s.dn ? 'crawl' : typeof s.po === 'string' ? s.po : 'walk';
         animatePill(r.pill.children[0], s.sp, dt, remotePose, +s.pp || 0); // mesma animação que o jogador vê
+        this._remoteWeapon(r, s);
+        if (r.wMesh) r.wMesh.visible = !s.bm && !s.dead && !s.sw;
+        if (r.flashT > 0 && (r.flashT -= dt) <= 0 && r.wFlash) r.wFlash.visible = false;
       } else animateHumanoid(mesh, s.sp, dt, s.sw ? 'swim' : 'walk');
     }
   }

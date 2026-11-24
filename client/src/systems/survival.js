@@ -6,7 +6,7 @@ import { sfx } from '../core/sfx.js';
 export const ITEM_NAMES = {
   metal: 'Metal', peixe: 'Peixe', bandagem: 'Bandagem', barra_proteina: 'Barra de proteína', energetico: 'Energético', chocolate: 'Chocolate',
   kit: 'Kit médico', municao: 'Munição', cartucho: 'Cartuchos',
-  canhao: 'Canhão improvisado', gancho: 'Torreta-arpão', bala_canhao: 'Balas de canhão',
+  canhao: 'Canhão improvisado', canhao_ferro: 'Canhão de ferro', gancho: 'Torreta-arpão', bala_canhao: 'Balas de canhão',
 };
 // Comidas: buffs temporários (4 min). Comer de novo renova o tempo.
 export const BUFFS = {
@@ -30,7 +30,7 @@ export class Survival {
   constructor(G) {
     this.G = G;
     this.vida = 100;
-    this.inv = { metal: 0, bandagem: 0, kit: 0, municao: 0, cartucho: 0, canhao: 0, gancho: 0, bala_canhao: 0, barra_proteina: 0, energetico: 0, chocolate: 0, peixe: 0 };
+    this.inv = { metal: 0, bandagem: 0, kit: 0, municao: 0, cartucho: 0, canhao: 0, canhao_ferro: 0, gancho: 0, bala_canhao: 0, barra_proteina: 0, energetico: 0, chocolate: 0, peixe: 0 };
     this.buffs = {}; // nome → segundos restantes
     this.deadTimer = 0;
   }

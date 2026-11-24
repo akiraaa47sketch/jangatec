@@ -8,15 +8,15 @@ import { keyOf } from '../core/keybinds.js';
 
 const $ = (id) => document.getElementById(id);
 const RARITY = ['', '#b9c0c4', '#6fdc8c', '#5fb4ff', '#c58bff', '#ffc94d'];
-const ICON = { bandagem: '✚', kit: '♥', municao: '•', cartucho: '▮', bala_canhao: '●', canhao: '⊛', gancho: '⚓', barra_proteina: 'P', energetico: 'E', chocolate: 'C', peixe: '~', metal: '▤' };
+const ICON = { bandagem: '✚', kit: '♥', municao: '•', cartucho: '▮', bala_canhao: '●', canhao: '⊛', canhao_ferro: '◉', gancho: '⚓', barra_proteina: 'P', energetico: 'E', chocolate: 'C', peixe: '~', metal: '▤' };
 const DESC = {
   bandagem: 'Recupera 30 de vida.', kit: 'Recupera toda a vida.', municao: 'Munição de pistola, revólver e rifles.',
-  cartucho: 'Cartuchos de escopeta.', bala_canhao: 'Munição dos canhões da jangada.', canhao: 'Instale a bordo, num ponto livre.',
+  cartucho: 'Cartuchos de escopeta.', bala_canhao: 'Munição dos canhões da jangada.', canhao: 'Instale a bordo, num ponto livre.', canhao_ferro: 'Canhão de verdade: recarrega mais rápido e bate quase 2× mais forte. Instale a bordo.',
   gancho: 'Torreta-arpão: carregue e solde na jangada.', barra_proteina: '+25% de dano por 4 min.', energetico: 'Estamina gasta pela metade por 4 min.',
   chocolate: 'Regenera vida por 4 min.', peixe: 'Recupera 20 de vida.', metal: 'Material.',
 };
 const USABLE = { bandagem: 'bandage', kit: 'medkit', barra_proteina: 'food1', energetico: 'food2', chocolate: 'food3', peixe: 'food4' };
-const ORDER = ['bandagem', 'kit', 'peixe', 'barra_proteina', 'energetico', 'chocolate', 'municao', 'cartucho', 'bala_canhao', 'canhao', 'metal'];
+const ORDER = ['bandagem', 'kit', 'peixe', 'barra_proteina', 'energetico', 'chocolate', 'municao', 'cartucho', 'bala_canhao', 'canhao', 'canhao_ferro', 'metal'];
 const wOf = (id) => WEAPONS.find((w) => w.id === id);
 const short = (nome) => nome.replace(/ (com|de|improvisado|reforçado|pirata).*$/i, '').replace(/^Rifle de precisão$/, 'Precisão');
 

@@ -60,7 +60,7 @@ function placementState(id, state) {
   return { id, p: state.p, q: state.q, placed: true, water: !!state.water };
 }
 
-const ITEM_RE = /^(metal|bandagem|kit|municao|cartucho|canhao|gancho|bala_canhao|barra_proteina|energetico|chocolate|peixe|arma_[a-z0-9_]+)$/;
+const ITEM_RE = /^(metal|bandagem|kit|municao|cartucho|canhao|canhao_ferro|gancho|bala_canhao|barra_proteina|energetico|chocolate|peixe|arma_[a-z0-9_]+)$/;
 function cleanDrop(d) {
   if (!d || typeof d.id !== 'string' || d.id.length > 64 || !Array.isArray(d.p) || d.p.length !== 3 || !d.p.every(Number.isFinite) || !d.loot || typeof d.loot !== 'object') return null;
   const loot = {};
@@ -337,9 +337,9 @@ function handle(ws, m) {
       // Eventos do mar sorteados pelo host (onda, furacão, tempestade, kraken, tubarões, peixes, raios,
       // navio-fantasma): valida e repassa a todos.
       const e = m.e;
-      if (room.hostId !== ws.id || !e || !['tsunami', 'furacao', 'tempestade', 'kraken', 'tubaroes', 'peixes', 'raios', 'fantasma'].includes(e.kind) ||
+      if (room.hostId !== ws.id || !e || !['tsunami', 'furacao', 'tempestade', 'kraken', 'tubaroes', 'peixes', 'raios', 'fantasma', 'sos'].includes(e.kind) ||
           typeof e.id !== 'string' || e.id.length > 40) break;
-      const keys = ['t0', 'dur', 'ox', 'oz', 'dx', 'dz', 'speed', 'A', 'sigma', 'cx', 'cz', 'fx', 'fz', 'lat', 'latV', 'ahead', 'R', 'depth', 'spin', 'seed', 'n', 'gap'];
+      const keys = ['t0', 'dur', 'ox', 'oz', 'dx', 'dz', 'speed', 'A', 'sigma', 'cx', 'cz', 'fx', 'fz', 'lat', 'latV', 'ahead', 'R', 'depth', 'spin', 'seed', 'n', 'gap', 'x', 'z', 'yaw']; // x/z/yaw: posição da plataforma do SOS
       const clean = { id: e.id, kind: e.kind, end: !!e.end };
       for (const key of keys) {
         if (e[key] === undefined) continue;

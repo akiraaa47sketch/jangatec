@@ -11,6 +11,7 @@ import { inRoom } from '../world/camp.js';
 import { SHIP } from '../world/navalmodels.js';
 import { SIEGE } from './siege.js';
 const SIEGE_MORTAR = () => SIEGE.mortar;
+import { ZONES, zoneOf } from './zones.js';
 import { sfx } from '../core/sfx.js';
 
 export const ENEMY_TYPES = {
@@ -36,6 +37,16 @@ export const ENEMY_TYPES = {
   escafandrista: { nome: 'Escafandrista amaldiçoado', hp: 320, speed: 2.4, dmg: 15, range: 2.3, cd: 1.6, cor: 0x4d5d62, scale: 1.3, boss: 'mini', ring: 2.5, hitR: 0.35 },
   // chefe das bases militares: gira a minigun (aviso), solta uma rajada longa e superaquece
   metralhador: { nome: 'Metralhador', hp: 700, speed: 1.7, dmg: 5, range: 30, cd: 4.2, cor: 0x3a4226, scale: 1.35, ranged: true, boss: 'minigun', burst: 34, burstGap: 0.07, acc: 0.4, spinUp: 1.2, hitR: 0.4 },
+  // --- Zona 51 (fim de jogo): agentes de terno, cientistas com gás, mutantes e ciborgues ---
+  agente:   { nome: 'Agente', hp: 125, speed: 3.5, dmg: 9, range: 26, cd: 1.5, cor: 0x1a1a1e, scale: 1.02, ranged: true, burst: 2, acc: 0.74, keep: 7, dodge: { cd: 4, chance: 0.5 } },
+  cientista: { nome: 'Cientista louco', hp: 85, speed: 3.0, dmg: 0, range: 15, cd: 99, cor: 0xe8e4d6, scale: 1, ranged: true, burst: 0, skill: 'bomb', keep: 8 },
+  mutante:  { nome: 'Mutante', hp: 150, speed: 4.6, dmg: 14, range: 1.9, cd: 0.9, cor: 0x5aff6a, scale: 1.1 },
+  ciborgue: { nome: 'Ciborgue', hp: 280, speed: 2.3, dmg: 24, range: 2.4, cd: 1.6, cor: 0x7a8088, scale: 1.3, hitR: 0.35 },
+  // chefes da plataforma Leviatã (evento SOS) — habilidades em bossskills.js
+  soldador:   { nome: 'O Soldador', hp: 650, speed: 2.8, dmg: 16, range: 2.4, cd: 1.4, cor: 0xd8731a, scale: 1.4, boss: 'solda', hitR: 0.4 },
+  quimico:    { nome: 'Dr. Gás', hp: 620, speed: 2.7, dmg: 13, range: 2.2, cd: 1.2, cor: 0x5f8a2a, scale: 1.3, boss: 'gas', hitR: 0.35 },
+  perfurador: { nome: 'O Perfurador', hp: 1000, speed: 2.1, dmg: 26, range: 2.9, cd: 1.8, cor: 0x8a6a2a, scale: 1.6, boss: 'broca', hitR: 0.55 },
+  faisca:     { nome: 'Faísca', hp: 820, speed: 3.7, dmg: 14, range: 2.0, cd: 1.0, cor: 0x3a6ad8, scale: 1.3, boss: 'raio', hitR: 0.35 },
   fantasma: { nome: 'Pirata fantasma', hp: 80, speed: 4.6, dmg: 6, range: 1.8, cd: 1.5, cor: 0x8fe8d8, scale: 1.05 }, // fraco, mas atravessa a névoa
 };
 // Quem aparece onde (por dificuldade = distância na rota):
@@ -71,8 +82,8 @@ export const COMBAT_DIRECTOR = {
 // e +1 pirata nas invasões a cada 2 aliados. Dano e velocidade não mudam.
 export const PARTY = { hp: 0.12, bossHp: 0.2, extraPirateEvery: 2 };
 export const PIRATE_BALANCE = {
-  firstWave: [110, 160],   // primeira invasão
-  interval: [140, 230],    // entre invasões (conta só depois que a anterior acabou)
+  firstWave: [75, 115],    // primeira invasão
+  interval: [95, 160],     // entre invasões (conta só depois que a anterior acabou)
   spawnDistance: 42,       // as balsas aparecem longe o bastante para serem vistas
 };
 const between = ([a, b]) => a + Math.random() * (b - a);
@@ -81,6 +92,7 @@ const between = ([a, b]) => a + Math.random() * (b - a);
 function bossLoot(kind) {
   const r = Math.random();
   if (kind === 'minigun') return { arma_minigun: 140, municao: 20, kit: 1, bandagem: 2 }; // a minigun vem com 140 balas
+  if (['solda', 'gas', 'broca', 'raio'].includes(kind)) return { municao: 25, cartucho: 8, kit: 1, bandagem: 2, energetico: 1 }; // chefes da Leviatã
   const loot = { municao: 10, bandagem: 2, chocolate: 1 };
   if (r < 0.35) loot['arma_' + ['revolver', 'facao', 'martelo'][(Math.random() * 3) | 0]] = 1;
   else if (r < 0.7) loot.kit = 1;
@@ -149,7 +161,8 @@ export class Enemies {
     if (isl.starter || !this.auth) return;
     const G = this.G, r = mulberry32(hash2(G.world.seed, Math.round(isl.x) + 9, Math.round(isl.z) - 9));
     if (isl.seaSite) { this._spawnSeaSite(isl, r); return; }
-    const pool = BY_DIFF[isl.diff];
+    const Z = ZONES[isl.zone] || zoneOf(isl.diff); // zona da ilha: quem vive nela
+    const pool = Z.enemies || BY_DIFF[isl.diff];
     const baseCount = isl.diff === 0 ? (r() < 0.5 ? 1 : 0) : 1 + isl.diff + ((r() * 2) | 0);
     const n = Math.max(isl.siteType === 'fort' ? 3 : 2, baseCount);
     // não nasce dentro de parede/móvel (tenta alguns pontos em volta do pátio)
@@ -183,8 +196,8 @@ export class Enemies {
     for (let i = 0; i < count; i++) {
       const id = `${isl.id}e${i}`, sp = spots.length ? spots[i % spots.length] : null;
       let type = pool[(r() * pool.length) | 0];
-      if (military || isl.siteType === 'bunker') type = SOLDIERS(r, sp && sp.high, isl.diff); // soldados: a maioria atira
-      else if (sp && sp.high) type = isl.diff >= 3 && r() < 0.5 ? 'soldado' : 'atirador';
+      if (military || isl.siteType === 'bunker' || Z.id === 'militar') type = SOLDIERS(r, sp && sp.high, isl.diff); // soldados: a maioria atira
+      else if (sp && sp.high) type = Z.high ? Z.high[(r() * Z.high.length) | 0] : isl.diff >= 3 && r() < 0.5 ? 'soldado' : 'atirador';
       let lx = sp ? sp.x : isl.siteCenter[0], lz = sp ? sp.z : isl.siteCenter[1];
       if (i >= spots.length || !sp) { // mais inimigos que pontos: em volta de um ponto livre
         for (let k = 0; k < 12; k++) {
@@ -233,6 +246,14 @@ export class Enemies {
       for (let i = 0; i < n && i < spots.length; i++) put(`${isl.id}e${i}`, isl.diff >= 2 && r() < 0.5 ? 'soldado' : r() < 0.5 ? 'pistoleiro' : 'atirador', spots[i], isl.set.y + 0.75);
       return;
     }
+    if (isl.siteType === 'tralha' || isl.siteType === 'barraco') { // zona pirata: poucos inimigos (1, às vezes 2)
+      const pool = ZONES.pirata.enemies, n = r() < 0.3 ? 2 : 1;
+      for (let i = 0; i < n && i < spots.length; i++) {
+        const sp = spots[i], e = put(`${isl.id}e${i}`, sp.high ? 'pistoleiro' : pool[(r() * pool.length) | 0], sp, isl.set.y + 0.75 + (sp.y || 0));
+        if (e && sp.high) e.post = true;
+      }
+      return;
+    }
     if (r() >= 0.55) return;
     const pool = BY_DIFF[isl.diff], n = Math.min(spots.length, 1 + ((r() * 2) | 0) + (isl.diff >= 2 ? 1 : 0));
     for (let i = 0; i < n; i++) put(`${isl.id}e${i}`, pool[(r() * pool.length) | 0], spots[i], isl.set.y + 0.75);
@@ -240,7 +261,8 @@ export class Enemies {
 
   spawn(id, type, isl, x, z) {
     const def = ENEMY_TYPES[type];
-    const mesh = makeEnemyPill(type); // pílula malvada (visual por tipo)
+    let seed = 0; for (let i = 0; i < id.length; i++) seed = (seed * 31 + id.charCodeAt(i)) | 0;
+    const mesh = makeEnemyPill(type, seed); // pílula malvada (visual por tipo + variação sorteada pelo id)
     mesh.scale.setScalar(def.scale);
     mesh.rotation.order = 'YXZ';
     const e = {
@@ -306,6 +328,9 @@ export class Enemies {
       n *= e.def.armor;
       if (G.melee && Math.random() < 0.35) G.melee.say(e.body.pos.clone().setY(e.body.pos.y + 1.6), 'CASCO', '#c8d2da');
     }
+    if (G.vfx && n > 0 && !e.creature) { // faíscas e pedacinhos da cor do inimigo no acerto
+      const p = e.body.pos; G.vfx.hit({ x: p.x, y: p.y + 1.1 * (e.def.scale || 1), z: p.z }, e.def.cor || 0xaa3333, n >= 25);
+    }
     if (e.replica) { // inimigo de outro jogador (host): o acerto vai para ele decidir
       e.hp -= n; e.hitT = 0.22;
       G.net.send({ t: 'ehit', id: e.id, n: Math.round(n) });
@@ -317,6 +342,7 @@ export class Enemies {
     if (e.hp <= 0) {
       e.state = 'dead'; e.timer = 5; e.deathT = 0;
       sfx.enemyDown(e.body.pos);
+      if (G.vfx) { const p = e.body.pos; G.vfx.death({ x: p.x, y: p.y + 1.0 * (e.def.scale || 1), z: p.z }, e.def.cor || 0xaa3333); }
       if (this.G.melee) { this.G.melee.tokens.delete(e); this.G.melee.setTell(e, null); this.G.melee.updateStars(e, 0, false); }
       this.G.world.collected.add(e.id);
       const r = Math.random();
@@ -330,8 +356,8 @@ export class Enemies {
       } else this.G.hud.msg(`${e.def.nome} derrotado`);
       if (e.def.boss && G.drops) { // chefe: saco de loot no chão para quem pegar primeiro
         G.drops.dropAt(e.body.pos, bossLoot(e.def.boss));
-        G.hud.msg(e.def.boss === 'minigun' ? 'O Metralhador caiu! Pegue o saco de loot' : 'O escafandrista caiu e largou um saco de loot');
-        if (G.enemyNet) G.enemyNet.banner(e.def.boss === 'minigun' ? 'METRALHADOR DERROTADO' : 'ESCAFANDRISTA DERROTADO', 'O loot ficou no chão — pegue com E.', 'good');
+        G.hud.msg(`${e.def.nome} caiu! Pegue o saco de loot`);
+        if (G.enemyNet) G.enemyNet.banner(`${e.def.nome.toUpperCase()} DERROTADO`, 'O loot ficou no chão — pegue com E.', 'good');
       }
       if (G.net.online) {
         G.net.send({ t: 'edie', id: e.id, side: e.deathSide, to: by === 'L' ? null : by, loot: loot ? { ...loot, ...(sabre ? { arma_sabre: 1 } : {}) } : sabre ? { arma_sabre: 1 } : null });
@@ -353,7 +379,7 @@ export class Enemies {
     }
     const wave = this.pirateWave++;
     // a partir da 2ª invasão, metade das vezes é um navio de abordagem (quem decide é o host)
-    if (wave >= 1 && Math.random() < 0.5 && G.naval && G.naval._isHost()) {
+    if (wave >= 1 && Math.random() < 0.6 && G.naval && G.naval._isHost()) {
       G.naval.startBoarding();
       this.pirateSpawnTimer = between(PIRATE_BALANCE.interval);
       return;
@@ -403,6 +429,13 @@ export class Enemies {
       this.toLand(e, s.x + ox, s.z + oz);
       e.cd = 0.6 + i * 0.4;
     }
+  }
+  _defendDeck(e) {
+    const s = e.ship;
+    e.pirate = false; e.walker = false; e.onDeckOf = s; e.isl = s.deckIsl; e.zone = s.deckZone;
+    if (!s.deckIsl.enemies.includes(e)) s.deckIsl.enemies.push(e);
+    e.state = 'chase'; e.timer = 0; e.cd = 0.4 + Math.random() * 0.6; e.m = { state: 'idle', t: 0 };
+    e.body.vel.set(0, 0, 0); e.body.grounded = false;
   }
   _placeOnShip(e) {
     const s = e.ship, [ox, oz] = rot(0, e.deckZ, s.yaw);
@@ -772,6 +805,8 @@ export class Enemies {
     if (e.state === 'onShip') { // no navio esperando a vez de pular
       if (!e.ship || e.ship.sinkT > 0) { this.damage(e, 9999); return; }
       if (e.ship.stranded) { this.toLand(e, e.ship.x + Math.sin(e.ship.yaw + Math.PI / 2) * 4, e.ship.z + Math.cos(e.ship.yaw + Math.PI / 2) * 4); return; } // navio encalhado: desce e vai a pé
+      // invadiram o navio: a tripulação larga a abordagem e defende o convés
+      if (this.P.some((T) => !T.dead && this.G.naval.onShip(e.ship, T.pos))) { this._defendDeck(e); return; }
       this._placeOnShip(e);
       e.yaw = lerpAngle(e.yaw, Math.atan2(boat.x - p.x, boat.z - p.z), Math.min(1, 6 * dt));
       e.mesh.rotation.y = e.yaw;
@@ -939,6 +974,7 @@ export class Enemies {
     e.state = 'chase'; react(e);
     for (const o of this.list) {
       if (o === e || o.isl !== e.isl || o.state === 'dead' || o.state === 'chase' || o.state === 'attack' || o.def.mortar) continue;
+      if (Math.abs(o.body.pos.y - e.body.pos.y) > 4.5) continue; // o alerta não atravessa andares
       if (Math.hypot(o.body.pos.x - e.body.pos.x, o.body.pos.z - e.body.pos.z) < 14) { o.state = 'chase'; o.timer = 0; react(o); }
     }
   }
@@ -1020,8 +1056,12 @@ export class Enemies {
   }
 
   think(e, dist, pdx, pdz) {
-    const T = e.tgt || this.localT, def = e.def, alive = !T.dead && !T.downed; // caído: inimigos perdem o interesse
-    e.los = dist < SIGHT + 10 ? this.hasLos(e) : false;
+    const T = e.tgt || this.localT, def = e.def;
+    // outro andar (prédios, Leviatã, torre-espiral): não percebe nem persegue quem está acima/abaixo —
+    // só os postos no alto (torres) continuam atirando para baixo
+    const sameLevel = e.post || !T.pos || Math.abs(T.pos.y - e.body.pos.y) < 4.5;
+    const alive = !T.dead && !T.downed && sameLevel; // caído (ou fora do andar): inimigos perdem o interesse
+    e.los = dist < SIGHT + 10 && sameLevel ? this.hasLos(e) : false;
     switch (e.state) {
       case 'idle': case 'patrol': case 'search': {
         // só percebe quem ENXERGA: dentro do cone à frente e sem parede no meio (ou muito perto)
@@ -1089,7 +1129,7 @@ export class Enemies {
       }
       // corpo a corpo: aviso -> golpe -> recuperação, guarda, atordoamento (sistema Melee)
       let mres = null;
-      if (!e.def.ranged && dist < 7 && G.melee) mres = G.melee.enemyTick(e, dt, dist);
+      if (!e.def.ranged && dist < 7 && G.melee && Math.abs(pp.y - p.y) < 4.5) mres = G.melee.enemyTick(e, dt, dist); // só no mesmo andar
       if (e.state === 'chase' && e.goal && e.los === false && thinkNow) e.goal = this.route(e, pp.x, pp.z);
       if (e.skillHold > 0) e.skillHold -= dt; else e.skillPose = null;
       if ((mres && mres.hold) || e.post || e.skillHold > 0) { mx = 0; mz = 0; } // usando habilidade: parado

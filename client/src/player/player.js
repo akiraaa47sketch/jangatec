@@ -210,8 +210,9 @@ export class Player {
     const prevY = p.y;
     const wh = waveHeight(p.x, p.z, t);
     // escada de mão soldada na jangada: frente sobe, trás desce, solta = fica parado agarrado
-    const lad = !this.swimming && !this.downed && !this.mantle ? this.ladderAt(p) : null;
-    this.onLadder = !!lad;
+    // escadas: de ilha/jangada só fora d'água; a escada de corda do navio pirata dá para pegar nadando
+    const lad = this.downed || this.mantle ? null : (!this.swimming && this.ladderAt(p)) || (G.naval && G.naval.ladderAt(p)) || null;
+    this.onLadder = !!lad; this.ladderShip = lad && lad.ship || null;
     if (lad) {
       const climb = (inp.held('forward') ? 1 : 0) - (inp.held('back') ? 1 : 0);
       b.vel.y = climb * 2.6; p.y += b.vel.y * dt;
@@ -244,6 +245,7 @@ export class Player {
     if (b.grounded) {
       this.swimming = false;
       b.carrier = b.groundSet;
+      if (!this.wasGroundedPrev && b.landVel < -7 && G.vfx) G.vfx.dust(p, Math.min(18, Math.round(-b.landVel)), 0xcbbf9e, 2 + (-b.landVel) * 0.12); // poeira da aterrissagem
       if (!this.wasGroundedPrev && b.landVel < -4) { this.squash = Math.min(1, (-b.landVel - 3) / 10); sfx.land(Math.min(1, (-b.landVel - 4) / 10)); } // amassa ao cair
       if (b.landVel < -13) G.survival.damage((-b.landVel - 13) * 5, 'Queda');
     } else if (!this.swimming && p.y < wh - 1.0) {
