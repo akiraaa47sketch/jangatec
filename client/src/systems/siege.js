@@ -84,6 +84,7 @@ export class Siege {
     // colisores somem (do conjunto da ilha, da lista usada pela maré e da física)
     const drop = (arr) => { for (const it of t.items) { const i = arr.indexOf(it); if (i >= 0) arr.splice(i, 1); } };
     drop(isl.set.items); drop(isl.allItems);
+    if (isl.ladders) isl.ladders = isl.ladders.filter((l) => l.towerId !== t.id); // a escada cai junto
     G.physics.removeStaticSet(isl.set); G.physics.addStaticSet(isl.set);
     for (const m of t.solids) { let i = G.solids.indexOf(m); if (i >= 0) G.solids.splice(i, 1); i = isl.solids.indexOf(m); if (i >= 0) isl.solids.splice(i, 1); }
     G.world.collected.add(t.id); G.net.send({ t: 'collect', id: t.id });

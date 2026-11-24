@@ -11,11 +11,11 @@ import { sfx, setListener } from '../core/sfx.js';
 
 export const MELEE = {
   stamina: { max: 100, regen: 30, delay: 0.7 },
-  light: { cost: 11, combo: [1, 1.15, 1.6], window: 0.8, knock: [2.4, 2.8, 6], recover: 0.14, finisherRecover: 0.32 }, // recover: respiro depois do golpe (sem spam)
-  heavy: { cost: 22, minHold: 0.24, maxCharge: 0.7, mult: [1.7, 2.6], knock: 8 },
+  light: { cost: 11, combo: [1, 1.15, 1.6], window: 0.8, knock: [1.3, 1.5, 3.2], recover: 0.14, finisherRecover: 0.32 }, // recover: respiro depois do golpe (sem spam)
+  heavy: { cost: 22, minHold: 0.24, maxCharge: 0.7, mult: [1.7, 2.6], knock: 4.2 },
   block: { mult: 0.2, heavyMult: 0.5, cost: 14, parry: 0.18, arc: 0.3 },
   dodge: { cost: 20, speed: 10, dur: 0.34, iframes: 0.28, cd: 0.5 }, // arranque que desacelera (~1,9 m)
-  kick: { cost: 14, dur: 0.42, range: 1.8, dmg: 5, knock: 7, breakStun: 1.3 }, // chute quebra-guarda
+  kick: { cost: 14, dur: 0.42, range: 1.8, dmg: 5, knock: 4, breakStun: 1.3 }, // chute quebra-guarda
   clash: { window: 0.14, recover: 0.42, guard: [1.4, 2.4] }, // depois do choque o inimigo fica em guarda (s)
   guardBreak: 4,                              // pesado na guarda: atordoado esse tempo (s)     // espadas se chocando: janela antes do golpe dele e recuo
   enemy: { recover: 0.32, heavyRecover: 0.6, lunge: 3.6, evade: 0.16 }, // ritmo dos inimigos
@@ -327,7 +327,7 @@ export class Melee {
     if (ms.token) { this.tokens.delete(e); ms.token = false; }
     Object.assign(ms, { state: 'clashed', t: MELEE.clash.recover, move: null, hit: 0 });
     this.setTell(e, null);
-    e.knock = { x: nx * 4.5, z: nz * 4.5 };
+    e.knock = { x: nx * 2.8, z: nz * 2.8 };
     const at = new THREE.Vector3((pp.x + e.body.pos.x) / 2, pp.y + 1.35, (pp.z + e.body.pos.z) / 2);
     this.sparks(at, 22); sfx.clash(at);
     this.say(e.body.pos, 'CLANG!', '#ffe9a8', true);
@@ -505,7 +505,7 @@ export class Melee {
       if ((ax * fx + az * fz) / l > MELEE.block.arc) {
         if (this.blockT <= MELEE.block.parry * (heavy ? 0.7 : 1)) { // PARRY
           this.staggerEnemy(attacker, heavy ? 1.8 : 1.4);
-          this.knockEnemy(attacker, ax / l * 4, az / l * 4);
+          this.knockEnemy(attacker, ax / l * 2.4, az / l * 2.4);
           this.stamina = Math.min(MELEE.stamina.max, this.stamina + 15);
           this.say(attacker.body.pos, 'PARRY!', '#ffe14d', true);
           sfx.parry(pp);

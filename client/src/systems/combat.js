@@ -11,7 +11,7 @@ export const WEAPONS = [
   { id: 'facao', nome: 'Facão reforçado', stars: 2, melee: true, dmg: 38, range: 2.6, rate: 0.42, durability: 120, color: 0x555c60, scale: [0.55, 0.55, 1.35] },
   { id: 'sabre', nome: 'Sabre pirata', stars: 3, melee: true, dmg: 34, range: 2.5, rate: 0.4, durability: 150, color: 0xb58d4a, scale: [0.5, 0.5, 1.5] },
   { id: 'revolver', nome: 'Revólver', stars: 2, dmg: 26, mag: 6, rate: 0.38, spread: 0.028, range: 60, reload: 1.55, recoil: 0.026, pellets: 1, ammo: 'municao', durability: 90, color: 0x514b45, scale: [0.8, 0.75, 0.95] },
-  { id: 'pistola', nome: 'Pistola', stars: 3, dmg: 30, mag: 12, rate: 0.24, spread: 0.009, range: 100, reload: 1.1, recoil: 0.02, pellets: 1, ammo: 'municao', durability: 140, color: 0x33383c, scale: [0.9, 0.85, 0.9], automatic: true },
+  { id: 'pistola', nome: 'Pistola', stars: 3, dmg: 30, mag: 12, rate: 0.24, spread: 0.009, range: 100, reload: 1.5, recoil: 0.02, pellets: 1, ammo: 'municao', durability: 140, color: 0x33383c, scale: [0.9, 0.85, 0.9], automatic: true },
   { id: 'escopeta', nome: 'Escopeta', stars: 4, dmg: 12, mag: 5, rate: 0.8, spread: 0.07, range: 32, reload: 1.9, recoil: 0.04, pellets: 8, ammo: 'cartucho', durability: 110, color: 0x4c3525, scale: [1, 1, 1.7] },
   { id: 'rifle', nome: 'Rifle', stars: 4, dmg: 38, mag: 20, rate: 0.12, spread: 0.006, range: 140, reload: 2, recoil: 0.018, pellets: 1, ammo: 'municao', durability: 190, color: 0x454239, scale: [0.8, 0.8, 1.8], automatic: true },
   // ferramentas: martelo conserta peças da jangada (e ainda bate), banjo toca e cura aliados,
@@ -157,6 +157,8 @@ export class Combat {
     if (!inv[w.ammo]) { this.G.hud.msg('Sem munição'); return; }
     this.reloading = w.reload;
     const pp = this.G.player.body.pos;
+    this.reloadSample = sfx.reload(pp, w.id); // pistola: som gravado da recarga inteira
+    if (this.reloadSample) return;
     if (w.id === 'escopeta' || w.id === 'revolver') sfx.shell(pp); else sfx.click(pp, 0.85); // tira o carregador / abre
   }
 
@@ -259,7 +261,7 @@ export class Combat {
       if (this.reloading <= 0) {
         const inv = G.survival.inv, count = Math.min(w.mag - this.mags[w.id], inv[w.ammo]);
         this.mags[w.id] += count; inv[w.ammo] -= count;
-        sfx.click(G.player.body.pos, 1.1); // encaixa e trava
+        if (!this.reloadSample) sfx.click(G.player.body.pos, 1.1); // encaixa e trava
       }
     }
     if (!building && !looting && !G.player.dead && !G.player.downed && !G.player.mantle && !this.buildMode && w) {

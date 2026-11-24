@@ -4,10 +4,10 @@
 //     AFOGA (sem loot); se você matar, larga um saco com loot.
 // Só o host sorteia e simula (os outros recebem réplicas como qualquer inimigo).
 import { sea } from '../world/ocean.js';
-import { TIDE } from './tide.js';
+import { WORLD_LOOT_PARAMS } from './loot.js';
 
 export const BOSSES = {
-  runLength: 1280,      // m até a dificuldade máxima (world.difficulty chega a 4)
+  runLength: 4 * WORLD_LOOT_PARAMS.diffStep, // m até a dificuldade máxima (world.difficulty chega a 4)
   miniChance: 0.22,     // por seca: evento raro (não toda seca, para não ficar previsível)
   miniMaxProgress: 0.5, // miniboss fraco: só na primeira metade da rota
   dist: [26, 40],       // m da jangada até onde o chefe surge
@@ -32,7 +32,7 @@ export class Bosses {
     if (!E.auth) return;
     const st = G.startup.tide.state;
     if (!st || st.phase.id !== 'seco' || st.changing || st.nextIn < 40) return;
-    const cycle = Math.floor(t / TIDE.period);
+    const cycle = st.cycle;
     if (this.cycle === cycle) return;
     this.cycle = cycle; // uma tentativa por seca
     if (G.events.current || (G.naval && G.naval.active)) return;

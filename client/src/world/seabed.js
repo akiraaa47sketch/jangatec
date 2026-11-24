@@ -32,7 +32,8 @@ export function patchVortexDip(material) {
   material.needsUpdate = true;
 }
 
-export const SEABED = { base: -4.6, min: -6.4, islandEdge: 0.8, starterEdge: -2.0, slope: 32 };
+// islandEdge bem abaixo da quilha (0,9 m): perto das ilhas o fundo não encalha mais a jangada com o mar cheio
+export const SEABED = { base: -4.6, min: -6.4, islandEdge: -1.9, starterEdge: -2.0, slope: 22 };
 
 // Ilha do chunk (mesma ordem de RNG de World.makeChunk/makeIsland).
 const islandCache = new Map();
@@ -45,7 +46,7 @@ function chunkIsland(seed, cx, cz) {
     if (starter || roll < WORLD_LOOT_PARAMS.islandChance) {
       const x = cx * S + (r() - 0.5) * 30, z = cz * S + (r() - 0.5) * 30;
       const R = starter ? 15 + r() * 3 : 9 + r() * 6;
-      isl = { x, z, R: R + 7.5, edge: starter ? SEABED.starterEdge : SEABED.islandEdge };
+      isl = { x, z, R: R + (starter ? 7.5 : 2.2), edge: starter ? SEABED.starterEdge : SEABED.islandEdge };
     }
   }
   if (islandCache.size > 4000) islandCache.clear();
@@ -75,7 +76,7 @@ export function seabedHeight(seed, x, z) {
   return Math.max(SEABED.min, h);
 }
 
-const WEED = new THREE.MeshStandardMaterial({ color: 0x3f6b33, roughness: 0.9, side: THREE.DoubleSide });
+const WEED = new THREE.MeshStandardMaterial({ color: 0x5b6b45, roughness: 0.95, side: THREE.DoubleSide }); // alga seca, cor apagada
 const SHELL_COLORS = [0xe0643c, 0xd94f6a, 0xf0a13c, 0xefe3cf];
 let starGeo = null;
 function starGeometry() {
@@ -104,29 +105,29 @@ export function makeSeabedChunk(seed, cx, cz) {
   geo.computeVertexNormals();
   const mesh = new THREE.Mesh(geo, new THREE.MeshStandardMaterial({
     vertexColors: true, roughness: 0.95,
-    map: repeated(sandTexture(), S / 3), bumpMap: repeated(sandBump(), S / 3), bumpScale: 1.5,
+    map: repeated(sandTexture(), S / 7), bumpMap: repeated(sandBump(), S / 7), bumpScale: 0.6, // textura mais calma (menos ruído visual na seca)
   }));
   mesh.position.set(cx * S, 0, cz * S);
   mesh.receiveShadow = true;
   group.add(mesh);
-  // decoração: pedras, algas, estrelas-do-mar e conchas
+  // decoração esparsa (a seca ficava poluída): poucas pedras, tufos de alga e uma ou outra estrela
   const r = mulberry32(hash2(seed ^ 0x2b1d, cx, cz));
   const at = (x, z) => [cx * S + x, seabedHeight(seed, cx * S + x, cz * S + z), cz * S + z];
-  for (let i = 0; i < 9; i++) {
+  for (let i = 0; i < 4; i++) {
     const [x, y, z] = at((r() - 0.5) * S, (r() - 0.5) * S);
     if (y > SEABED.islandEdge - 0.3) continue;
     const rock = makeRock(r, 0.3 + r() * 0.9); rock.position.set(x, y - 0.1, z); group.add(rock);
   }
-  for (let i = 0; i < 22; i++) {
+  for (let i = 0; i < 7; i++) {
     const [x, y, z] = at((r() - 0.5) * S, (r() - 0.5) * S);
     if (y > SEABED.islandEdge - 0.3) continue;
     const w = new THREE.Mesh(new THREE.PlaneGeometry(0.22, 0.6 + r() * 0.8), WEED);
     w.geometry.translate(0, 0.35, 0);
     w.position.set(x, y, z); w.rotation.set(0, r() * 3, (r() - 0.5) * 0.5); group.add(w);
   }
-  for (let i = 0; i < 8; i++) {
+  for (let i = 0; i < 2; i++) {
     const [x, y, z] = at((r() - 0.5) * S, (r() - 0.5) * S);
-    const st = new THREE.Mesh(starGeometry(), new THREE.MeshStandardMaterial({ color: SHELL_COLORS[i % 4], roughness: 0.7 }));
+    const st = new THREE.Mesh(starGeometry(), new THREE.MeshStandardMaterial({ color: new THREE.Color(SHELL_COLORS[i % 4]).lerp(new THREE.Color(0xb8a27a), 0.45), roughness: 0.8 }));
     st.rotation.set(-Math.PI / 2, 0, r() * 6); st.position.set(x, y + 0.02, z); st.userData.sharedGeo = true; group.add(st);
   }
   return group;

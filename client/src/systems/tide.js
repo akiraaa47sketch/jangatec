@@ -6,12 +6,12 @@
 import { clamp } from '../core/util.js';
 
 export const TIDE = {
-  period: 360,          // segundos por ciclo (cheio + seco)
+  period: 240,          // segundos por ciclo (cheio + seco)
   full: 0.9,            // nível com o mar cheio (o mesmo da inundação inicial)
   dry: -7.2,            // nível com o mar seco: abaixo de todo o fundo (mín. -6,4)
-  dryShare: 0.4,        // fração do ciclo com o mar seco (≈ 2 min 24 s); o resto é mar cheio
-  transition: 16,       // segundos que o mar leva para secar ou encher
-  blendIn: 20,          // s para entrar no ciclo depois da partida
+  dryShare: 0.375,      // fração do ciclo com o mar seco (90 s); o resto é mar cheio (150 s)
+  transition: 14,       // segundos que o mar leva para secar ou encher
+  blendIn: 6,           // s para entrar no ciclo depois da partida
 };
 export const TIDE_STATES = {
   cheio: { id: 'cheio', nome: 'Mar cheio' },
@@ -19,8 +19,11 @@ export const TIDE_STATES = {
 };
 const smooth = (x) => { x = clamp(x, 0, 1); return x * x * (3 - 2 * x); };
 
+// t = segundos desde a PARTIDA (não o relógio absoluto). O ciclo começa já com o mar cheio
+// (pula a transição "seco → cheio" do início), então a primeira seca só vem depois do cheio inteiro.
 export function tideAt(t) {
   const P = TIDE.period, fullDur = P * (1 - TIDE.dryShare), tr = TIDE.transition;
+  t = Math.max(0, t) + tr;
   const s = ((t % P) + P) % P;
   const dry = s >= fullDur;
   const into = dry ? s - fullDur : s;                    // segundos dentro do estado atual
@@ -32,7 +35,7 @@ export function tideAt(t) {
   return {
     phase, next: dry ? TIDE_STATES.cheio : TIDE_STATES.seco,
     level, norm: (level - TIDE.dry) / (TIDE.full - TIDE.dry),
-    changing: into < tr, nextIn: dur - into,
+    changing: into < tr, nextIn: dur - into, cycle: Math.floor(t / P),
   };
 }
 

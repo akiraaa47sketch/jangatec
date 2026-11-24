@@ -156,7 +156,7 @@ export function buildSeaTower(ctx) {
     for (const mesh of meshes) mesh.traverse((o) => { if (o.isMesh) { solids.push(o); tsol.push(o); } });
     towers.push({ id, group: tg, items, meshes, solids: tsol, top, hp: 100, lx: 0, lz: 0, r: S + 0.4 });
     const [lx, lz] = P(0, -S - 0.3);
-    ladders.push({ x: ctx.x + lx, z: ctx.z + lz, y0: deckY, top: deckY + top + 0.14, yaw: ctx.yaw, dir: -1 });
+    ladders.push({ x: ctx.x + lx, z: ctx.z + lz, y0: deckY, top: deckY + top + 0.14, yaw: ctx.yaw, dir: -1, towerId: id });
   }
   const spawns = [P(1.6, -1.4), P(-1.6, -1.4)].map(([x, z]) => ({ x, z, y: 0, high: false }));
   return {

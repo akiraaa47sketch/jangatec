@@ -13,11 +13,27 @@ function ac() {
     out = ctx.createGain(); out.gain.value = 0.5 * volume;
     const comp = ctx.createDynamicsCompressor(); comp.threshold.value = -14;
     out.connect(comp); comp.connect(ctx.destination);
+    loadSamples();
     noiseBuf = ctx.createBuffer(1, ctx.sampleRate, ctx.sampleRate);
     const d = noiseBuf.getChannelData(0); for (let i = 0; i < d.length; i++) d[i] = Math.random() * 2 - 1;
   }
   if (ctx.state === 'suspended') ctx.resume();
   return ctx;
+}
+// Sons gravados (arquivos em public/sounds). Carregam quando o áudio liga; até lá usa o sintetizado.
+const SAMPLE_URLS = { sniper: './sounds/sniper.mp3', pistolReload: './sounds/pistol-reload.mp3', pistol: './sounds/pistol-shot.mp3' };
+const samples = {};
+function loadSamples() {
+  for (const [k, url] of Object.entries(SAMPLE_URLS)) {
+    fetch(url).then((r) => r.arrayBuffer()).then((data) => ctx.decodeAudioData(data))
+      .then((buf) => { samples[k] = buf; }).catch(() => { /* sem arquivo: fica o sintetizado */ });
+  }
+}
+function playSample(name, dest, rate = 1) {
+  const buf = samples[name]; if (!buf) return false;
+  const s = ctx.createBufferSource(); s.buffer = buf; s.playbackRate.value = rate;
+  s.connect(dest); s.start();
+  return true;
 }
 const env = (g, t, a, peak, dec) => { g.gain.setValueAtTime(0.0001, t); g.gain.linearRampToValueAtTime(peak, t + a); g.gain.exponentialRampToValueAtTime(0.0001, t + a + dec); };
 function noise(t, dur, type, f0, f1, q, peak, dest) {
@@ -85,6 +101,8 @@ export const sfx = {
   gun(pos, kind = 'pistol') {
     const big = { pistol: 0.75, revolver: 0.95, rifle: 0.9, shotgun: 1.15, sniper: 1.25 }[kind] || 0.8;
     const b = bus(pos, big, 120); if (!b) return;
+    if (kind === 'sniper' && playSample('sniper', b, 0.97 + Math.random() * 0.06)) return; // tiro gravado (já tem eco)
+    if (kind === 'pistol' && playSample('pistol', b, 0.96 + Math.random() * 0.08)) return; // tiro gravado da pistola
     const t = ctx.currentTime;
     noise(t, 0.05, 'highpass', 2500, 1200, 0.7, 0.9, b);                     // estalo
     noise(t, 0.12 + big * 0.18, 'lowpass', 4200 * big, 260, 0.8, 0.9, b);   // corpo do tiro
@@ -99,6 +117,12 @@ export const sfx = {
   click(pos, f = 1) { // pecinhas de metal da recarga (sai, entra, trava)
     const b = bus(pos, 0.55); if (!b) return; const t = ctx.currentTime;
     noise(t, 0.035, 'bandpass', 3200 * f, 2200 * f, 3, 0.8, b); tone(t, 1300 * f, 0.05, 0.25, b, 'triangle', 0.7);
+  },
+  // recarga gravada (tira o carregador, põe o novo, puxa o ferrolho); false = arquivo não carregou
+  reload(pos, kind) {
+    if (kind !== 'pistola') return false;
+    const b = bus(pos, 0.8); if (!b) return true;
+    return playSample('pistolReload', b);
   },
   bolt(pos) { const t0 = ctx && ctx.currentTime; this.click(pos, 0.8); setTimeout(() => this.click(pos, 1.1), 180); void t0; },
   shell(pos) { this.click(pos, 0.6); setTimeout(() => this.click(pos, 0.9), 90); },

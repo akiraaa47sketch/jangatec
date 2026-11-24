@@ -1,6 +1,7 @@
 import * as THREE from '../three.js';
 import { clamp } from '../core/util.js';
 import { keyOf } from '../core/keybinds.js';
+import { orientedBox } from '../world/colliders.js';
 import { BuildSnap } from './snap.js';
 
 const PICKUP_DISTANCE = 2.8;
@@ -102,9 +103,9 @@ export class Build {
       }) || null;
     }
     if (target) {
-      const position = target.mesh.getWorldPosition(new THREE.Vector3());
-      const distance = position.distanceTo(G.player.body.pos);
-      if (distance > PICKUP_DISTANCE) target = null;
+      // alcance medido até o PONTO mirado (não até o centro): peça grande dá para pegar pela borda
+      const pp = G.player.body.pos, chest = new THREE.Vector3(pp.x, pp.y + 1.0, pp.z);
+      if (hit.point.distanceTo(chest) > PICKUP_DISTANCE + 0.6) target = null;
     }
     this._setPickupTarget(target);
     return target;
@@ -178,7 +179,7 @@ export class Build {
 
   _rayTargets(includePickupHitboxes = false) {
     const G = this.G;
-    const targets = new Set(G.solids), pp = G.player.body.pos, reach2 = (PICKUP_DISTANCE + 4) ** 2;
+    const targets = new Set(G.solids), pp = G.player.body.pos, reach2 = (PICKUP_DISTANCE + 6) ** 2;
     for (const obj of G.world.physObjects) {
       if (obj === this.held || obj.carriedBy || obj.welded || !obj.mesh.visible) continue;
       // para pegar, só interessa o que está ao alcance (antes testava todos os ~200 destroços por quadro)
@@ -222,7 +223,9 @@ export class Build {
       body.position.z + offset.z
     );
     hitbox.quaternion.copy(quaternion);
-    hitbox.scale.copy(this._physicsSize(obj));
+    // caixa de pegar = o objeto inteiro, com folga (peças finas ganham espessura para mirar fácil)
+    const size = this._physicsSize(obj);
+    hitbox.scale.set(Math.max(0.5, size.x + 0.2), Math.max(0.5, size.y + 0.2), Math.max(0.5, size.z + 0.2));
     hitbox.updateMatrixWorld(true);
     return hitbox;
   }
@@ -689,12 +692,13 @@ export class Build {
     const size = piece.physSize || obj.physicsSize || obj.def.size || [1, 1, 1];
     const offset = new THREE.Vector3(...(piece.physOffset || obj.physicsOffset || [0, 0, 0]))
       .applyQuaternion(obj.mesh.quaternion);
-    const col = {
-      type: obj.def && obj.def.col === 'ramp' ? 'ramp' : 'box', // rampa: colisão inclinada (sobe para +Z)
-      x: piece.x + offset.x, y: piece.y + offset.y, z: piece.z + offset.z,
-      hx: size[0] / 2, hy: size[1] / 2, hz: size[2] / 2,
-      yaw: piece.yaw,
-    };
+    // hitbox acompanha o giro em todos os eixos (antes só o yaw: peça tombada ficava com a caixa em pé)
+    const col = orientedBox(
+      piece.x + offset.x, piece.y + offset.y, piece.z + offset.z,
+      size[0] / 2, size[1] / 2, size[2] / 2,
+      piece.yaw, piece.rotX || 0, piece.rotZ || 0,
+      obj.def && obj.def.col === 'ramp' ? 'ramp' : 'box' // rampa: colisão inclinada (sobe para +Z)
+    );
     boat.set.items.push(col);
     obj.mesh.traverse((child) => {
       if (child.isMesh) { child.buildPiece = piece; G.solids.push(child); }
