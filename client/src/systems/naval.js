@@ -42,7 +42,10 @@ export const TWINS = {
 }; // navio-fantasma: mais vida, tiro bem mais fraco
 // Torreta-arpão: dispara um arpão com corda (mais reto e rápido que uma bala), crava no alvo e fisga caixotes.
 export const HOOK_TURRET = { speed: 46, range: 42, gravity: 4.9, dmg: 40, creatureMul: 1.5, shipDmg: 14 };
-export const PIECE_HP = { piso: 240, plataforma: 240, tabua: 70, bloco: 130, rampa: 110, escada: 100, parede: 120, suporte: 60, chapa: 230, canhao: 160, gancho: 140, parede_plastico: 35, parede_ferro: 330 };
+// tipos de canhão: o improvisado (galão d'água) e o de FERRO (meio do jogo) — recarga, força da bala e velocidade
+export const CANNON_TYPES = { canhao: { reload: 7, mult: 1, speed: 44 }, canhao_ferro: { reload: 4.5, mult: 1.9, speed: 52 } };
+const isCannon = (t) => t === 'canhao' || t === 'canhao_ferro';
+export const PIECE_HP = { canhao_ferro: 280, piso: 240, plataforma: 240, tabua: 70, bloco: 130, rampa: 110, escada: 100, parede: 120, suporte: 60, chapa: 230, canhao: 160, gancho: 140, parede_plastico: 35, parede_ferro: 330 };
 const between = ([a, b]) => a + Math.random() * (b - a);
 const CHAR = new THREE.Color(0x2a1d14);
 const _v = new THREE.Vector3(), _w = new THREE.Vector3(), _q = new THREE.Quaternion();
@@ -119,10 +122,10 @@ export class Naval {
   }
 
   // ---------- canhões na jangada ----------
-  get cannons() { return [...this.G.boat.pieces.values()].filter((p) => p.type === 'canhao'); }
-  get turrets() { return [...this.G.boat.pieces.values()].filter((p) => p.type === 'canhao' || p.type === 'gancho'); }
+  get cannons() { return [...this.G.boat.pieces.values()].filter((p) => isCannon(p.type)); }
+  get turrets() { return [...this.G.boat.pieces.values()].filter((p) => isCannon(p.type) || p.type === 'gancho'); }
   maxHp(piece) {
-    if (piece.type === 'canhao') return PIECE_HP.canhao;
+    if (isCannon(piece.type)) return PIECE_HP[piece.type];
     const size = piece.physSize || (PIECES[piece.type] && PIECES[piece.type].size) || [1, 1, 1];
     const base = PIECE_HP[piece.type] || 90;
     const wall = String(piece.type).startsWith('parede') || piece.type === 'escada'; // paredes: conta a face (largura × altura)
@@ -144,7 +147,7 @@ export class Naval {
   }
 
   install(kind = 'canhao') {
-    const G = this.G, spot = this.canInstallHere(kind), nome = kind === 'gancho' ? 'a torreta-gancho' : 'o canhão';
+    const G = this.G, spot = this.canInstallHere(kind), nome = kind === 'gancho' ? 'a torreta-gancho' : kind === 'canhao_ferro' ? 'o canhão de ferro' : 'o canhão';
     if (!spot) { G.hud.msg(`Não dá para instalar ${nome} aqui`); return; }
     const p = G.player.body.pos;
     const piece = {
@@ -154,7 +157,7 @@ export class Naval {
     G.survival.inv[kind]--;
     G.boat.addPiece(piece);
     G.net.send({ t: 'add', piece });
-    G.hud.msg(kind === 'gancho' ? `Torreta-gancho instalada! [${keyOf('interact')}] nela para usar — fisga caixotes, aliados e inimigos` : `Canhão instalado! [${keyOf('interact')}] nele para usar`);
+    G.hud.msg(kind === 'gancho' ? `Torreta-gancho instalada! [${keyOf('interact')}] nela para usar — fisga caixotes, aliados e inimigos` : `${kind === 'canhao_ferro' ? 'Canhão de ferro' : 'Canhão'} instalado! [${keyOf('interact')}] nele para usar`);
   }
 
   man(piece) {
@@ -222,14 +225,15 @@ export class Naval {
     if (!piece) return;
     if (piece.type === 'gancho') { this.fireHook(piece); return; }
     if (this.reload > 0) return;
-    this.reload = NAVAL.reload;
+    const CT = CANNON_TYPES[piece.type] || CANNON_TYPES.canhao;
+    this.reload = this.reloadMax = CT.reload;
     const o = new THREE.Vector3(), v = new THREE.Vector3();
-    this._muzzle(piece, o, v);
-    this.spawnBall(o, v, 'p');
+    this._muzzle(piece, o, v, CT.speed);
+    this.spawnBall(o, v, 'p', CT.mult);
     this.balls[this.balls.length - 1].mine = true; // só quem atirou conta o dano nas torres
     const c = this._nodes(piece); if (c) c.recoil = 1;
     const r = (x) => Math.round(x * 100) / 100;
-    G.net.send({ t: 'naval', k: 'fire', o: o.toArray().map(r), v: v.toArray().map(r), by: 'p', id: piece.id });
+    G.net.send({ t: 'naval', k: 'fire', o: o.toArray().map(r), v: v.toArray().map(r), by: 'p', id: piece.id, gm: CT.mult });
   }
 
   // há algo que o arpão acerte perto de p? (caixote boiando, inimigo/criatura, navio)
@@ -269,7 +273,7 @@ export class Naval {
     }
     if (kind === 'ship' && target) {
       this._shipReact(target, point, b);
-      if (b.by === 'p' && b.mine && G.melee) G.melee.num({ x: point.x, y: point.y - 1, z: point.z }, Math.round(NAVAL.dmg.ship), '#ffb347', target.twin ? TWINS.names[target.twin - 1] : null); // número de dano no seu acerto
+      if (b.by === 'p' && b.mine && G.melee) G.melee.num({ x: point.x, y: point.y - 1, z: point.z }, Math.round(NAVAL.dmg.ship * (b.mult || 1)), '#ffb347', target.twin ? TWINS.names[target.twin - 1] : null); // número de dano no seu acerto
     }
     this.boom.spawn(point, kind === 'ship' ? 1.3 : 0.9);
     sfx.explosion(point, kind === 'ship' ? 1.2 : 0.9);
@@ -287,7 +291,7 @@ export class Naval {
     // torres de sucata: quem atirou avisa a sala (acerto direto ou estilhaços por perto)
     if ((kind === 'tower' || kind === 'ground') && b.by === 'p' && b.mine && G.siege) G.siege.cannonImpact(point, b.vel, kind === 'tower' ? target : null);
     if (!this._isHost()) return;
-    if (kind === 'ship') this._damageShip(target, NAVAL.dmg.ship * (0.85 + Math.random() * 0.3), point);
+    if (kind === 'ship') this._damageShip(target, NAVAL.dmg.ship * (b.by !== 's' ? b.mult || 1 : 1) * (0.85 + Math.random() * 0.3), point);
     else if (kind === 'raft') this._damageRaftAt(point, target, b.mult || 1);
   }
 
@@ -974,7 +978,7 @@ export class Naval {
   _removeCrate(id) { const c = this.crates.get(id); if (!c) return; this.G.scene.remove(c.mesh); this.crates.delete(id); }
   _dropCrates(s) {
     if (s.twin) { // loot lendário
-      const loots = [{ arma_rifle_precisao: 1, municao: 30, kit: 2 }, { arma_minigun: 160, municao: 30 }, { canhao: 1, cartucho: 20, bandagem: 4 }];
+      const loots = [{ arma_rifle_precisao: 1, municao: 30, kit: 2 }, { arma_minigun: 160, municao: 30 }, { canhao_ferro: 1, cartucho: 20, bandagem: 4 }];
       loots.forEach((loot, i) => { const a = Math.random() * 6.28, d = 3 + Math.random() * 5; this._spawnCrate({ id: `crate-${s.id}-${i}`, x: s.x + Math.cos(a) * d, z: s.z + Math.sin(a) * d, vx: Math.cos(a) * 1.5, vz: Math.sin(a) * 1.5, loot }); });
       this._sendCrates(); return;
     }
@@ -1062,7 +1066,7 @@ export class Naval {
       case 'fire': {
         if (!Array.isArray(m.o) || !Array.isArray(m.v)) return;
         const o = new THREE.Vector3().fromArray(m.o), v = new THREE.Vector3().fromArray(m.v);
-        this.spawnBall(o, v, m.by === 's' ? 's' : 'r', Number.isFinite(m.gm) ? clamp(m.gm, 0.1, 1) : 1);
+        this.spawnBall(o, v, m.by === 's' ? 's' : 'r', Number.isFinite(m.gm) ? clamp(m.gm, 0.1, m.by === 's' ? 1 : 2) : 1);
         const piece = m.id && G.boat.pieces.get(m.id), c = this._nodes(piece); if (c) c.recoil = 1;
         break;
       }
@@ -1148,7 +1152,7 @@ export class Naval {
     for (const piece of this.cannons) {
       const c = this._nodes(piece); if (!c) continue;
       if (c.recoil > 0) c.recoil = Math.max(0, c.recoil - dt * 3);
-      c.barrel.position.z = 0.62 - c.recoil * 0.25;
+      c.barrel.position.z = (c.base ?? 0.62) - c.recoil * 0.25;
     }
     if (this.manning) this._updateManning(dt);
     this.flames.update(dt); this.smoke.update(dt); this.splash.update(dt); this.splinters.update(dt); this.boom.update(dt);
@@ -1159,7 +1163,7 @@ export class Naval {
   _updateManning(dt) {
     const G = this.G, inp = G.input, piece = G.boat.pieces.get(this.manning);
     if (!piece || G.player.dead || G.player.downed || !G.player.aboard && !G.player.body.carrier) { this.leave(); return; }
-    const hookT = piece.type === 'gancho';
+    const hookT = piece.type === 'gancho', CT = CANNON_TYPES[piece.type] || CANNON_TYPES.canhao;
     // mira: mouse/setas giram o cano (limitado) e levantam/abaixam
     const keysYaw = ((inp.held('left') || inp.held('camLeft')) ? 1 : 0) - ((inp.held('right') || inp.held('camRight')) ? 1 : 0);
     const keysEl = ((inp.held('forward') || inp.held('camUp')) ? 1 : 0) - ((inp.held('back') || inp.held('camDown')) ? 1 : 0);
@@ -1171,7 +1175,7 @@ export class Naval {
     if (this.aimAcc > 0.1) { this.aimAcc = 0; G.net.send({ t: 'naval', k: 'aim', id: piece.id, y: Math.round(this.aimYaw * 100) / 100, e: Math.round(this.aimElev * 100) / 100 }); }
     // trajetória prevista
     const o = new THREE.Vector3(), v = new THREE.Vector3();
-    this._muzzle(piece, o, v, hookT ? HOOK_TURRET.speed : NAVAL.muzzle);
+    this._muzzle(piece, o, v, hookT ? HOOK_TURRET.speed : CT.speed);
     const pts = this.pathGeo.attributes.position, p = o.clone(), vel = v.clone(), step = hookT ? 0.035 : 0.06;
     let hit = null, n = 0;
     for (; n < pts.count; n++) {
@@ -1208,7 +1212,7 @@ export class Naval {
         reticle.dataset.ammo = busy ? 'clique: recolher' : 'ARPÃO PRONTO';
         reticle.classList.toggle('ready', !busy);
       } else {
-        reticle.style.setProperty('--r', (1 - this.reload / NAVAL.reload).toFixed(3));
+        reticle.style.setProperty('--r', (1 - this.reload / (this.reloadMax || NAVAL.reload)).toFixed(3));
         reticle.dataset.ammo = this.reload > 0 ? `recarregando ${Math.ceil(this.reload)}s` : 'PRONTO';
         reticle.classList.toggle('ready', this.reload <= 0);
       }

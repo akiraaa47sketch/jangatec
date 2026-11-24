@@ -68,8 +68,8 @@ function plankFloor(w, l, r) {
   return g;
 }
 export const DEBRIS = [
-  { nome: 'Parede de madeira', w: 6, real: true, pieceType: 'parede', size: [2, 2, 0.14], make: (r) => plankWall(2, 2, 0.14, WOOD[0], r) },
-  { nome: 'Meia parede de madeira', w: 3, real: true, pieceType: 'parede', size: [2, 1, 0.14], make: (r) => plankWall(2, 1, 0.14, WOOD[1], r) },
+  { nome: 'Parede de madeira', w: 8, real: true, pieceType: 'parede', size: [2, 2, 0.14], make: (r) => plankWall(2, 2, 0.14, WOOD[0], r) },
+  { nome: 'Meia parede de madeira', w: 4, real: true, pieceType: 'parede', size: [2, 1, 0.14], make: (r) => plankWall(2, 1, 0.14, WOOD[1], r) },
   { nome: 'Parede de plástico', w: 4, real: true, pieceType: 'parede_plastico', size: [1, 2, 0.06], make: (r) => {
     const g = new THREE.Group(), c = [0x3c8fd6, 0xe8e6df, 0x3ca35a, 0xe2a23a][(r() * 4) | 0];
     const panel = box(1, 2, 0.04, new THREE.MeshPhysicalMaterial({ color: c, roughness: 0.35, clearcoat: 0.4, transparent: true, opacity: 0.92 })); g.add(panel);
@@ -83,7 +83,7 @@ export const DEBRIS = [
   { nome: 'Chão de madeira', w: 6, real: true, pieceType: 'piso', size: [2, 0.15, 2], make: (r) => plankFloor(2, 2, r) },
   { nome: 'Chão grande de madeira', w: 2, real: true, pieceType: 'piso', size: [3, 0.15, 3], make: (r) => plankFloor(3, 3, r) },
   // a mesma plataforma grande da ilha inicial (6 × 6 m, encaixa nos espaços do convés): rara no mar
-  { nome: 'Plataforma de madeira', w: 2, real: true, pieceType: 'piso', size: PIECES.piso.size, make: () => makePieceMesh('piso') },
+  { nome: 'Plataforma de madeira', w: 5, real: true, pieceType: 'piso', size: PIECES.piso.size, make: () => makePieceMesh('piso') },
   { nome: 'Chão de metal', w: 2, real: true, sinks: true, pieceType: 'chapa', size: [2, 0.08, 2], make: () => {
     const geo = new THREE.BoxGeometry(2, 0.06, 2); const m = new THREE.Mesh(scaleBoxUVs(geo, 2, 0.06, 2), ironMat());
     const g = new THREE.Group(); g.add(m); for (let i = -4; i <= 4; i++) { const ridge = box(0.04, 0.02, 1.9, ironMat()); ridge.position.set(i * 0.22, 0.04, 0); g.add(ridge); } return g; } },

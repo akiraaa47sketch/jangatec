@@ -147,7 +147,7 @@ export function generateCrateLoot(seed, id, difficulty, playerCount = 1) {
     const foods = ['barra_proteina', 'energetico', 'chocolate'];
     if (random() < 0.7) add(foods[Math.floor(random() * 3)], 1);
     if (regionIndex >= 2 && random() < 0.1) add('kit', 1);
-    if (random() < 0.06) add('canhao', 1); // às vezes um canhão enterrado na seca
+    if (random() < 0.12) add('canhao', 1); // às vezes um canhão enterrado na seca
     return loot;
   }
   const region = LOOT_CONFIG.regions[regionIndex];
@@ -184,7 +184,9 @@ export function generateCrateLoot(seed, id, difficulty, playerCount = 1) {
   const wreck = id.startsWith('b');
   // Canhão improvisado (galão d'água): já no começo da jornada (região 0), mais comum em naufrágios e
   // mais longe na rota. As balas são infinitas (o canhão só tem recarga longa).
-  if (random() < (wreck ? 0.4 : regionIndex === 0 ? 0.12 : 0.2) + Math.max(0, regionIndex - 1) * 0.05) add('canhao', 1);
+  if (random() < (wreck ? 0.5 : regionIndex === 0 ? 0.24 : 0.3) + Math.max(0, regionIndex - 1) * 0.04) add('canhao', 1);
+  // CANHÃO DE FERRO (mais forte, recarga menor): do meio da rota em diante (região 2+)
+  if (regionIndex >= 2 && random() < (wreck ? 0.22 : 0.09) + (regionIndex - 2) * 0.05) add('canhao_ferro', 1);
   // Ferramentas: o GANCHO sai principalmente de destroços/naufrágios; BANJO e martelo extra em caixas.
   if (random() < (wreck ? 0.4 : regionIndex >= 1 ? 0.07 : 0)) add('gancho', 1); // torreta-arpão (aparece como peça para soldar)
   if (random() < (wreck ? 0.15 : regionIndex >= 1 ? 0.08 : 0.03)) add('arma_banjo', 1);

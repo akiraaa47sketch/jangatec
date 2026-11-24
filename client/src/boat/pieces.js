@@ -2,7 +2,7 @@
 // size = [largura X, altura Y, comprimento Z]; col = tipo de colisor.
 import * as THREE from '../three.js';
 import { woodTexture, woodBump, metalTexture, scaleBoxUVs } from '../world/textures.js';
-import { makeCannonMesh, makeHookTurretMesh } from '../world/navalmodels.js';
+import { makeCannonMesh, makeIronCannonMesh, makeHookTurretMesh } from '../world/navalmodels.js';
 
 export const STARTER_PLATFORM_SIZE = 6;
 
@@ -17,6 +17,7 @@ export const PIECES = {
   suporte:    { nome: 'Suporte',     size: [0.3, 2, 0.3],   custo: { madeira: 1 }, cor: 0x6b4f30 },
   chapa:      { nome: 'Chapa',       size: [2, 0.1, 2],     custo: { metal: 2 },   cor: 0x8f979c, metal: true },
   canhao:     { nome: 'Canhão improvisado', size: [1.0, 0.9, 1.5], custo: {}, cor: 0x3f8fd8, hidden: true, make: makeCannonMesh },
+  canhao_ferro: { nome: 'Canhão de ferro', size: [1.1, 1.0, 1.8], custo: {}, cor: 0x2a2d31, hidden: true, make: makeIronCannonMesh },
   gancho:     { nome: 'Torreta-arpão', size: [0.8, 1.1, 1.0], custo: {}, cor: 0x52575d, hidden: true, make: makeHookTurretMesh },
   mastro:     { nome: 'Mastro',      size: [0.3, 5, 0.3],   custo: {}, cor: 0x5d4428, col: 'cyl', fixed: true, hidden: true },
 };

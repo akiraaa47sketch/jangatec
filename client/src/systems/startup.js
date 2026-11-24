@@ -12,7 +12,7 @@ const FLOOD_LEVEL = 0.9;
 const CLOCK_WRAP = 100000;
 // Marulho: de vez em quando (~45% das janelas de 40 s) as ondas crescem e baixam de novo em ~20 s.
 // Deriva só do relógio comum: todos os jogadores veem as mesmas ondas.
-export const SWELL = { slot: 40, chance: 0.45, A: [0.45, 1.1] };
+export const SWELL = { slot: 35, chance: 0.62, A: [0.7, 1.6] }; // mar ensolarado mais vivo: ondulação maior e mais frequente
 export function swellAt(t) {
   const k = Math.floor(t / SWELL.slot), u = t / SWELL.slot - k, h = mulberry32(k * 7919 + 13)();
   if (h > SWELL.chance) return 0;
@@ -255,7 +255,7 @@ export class Startup {
     const swell = this.departed && this.waterLevel > 0.5 ? swellAt(t) : 0;
     if (swell > 0.35 && !this.swellOn) G.hud.msg('Ondas grandes chegando — segure-se!');
     this.swellOn = swell > 0.35 ? true : swell < 0.1 ? false : this.swellOn;
-    sea.amp = 1 + storm * 0.7 + swell;
+    sea.amp = 1 + storm * 0.7 + swell + (this.departed ? 0.3 : 0); // depois da partida o mar nunca fica liso
     if (G.boat.sailInstalled) G.boat.sailGroup.rotation.z = Math.sin(t * 6) * storm * 0.045;
 
     const player = G.player.body.pos;

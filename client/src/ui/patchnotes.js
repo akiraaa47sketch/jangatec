@@ -5,6 +5,19 @@
 // Nos textos, **assim** vira negrito.
 export const PATCH_NOTES = [
   {
+    id: '0.19', versao: 'v0.19', data: '24/11/2026', titulo: 'Mar bravo e canhão de ferro',
+    destaques: [
+      { tag: 'Evento', titulo: 'Tempestade de ondas gigantescas', texto: 'As ondas desse evento agora têm **7 a 11 m** — maiores que a onda gigante — e vêm com **chuva forte e raios**. A jangada **sobe e desce a montanha inteira** com todo mundo a bordo (acabou o "segure no mastro").' },
+      { tag: 'Multiplayer', titulo: 'Armas dos parceiros', texto: 'Agora você **vê a arma na mão de cada parceiro**, ela troca quando ele troca de arma, some no modo construção e **pisca no tiro**.' },
+    ],
+    secoes: [
+      { icone: '💣', nome: 'Canhões', itens: ['**Canhão improvisado bem mais cedo** (~24% das caixas e ~50% dos naufrágios logo no começo).', 'Novo **canhão de ferro** do meio do jogo: **recarga 4,5 s** e bala **~2× mais forte**.', 'Os Twins agora deixam um canhão de ferro.'] },
+      { icone: '🌊', nome: 'Mar', itens: ['Mar ensolarado **mais agitado**: ondulação maior e mais frequente, jangada balança mais.', 'Ondas grandes **não arrastam** mais ninguém para fora da jangada.'] },
+      { icone: '🪵', nome: 'Destroços', itens: ['**Plataforma 6 × 6** bem menos rara.', 'Um pouco **mais de paredes** boiando.'] },
+      { icone: '👥', nome: 'Multiplayer', itens: ['Modelo da **arma do parceiro** na mão (e o banjo no peito).', '**Clarão** na arma do parceiro quando ele atira.'] },
+    ],
+  },
+  {
     id: '0.18', versao: 'v0.18', data: '24/11/2026', titulo: 'Rumo ao abrigo: os Twins',
     destaques: [
       { tag: 'Fim de jogo', titulo: 'Coordenadas do abrigo', texto: 'Derrubando os quatro chefes da Leviatã, o rádio do topo revela **as coordenadas de um abrigo**. A jangada ganha **navegação 360°** (a vela vira o leme) e um **marcador no topo da tela** mostra direção e distância.' },
