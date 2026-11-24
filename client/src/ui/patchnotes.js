@@ -5,6 +5,17 @@
 // Nos textos, **assim** vira negrito.
 export const PATCH_NOTES = [
   {
+    id: '0.15', versao: 'v0.15', data: '24/11/2026', titulo: 'Novidades e plataformas grandes',
+    destaques: [
+      { tag: 'Menu', titulo: 'Aba Novidades', texto: 'O menu principal ganhou esta aba com **as notas de todas as atualizações**, da v0.1 até agora. O selo **NOVO** aparece sempre que sai um update.' },
+      { tag: 'Construção', titulo: 'Plataformas grandes no mar', texto: 'A **plataforma de madeira 6 × 6 m** da ilha inicial agora também aparece **boiando no mar**. É rara (mais ou menos uma a cada 1 km), mas encaixa direto nos espaços do convés.' },
+    ],
+    secoes: [
+      { icone: '📜', nome: 'Menu', itens: ['Aba **Novidades** com o histórico de versões; a mais nova fica aberta.', 'Selo **NOVO** ao lado da aba até você abrir a versão atual.'] },
+      { icone: '🔨', nome: 'Construção', itens: ['**Plataforma grande** (6 × 6 m) aparece rara entre os destroços do mar.'] },
+    ],
+  },
+  {
     id: '0.14', versao: 'v0.14', data: '24/11/2026', titulo: 'Fortaleza, SOS e mar vivo',
     destaques: [
       { tag: 'Nova base', titulo: 'Complexo militar com torre-espiral', texto: 'Uma ilha enorme murada, com torres de vigia, radomes e antenas. No centro, um prédio fechado sobe em **espiral por 16 salas**, com 1 a 3 inimigos em cada, até uma **esfera gigante** no topo: a arena do chefe da minigun, cheia de covers.' },
@@ -14,7 +25,7 @@ export const PATCH_NOTES = [
       { icone: '🌊', nome: 'Mar e maré', itens: ['A jornada **começa com o mar cheio**; a seca não vem mais logo na saída.', 'Ciclo mais curto: **150 s de mar cheio, 90 s de seca**.', '**Ondas grandes** de vez em quando.', 'A jangada **não encalha mais** do lado das ilhas e contorna em vez de travar.', 'Itens que boiavam agora **caem** quando a água desce.', 'Água bem mais realista no gráfico **Ultra**.'] },
       { icone: '⚓', nome: 'Batalha naval', itens: ['Navios **reagem ao canhão**: adernam, balançam, soltam lascas e tábuas.', 'Tripulação perto do impacto **leva dano**; o capitão desvia em zigue-zague.', 'Casco furado deixa o navio **mais lento**.', '**Canhão** aparece no loot bem mais cedo (~850 m).'] },
       { icone: '⚔', nome: 'Inimigos', itens: ['**Menos empurrão** nos golpes.', 'Piratas na jangada **não caem mais** no mar (nem "teleportam").', 'Na seca eles caem e **voltam escalando** a jangada.', 'Bases com inimigos **espalhados pelas salas**, sem amontoado.'] },
-      { icone: '🔨', nome: 'Construção', itens: ['A colisão **acompanha o giro** da peça.', '**Pegar objetos** mirando em qualquer parte deles.', '**Paredes maiores** (mais largas e mais altas).', 'Escada da torre de sucata **funciona**.', '**Plataformas grandes** (a mesma da ilha inicial) boiando no mar, raras.'] },
+      { icone: '🔨', nome: 'Construção', itens: ['A colisão **acompanha o giro** da peça.', '**Pegar objetos** mirando em qualquer parte deles.', '**Paredes maiores** (mais largas e mais altas).', 'Escada da torre de sucata **funciona**.'] },
       { icone: '🧭', nome: 'Progressão e loot', itens: ['Progressão **bem mais lenta**: o mar é maior e mais vazio.', '**Eventos do mar** começam já no primeiro minuto.', 'Menos caixas na seca e **loot mais escasso**.', 'Fundo da seca mais limpo.'] },
       { icone: '🔊', nome: 'Sons', itens: ['Tiro novo do **rifle de precisão** (com eco) e da **pistola**.', 'Som de **recarga da pistola** (recarga agora em 1,5 s).'] },
     ],
