@@ -21,7 +21,7 @@ function ac() {
   return ctx;
 }
 // Sons gravados (arquivos em public/sounds). Carregam quando o áudio liga; até lá usa o sintetizado.
-const SAMPLE_URLS = { sniper: './sounds/sniper.mp3' };
+const SAMPLE_URLS = { sniper: './sounds/sniper.mp3', pistolReload: './sounds/pistol-reload.mp3' };
 const samples = {};
 function loadSamples() {
   for (const [k, url] of Object.entries(SAMPLE_URLS)) {
@@ -116,6 +116,12 @@ export const sfx = {
   click(pos, f = 1) { // pecinhas de metal da recarga (sai, entra, trava)
     const b = bus(pos, 0.55); if (!b) return; const t = ctx.currentTime;
     noise(t, 0.035, 'bandpass', 3200 * f, 2200 * f, 3, 0.8, b); tone(t, 1300 * f, 0.05, 0.25, b, 'triangle', 0.7);
+  },
+  // recarga gravada (tira o carregador, põe o novo, puxa o ferrolho); false = arquivo não carregou
+  reload(pos, kind) {
+    if (kind !== 'pistola') return false;
+    const b = bus(pos, 0.8); if (!b) return true;
+    return playSample('pistolReload', b);
   },
   bolt(pos) { const t0 = ctx && ctx.currentTime; this.click(pos, 0.8); setTimeout(() => this.click(pos, 1.1), 180); void t0; },
   shell(pos) { this.click(pos, 0.6); setTimeout(() => this.click(pos, 0.9), 90); },
