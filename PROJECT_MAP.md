@@ -1,4 +1,4 @@
-# PROJECT_MAP — Maré Alta (guia rápido para analisar o código sem ler tudo)
+# PROJECT_MAP — Jangatec (guia rápido para analisar o código sem ler tudo)
 
 > **Como usar (humano ou IA):** leia ESTE arquivo primeiro; abra só o módulo da tabela "Onde mexer".
 > Para atualizar o índice (seção 10): `python3 tools/map-index.py` e cole o resultado na seção 10.

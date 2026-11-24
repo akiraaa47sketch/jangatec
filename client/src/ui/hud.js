@@ -142,7 +142,6 @@ export class Hud {
     $('lifeArc').style.strokeDashoffset = String(LIFE_C * (1 - vida / 100));
     $('lifeRing').classList.toggle('low', vida <= 30);
     $('lockTag').hidden = !G.player.faceCam || G.player.firstPerson;
-    $('objective').textContent = G.startup.objective;
     // barra de vida do chefe mais perto (escafandrista / Metralhador)
     const pp = G.player.body.pos;
     const boss = G.enemies.list.filter((e) => e.def.boss && e.state !== 'dead' && Math.hypot(e.body.pos.x - pp.x, e.body.pos.z - pp.z) < 70).sort((a, b) => b.def.hp - a.def.hp)[0];

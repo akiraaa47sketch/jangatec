@@ -406,6 +406,7 @@ export class Intro {
     }
     if (this.pilot.pill) animatePill(this.pilot.pill, 0, dt, 'row', 0.25);
 
+    if (!this.zoneShown && ct >= T.wake + 4.2 && G.zoneTitle) { this.zoneShown = true; const z = G.zoneTitle.zoneAt(); G.zoneTitle.show(z.name, z.sub); }
     if (ct < T.crash) this._camera(ct);
     else this._wakeCamera(ct);
     this._overlay(ct, dt);
@@ -478,6 +479,10 @@ export class Intro {
     ui.fade.style.opacity = '1';
     requestAnimationFrame(() => { ui.fade.style.transition = 'opacity 0.6s'; ui.fade.style.opacity = '0'; });
     setTimeout(() => ui.el.remove(), 800);
+    if (G.zoneTitle) { // nome da ilha ao acordar (também quando a cutscene foi pulada)
+      if (!this.zoneShown) { const z = G.zoneTitle.zoneAt(); setTimeout(() => G.zoneTitle.show(z.name, z.sub), 500); }
+      G.zoneTitle.sync();
+    }
     if (this.onDone) this.onDone();
   }
 }

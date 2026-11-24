@@ -43,6 +43,7 @@ import { Sos } from './systems/sos.js';
 import { Inventory } from './ui/inventory.js';
 import { clock } from './core/util.js';
 import { Intro } from './systems/intro.js';
+import { ZoneTitle } from './ui/zonetitle.js';
 
 const $ = (id) => document.getElementById(id);
 const canvas = $('c');
@@ -107,6 +108,7 @@ G.enemyNet = new EnemyNet(G); // inimigos sincronizados (host simula, os outros 
 G.seaEvents = new SeaEvents(G); // kraken, tubarões, peixes voadores e raios
 G.sos = new Sos(G); // plataforma de petróleo do SOS (fim da jornada)
 G.inventory = new Inventory(G); // tela de inventário (Tab)
+G.zoneTitle = new ZoneTitle(G); // nome da zona ao entrar numa zona nova
 const atmo = new Atmosphere(renderer, scene, { sun, hemisphere }); // céu, IBL e sombras
 const ocean = new Ocean(scene, atmo);
 ocean.islandSource = () => G.world.islands.filter((i) => !i.seaSite); // estruturas do mar não têm água rasa
@@ -209,6 +211,7 @@ function start(seed, welcome, opts = {}) {
   G.combat.startWithRandomImprovisedWeapon();
   G.combat.setBuildMode(false);
   G.started = true;
+  G.zoneTitle.current = null;
   $('menu').hidden = true;
   if (G.cutscene) G.cutscene.finish();
   const play = () => {
@@ -330,6 +333,7 @@ function frame() {
   atmo.update(dt, camera);
   ocean.update(t, camera.position.x, camera.position.z);
   G.hud.update(dt);
+  G.zoneTitle.update(dt);
   if (G.touch && !cut) G.touch.update();
   sunVisual.update(camera, t);
   G.gfx.render(dt);

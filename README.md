@@ -1,6 +1,6 @@
 <p align="center"><img src="client/public/jangatec-logo.png" alt="Jangatec" width="560"></p>
 
-# Maré Alta — protótipo
+# Jangatec — protótipo
 
 Jogo 3D de sobrevivência, exploração e construção em alto-mar, no navegador.
 Three.js e Cannon-es no frontend, Node.js + WebSocket no backend.

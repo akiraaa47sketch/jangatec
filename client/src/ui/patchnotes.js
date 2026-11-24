@@ -11,6 +11,7 @@ export const PATCH_NOTES = [
       { tag: 'Mar', titulo: 'Ondas do norte e jangada colada na água', texto: 'As ondas agora **vêm só do norte**, a jangada **acompanha a água sem atraso** e, no multiplayer, todos usam **o relógio do servidor**: as ondas são iguais para todo mundo.' },
     ],
     secoes: [
+      { icone: '🗺', nome: 'Zonas', itens: ['Ao entrar numa zona nova o **nome dela aparece na tela** (na fonte do logo) e some sozinho: ilhas por tipo, estruturas, plataforma do SOS, leito seco e o mar, que muda de nome conforme você avança.', 'Saiu o **indicador fixo** do topo da tela.'] },
       { icone: '🚁', nome: 'Ilha inicial', itens: ['**Destroços do helicóptero** na beira da ilha, pegando fogo e soltando fumaça (a cauda caiu na água).'] },
       { icone: '🌊', nome: 'Mar', itens: ['Ondas **só do norte**, num leque estreito.', 'Perto das ilhas a água é rasa e as ondas **perdem força**.', 'A jangada **sobe e desce junto com a onda** (antes chegava atrasada).', 'Multiplayer: **relógio acertado pelo servidor** e jangada **prevista entre pacotes** (sem trancos nem atraso por ping).'] },
       { icone: '🌀', nome: 'Ondas gigantes', itens: ['Onda gigante e ondas da tempestade **também vêm do norte**: dá para vê-las chegando pela proa.', 'Frente **mais íngreme** (parede de água) e encosta longa atrás.', 'A jangada **sobe a onda de verdade** em vez de ser engolida e subir depois.'] },

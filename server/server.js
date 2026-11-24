@@ -435,4 +435,4 @@ setInterval(() => {
   }
 }, 30000);
 
-server.listen(PORT, () => console.log(`Servidor Maré Alta na porta ${PORT}`));
+server.listen(PORT, () => console.log(`Servidor Jangatec na porta ${PORT}`));

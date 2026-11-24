@@ -1,4 +1,4 @@
-/* Maré Alta — identidade visual: azul-marinho profundo, latão envelhecido, pergaminho e corda. */
+/* Jangatec — identidade visual: azul-marinho profundo, latão envelhecido, pergaminho e corda. */
 :root {
   --ink: #f6eedb; --ink-dim: rgba(246, 238, 219, 0.72);
   --navy: #0d2230; --navy-2: #143549; --navy-3: #1c4a63;
@@ -57,7 +57,7 @@ kbd { display: inline-block; min-width: 1.6em; padding: 1px 6px; margin: 0 2px; 
   font: 800 12.5px var(--ui); letter-spacing: 0.02em; text-align: center; color: var(--parchment-ink); text-shadow: none;
   background: linear-gradient(#f7ebcf, var(--parchment)); border-radius: 3px;
   clip-path: polygon(0 0, 100% 0, 97% 50%, 100% 100%, 0 100%, 3% 50%); opacity: 0.92; }
-#objective:empty { display: none; }
+#objective { display: none !important; } /* sem indicador fixo: avisos de objetivo saem como mensagens */
 
 /* mensagens */
 #msgs { position: absolute; left: 50%; top: 50px; transform: translateX(-50%); display: grid; justify-items: center; gap: 4px; }
@@ -667,3 +667,19 @@ body.bossfight #msgs { top: 96px; } body.touch.bossfight #msgs { top: 84px; }
 #cutscene .cs-sub.on { opacity: 1; }
 #cutscene .cs-skip { position: absolute; right: 18px; bottom: 14px; color: rgba(255,255,255,0.55); font-size: 13px; letter-spacing: 0.05em; }
 #cutscene.out .cs-skip, #cutscene.out .cs-sub, #cutscene.out .cs-title { display: none; }
+
+/* ---------- nome da zona (aparece ao entrar numa zona nova, na fonte do logo) ---------- */
+#zoneTitle { position: fixed; left: 0; right: 0; top: 17vh; z-index: 55; pointer-events: none; display: flex; flex-direction: column;
+  align-items: center; gap: 2px; opacity: 0; }
+#zoneTitle.on { animation: zoneIn 4.4s ease-in-out forwards; }
+#zoneTitle .zt-name { font: 400 clamp(40px, 7vw, 86px)/1.05 var(--display); letter-spacing: 3px; padding: 0 0.15em;
+  background: linear-gradient(180deg, #fff3c9 0%, #f3cf7e 38%, #e0ac4c 62%, #8a6420 100%); -webkit-background-clip: text; background-clip: text; color: transparent;
+  filter: drop-shadow(0 0 1.5px #2b1c08) drop-shadow(0 0 1.5px #2b1c08) drop-shadow(0 0 1px #2b1c08) drop-shadow(0 5px 7px rgba(0, 0, 0, 0.6)); }
+#zoneTitle .zt-line { width: min(46vw, 420px); height: 2px; background: linear-gradient(90deg, transparent, rgba(243, 207, 126, 0.85), transparent);
+  transform: scaleX(0); animation: inherit; }
+#zoneTitle.on .zt-line { animation: zoneLine 4.4s ease-in-out forwards; }
+#zoneTitle .zt-sub { font: 800 clamp(11px, 1.4vw, 14px) var(--ui); letter-spacing: 0.42em; text-transform: uppercase; color: rgba(246, 238, 219, 0.85);
+  text-shadow: 0 2px 6px rgba(0, 0, 0, 0.75); }
+#zoneTitle .zt-sub:empty { display: none; }
+@keyframes zoneIn { 0% { opacity: 0; transform: translateY(10px); } 18% { opacity: 1; transform: none; } 74% { opacity: 1; } 100% { opacity: 0; transform: translateY(-4px); } }
+@keyframes zoneLine { 0% { transform: scaleX(0); } 25% { transform: scaleX(1); } 100% { transform: scaleX(1); } }
