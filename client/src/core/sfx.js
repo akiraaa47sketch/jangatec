@@ -21,7 +21,7 @@ function ac() {
   return ctx;
 }
 // Sons gravados (arquivos em public/sounds). Carregam quando o áudio liga; até lá usa o sintetizado.
-const SAMPLE_URLS = { sniper: './sounds/sniper.mp3', pistolReload: './sounds/pistol-reload.mp3' };
+const SAMPLE_URLS = { sniper: './sounds/sniper.mp3', pistolReload: './sounds/pistol-reload.mp3', pistol: './sounds/pistol-shot.mp3' };
 const samples = {};
 function loadSamples() {
   for (const [k, url] of Object.entries(SAMPLE_URLS)) {
@@ -102,6 +102,7 @@ export const sfx = {
     const big = { pistol: 0.75, revolver: 0.95, rifle: 0.9, shotgun: 1.15, sniper: 1.25 }[kind] || 0.8;
     const b = bus(pos, big, 120); if (!b) return;
     if (kind === 'sniper' && playSample('sniper', b, 0.97 + Math.random() * 0.06)) return; // tiro gravado (já tem eco)
+    if (kind === 'pistol' && playSample('pistol', b, 0.96 + Math.random() * 0.08)) return; // tiro gravado da pistola
     const t = ctx.currentTime;
     noise(t, 0.05, 'highpass', 2500, 1200, 0.7, 0.9, b);                     // estalo
     noise(t, 0.12 + big * 0.18, 'lowpass', 4200 * big, 260, 0.8, 0.9, b);   // corpo do tiro
