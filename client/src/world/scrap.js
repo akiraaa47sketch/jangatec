@@ -45,7 +45,7 @@ function rustTex() {
 }
 
 let M = null;
-function mats() {
+export function mats() {
   if (M) return M;
   const std = (o) => new THREE.MeshStandardMaterial({ roughness: 0.78, metalness: 0.35, ...o });
   M = {

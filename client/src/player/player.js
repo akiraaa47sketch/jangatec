@@ -101,6 +101,16 @@ export class Player {
 
   // Escada de mão soldada na jangada perto de p (encostado nela, de frente)? → { top, fx, fz } (mundo)
   ladderAt(p) {
+    // escadas das torres de vigia das ilhas
+    for (const isl of this.G.world ? this.G.world.islands : []) {
+      if (!isl.ladders || !isl.ladders.length || Math.hypot(p.x - isl.x, p.z - isl.z) > isl.R + 10) continue;
+      for (const L of isl.ladders) {
+        const [lx, lz] = rot(p.x - L.x, p.z - L.z, -L.yaw);
+        if (Math.abs(lx) > 0.4 || Math.abs(lz) > 0.6 || p.y < L.y0 - 0.3 || p.y > L.top + 0.1) continue;
+        const [dx, dz] = rot(0, -L.dir, L.yaw); // para dentro da torre
+        return { top: L.top, fx: dx, fz: dz };
+      }
+    }
     const boat = this.G.boat; if (!boat) return null;
     const [bx, bz] = boat.toLocal(p.x, p.z), by = p.y - boat.set.y;
     for (const piece of boat.pieces.values()) {
@@ -173,7 +183,6 @@ export class Player {
     if (this.downed) speed = this.swimming ? CFG.swim * 0.6 : 0.9; // caído: só se arrasta
     if (aiming) speed = Math.min(speed, 3);
     speed *= this.speedMul || 1; // bloqueando/carregando golpe anda devagar
-    if (this.slowT > 0) speed *= 0.5; // espuma do Caranguejo-Rei
     // furacão: andar CONTRA o empurrão = se firmar (anda devagar e não escorrega)
     this.bracing = 0;
     if (this.drift && moving && this.aboard) {

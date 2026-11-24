@@ -527,6 +527,14 @@ export class Naval {
   _shipAI(s, dt) {
     const G = this.G, boat = G.boat;
     const fx = Math.sin(boat.yaw), fz = Math.cos(boat.yaw), rx = fz, rz = -fx;
+    // maré baixou embaixo do casco: o navio encalha e a tripulação desce para correr atrás da jangada
+    const dry = G.enemies.isDry(s.x, s.z);
+    if (dry && !s.stranded) {
+      s.stranded = true; s.speed = 0;
+      G.hud.msg('O navio pirata encalhou — a tripulação está descendo para vir a pé!');
+      if (!s.landed) { s.landed = true; G.enemies.spawnDisembark(s); }
+    } else if (!dry && s.stranded && sea.level > G.world.seabedHeight(s.x, s.z) + 1.2) s.stranded = false; // água voltou: desencalha
+    if (s.stranded) return;
     let tx, tz;
     if (s.retreat) { tx = s.x + Math.sin(s.yaw) * 100; tz = s.z + Math.cos(s.yaw) * 100; }
     else {
@@ -596,6 +604,9 @@ export class Naval {
     const hL = waveHeight(s.x + fz * 2.5, s.z - fx * 2.5, t), hR = waveHeight(s.x - fz * 2.5, s.z + fx * 2.5, t);
     const dmg = 1 - s.hp / s.max;
     let y = (hB + hS + hL + hR) / 4 + 0.55 - dmg * 0.8, pitch = clamp((hS - hB) / 14, -0.12, 0.12), roll = clamp((hL - hR) / 5, -0.15, 0.15) + dmg * 0.06 * s.side;
+    // encalhado: o casco assenta no fundo e tomba um pouco para o lado
+    const bed = this.G.world.seabedHeight(s.x, s.z) - SHIP.keel - 0.5;
+    if (y < bed) { const k = clamp((bed - y) / 1.5, 0, 1); y = bed; pitch *= 1 - k; roll = roll * (1 - k) + 0.2 * s.side * k; }
     if (s.sinkT > 0) {
       s.sinkT += dt;
       const u = Math.min(1, s.sinkT / 16);
@@ -787,8 +798,8 @@ export class Naval {
     if (!G.started) return;
     const host = this._isHost();
     if (host) this._schedule(dt);
-    // maré segurada no cheio durante a batalha (sobe rápido, solta devagar)
-    this.holdK = clamp(this.holdK + (this.active ? dt / 4 : -dt / 12), 0, 1);
+    // a maré não é mais segurada na batalha: se a água baixar, os navios encalham e a tripulação desce
+    this.holdK = clamp(this.holdK - dt / 12, 0, 1);
 
     if (host && this.active) {
       this.battleT += dt;

@@ -193,7 +193,11 @@ export class Physics {
         collisionFilterMask: GROUP_DEBRIS | GROUP_RAFT,
       });
       body.quaternion.setFromAxisAngle(new CANNON.Vec3(0, 1, 0), set.yaw + (collider.yaw || 0));
-      if (collider.type === 'cyl') {
+      if (collider.type === 'ramp') { // rampa: placa inclinada no plano do topo (sobe para +z local)
+        const pitch = new CANNON.Quaternion(); pitch.setFromAxisAngle(new CANNON.Vec3(1, 0, 0), -Math.atan2(collider.hy, collider.hz));
+        body.quaternion = body.quaternion.mult(pitch);
+        body.addShape(new CANNON.Box(new CANNON.Vec3(collider.hx, 0.15, Math.hypot(collider.hy, collider.hz))), new CANNON.Vec3(0, -0.15, 0));
+      } else if (collider.type === 'cyl') {
         body.addShape(new CANNON.Cylinder(collider.hx, collider.hx, collider.hy * 2, 12));
       } else {
         body.addShape(new CANNON.Box(new CANNON.Vec3(collider.hx, collider.hy, collider.hz)));

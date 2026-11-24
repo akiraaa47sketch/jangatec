@@ -133,7 +133,9 @@ export class Events {
     if (G.startup.waterLevel < 0.5 || (tide && (tide.phase.id === 'seco' || tide.nextIn < 75))) { this.timer = 15; return; }
     // quase nunca repete o mesmo tipo em seguida; às vezes o mar simplesmente fica quieto
     if (Math.random() < 0.18) { this.timer = between([90, 200]); return; }
-    const kinds = ['tsunami', 'furacao', 'tempestade', ...SEA_KINDS, 'fantasma'], others = kinds.filter((k) => k !== this.lastKind);
+    // chefes do mar (kraken, navio-fantasma) só do meio da rota em diante
+    const prog = Math.min(1, Math.hypot(G.boat.x, G.boat.z) / 1280);
+    const kinds = ['tsunami', 'furacao', 'tempestade', ...SEA_KINDS, 'fantasma'].filter((k) => !((k === 'kraken' || k === 'fantasma') && prog < 0.35)), others = kinds.filter((k) => k !== this.lastKind);
     const kind = Math.random() < 0.88 ? others[(Math.random() * others.length) | 0] : kinds[(Math.random() * kinds.length) | 0];
     this.begin(this.make(kind, t), true);
   }

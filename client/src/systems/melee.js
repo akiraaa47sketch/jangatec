@@ -31,13 +31,14 @@ const MOVES = {
   rapido: [{ wind: 0.24, mult: 0.8, hits: 3, w: 3 }, { wind: 0.36, mult: 1.3, w: 1 }],
   pesado: [{ wind: 0.75, mult: 1.6, heavy: true, aoe: 3.0, w: 2 }, { wind: 0.42, mult: 0.9, w: 1 }, { wind: 0.5, mult: 0.6, kick: true, w: 1 }],
   escafandrista: [{ wind: 0.75, mult: 1.5, heavy: true, aoe: 3.2, w: 2 }, { wind: 0.45, mult: 0.9, hits: 2, w: 2 }, { wind: 0.5, mult: 0.6, kick: true, w: 1 }],
-  siri: [{ wind: 0.3, mult: 1, hits: 2, w: 3 }, { wind: 0.4, mult: 1.3, w: 1 }],
-  caranguejo: [{ wind: 0.55, mult: 0.9, hits: 2, w: 3 }, { wind: 0.85, mult: 1.6, heavy: true, aoe: 4.2, w: 2 }, { wind: 0.5, mult: 0.6, kick: true, w: 1 }],
+  lanceiro: [{ wind: 0.45, mult: 1, w: 3 }, { wind: 0.35, mult: 0.8, hits: 2, w: 2 }, { wind: 0.7, mult: 1.6, heavy: true, w: 1 }], // estocadas de longe
+  esquivo: [{ wind: 0.26, mult: 0.9, hits: 2, w: 3 }, { wind: 0.4, mult: 0.5, kick: true, w: 1 }],
+  duelista: [{ wind: 0.3, mult: 1, hits: 2, w: 3 }, { wind: 0.26, mult: 0.9, hits: 3, w: 2 }, { wind: 0.55, mult: 1.6, heavy: true, w: 1 }],
   pirata: [{ wind: 0.32, mult: 1, hits: 2, w: 3 }, { wind: 0.28, mult: 0.9, hits: 3, w: 1 }, { wind: 0.6, mult: 1.8, heavy: true, w: 1 }, { wind: 0.4, mult: 0.5, kick: true, w: 1.5 }],
 };
 const LIGHT_POSES = ['slashR', 'slashL', 'thrust', 'uppercut'];
-const GUARD_CHANCE = { melee: 0.5, pesado: 0.55, pirata: 0.6, rapido: 0.2, fantasma: 0.4, escafandrista: 0.35, caranguejo: 0.4 };
-const RIPOSTE_CHANCE = { melee: 0.3, pesado: 0.15, pirata: 0.55, rapido: 0.2, escafandrista: 0.2, caranguejo: 0.3 }; // contra-ataque depois de defender
+const GUARD_CHANCE = { lanceiro: 0.3, esquivo: 0.1, duelista: 0.45, melee: 0.4, pesado: 0.45, pirata: 0.5, rapido: 0.15, fantasma: 0.35, escafandrista: 0.35 };
+const RIPOSTE_CHANCE = { lanceiro: 0.2, esquivo: 0.3, duelista: 0.7, melee: 0.3, pesado: 0.15, pirata: 0.55, rapido: 0.2, escafandrista: 0.2 }; // contra-ataque depois de defender
 const EVADE_CHANCE = { melee: 0.12, pesado: 0, pirata: 0.18, rapido: 0.3 }; // desviam do seu golpe
 
 let bangTex = {}, starTex = null;
@@ -435,7 +436,9 @@ export class Melee {
     // desvia do seu golpe que está vindo (pulo lateral)
     if (mine && this.pending && dist < 2.8 && !ms.evadeTried) {
       ms.evadeTried = true;
-      if (Math.random() < (EVADE_CHANCE[e.type] || 0)) {
+      const dg = def.dodge, ready = !dg || performance.now() >= (e.dodgeAt || 0); // esquivos: chance alta, mas com recarga
+      if (ready && Math.random() < (dg ? dg.chance : EVADE_CHANCE[e.type] || 0)) {
+        if (dg) e.dodgeAt = performance.now() + dg.cd * 1000;
         const pp = pl.pos || G.player.body.pos, dx = pp.x - e.body.pos.x, dz = pp.z - e.body.pos.z, l = Math.hypot(dx, dz) || 1, sd = Math.random() < 0.5 ? 1 : -1;
         e.knock = { x: -dz / l * 7 * sd - dx / l * 2, z: dx / l * 7 * sd - dz / l * 2 };
         e.mesh.userData.pill && (e.mesh.userData.pill.userData.rollDir = sd);
