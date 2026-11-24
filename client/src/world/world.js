@@ -82,6 +82,8 @@ export const DEBRIS = [
     return g; } },
   { nome: 'Chão de madeira', w: 6, real: true, pieceType: 'piso', size: [2, 0.15, 2], make: (r) => plankFloor(2, 2, r) },
   { nome: 'Chão grande de madeira', w: 2, real: true, pieceType: 'piso', size: [3, 0.15, 3], make: (r) => plankFloor(3, 3, r) },
+  // a mesma plataforma grande da ilha inicial (6 × 6 m, encaixa nos espaços do convés): rara no mar
+  { nome: 'Plataforma de madeira', w: 2, real: true, pieceType: 'piso', size: PIECES.piso.size, make: () => makePieceMesh('piso') },
   { nome: 'Chão de metal', w: 2, real: true, sinks: true, pieceType: 'chapa', size: [2, 0.08, 2], make: () => {
     const geo = new THREE.BoxGeometry(2, 0.06, 2); const m = new THREE.Mesh(scaleBoxUVs(geo, 2, 0.06, 2), ironMat());
     const g = new THREE.Group(); g.add(m); for (let i = -4; i <= 4; i++) { const ridge = box(0.04, 0.02, 1.9, ironMat()); ridge.position.set(i * 0.22, 0.04, 0); g.add(ridge); } return g; } },
