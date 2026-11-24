@@ -248,6 +248,7 @@
         <button type="button" data-tab="char">Personagem</button>
         <button type="button" data-tab="options">Opções</button>
         <button type="button" data-tab="controls">Controles</button>
+        <button type="button" data-tab="news">Novidades<b id="newsBadge" class="news-badge" hidden>NOVO</b></button>
       </nav>
       <label class="captain"><span>Nome do capitão</span><input id="name" maxlength="16" placeholder="Náufrago" autocomplete="nickname"></label>
     </aside>
@@ -358,6 +359,13 @@
             <p class="tip" id="vTip">O microfone só é pedido quando você marcar a opção.</p>
           </article>
         </div>
+      </section>
+
+      <section class="tab tab-news" data-tab="news">
+        <p class="eyebrow">Notas de atualização</p>
+        <h2>Novidades</h2>
+        <p class="lead">Todas as atualizações do Jangatec. A mais nova fica aberta; clique numa versão antiga para ver o que ela trouxe.</p>
+        <div id="patchNotes"></div>
       </section>
 
       <section class="tab" data-tab="controls">

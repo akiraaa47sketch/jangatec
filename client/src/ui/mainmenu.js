@@ -2,11 +2,13 @@
 // Opções (gráficos e chat de voz) · Controles. O fundo é a cena 3D da jangada girando.
 import { Net } from '../net/net.js';
 import { DEFAULT_SERVER } from '../config.js';
+import { renderPatchNotes, NEWS_VERSION } from './patchnotes.js';
 
 const $ = (id) => document.getElementById(id);
 const esc = (t) => String(t).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const PHASE = { build: 'montando a jangada', install: 'instalando a vela', calm: 'calmaria', storm: 'tempestade chegando', flood: 'inundação', board: 'embarcando', depart: 'navegando' };
 const NAME_KEY = 'jangatec-nome', SERVER_KEY = 'jangatec-servidor';
+const NEWS_KEY = 'jangatec-novidades-vistas'; // selo "NOVO" some depois de abrir a versão atual (ui/patchnotes.js)
 
 export class MainMenu {
   // actions: { solo(seed), multi(welcome), bench() }
@@ -46,6 +48,10 @@ export class MainMenu {
     $('btnGfx').onclick = () => G.gfxMenu.toggle(true);
     $('btnHelp').onclick = () => { $('help').hidden = false; };
     this.bindVoice();
+    // notas de atualização + selo "NOVO" na aba Novidades até o jogador abrir a aba desta versão
+    renderPatchNotes($('patchNotes'));
+    let seen = null; try { seen = localStorage.getItem(NEWS_KEY); } catch { /* ok */ }
+    $('newsBadge').hidden = seen === NEWS_VERSION;
   }
 
   status(t) { $('menuStatus').textContent = t || ''; }
@@ -57,6 +63,7 @@ export class MainMenu {
     for (const b of document.querySelectorAll('.menu-nav [data-tab]')) b.classList.toggle('on', b.dataset.tab === tab);
     for (const s of document.querySelectorAll('.tab')) s.classList.toggle('on', s.dataset.tab === tab);
     clearInterval(this.pollT);
+    if (tab === 'news') { $('newsBadge').hidden = true; try { localStorage.setItem(NEWS_KEY, NEWS_VERSION); } catch { /* ok */ } }
     if (tab === 'servers') { this.refresh(true); this.pollT = setInterval(() => this.refresh(), 4000); }
     if (tab === 'options') this.meterLoop();
   }
