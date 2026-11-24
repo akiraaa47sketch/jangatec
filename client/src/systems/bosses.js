@@ -31,7 +31,7 @@ export class Bosses {
     }
     if (!E.auth) return;
     const st = G.startup.tide.state;
-    if (!st || st.phase.id !== 'seco' || st.changing || st.nextIn < 40) return;
+    if (!st || st.phase.id !== 'seco' || st.changing || st.nextIn < 20) return; // seca curta (40 s): ainda dá tempo
     const cycle = st.cycle;
     if (this.cycle === cycle) return;
     this.cycle = cycle; // uma tentativa por seca

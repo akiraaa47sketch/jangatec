@@ -7,7 +7,7 @@ export const PATCH_NOTES = [
   {
     id: '0.22', versao: 'v0.22', data: '24/11/2026', titulo: 'Mar mais movimentado',
     secoes: [
-      { icone: '🌊', nome: 'Mais eventos', itens: ['Eventos do mar **bem mais frequentes**: o primeiro em 20–40 s e depois a cada **~1–2 min**.', '"Mar quieto" quase nunca (3%).', '**Kraken e navio-fantasma** já a partir de ~700 m.', '**SOS** com mais chance e até **3 por partida**.'] },
+      { icone: '🌊', nome: 'Mais eventos', itens: ['Eventos do mar **bem mais frequentes**: o primeiro em 20–40 s e depois a cada **~1–2 min**.', '"Mar quieto" quase nunca (3%).', '**Seca mais curta: 40 s** (mar cheio continua 2 min 30 s).', '**Kraken e navio-fantasma** já a partir de ~700 m.', '**SOS** com mais chance e até **3 por partida**.'] },
       { icone: '☠', nome: 'Mais ação', itens: ['Invasões piratas **mais frequentes** (e 60% de chance de navio de abordagem).', 'Batalhas navais **mais cedo e mais seguidas**.', 'Escafandrista aparece em **38%** das secas (até 60% da rota).'] },
       { icone: '🛠', nome: 'Correções', itens: ['Inimigos **não te perseguem mais através do chão/teto** (Leviatã, torre-espiral, prédios) — só os atiradores de torre atiram para baixo.', 'O alerta de um inimigo não acorda os do andar de cima/baixo.'] },
     ],
