@@ -34,7 +34,8 @@ export class Bosses {
     if (!st || st.phase.id !== 'seco') return;
     const cycle = st.cycle;
     // a seca começou: sorteia UMA vez; se der certo, o chefe surge assim que a água termina de descer
-    if (this.cycle !== cycle) { this.cycle = cycle; this.pending = this.progress() < BOSSES.miniMaxProgress && Math.random() < BOSSES.miniChance; }
+    // nunca na PRIMEIRA seca da viagem (ciclo 0)
+    if (this.cycle !== cycle) { this.cycle = cycle; this.pending = cycle >= 1 && this.progress() < BOSSES.miniMaxProgress && Math.random() < BOSSES.miniChance; }
     if (this.pending && !st.changing) { this.pending = false; this.spawn('escafandrista', cycle); }
   }
 

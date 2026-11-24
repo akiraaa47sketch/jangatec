@@ -45,13 +45,18 @@ const MESSAGES = {
 };
 
 export class Tide {
-  constructor(G) { this.G = G; this.state = null; this.lastPhase = null; this.departT = 0; }
+  constructor(G) { this.G = G; this.state = null; this.lastPhase = null; this.departT = 0; this.lockK = 0; }
 
   level(t, dt, floodLevel) {
     this.departT += dt;
     this.state = tideAt(t);
+    // fim de jogo (coordenadas do abrigo reveladas): o mar NUNCA mais seca — sobe aos poucos se estiver
+    // seco e fica cheio para a viagem e a batalha contra os Twins não serem interrompidas
+    const locked = !!(this.G.endgame && this.G.endgame.shelter);
+    if (locked && this.lockK === 0 && this.state.phase.id === 'seco') this.G.hud.msg('🌊 A água está voltando — e não vai mais secar até o abrigo.');
+    this.lockK = locked ? Math.min(1, this.lockK + dt / 10) : 0;
     // batalha naval: o mar fica segurado no CHEIO (a seca só acontece fora de combate)
-    const hold = this.G.naval ? this.G.naval.holdK : 0;
+    const hold = Math.max(this.G.naval ? this.G.naval.holdK : 0, this.lockK);
     if (hold > 0) {
       const st = this.state, lvl = st.level + (TIDE.full - st.level) * hold;
       this.state = { ...st, level: lvl, norm: (lvl - TIDE.dry) / (TIDE.full - TIDE.dry), ...(hold > 0.5 ? { phase: TIDE_STATES.cheio, changing: false } : {}) };
