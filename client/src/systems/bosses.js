@@ -8,8 +8,8 @@ import { WORLD_LOOT_PARAMS } from './loot.js';
 
 export const BOSSES = {
   runLength: 4 * WORLD_LOOT_PARAMS.diffStep, // m até a dificuldade máxima (world.difficulty chega a 4)
-  miniChance: 0.22,     // por seca: evento raro (não toda seca, para não ficar previsível)
-  miniMaxProgress: 0.5, // miniboss fraco: só na primeira metade da rota
+  miniChance: 0.38,     // por seca: nem toda seca (para não ficar previsível)
+  miniMaxProgress: 0.6, // miniboss fraco: até ~60% da rota
   dist: [26, 40],       // m da jangada até onde o chefe surge
 };
 

@@ -19,8 +19,8 @@ import { SOS } from './sos.js';
 import { WORLD_LOOT_PARAMS } from './loot.js';
 
 export const EVENT_BALANCE = {
-  first: [30, 60],           // s depois da partida até o primeiro evento (cai no 1º mar cheio)
-  interval: [100, 190],      // s entre o fim de um evento e o próximo (mar agitado: mais eventos)
+  first: [20, 40],           // s depois da partida até o primeiro evento (cai no 1º mar cheio)
+  interval: [60, 115],       // s entre o fim de um evento e o próximo (mar bem agitado)
   tsunami: { speed: [13, 18], startDist: 235, A: [3.6, 5.6], sigma: [9, 13], damage: 22, knock: 8.5 },
   // R = raio do redemoinho, depth = fundura do funil d'água, pull = puxão (m/s), swirl = giro (m/s)
   // tempestade de ONDAS GIGANTESCAS: maiores que a onda gigante (tsunami), com chuva forte e raios
@@ -133,14 +133,14 @@ export class Events {
     if (G.enemies.list.some((e) => e.pirate && e.state !== 'dead')) { this.timer = 15; return; }
     if (G.naval && G.naval.active) { this.timer = 30; return; } // nada de onda/furacão no meio da batalha naval
     const tide = G.startup.tide.state; // só com o mar cheio e longe da próxima seca
-    if (G.startup.waterLevel < 0.5 || (tide && (tide.phase.id === 'seco' || tide.nextIn < 50))) { this.timer = 15; return; }
+    if (G.startup.waterLevel < 0.5 || (tide && (tide.phase.id === 'seco' || tide.nextIn < 35))) { this.timer = 10; return; }
     // quase nunca repete o mesmo tipo em seguida; às vezes o mar simplesmente fica quieto
-    if (Math.random() < 0.08) { this.timer = between([50, 110]); return; }
+    if (Math.random() < 0.03) { this.timer = between([30, 60]); return; }
     // chefes do mar (kraken, navio-fantasma) só do meio da rota em diante
     const prog = Math.min(1, Math.hypot(G.boat.x, G.boat.z) / (4 * WORLD_LOOT_PARAMS.diffStep));
     // SOS da plataforma de petróleo: só no fim da jornada, uma de cada vez (e no máximo 2 por partida)
-    const sosOk = prog >= SOS.minProgress && !G.sos.rig && G.sos.done < 2;
-    const kinds = ['tsunami', 'furacao', 'tempestade', ...SEA_KINDS, 'fantasma', ...(sosOk ? ['sos', 'sos'] : [])].filter((k) => !((k === 'kraken' || k === 'fantasma') && prog < 0.35)), others = kinds.filter((k) => k !== this.lastKind);
+    const sosOk = prog >= SOS.minProgress && !G.sos.rig && G.sos.done < 3;
+    const kinds = ['tsunami', 'furacao', 'tempestade', ...SEA_KINDS, 'fantasma', ...(sosOk ? ['sos', 'sos', 'sos'] : [])].filter((k) => !((k === 'kraken' || k === 'fantasma') && prog < 0.2)), others = kinds.filter((k) => k !== this.lastKind);
     const kind = Math.random() < 0.88 ? others[(Math.random() * others.length) | 0] : kinds[(Math.random() * kinds.length) | 0];
     this.begin(this.make(kind, t), true);
   }

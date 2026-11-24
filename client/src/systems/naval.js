@@ -21,8 +21,8 @@ import { keyOf } from '../core/keybinds.js';
 import { sfx } from '../core/sfx.js';
 
 export const NAVAL = {
-  first: [150, 300],          // s (com canhão instalado e mar cheio) até a 1ª batalha
-  interval: [380, 650],       // s entre batalhas
+  first: [90, 180],           // s (com canhão instalado e mar cheio) até a 1ª batalha
+  interval: [220, 380],       // s entre batalhas
   muzzle: 44,                 // m/s
   gravity: 9.8,
   reload: 7,                  // s entre disparos do jogador (balas infinitas)

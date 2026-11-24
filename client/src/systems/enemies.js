@@ -82,8 +82,8 @@ export const COMBAT_DIRECTOR = {
 // e +1 pirata nas invasões a cada 2 aliados. Dano e velocidade não mudam.
 export const PARTY = { hp: 0.12, bossHp: 0.2, extraPirateEvery: 2 };
 export const PIRATE_BALANCE = {
-  firstWave: [110, 160],   // primeira invasão
-  interval: [140, 230],    // entre invasões (conta só depois que a anterior acabou)
+  firstWave: [75, 115],    // primeira invasão
+  interval: [95, 160],     // entre invasões (conta só depois que a anterior acabou)
   spawnDistance: 42,       // as balsas aparecem longe o bastante para serem vistas
 };
 const between = ([a, b]) => a + Math.random() * (b - a);
@@ -371,7 +371,7 @@ export class Enemies {
     }
     const wave = this.pirateWave++;
     // a partir da 2ª invasão, metade das vezes é um navio de abordagem (quem decide é o host)
-    if (wave >= 1 && Math.random() < 0.5 && G.naval && G.naval._isHost()) {
+    if (wave >= 1 && Math.random() < 0.6 && G.naval && G.naval._isHost()) {
       G.naval.startBoarding();
       this.pirateSpawnTimer = between(PIRATE_BALANCE.interval);
       return;
@@ -966,6 +966,7 @@ export class Enemies {
     e.state = 'chase'; react(e);
     for (const o of this.list) {
       if (o === e || o.isl !== e.isl || o.state === 'dead' || o.state === 'chase' || o.state === 'attack' || o.def.mortar) continue;
+      if (Math.abs(o.body.pos.y - e.body.pos.y) > 4.5) continue; // o alerta não atravessa andares
       if (Math.hypot(o.body.pos.x - e.body.pos.x, o.body.pos.z - e.body.pos.z) < 14) { o.state = 'chase'; o.timer = 0; react(o); }
     }
   }
@@ -1047,8 +1048,12 @@ export class Enemies {
   }
 
   think(e, dist, pdx, pdz) {
-    const T = e.tgt || this.localT, def = e.def, alive = !T.dead && !T.downed; // caído: inimigos perdem o interesse
-    e.los = dist < SIGHT + 10 ? this.hasLos(e) : false;
+    const T = e.tgt || this.localT, def = e.def;
+    // outro andar (prédios, Leviatã, torre-espiral): não percebe nem persegue quem está acima/abaixo —
+    // só os postos no alto (torres) continuam atirando para baixo
+    const sameLevel = e.post || !T.pos || Math.abs(T.pos.y - e.body.pos.y) < 4.5;
+    const alive = !T.dead && !T.downed && sameLevel; // caído (ou fora do andar): inimigos perdem o interesse
+    e.los = dist < SIGHT + 10 && sameLevel ? this.hasLos(e) : false;
     switch (e.state) {
       case 'idle': case 'patrol': case 'search': {
         // só percebe quem ENXERGA: dentro do cone à frente e sem parede no meio (ou muito perto)
@@ -1116,7 +1121,7 @@ export class Enemies {
       }
       // corpo a corpo: aviso -> golpe -> recuperação, guarda, atordoamento (sistema Melee)
       let mres = null;
-      if (!e.def.ranged && dist < 7 && G.melee) mres = G.melee.enemyTick(e, dt, dist);
+      if (!e.def.ranged && dist < 7 && G.melee && Math.abs(pp.y - p.y) < 4.5) mres = G.melee.enemyTick(e, dt, dist); // só no mesmo andar
       if (e.state === 'chase' && e.goal && e.los === false && thinkNow) e.goal = this.route(e, pp.x, pp.z);
       if (e.skillHold > 0) e.skillHold -= dt; else e.skillPose = null;
       if ((mres && mres.hold) || e.post || e.skillHold > 0) { mx = 0; mz = 0; } // usando habilidade: parado
