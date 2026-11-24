@@ -94,6 +94,8 @@ export class Naval {
     this.flames = new Particles(s, { color: 0xff8a2a, additive: true, max: 500 });
     this.smoke = new Particles(s, { color: 0x3a3634, max: 600, opacity: 0.55 });
     this.splash = new Particles(s, { color: 0xeaf6ff, max: 700, opacity: 0.9 });
+    this.splinters = new Particles(s, { color: 0x6e4a2a, max: 500, opacity: 1 }); // lascas de madeira do casco
+    this.planks = []; // tábuas arrancadas que voam e caem na água
     this.ballGeo = new THREE.SphereGeometry(0.17, 12, 8);
     this.ballMat = new THREE.MeshStandardMaterial({ color: 0x1b1b1d, metalness: 0.6, roughness: 0.4 });
     // trajetória prevista (pontilhada) + anel no ponto de impacto
@@ -250,6 +252,7 @@ export class Naval {
       }
       return;
     }
+    if (kind === 'ship' && target) this._shipReact(target, point, b);
     this.boom.spawn(point, kind === 'ship' ? 1.3 : 0.9);
     sfx.explosion(point, kind === 'ship' ? 1.2 : 0.9);
     for (let i = 0; i < 10; i++) this.smoke.emit(point.x, point.y, point.z, (Math.random() - 0.5) * 2, 1 + Math.random() * 2, (Math.random() - 0.5) * 2, 2.5, 1.4, -0.2, 2);
@@ -268,6 +271,55 @@ export class Naval {
     if (!this._isHost()) return;
     if (kind === 'ship') this._damageShip(target, NAVAL.dmg.ship * (0.85 + Math.random() * 0.3), point);
     else if (kind === 'raft') this._damageRaftAt(point, target, b.mult || 1);
+  }
+
+  // Navio atingido (visual em todos os clientes): aderna para longe do impacto e balança de volta,
+  // afunda um pouco com o tranco, solta lascas e tábuas, e a tripulação perto do impacto é atingida.
+  _shipReact(s, point, b) {
+    const G = this.G, [lx, lz] = rot(point.x - s.x, point.z - s.z, -s.yaw), side = lx >= 0 ? 1 : -1;
+    const high = clamp((point.y - s.y - SHIP.keel) / (SHIP.deck - SHIP.keel), 0.3, 1.2);
+    s.hrv += side * 1.5 * high; s.hpv += clamp(-lz / 9, -1, 1) * 0.9; s.dipv -= 1.4;
+    const v = b.vel || _w.set(0, 0, 0), sp = Math.hypot(v.x, v.z) || 1;
+    s.push.x += v.x / sp * 1.6; s.push.z += v.z / sp * 1.6; // empurrão na direção do tiro
+    for (let i = 0; i < 34; i++) {
+      const a = Math.random() * 6.28, r2 = 2 + Math.random() * 5;
+      this.splinters.emit(point.x, point.y, point.z, Math.cos(a) * r2 + v.x / sp * 3, 2 + Math.random() * 6, Math.sin(a) * r2 + v.z / sp * 3, 0.9 + Math.random() * 0.6, 0.16 + Math.random() * 0.2, 14);
+    }
+    for (let i = 0; i < 3 + ((Math.random() * 3) | 0); i++) this._plank(point, v, sp);
+    if (G.camera.position.distanceTo(point) < 60) sfx.kick(point);
+    // tripulação no convés perto do impacto (host aplica; réplicas recebem o dano pela rede)
+    if (this._isHost()) for (const e of G.enemies.list) {
+      if (e.ship !== s || e.state === 'dead') continue;
+      const d = Math.hypot(e.body.pos.x - point.x, e.body.pos.y + 0.9 - point.y, e.body.pos.z - point.z);
+      if (d < 4.5) { G.enemies.damage(e, Math.round(55 * (1 - d / 4.5) + 10)); if (G.melee) G.melee.say(e.body.pos, 'BOOM!', '#ffb060'); }
+    }
+  }
+  _plank(point, v, sp) {
+    if (this.planks.length > 40) { const old = this.planks.shift(); this.G.scene.remove(old.mesh); }
+    if (!this._plankGeo) { this._plankGeo = new THREE.BoxGeometry(0.9, 0.06, 0.22); this._plankMat = new THREE.MeshStandardMaterial({ color: 0x5a3c22, roughness: 0.9 }); }
+    const m = new THREE.Mesh(this._plankGeo, this._plankMat);
+    m.position.copy(point); m.scale.set(0.5 + Math.random(), 1, 0.6 + Math.random() * 0.8);
+    this.G.scene.add(m);
+    const a = Math.random() * 6.28, r2 = 1.5 + Math.random() * 4;
+    this.planks.push({ mesh: m, v: new THREE.Vector3(Math.cos(a) * r2 + v.x / sp * 4, 4 + Math.random() * 6, Math.sin(a) * r2 + v.z / sp * 4),
+      w: new THREE.Vector3((Math.random() - 0.5) * 14, (Math.random() - 0.5) * 14, (Math.random() - 0.5) * 14), floatT: 0 });
+  }
+  _updatePlanks(dt) {
+    const t = this.t || 0;
+    for (let i = this.planks.length - 1; i >= 0; i--) {
+      const p = this.planks[i], m = p.mesh;
+      if (p.floatT > 0) { // boiando: balança nas ondas e some depois de um tempo
+        p.floatT += dt; m.position.y = waveHeight(m.position.x, m.position.z, t) + 0.02;
+        if (p.floatT > 14) { this.G.scene.remove(m); this.planks.splice(i, 1); }
+        continue;
+      }
+      p.v.y -= 9.8 * dt; m.position.addScaledVector(p.v, dt);
+      m.rotation.x += p.w.x * dt; m.rotation.y += p.w.y * dt; m.rotation.z += p.w.z * dt;
+      if (m.position.y < waveHeight(m.position.x, m.position.z, t)) {
+        p.floatT = 0.01; m.rotation.set(0, m.rotation.y, 0);
+        this.splash.emit(m.position.x, m.position.y, m.position.z, 0, 2.5, 0, 0.6, 0.4, 10);
+      }
+    }
   }
 
   _removeBall(b) {
@@ -407,6 +459,7 @@ export class Naval {
       speed: 0, fireCd: between(NAVAL.ship.fireCd) + 3, roll: 0, pitch: 0, fires: [], scorch: 0,
       net: { x: st.x, z: st.z, yaw: st.yaw }, diff: st.diff || 0, retreat: false,
       boarder: !!st.b, boardT: 0, ghost: !!st.g,
+      hr: 0, hrv: 0, hpt: 0, hpv: 0, dip: 0, dipv: 0, evadeT: 0, push: { x: 0, z: 0 }, // reação aos acertos
     };
     if (s.ghost) { // navio-fantasma: casco translúcido esverdeado, velas rasgadas brilhando
       mesh.traverse((o) => {
@@ -430,6 +483,8 @@ export class Naval {
     if (s.sinkT > 0) return;
     s.hp = Math.max(0, s.hp - dmg);
     this._shipHitFx(s, point);
+    // tripulação atordoada e o capitão manobra para sair da mira (zigue-zague por uns segundos)
+    s.fireCd = Math.max(s.fireCd, 0) + 1.4; s.evadeT = 3.5 + Math.random() * 1.5; s.phase += 1.5 + Math.random() * 2;
     if (s.hp <= 0) {
       s.sinkT = 0.01;
       this.G.net.send({ t: 'naval', k: 'sunk', id: s.id });
@@ -549,10 +604,14 @@ export class Naval {
       const crew = G.enemies.list.filter((e) => e.ship === s && e.state !== 'dead').length;
       if (s.spawned && crew === 0 && s.boardT > 6) { s.retreat = true; G.hud.msg('O navio de abordagem está fugindo!'); }
     }
-    s.yaw = lerpAngle(s.yaw, desired, Math.min(1, 0.32 * dt));
-    const want = s.retreat ? 7 : clamp(boat.speed + d * (s.boarder ? 0.14 : 0.09), 1.2, boat.speed + (s.boarder ? 7 : 5));
+    let steer = desired;
+    if (s.evadeT > 0) { s.evadeT -= dt; steer += Math.sin(this.t * 2.2 + s.phase) * 0.7; } // desvia em zigue-zague
+    s.yaw = lerpAngle(s.yaw, steer, Math.min(1, (s.evadeT > 0 ? 0.6 : 0.32) * dt));
+    const crippled = 1 - 0.35 * (1 - s.hp / s.max); // casco furado: mais lento
+    const want = (s.retreat ? 7 : clamp(boat.speed + d * (s.boarder ? 0.14 : 0.09), 1.2, boat.speed + (s.boarder ? 7 : 5)) + (s.evadeT > 0 ? 2 : 0)) * crippled;
     s.speed += (want - s.speed) * Math.min(1, 0.4 * dt);
     s.x += Math.sin(s.yaw) * s.speed * dt; s.z += Math.cos(s.yaw) * s.speed * dt;
+    s.x += s.push.x * dt; s.z += s.push.z * dt; // tranco do tiro (some em ~1 s)
     // não encostar na jangada
     const bx = s.x - boat.x, bz = s.z - boat.z, bd = Math.hypot(bx, bz);
     const minD = s.boarder && !s.retreat ? 8.5 : 22;
@@ -614,8 +673,14 @@ export class Naval {
       if (Math.random() < dt * 30) this.splash.emit(s.x + (Math.random() - 0.5) * 6, sea.level + 0.2, s.z + (Math.random() - 0.5) * 12, 0, 1.5 + Math.random() * 2, 0, 1, 0.8, 4);
     }
     s.y = y; s.pitch += (pitch - s.pitch) * Math.min(1, 2 * dt); s.roll += (roll - s.roll) * Math.min(1, 2 * dt);
-    s.mesh.position.set(s.x, s.y, s.z);
-    s.mesh.rotation.set(s.pitch, s.yaw, s.roll);
+    // molas do tranco: adernar, arfar e afundar um pouco, voltando com balanço amortecido
+    const sd = Math.min(dt, 1 / 30);
+    s.hrv += (-s.hr * 9 - s.hrv * 2.2) * sd; s.hr += s.hrv * sd;
+    s.hpv += (-s.hpt * 10 - s.hpv * 2.6) * sd; s.hpt += s.hpv * sd;
+    s.dipv += (-s.dip * 14 - s.dipv * 3.5) * sd; s.dip += s.dipv * sd;
+    const k2 = Math.exp(-2.5 * dt); s.push.x *= k2; s.push.z *= k2;
+    s.mesh.position.set(s.x, s.y + s.dip, s.z);
+    s.mesh.rotation.set(s.pitch + clamp(s.hpt, -0.25, 0.25), s.yaw, s.roll + clamp(s.hr, -0.35, 0.35));
     // fogo e fumaça nos pontos atingidos
     s.mesh.updateWorldMatrix(true, false);
     for (const f of s.fires) {
@@ -830,7 +895,8 @@ export class Naval {
       c.barrel.position.z = 0.62 - c.recoil * 0.25;
     }
     if (this.manning) this._updateManning(dt);
-    this.flames.update(dt); this.smoke.update(dt); this.splash.update(dt); this.boom.update(dt);
+    this.flames.update(dt); this.smoke.update(dt); this.splash.update(dt); this.splinters.update(dt); this.boom.update(dt);
+    this._updatePlanks(dt);
   }
 
   _updateManning(dt) {

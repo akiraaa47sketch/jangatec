@@ -18,7 +18,7 @@ import { woodTexture, woodBump, sandTexture, sandBump, grassTexture, thatchTextu
 const M = (color, extra = {}) => new THREE.MeshStandardMaterial({ color, roughness: 0.9, ...extra });
 const WOOD = [0x9b7242, 0x86623a, 0xb08a55, 0x6f5231];
 // Areia em gradiente: molhada/escura perto da água, seca/clara no alto (chave = dr do patamar).
-const SAND = { 7.5: 0x9a8d68, 6: 0xab9c72, 4.5: 0xbcab7c, 3: 0xcdb986, 1.5: 0xd8c48e, 0.5: 0xe0cc96, 0: 0xdcc891 };
+const SAND = { 7.5: 0x9a8d68, 6: 0xab9c72, 4.5: 0xbcab7c, 3: 0xcdb986, 2.2: 0xb3a275, 1.5: 0xd8c48e, 1.1: 0xcdb986, 0.5: 0xe0cc96, 0.4: 0xd8c48e, 0: 0xdcc891 };
 // UVs em escala de mundo: texturas mantêm o mesmo tamanho em qualquer caixa.
 const box = (w, h, l, mat) => new THREE.Mesh(scaleBoxUVs(new THREE.BoxGeometry(w, h, l), w, h, l), mat);
 let SHARED = null; // materiais texturizados compartilhados pelas ilhas

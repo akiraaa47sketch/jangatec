@@ -145,6 +145,14 @@ float vnoise(vec2 p) {
   vec2 i = floor(p), f = fract(p); f = f * f * (3.0 - 2.0 * f);
   return mix(mix(hash(i), hash(i + vec2(1, 0)), f.x), mix(hash(i + vec2(0, 1)), hash(i + vec2(1, 1)), f.x), f.y);
 }
+#ifdef ULTRA
+// gradiente analítico do ruído de valor (para a normal das marolas)
+vec2 nGrad(vec2 p) {
+  vec2 i = floor(p), f = fract(p), u = f * f * (3.0 - 2.0 * f), du = 6.0 * f * (1.0 - f);
+  float a = hash(i), b = hash(i + vec2(1, 0)), c = hash(i + vec2(0, 1)), d = hash(i + vec2(1, 1));
+  return du * vec2(b - a + (a - b - c + d) * u.y, c - a + (a - b - c + d) * u.x);
+}
+#endif
 void main() {
   vec3 toCam = cameraPosition - vWorld;
   float dist = length(toCam);
@@ -158,6 +166,15 @@ void main() {
   // inclinação exagerada só no SOMBREAMENTO (a física usa as ondas reais): dá leitura às ondas
   vec3 N = vec3(vN.x * 2.2, vN.y, vN.z * 2.2);
   N.xz += (r1 * 0.06 + r2 * 0.035) * fade * (0.7 + 0.9 * uStorm);
+#ifdef ULTRA
+  // ULTRA: 4 camadas de ondulação fina (ruído em movimento, direções diferentes) até mais longe
+  float fadeU = 1.0 - smoothstep(30.0, 260.0, dist);
+  vec2 dU = nGrad(q * 0.55 + vec2(uTime * 0.22, uTime * 0.13)) * 0.050
+          + nGrad(q * 1.30 - vec2(uTime * 0.31, -uTime * 0.17)) * 0.034
+          + nGrad(q * 3.10 + vec2(-uTime * 0.45, uTime * 0.38)) * 0.020
+          + nGrad(q * 7.30 + vec2(uTime * 0.70, uTime * 0.55)) * 0.010 * (1.0 - smoothstep(10.0, 60.0, dist));
+  N.xz -= dU * fadeU * (0.85 + 1.1 * uStorm);
+#endif
   N = normalize(N);
 
   // perto das ilhas a água é rasa: mais clara, mais transparente, com espuma na orla
@@ -170,7 +187,11 @@ void main() {
   }
 
   float NdotV = clamp(dot(N, V), 0.0, 1.0);
+#ifdef ULTRA
+  float F = clamp(0.02 + 0.98 * pow(1.0 - NdotV, 5.0), 0.0, 0.93); // Fresnel físico (água: F0 = 0,02)
+#else
   float F = clamp(0.02 + 0.98 * pow(1.0 - NdotV, 5.0), 0.0, 1.0) * 0.85;
+#endif
   vec3 R = reflect(-V, N); R.y = abs(R.y) + 0.02;
   vec3 refl = skyColor(normalize(R));
 
@@ -181,16 +202,32 @@ void main() {
   body *= (0.30 + 0.70 * uLight) * (0.70 + 0.65 * clamp(dot(N, L), 0.0, 1.0));
   float sss = pow(clamp(dot(V, -normalize(L + N * 0.4)), 0.0, 1.0), 3.0) * smoothstep(-0.05, 0.4, hn);
   body += vec3(0.05, 0.34, 0.30) * sss * uSunColor * 0.9;
+#ifdef ULTRA
+  // cavas mais escuras e cristas translúcidas (luz atravessando a água contra o sol)
+  body *= 0.82 + 0.3 * smoothstep(-0.25, 0.35, hn);
+  float thin = pow(clamp(dot(V, -L) * 0.5 + 0.5, 0.0, 1.0), 2.0) * smoothstep(0.0, 0.45, hn);
+  body += vec3(0.04, 0.42, 0.36) * thin * uSunColor * 0.7 * uLight;
+#endif
 
   vec3 col = mix(body, refl, F);
   vec3 H = normalize(L + V); float ns = max(dot(N, H), 0.0);
   col += uSunColor * (pow(ns, 260.0) * 2.6 + pow(ns, 38.0) * 0.10) * (1.0 - uStorm * 0.7);
+#ifdef ULTRA
+  // faíscas do sol: pontinhos brilhando no caminho de luz
+  float glit = step(0.86, vnoise(q * 9.0 + vec2(uTime * 1.7, -uTime * 1.3))) * pow(ns, 70.0);
+  col += uSunColor * glit * 3.5 * (1.0 - uStorm) * (1.0 - smoothstep(20.0, 160.0, dist));
+#endif
 
   // espuma: cristas (mais com tempestade) + orla das ilhas
   float n1 = vnoise(q * 0.9 + vec2(uTime * 0.15, 0.0));
   float n2 = vnoise(q * 3.1 - vec2(0.0, uTime * 0.3));
   float crest = smoothstep(0.30 - uStorm * 0.09, 0.50, hn + (n1 - 0.5) * 0.16);
   float foam = crest * (0.5 + 0.5 * n2) * (1.0 - smoothstep(150.0, 300.0, dist));
+#ifdef ULTRA
+  // espuma em listras (rastro da crista arrastado pelo vento) em vez de manchas
+  float streak = vnoise(vec2(q.x * 0.35 + q.y * 0.9, q.y * 0.35 - q.x * 0.9) * vec2(0.6, 3.2) + vec2(uTime * 0.2, 0.0));
+  foam *= 0.55 + 0.9 * smoothstep(0.45, 0.8, streak);
+#endif
   foam = max(foam * 0.9, shore * (0.6 + 0.4 * n2));
   foam = max(foam, smoothstep(0.25, 0.85, vEv + (n2 - 0.5) * 0.35));
   // redemoinho: água escura e funda no centro + faixas de espuma girando
@@ -252,6 +289,9 @@ export class Ocean {
     const [rings, sectors] = { baixa: [60, 100], media: [90, 150], alta: [110, 180], ultra: [170, 280] }[q] || [110, 180];
     if (this._q === q) return;
     this._q = q;
+    // ULTRA liga o caminho caro do shader (marolas em camadas, Fresnel físico, faíscas, espuma em listras)
+    this.material.defines = q === 'ultra' ? { ULTRA: '' } : {};
+    this.material.needsUpdate = true;
     this.mesh.geometry.dispose();
     this.mesh.geometry = polarGrid(rings, sectors, 0.4, 420);
   }

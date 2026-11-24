@@ -181,9 +181,9 @@ export function generateCrateLoot(seed, id, difficulty, playerCount = 1) {
   }
 
   const wreck = id.startsWith('b');
-  // Canhão improvisado (galão d'água) só aparece longe na rota (região 3+, ~640 m) — e naufrágios
-  // escondem mais. As balas são infinitas (o canhão só tem recarga longa).
-  if (regionIndex >= 2 && random() < (wreck ? 0.3 : 0.14) + (regionIndex - 2) * 0.05) add('canhao', 1);
+  // Canhão improvisado (galão d'água): a partir da região 1 (~850 m), mais comum em naufrágios e
+  // mais longe na rota. As balas são infinitas (o canhão só tem recarga longa).
+  if (regionIndex >= 1 && random() < (wreck ? 0.38 : 0.17) + (regionIndex - 1) * 0.05) add('canhao', 1);
   // Ferramentas: o GANCHO sai principalmente de destroços/naufrágios; BANJO e martelo extra em caixas.
   if (random() < (wreck ? 0.4 : regionIndex >= 1 ? 0.07 : 0)) add('gancho', 1); // torreta-arpão (aparece como peça para soldar)
   if (random() < (wreck ? 0.15 : regionIndex >= 1 ? 0.08 : 0.03)) add('arma_banjo', 1);
