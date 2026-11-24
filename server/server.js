@@ -123,6 +123,8 @@ function leave(ws) {
 }
 
 function handle(ws, m) {
+  // acerto de relógio: devolve a hora do servidor junto com a do cliente (ondas e eventos iguais para todos)
+  if (m.t === 'time') { if (Number.isFinite(m.c)) send(ws, { t: 'time', c: m.c, s: Date.now() }); return; }
   if (m.t === 'list') { send(ws, { t: 'rooms', rooms: roomList(), online: wss.clients.size }); return; }
   if (m.t === 'join') {
     if (ws.room) return;
@@ -171,6 +173,7 @@ function handle(ws, m) {
         sailInstalled: !!state.sailInstalled,
         sailUp: !!state.sailUp,
         anchor: state.anchor,
+        ...(Number.isFinite(state.departAt) ? { departAt: state.departAt } : {}),
       };
       broadcast(room, { t: 'start', state: room.start }, ws);
       break;

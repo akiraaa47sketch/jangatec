@@ -5,6 +5,19 @@
 // Nos textos, **assim** vira negrito.
 export const PATCH_NOTES = [
   {
+    id: '0.16', versao: 'v0.16', data: '24/11/2026', titulo: 'A queda do helicóptero',
+    destaques: [
+      { tag: 'Cutscene', titulo: 'Abertura: o voo 47', texto: 'Toda partida começa num **helicóptero de resgate com todos os jogadores da sala**. Um raio acerta o rotor, ele cai em espiral e vocês despencam na ilha. Você **acorda em 1ª pessoa** ao lado dos destroços. Espaço ou clique pula.' },
+      { tag: 'Mar', titulo: 'Ondas do norte e jangada colada na água', texto: 'As ondas agora **vêm só do norte**, a jangada **acompanha a água sem atraso** e, no multiplayer, todos usam **o relógio do servidor**: as ondas são iguais para todo mundo.' },
+    ],
+    secoes: [
+      { icone: '🚁', nome: 'Ilha inicial', itens: ['**Destroços do helicóptero** na beira da ilha, pegando fogo e soltando fumaça (a cauda caiu na água).'] },
+      { icone: '🌊', nome: 'Mar', itens: ['Ondas **só do norte**, num leque estreito.', 'Perto das ilhas a água é rasa e as ondas **perdem força**.', 'A jangada **sobe e desce junto com a onda** (antes chegava atrasada).', 'Multiplayer: **relógio acertado pelo servidor** e jangada **prevista entre pacotes** (sem trancos nem atraso por ping).'] },
+      { icone: '🌀', nome: 'Ondas gigantes', itens: ['Onda gigante e ondas da tempestade **também vêm do norte**: dá para vê-las chegando pela proa.', 'Frente **mais íngreme** (parede de água) e encosta longa atrás.', 'A jangada **sobe a onda de verdade** em vez de ser engolida e subir depois.'] },
+      { icone: '💧', nome: 'Enchente inicial', itens: ['A água **sobe suave** (sem pular para o nível máximo).', 'O chão da ilha **não some mais de uma vez**: fica visível debaixo da água rasa.', 'Para quem não é host a água **acompanha o host sem degraus**.'] },
+    ],
+  },
+  {
     id: '0.15', versao: 'v0.15', data: '24/11/2026', titulo: 'Novidades e plataformas grandes',
     destaques: [
       { tag: 'Menu', titulo: 'Aba Novidades', texto: 'O menu principal ganhou esta aba com **as notas de todas as atualizações**, da v0.1 até agora. O selo **NOVO** aparece sempre que sai um update.' },
