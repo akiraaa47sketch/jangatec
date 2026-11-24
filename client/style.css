@@ -621,7 +621,19 @@ body.bossfight #msgs { top: 96px; } body.touch.bossfight #msgs { top: 84px; }
 
 /* ---------- aba Novidades (patch notes) ---------- */
 .menu-nav b.news-badge { background: rgba(224, 172, 76, 0.2); color: var(--brass-2); }
-.news-hero { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; margin-bottom: 18px; }
+.news-hero { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; margin-bottom: 14px; }
+.news-patch { margin: 0 0 10px; border-radius: 6px; border: 1px solid rgba(255, 255, 255, 0.1); background: rgba(0, 0, 0, 0.18); }
+.news-patch[open] { border-color: rgba(224, 172, 76, 0.35); }
+.news-patch > summary { display: flex; align-items: baseline; gap: 12px; padding: 13px 16px; cursor: pointer; list-style: none; user-select: none; }
+.news-patch > summary::-webkit-details-marker { display: none; }
+.news-patch > summary::after { content: '▸'; order: 9; margin-left: auto; color: var(--brass); transition: transform 0.15s; }
+.news-patch[open] > summary::after { transform: rotate(90deg); }
+.news-patch > summary:hover .news-title { color: var(--brass-2); }
+.news-patch > .news-hero, .news-patch > .news-grid { margin: 0 14px 14px; }
+.news-ver { font: 800 12px var(--ui); letter-spacing: 0.12em; color: var(--brass); min-width: 46px; }
+.news-title { font: 400 21px/1.1 var(--display); color: var(--ink); }
+.news-date { font-size: 12px; color: var(--ink-dim); }
+.news-now { padding: 2px 7px; border-radius: 3px; background: rgba(98, 238, 145, 0.16); color: var(--green); font: 800 10px var(--ui); letter-spacing: 0.12em; text-transform: uppercase; }
 .news-big { position: relative; padding: 18px 20px; border-radius: 6px; border: 1px solid rgba(224, 172, 76, 0.45);
   background: linear-gradient(160deg, rgba(224, 172, 76, 0.16), rgba(10, 30, 43, 0.6)); }
 .news-big h3 { font: 400 26px/1.05 var(--display) !important; letter-spacing: 0.01em !important; text-transform: none !important; color: var(--brass-2) !important; margin: 8px 0 8px !important; }
@@ -635,4 +647,4 @@ body.bossfight #msgs { top: 96px; } body.touch.bossfight #msgs { top: 84px; }
 .news-grid li { margin: 3px 0; }
 .news-grid li b { color: var(--ink); font-weight: 800; }
 @media (max-width: 1100px) { .news-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
-@media (max-width: 760px) { .news-hero, .news-grid { grid-template-columns: 1fr; } .news-big h3 { font-size: 22px !important; } }
+@media (max-width: 760px) { .news-hero, .news-grid { grid-template-columns: 1fr; } .news-big h3 { font-size: 22px !important; } .news-patch > summary { flex-wrap: wrap; gap: 4px 10px; } .news-title { font-size: 18px; } .news-date { order: 3; } }

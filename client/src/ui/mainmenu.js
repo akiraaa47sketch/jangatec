@@ -2,13 +2,13 @@
 // Opções (gráficos e chat de voz) · Controles. O fundo é a cena 3D da jangada girando.
 import { Net } from '../net/net.js';
 import { DEFAULT_SERVER } from '../config.js';
+import { renderPatchNotes, NEWS_VERSION } from './patchnotes.js';
 
 const $ = (id) => document.getElementById(id);
 const esc = (t) => String(t).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const PHASE = { build: 'montando a jangada', install: 'instalando a vela', calm: 'calmaria', storm: 'tempestade chegando', flood: 'inundação', board: 'embarcando', depart: 'navegando' };
 const NAME_KEY = 'jangatec-nome', SERVER_KEY = 'jangatec-servidor';
-// troque a versão a cada patch novo: o selo "NOVO" volta a aparecer na aba Novidades
-const NEWS_VERSION = '2026-11-espiral-sos', NEWS_KEY = 'jangatec-novidades-vistas';
+const NEWS_KEY = 'jangatec-novidades-vistas'; // selo "NOVO" some depois de abrir a versão atual (ui/patchnotes.js)
 
 export class MainMenu {
   // actions: { solo(seed), multi(welcome), bench() }
@@ -48,7 +48,8 @@ export class MainMenu {
     $('btnGfx').onclick = () => G.gfxMenu.toggle(true);
     $('btnHelp').onclick = () => { $('help').hidden = false; };
     this.bindVoice();
-    // selo "NOVO" na aba Novidades até o jogador abrir a aba desta versão
+    // notas de atualização + selo "NOVO" na aba Novidades até o jogador abrir a aba desta versão
+    renderPatchNotes($('patchNotes'));
     let seen = null; try { seen = localStorage.getItem(NEWS_KEY); } catch { /* ok */ }
     $('newsBadge').hidden = seen === NEWS_VERSION;
   }
