@@ -1,12 +1,11 @@
 // Eventos aleatórios em alto-mar (só depois da partida):
 //   • Onda gigante (tsunami): uma frente de água atravessa o mar. Baixe a vela e segure-se
 //     perto do mastro; com a vela cheia a jangada é arremessada e todos se machucam.
-//   • Furacão: o mar se abre num REDEMOINHO gigante ao lado da rota que gira e vai sugando a
-//     jangada aos poucos. Levante a vela e gire-a para o lado OPOSTO ao redemoinho para escapar.
+//   • Redemoinho (id 'furacao' na rede, por compatibilidade): o mar se abre num REDEMOINHO gigante ao
+//     lado da rota que gira e vai sugando a jangada aos poucos. Levante a vela e gire-a para o lado
+//     OPOSTO ao redemoinho para escapar. Sem vento: ninguém é empurrado nem arremessado da jangada.
 //   • Tempestade forte: céu fecha, raios e uma SÉRIE de ondas gigantes vindas de lados diferentes que
 //     chacoalham a jangada (segure no mastro!).
-//   • No furacão o vento/giro EMPURRA quem está a bordo para fora: ande em direção ao redemoinho ou
-//     você escorrega e cai da jangada.
 // Nada é anunciado: os eventos são raros, chegam do nada e cada um sai um pouco diferente.
 // O host sorteia e anuncia o evento pela rede; todos os clientes derivam o estado do mesmo
 // relógio comum (clock), então ondas e funil aparecem iguais para todos. Só o host move o barco.
@@ -20,8 +19,8 @@ import { SOS } from './sos.js';
 import { WORLD_LOOT_PARAMS } from './loot.js';
 
 export const EVENT_BALANCE = {
-  first: [45, 90],           // s depois da partida até o primeiro evento (cai no 1º mar cheio)
-  interval: [180, 320],      // s entre o fim de um evento e o próximo
+  first: [30, 60],           // s depois da partida até o primeiro evento (cai no 1º mar cheio)
+  interval: [100, 190],      // s entre o fim de um evento e o próximo (mar agitado: mais eventos)
   tsunami: { speed: [13, 18], startDist: 235, A: [3.6, 5.6], sigma: [9, 13], damage: 22, knock: 8.5 },
   // R = raio do redemoinho, depth = fundura do funil d'água, pull = puxão (m/s), swirl = giro (m/s)
   tempestade: { dur: [75, 100], waves: [5, 8], A: [2.6, 4.3], speed: [12, 16], sigma: [7, 10], start: 120, knock: 6 },
@@ -109,6 +108,7 @@ export class Events {
   stormBoost(t) {
     const e = this.current;
     if (!e) return 0;
+    if (e.kind === 'furacao') return 0.25 * smooth((t - e.t0) / 10) * (1 - smooth((t - e.t0 - e.dur + 8) / 8)); // redemoinho: céu só um pouco fechado
     const u = t - e.t0, inK = smooth(u / 10), outK = 1 - smooth((u - e.dur + 8) / 8);
     const k = { tsunami: 0.7, kraken: 0.55, tubaroes: 0.15, peixes: 0, raios: 1, fantasma: 0.6, sos: 0 }[e.kind] ?? 1;
     return k * inK * outK;
@@ -134,7 +134,7 @@ export class Events {
     const tide = G.startup.tide.state; // só com o mar cheio e longe da próxima seca
     if (G.startup.waterLevel < 0.5 || (tide && (tide.phase.id === 'seco' || tide.nextIn < 50))) { this.timer = 15; return; }
     // quase nunca repete o mesmo tipo em seguida; às vezes o mar simplesmente fica quieto
-    if (Math.random() < 0.18) { this.timer = between([90, 200]); return; }
+    if (Math.random() < 0.08) { this.timer = between([50, 110]); return; }
     // chefes do mar (kraken, navio-fantasma) só do meio da rota em diante
     const prog = Math.min(1, Math.hypot(G.boat.x, G.boat.z) / (4 * WORLD_LOOT_PARAMS.diffStep));
     // SOS da plataforma de petróleo: só no fim da jornada, uma de cada vez (e no máximo 2 por partida)
@@ -275,7 +275,7 @@ export class Events {
     }
     // relâmpagos durante o furacão
     if (this.flash > 0) this.flash = Math.max(0, this.flash - dt * 3);
-    if (e && e.kind === 'furacao' && Math.random() < dt * 0.35 * this.stormBoost(t)) {
+    if (false && e && e.kind === 'furacao') { // redemoinho não tem mais raios (era o furacão)
       this.flash = 1;
       G.hud.flash('lightning');
       sfx.thunder(0.3 + Math.random() * 1.5, Math.random() * 0.7);
@@ -430,20 +430,9 @@ export class Events {
       this._hurricaneSucked(e, dx / d, dz / d);
     }
     if (G.player.aboard && !this.sucked) this.shake = Math.max(this.shake, 0.22 * k * reach * (1.2 - q * 0.6));
-    // força do giro: quem está a bordo é empurrado para FORA (para longe do centro). Ande em direção
-    // ao redemoinho para ficar na jangada; segurar no mastro ajuda. Na água, o redemoinho te puxa.
-    const pl = G.player, pp = pl.body.pos, pdx = cx - pp.x, pdz = cz - pp.z, pd = Math.hypot(pdx, pdz) || 1;
-    if (!this.sucked && !pl.dead && k * reach > 0.05) {
-      if (pl.aboard) {
-        const hold = this._holdingMast() ? 0.45 : 1;
-        const push = B.push * k * reach * grow * hold;
-        pl.drift = { x: -pdx / pd * push - pdz / pd * spin * push * 0.35, z: -pdz / pd * push + pdx / pd * spin * push * 0.35 };
-        if (!this.pushWarned && push > 1) { this.pushWarned = true; G.hud.msg('O vento do redemoinho está te jogando para fora — ande contra ele (na direção do redemoinho) para se firmar!'); }
-      } else if (pl.swimming) {
-        const pull = 1.6 * k * clamp(1.3 - pd / R, 0, 1);
-        pl.drift = { x: pdx / pd * pull - pdz / pd * spin * pull, z: pdz / pd * pull + pdx / pd * spin * pull };
-      } else pl.drift = null;
-    } else pl.drift = null;
+    // REDEMOINHO (sem furacão): só a água puxa e gira a jangada; quem está a bordo vai junto com ela
+    // (sem vento empurrando o personagem) e quem está nadando não é sugado.
+    G.player.drift = null;
     if (G.gfx && G.player.aboard && k * reach > 0.5 && Math.random() < dt * 0.4) G.gfx.wetLens(0.55); // spray do redemoinho
   }
 
@@ -452,18 +441,16 @@ export class Events {
     this.shake = 1.2;
     if (this._isHost()) {
       // gira em volta do olho e é cuspido para o lado oposto
-      boat.fling = { vx: -ux * 15, vz: -uz * 15, t: 2.8, T: 2.8 };
-      boat.spin = { rate: 3.2, t: 2.2 };
+      boat.fling = { vx: -ux * 12, vz: -uz * 12, t: 2.4, T: 2.4 };
+      boat.spin = { rate: 1.6, t: 1.8 };
       boat.setSail(false, 0);
       e.dur = Math.min(e.dur, clock() - e.t0 + 9);
       if (G.net.online) G.net.send({ t: 'event', e });
     }
     if (player.dead) return;
-    if (player.aboard) {
-      G.survival.damage(B.damage, 'Furacão');
-      if (!this._holdingMast()) { b.vel.x += -uz * 7; b.vel.z += ux * 7; b.vel.y = 7; b.grounded = false; }
-    } else if (player.swimming) G.survival.damage(B.damage * 0.6, 'Furacão');
-    G.hud.msg('O furacão sugou a jangada!');
+    void b; // ninguém é arremessado: a jangada gira e é cuspida, com todo mundo a bordo
+    if (player.aboard) G.survival.damage(B.damage * 0.5, 'Redemoinho');
+    G.hud.msg('O redemoinho engoliu a jangada e cuspiu de volta!');
   }
 
   // ---------- visuais ----------
@@ -518,8 +505,9 @@ export class Events {
 
   _updateFunnel(cx, cz, k, dt, t, R = 70, spin = 1) {
     const V = this.visuals;
-    V.funnel.visible = V.spray.visible = V.debris.visible = k > 0.01;
-    if (!V.funnel.visible) return;
+    V.spray.visible = V.debris.visible = k > 0.01;
+    if (!V.spray.visible) { V.funnel.visible = false; return; }
+    V.funnel.visible = false; // sem tornado/nuvem: só o redemoinho na água (espuma e destroços girando)
     V.funnel.position.set(cx, sea.level - sea.vortex.depth * 1.5, cz);
     // o funil se inclina e serpenteia um pouco
     V.funnel.rotation.z = Math.sin(t * 0.21) * 0.07;

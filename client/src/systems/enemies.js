@@ -404,6 +404,13 @@ export class Enemies {
       e.cd = 0.6 + i * 0.4;
     }
   }
+  _defendDeck(e) {
+    const s = e.ship;
+    e.pirate = false; e.walker = false; e.onDeckOf = s; e.isl = s.deckIsl; e.zone = s.deckZone;
+    if (!s.deckIsl.enemies.includes(e)) s.deckIsl.enemies.push(e);
+    e.state = 'chase'; e.timer = 0; e.cd = 0.4 + Math.random() * 0.6; e.m = { state: 'idle', t: 0 };
+    e.body.vel.set(0, 0, 0); e.body.grounded = false;
+  }
   _placeOnShip(e) {
     const s = e.ship, [ox, oz] = rot(0, e.deckZ, s.yaw);
     e.body.pos.set(s.x + ox, s.y + SHIP.deck + 0.1, s.z + oz);
@@ -772,6 +779,8 @@ export class Enemies {
     if (e.state === 'onShip') { // no navio esperando a vez de pular
       if (!e.ship || e.ship.sinkT > 0) { this.damage(e, 9999); return; }
       if (e.ship.stranded) { this.toLand(e, e.ship.x + Math.sin(e.ship.yaw + Math.PI / 2) * 4, e.ship.z + Math.cos(e.ship.yaw + Math.PI / 2) * 4); return; } // navio encalhado: desce e vai a pé
+      // invadiram o navio: a tripulação larga a abordagem e defende o convés
+      if (this.P.some((T) => !T.dead && this.G.naval.onShip(e.ship, T.pos))) { this._defendDeck(e); return; }
       this._placeOnShip(e);
       e.yaw = lerpAngle(e.yaw, Math.atan2(boat.x - p.x, boat.z - p.z), Math.min(1, 6 * dt));
       e.mesh.rotation.y = e.yaw;

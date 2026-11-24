@@ -471,10 +471,121 @@ export class Naval {
       });
     }
     drawShipHp(s.data, s.hp / s.max);
+    this._buildShipBody(s);
     this.ships.set(s.id, s);
     return s;
   }
+  // Corpo sólido do navio (todos os clientes): casco, convés andável, castelo de popa, amuradas com
+  // vão no meio, mastros, escadas de corda nos costados e a prancha de abordagem (ligada pelo host).
+  // É um conjunto de colisores que acompanha o navio (como a jangada): quem está em cima vai junto.
+  _buildShipBody(s) {
+    const { L, W, deck, keel } = SHIP, hw = W / 2;
+    const box = (x, y, z, hx, hy, hz) => ({ type: 'box', x, y, z, hx, hy, hz, yaw: 0 });
+    const items = [
+      box(0, (deck + keel) / 2, -1.5, hw * 0.93, (deck - keel) / 2, 7.5),         // casco/convés
+      box(0, (deck + keel) / 2, 7, hw * 0.45, (deck - keel) / 2, 1.6),            // proa
+      box(0, deck + 0.9, -L / 2 + 2.2, W * 0.45, 0.9, 2.2),                       // castelo de popa
+      { type: 'cyl', x: 0, y: deck + 6, z: 2.6, hx: 0.28, hy: 6, hz: 0.28 },
+      { type: 'cyl', x: 0, y: deck + 5, z: -3.6, hx: 0.28, hy: 5, hz: 0.28 },
+    ];
+    for (const sd of [-1, 1]) { // amuradas (vão de z -2,2 a 2,2 para a prancha e as escadas)
+      items.push(box(sd * (hw - 0.12), deck + 0.36, -4.6, 0.09, 0.36, 2.4));
+      items.push(box(sd * (hw - 0.12), deck + 0.36, 4.1, 0.09, 0.36, 1.9));
+    }
+    s.plankItem = { type: 'ramp', x: 0, y: deck - 1.1, z: 0, hx: 0.6, hy: 1.1, hz: 1.7, yaw: 0, noLos: true };
+    s.set = { x: s.x, z: s.z, y: s.y, yaw: s.yaw, radius: 11, items, ship: s };
+    this.G.colliders.addSet(s.set);
+    // escadas de corda (uma em cada costado) — sobem até da água
+    s.ladders = [-1, 1].map((sd) => ({ sd, x: sd * (shipHalfWidth(1.6) + 0.32), z: 1.6 }));
+    const rope = new THREE.MeshStandardMaterial({ color: 0x8a6e45, roughness: 1 });
+    for (const L2 of s.ladders) {
+      const g = new THREE.Group(), h = deck - keel + 0.6;
+      for (const dz of [-0.24, 0.24]) { const r = new THREE.Mesh(new THREE.CylinderGeometry(0.025, 0.025, h, 5), rope); r.position.set(0, 0, dz); g.add(r); }
+      for (let y = -h / 2 + 0.2; y < h / 2; y += 0.36) { const st = new THREE.Mesh(new THREE.CylinderGeometry(0.03, 0.03, 0.5, 5), rope); st.rotation.x = Math.PI / 2; st.position.y = y; g.add(st); }
+      g.position.set(L2.x, keel + h / 2 - 0.3, L2.z); s.mesh.add(g);
+    }
+    // prancha (aparece quando o navio de abordagem encosta de lado)
+    const plank = new THREE.Mesh(new THREE.BoxGeometry(3.5, 0.1, 1.15), new THREE.MeshStandardMaterial({ color: 0x6b4b2c, roughness: 0.95 }));
+    plank.visible = false; s.mesh.add(plank); s.plankMesh = plank; s.plank = 0;
+    // "ilha" do convés para a tripulação lutar quando alguém invade o navio
+    s.deckIsl = { id: `${s.id}-deck`, x: s.x, z: s.z, R: 9.6, rooms: [], enemies: [], minY: s.y - 4, set: s.set, diff: s.diff || 0 };
+    s.deckZone = { x: s.x, z: s.z, yaw: s.yaw, hw: hw - 0.55, hd: L / 2 - 1.3 };
+    s.prev = null;
+  }
+  _setPlank(s, sd) {
+    if (s.plank === sd) return;
+    s.plank = sd;
+    const items = s.set.items, i = items.indexOf(s.plankItem);
+    if (!sd) { if (i >= 0) items.splice(i, 1); s.plankMesh.visible = false; return; }
+    const ox = sd * (shipHalfWidth(0) + 1.7);
+    Object.assign(s.plankItem, { x: ox, yaw: -sd * Math.PI / 2 }); // sobe para dentro do navio
+    if (i < 0) items.push(s.plankItem);
+    s.plankMesh.position.set(ox, SHIP.deck - 1.1, 0); s.plankMesh.rotation.set(0, 0, -sd * Math.atan2(2.2, 3.4)); s.plankMesh.visible = true;
+  }
+  // alguém (posição) está em cima deste navio?
+  onShip(s, pos) {
+    const [lx, lz] = rot(pos.x - s.x, pos.z - s.z, -s.yaw);
+    return Math.abs(lz) < SHIP.L / 2 && Math.abs(lx) < shipHalfWidth(clamp(lz, -SHIP.L / 2, SHIP.L / 2)) + 0.3 && pos.y > s.y + SHIP.deck - 0.8;
+  }
+  // escada de corda mais perto (para o jogador subir — também nadando)
+  ladderAt(p) {
+    for (const s of this.ships.values()) {
+      if (s.sinkT > 0 || Math.abs(p.x - s.x) > 14 || Math.abs(p.z - s.z) > 14) continue;
+      const [lx, lz] = rot(p.x - s.x, p.z - s.z, -s.yaw);
+      for (const L2 of s.ladders) {
+        if (Math.abs(lx - L2.x) > 0.6 || Math.abs(lz - L2.z) > 0.65) continue;
+        const top = s.y + SHIP.deck + 0.05;
+        if (p.y < s.y + SHIP.keel - 1.6 || p.y > top + 0.1) continue;
+        const [fx, fz] = rot(-L2.sd, 0, s.yaw);
+        return { top, fx, fz, ship: s };
+      }
+    }
+    return null;
+  }
+  // Move quem está em cima do navio (ou na escada dele) junto com o casco.
+  _carryOnShip(s) {
+    const G = this.G, pv = s.prev, now = { x: s.x, y: s.set.y, z: s.z, yaw: s.yaw };
+    s.prev = now;
+    if (!pv) return;
+    const dyaw = now.yaw - pv.yaw, dy = now.y - pv.y;
+    if (Math.abs(now.x - pv.x) + Math.abs(now.z - pv.z) + Math.abs(dyaw) + Math.abs(dy) < 1e-6) return;
+    const move = (pos) => {
+      const [rx, rz] = rot(pos.x - pv.x, pos.z - pv.z, dyaw);
+      pos.x = now.x + rx; pos.z = now.z + rz; pos.y += dy;
+    };
+    const pl = G.player;
+    if (pl.body.carrier === s.set || pl.body.groundSet === s.set || (pl.onLadder && pl.ladderShip === s)) { move(pl.body.pos); pl.yaw += dyaw; pl.camYaw += dyaw; }
+    for (const e of G.enemies.list) if (!e.replica && e.state !== 'dead' && (e.body.groundSet === s.set || e.onDeckOf === s)) { move(e.body.pos); e.yaw += dyaw; }
+  }
+  // Colisão do navio (host): com a jangada (o navio é que desvia), com outros navios e com ilhas.
+  _collideShip(s) {
+    const G = this.G, boat = G.boat, rR = Math.max(3, boat.set.radius * 0.88);
+    const [lx, lz] = rot(boat.x - s.x, boat.z - s.z, -s.yaw);
+    const hz = SHIP.L / 2, hw = Math.max(1.2, shipHalfWidth(clamp(lz, -hz, hz)));
+    const cx = clamp(lx, -hw, hw), cz = clamp(lz, -hz, hz);
+    let ex = lx - cx, ez = lz - cz, d = Math.hypot(ex, ez), pen;
+    if (d < 1e-4) { ex = Math.sign(lx) || 1; ez = 0; d = 1; pen = rR + 0.6 + (hw - Math.abs(lx)); } // centro dentro do casco
+    else pen = rR + 0.6 - d;
+    if (pen > 0) {
+      const [wx, wz] = rot(ex / d, ez / d, s.yaw); // da quilha para a jangada
+      s.x -= wx * pen * 0.85; s.z -= wz * pen * 0.85; s.speed *= 0.6;
+      boat.x += wx * pen * 0.15; boat.z += wz * pen * 0.15; // um tranco leve na jangada
+      if (pen > 0.4 && !s.bumpT) { s.bumpT = 1.5; this.G.events.shake = Math.max(this.G.events.shake, 0.35); sfx.kick(new THREE.Vector3(boat.x, boat.set.y, boat.z)); }
+    }
+    if (s.bumpT) s.bumpT = Math.max(0, s.bumpT - 1 / 60);
+    for (const o of this.ships.values()) { // navio com navio
+      if (o === s || o.sinkT > 0) continue;
+      const dx = s.x - o.x, dz = s.z - o.z, dd = Math.hypot(dx, dz) || 1;
+      if (dd < 9) { s.x += dx / dd * (9 - dd) * 0.5; s.z += dz / dd * (9 - dd) * 0.5; }
+    }
+    for (const isl of G.world.islands) { // ilhas e estruturas: contorna
+      const r = (isl.R || 15) + 9, dx = s.x - isl.x, dz = s.z - isl.z, dd = Math.hypot(dx, dz) || 1;
+      if (dd < r) { s.x += dx / dd * (r - dd); s.z += dz / dd * (r - dd); s.speed *= 0.9; }
+    }
+  }
   _removeShip(s) {
+    this.G.colliders.removeSet(s.set);
+    for (const e of this.G.enemies.list) if (e.onDeckOf === s && e.state !== 'dead') this.G.enemies.damage(e, 99999);
     this.G.scene.remove(s.mesh);
     s.mesh.traverse((o) => { if (o.isMesh) o.geometry.dispose(); });
     this.ships.delete(s.id);
@@ -574,7 +685,7 @@ export class Naval {
     const r = (x) => Math.round(x * 10) / 10;
     this.G.net.send({
       t: 'naval', k: 'ships', on: this.active ? 1 : 0,
-      s: [...this.ships.values()].map((s) => ({ id: s.id, x: r(s.x), z: r(s.z), yaw: Math.round(s.yaw * 100) / 100, hp: Math.round(s.hp), max: Math.round(s.max), sink: r(s.sinkT), side: s.side, R: r(s.R), diff: s.diff, b: s.boarder ? 1 : 0, g: s.ghost ? 1 : 0 })),
+      s: [...this.ships.values()].map((s) => ({ id: s.id, x: r(s.x), z: r(s.z), yaw: Math.round(s.yaw * 100) / 100, hp: Math.round(s.hp), max: Math.round(s.max), sink: r(s.sinkT), side: s.side, R: r(s.R), diff: s.diff, b: s.boarder ? 1 : 0, g: s.ghost ? 1 : 0, pk: s.plank || 0 })),
     });
   }
 
@@ -591,6 +702,8 @@ export class Naval {
     } else if (!dry && s.stranded && sea.level > G.world.seabedHeight(s.x, s.z) + 1.2) s.stranded = false; // água voltou: desencalha
     if (s.stranded) return;
     let tx, tz;
+    // abordagem: encosta DE LADO, com o casco a ~2 m da borda da jangada (não passa por cima dela)
+    if (s.boarder) s.R = Math.max(3, boat.set.radius * 0.88) + SHIP.W / 2 + 2.2;
     if (s.retreat) { tx = s.x + Math.sin(s.yaw) * 100; tz = s.z + Math.cos(s.yaw) * 100; }
     else {
       const along = s.boarder ? 0 : Math.sin(this.t * 0.045 + s.phase) * 18; // abordagem: vem direto para o costado
@@ -608,14 +721,20 @@ export class Naval {
     if (s.evadeT > 0) { s.evadeT -= dt; steer += Math.sin(this.t * 2.2 + s.phase) * 0.7; } // desvia em zigue-zague
     s.yaw = lerpAngle(s.yaw, steer, Math.min(1, (s.evadeT > 0 ? 0.6 : 0.32) * dt));
     const crippled = 1 - 0.35 * (1 - s.hp / s.max); // casco furado: mais lento
-    const want = (s.retreat ? 7 : clamp(boat.speed + d * (s.boarder ? 0.14 : 0.09), 1.2, boat.speed + (s.boarder ? 7 : 5)) + (s.evadeT > 0 ? 2 : 0)) * crippled;
+    // perto do ponto o navio acompanha a velocidade da jangada (nada de investir em cima dela)
+    const want = (s.retreat ? 7 : clamp(boat.speed + d * (s.boarder ? 0.1 : 0.09), 1.2, boat.speed + (s.boarder ? (d > 25 ? 4 : 1.5) : 5)) + (s.evadeT > 0 ? 2 : 0)) * crippled;
     s.speed += (want - s.speed) * Math.min(1, 0.4 * dt);
     s.x += Math.sin(s.yaw) * s.speed * dt; s.z += Math.cos(s.yaw) * s.speed * dt;
     s.x += s.push.x * dt; s.z += s.push.z * dt; // tranco do tiro (some em ~1 s)
-    // não encostar na jangada
-    const bx = s.x - boat.x, bz = s.z - boat.z, bd = Math.hypot(bx, bz);
-    const minD = s.boarder && !s.retreat ? 8.5 : 22;
-    if (bd < minD) { s.x += (bx / bd) * (minD - bd) * 0.5 * dt * 4; s.z += (bz / bd) * (minD - bd) * 0.5 * dt * 4; }
+    // colisão de verdade com a jangada, outros navios e ilhas; os de canhão ainda ficam longe
+    const bx = s.x - boat.x, bz = s.z - boat.z, bd = Math.hypot(bx, bz) || 1;
+    if (!s.boarder && bd < 22) { s.x += (bx / bd) * (22 - bd) * 0.5 * dt * 4; s.z += (bz / bd) * (22 - bd) * 0.5 * dt * 4; }
+    this._collideShip(s);
+    // prancha de abordagem: só encostado de lado e alinhado com a jangada
+    if (s.boarder && !s.retreat) {
+      const [plx] = rot(boat.x - s.x, boat.z - s.z, -s.yaw), aligned = Math.abs(Math.atan2(Math.sin(s.yaw - boat.yaw), Math.cos(s.yaw - boat.yaw))) < 0.4;
+      this._setPlank(s, d < (s.plank ? 6 : 3.5) && aligned ? Math.sign(plx) || 1 : 0);
+    } else this._setPlank(s, 0);
     // tiro
     s.fireCd -= dt;
     if (!s.retreat && s.fireCd <= 0 && bd < NAVAL.ship.range && G.startup.departed && !(s.boarder && bd < 26)) { // abordagem: para de atirar ao encostar
@@ -680,6 +799,11 @@ export class Naval {
     s.dipv += (-s.dip * 14 - s.dipv * 3.5) * sd; s.dip += s.dipv * sd;
     const k2 = Math.exp(-2.5 * dt); s.push.x *= k2; s.push.z *= k2;
     s.mesh.position.set(s.x, s.y + s.dip, s.z);
+    Object.assign(s.set, { x: s.x, z: s.z, y: s.y + s.dip, yaw: s.yaw });
+    Object.assign(s.deckIsl, { x: s.x, z: s.z, minY: s.y - 4 });
+    Object.assign(s.deckZone, { x: s.x, z: s.z, yaw: s.yaw });
+    this._carryOnShip(s);
+    if (s.sinkT > 3 && this._isHost()) for (const e of this.G.enemies.list) if (e.onDeckOf === s && e.state !== 'dead') this.G.enemies.damage(e, 99999);
     s.mesh.rotation.set(s.pitch + clamp(s.hpt, -0.25, 0.25), s.yaw, s.roll + clamp(s.hr, -0.35, 0.35));
     // fogo e fumaça nos pontos atingidos
     s.mesh.updateWorldMatrix(true, false);
@@ -831,7 +955,7 @@ export class Naval {
           if (!s) s = this._spawnShip(st);
           s.net = { x: st.x, z: st.z, yaw: st.yaw };
           if (st.hp < s.hp) this._shipHitFx(s, null);
-          s.hp = st.hp; s.max = st.max; s.side = st.side;
+          s.hp = st.hp; s.max = st.max; s.side = st.side; this._setPlank(s, st.pk || 0);
           if (st.sink > 0 && s.sinkT <= 0) s.sinkT = st.sink;
           drawShipHp(s.data, s.hp / s.max);
         }

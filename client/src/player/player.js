@@ -210,8 +210,9 @@ export class Player {
     const prevY = p.y;
     const wh = waveHeight(p.x, p.z, t);
     // escada de mão soldada na jangada: frente sobe, trás desce, solta = fica parado agarrado
-    const lad = !this.swimming && !this.downed && !this.mantle ? this.ladderAt(p) : null;
-    this.onLadder = !!lad;
+    // escadas: de ilha/jangada só fora d'água; a escada de corda do navio pirata dá para pegar nadando
+    const lad = this.downed || this.mantle ? null : (!this.swimming && this.ladderAt(p)) || (G.naval && G.naval.ladderAt(p)) || null;
+    this.onLadder = !!lad; this.ladderShip = lad && lad.ship || null;
     if (lad) {
       const climb = (inp.held('forward') ? 1 : 0) - (inp.held('back') ? 1 : 0);
       b.vel.y = climb * 2.6; p.y += b.vel.y * dt;

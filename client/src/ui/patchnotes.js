@@ -5,6 +5,18 @@
 // Nos textos, **assim** vira negrito.
 export const PATCH_NOTES = [
   {
+    id: '0.16', versao: 'v0.16', data: '24/11/2026', titulo: 'Abordagem de verdade',
+    destaques: [
+      { tag: 'Batalha naval', titulo: 'Navio pirata sólido e invadível', texto: 'O navio pirata agora tem **colisão de verdade**: dá para andar no convés, subir pelas **escadas de corda** (até nadando) e o navio te leva junto. O de abordagem **encosta de lado e baixa uma prancha** em vez de atravessar a jangada. Invadiu? A **tripulação larga a abordagem e defende o convés**.' },
+      { tag: 'Eventos', titulo: 'Mar mais agitado, sem furacão', texto: 'Os **eventos aleatórios aparecem bem mais vezes**. O furacão saiu: ficou só o **redemoinho na água**, que puxa a jangada mas **não empurra nem arremessa você**.' },
+    ],
+    secoes: [
+      { icone: '⚓', nome: 'Navio pirata', itens: ['Casco, convés, castelo, mastros e amuradas **com colisão**.', '**Escadas de corda** nos dois costados.', 'Quem está no convés **vai junto** com o navio.', 'Colide com a **jangada**, com **ilhas** e com **outros navios**.', 'Abordagem: encosta **de lado, com folga**, e baixa a **prancha**.', 'Continua **destrutível**: afunda e leva quem estiver em cima.'] },
+      { icone: '🌊', nome: 'Eventos', itens: ['Primeiro evento em **30–60 s**; depois a cada **~2–3 min**.', '**Furacão virou redemoinho**: sem vento, sem tornado, sem raios.', 'Ser engolido pelo redemoinho só gira e cospe a jangada (ninguém voa).'] },
+      { icone: '💣', nome: 'Canhão', itens: ['Aparece **desde o começo**: ~13% das caixas, ~40% dos naufrágios e às vezes **enterrado na seca**.'] },
+    ],
+  },
+  {
     id: '0.15', versao: 'v0.15', data: '24/11/2026', titulo: 'Novidades e plataformas grandes',
     destaques: [
       { tag: 'Menu', titulo: 'Aba Novidades', texto: 'O menu principal ganhou esta aba com **as notas de todas as atualizações**, da v0.1 até agora. O selo **NOVO** aparece sempre que sai um update.' },
