@@ -111,7 +111,7 @@ function sleeve(side, mat, { length = 'long', rad = 0.07, cuff = null, cuffRad =
 
 // ---------- roupas ----------
 // Retorna { body: Group (no corpo), sleeves: { R, L } (nos ombros) } ou null.
-export function makeOutfit(id, color) {
+export function makeOutfit(id, color, tint = false) { // tint: inimigos — até o colete usa a cor dada (vira colete tático)
   const body = new THREE.Group(), sl = {};
   const both = (fn) => { sl.R = fn(-1); sl.L = fn(1); };
   if (id === 'casaco') {
@@ -156,7 +156,7 @@ export function makeOutfit(id, color) {
     }
     both((s) => { const g = sleeve(s, main, { cuffRad: 0.11, cuff: main }); const trim = new THREE.Mesh(new THREE.TorusGeometry(0.11, 0.012, 6, 20), gold); const c = g.children.at(-1); trim.position.copy(c.position); trim.quaternion.copy(c.quaternion).multiply(new THREE.Quaternion().setFromAxisAngle(V3(1, 0, 0), Math.PI / 2)); g.add(trim); return g; });
   } else if (id === 'colete') {
-    const orange = new THREE.MeshStandardMaterial({ color: 0xf26a1b, roughness: 0.6, map: quilt(), side: THREE.DoubleSide }), gap = 0.32;
+    const orange = new THREE.MeshStandardMaterial({ color: tint ? color : 0xf26a1b, roughness: 0.6, map: quilt(), side: THREE.DoubleSide }), gap = 0.32;
     const pts = shellProfile(0.07, -0.55);
     body.add(shell(pts, orange, gap));
     for (const s of [1, -1]) body.add(edgeTube(pts, s * gap / 2, 0.035, orange));

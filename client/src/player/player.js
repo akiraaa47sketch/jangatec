@@ -245,6 +245,7 @@ export class Player {
     if (b.grounded) {
       this.swimming = false;
       b.carrier = b.groundSet;
+      if (!this.wasGroundedPrev && b.landVel < -7 && G.vfx) G.vfx.dust(p, Math.min(18, Math.round(-b.landVel)), 0xcbbf9e, 2 + (-b.landVel) * 0.12); // poeira da aterrissagem
       if (!this.wasGroundedPrev && b.landVel < -4) { this.squash = Math.min(1, (-b.landVel - 3) / 10); sfx.land(Math.min(1, (-b.landVel - 4) / 10)); } // amassa ao cair
       if (b.landVel < -13) G.survival.damage((-b.landVel - 13) * 5, 'Queda');
     } else if (!this.swimming && p.y < wh - 1.0) {

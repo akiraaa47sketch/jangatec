@@ -39,6 +39,7 @@ import { EnemyNet } from './systems/enemynet.js';
 import { Bosses } from './systems/bosses.js';
 import { BossSkills } from './systems/bossskills.js';
 import { SeaEvents } from './systems/seaevents.js';
+import { VFX } from './core/vfx.js';
 import { Sos } from './systems/sos.js';
 import { Endgame } from './systems/endgame.js';
 import { Inventory } from './ui/inventory.js';
@@ -101,6 +102,7 @@ G.siege = new Siege(G);   // torres de sucata (derrubar com canhão) e morteiros
 G.tools = new Tools(G);     // banjo (música que cura) e gancho
 G.drops = new Drops(G);     // itens largados no mundo
 G.bossSkills = new BossSkills(G); // habilidades especiais dos chefes
+G.vfx = new VFX(scene); // faíscas, lascas, poeira, anéis de choque e clarões
 G.bosses = new Bosses(G);   // chefe da seca (escafandrista)
 G.enemyNet = new EnemyNet(G); // inimigos sincronizados (host simula, os outros veem réplicas)
 G.seaEvents = new SeaEvents(G); // kraken, tubarões, peixes voadores e raios
@@ -303,6 +305,7 @@ function frame() {
   G.siege.update(dt, t);
   G.tools.update(dt, t);
   G.drops.update(dt);
+  G.vfx.update(dt);
   G.seaEvents.tick(dt, t);
   G.sos.update(dt, t);
   G.endgame.update(dt, t);

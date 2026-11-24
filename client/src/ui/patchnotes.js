@@ -5,6 +5,19 @@
 // Nos textos, **assim** vira negrito.
 export const PATCH_NOTES = [
   {
+    id: '0.20', versao: 'v0.20', data: '24/11/2026', titulo: 'Inimigos com estilo e chefes furiosos',
+    destaques: [
+      { tag: 'Inimigos', titulo: 'Cada um com a sua roupa', texto: 'Os inimigos agora usam **roupas, chapéus e acessórios** com **variações temáticas por tipo**: bucaneiros com papagaio, grumetes de marinheiro, fuzileiros de boina, atiradores camuflados de capuz, cavalheiros de cartola, catadores de mochila e muito mais.' },
+      { tag: 'Chefes', titulo: 'Fúria e mira esperta', texto: 'Os chefes **miram onde você vai estar** e, abaixo de **50% de vida, ficam enfurecidos**: aura vermelha, habilidades mais rápidas, **combos** e versões mais fortes dos ataques.' },
+    ],
+    secoes: [
+      { icone: '🎭', nome: 'Visual dos inimigos', itens: ['**2 a 4 variações** por tipo (pirata, soldado, duelista, saqueador, atirador, fantasma...).', 'Chapéus novos: **boina** e **capuz**.', 'Coletes táticos, casacos, jalecos, capas, mochilas, bandoleiras e papagaios.'] },
+      { icone: '👑', nome: 'Chefes mais detalhados', itens: ['**Soldador**: avental de couro, ombreiras, mangueira e faíscas no maçarico.', '**Dr. Gás**: jaleco, frascos brilhando e vazamento de gás.', '**Perfurador**: colete refletivo, **broca girando** e fumaça no escapamento.', '**Faísca**: casaco escuro, **arcos elétricos** na bobina e visor piscando.', '**Metralhador**: colete, caixa de munição e fita de balas.', '**Escafandrista**: cilindros de ar, cinto de chumbo e bolhas.'] },
+      { icone: '🧠', nome: 'IA dos chefes', itens: ['**Mira preditiva** nas habilidades de longe.', '**Fúria** abaixo de 50%: maçarico que **varre**, mais poças e raios, mais válvulas, **investida e salto em dobro**, tremor com mais ondas.', '**Combos**: uma habilidade emenda na outra quando furioso.'] },
+      { icone: '✨', nome: 'Efeitos visuais', itens: ['**Faíscas e pedacinhos** da cor do inimigo a cada acerto.', '**Estouro** com clarão e anel quando um inimigo cai.', '**Poeira** na esquiva e nas quedas.', 'Brasas, ondas de choque, raios e anéis em todas as habilidades dos chefes.'] },
+    ],
+  },
+  {
     id: '0.19', versao: 'v0.19', data: '24/11/2026', titulo: 'Mar bravo e canhão de ferro',
     destaques: [
       { tag: 'Evento', titulo: 'Tempestade de ondas gigantescas', texto: 'As ondas desse evento agora têm **7 a 11 m** — maiores que a onda gigante — e vêm com **chuva forte e raios**. A jangada **sobe e desce a montanha inteira** com todo mundo a bordo (acabou o "segure no mastro").' },

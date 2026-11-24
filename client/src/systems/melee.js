@@ -133,6 +133,7 @@ export class Melee {
       this.iframes = MELEE.dodge.iframes; this.dodgeCd = MELEE.dodge.cd;
       this.cancelCharge(); this.pending = null; G.combat.cooldown = 0; this.buffer = 0;
       if (G.viewmodel && pl.firstPerson) G.viewmodel.springs.kickRx.kick(1.5);
+      if (G.vfx && pl.body.grounded) G.vfx.dust(pl.body.pos, 10); // poeira da esquiva
     }
     pl.dash = this.dodge;
     // carga máxima do pesado: brilho de faíscas na arma + som curto (solta agora!)

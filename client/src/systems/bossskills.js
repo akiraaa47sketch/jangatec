@@ -70,11 +70,18 @@ export class BossSkills {
         if (sk[kind] <= 0 && d > S.range[0] && d < S.range[1] && (kind === 'bomb' || e.los !== false)) { sk[kind] = between(S.cd); this.cast(kind, e, T); }
         continue;
       }
+      if (e.def.boss) this._enrage(e, G);
       if (BOSS_SKILLS[kind]) { // chefes da Leviatã: a primeira habilidade pronta e no alcance sai
         if (Math.abs(T.pos.y - p.y) > 3.5) continue; // jogador em outro andar
         for (const k of BOSS_SKILLS[kind]) {
           const S = SKILLS[k], [lo, hi] = Array.isArray(S.range) ? S.range : [0, S.range];
-          if (sk[k] <= 0 && d >= lo && d <= hi && (k !== 'charge' || e.los !== false)) { sk[k] = between(S.cd); for (const o of BOSS_SKILLS[kind]) sk[o] = Math.max(sk[o], 2.5); this.cast(k, e, T); break; }
+          if (sk[k] <= 0 && d >= lo && d <= hi && (k !== 'charge' || e.los !== false)) {
+            sk[k] = between(S.cd) * (e.enraged ? 0.65 : 1);
+            // furioso: emenda a outra habilidade logo depois (combo); calmo: dá um respiro entre elas
+            for (const o of BOSS_SKILLS[kind]) if (o !== k) sk[o] = e.enraged ? Math.min(sk[o], S.wind + 1.4) : Math.max(sk[o], 2.5);
+            if (e.enraged && (k === 'charge' || k === 'blink') && !e.again) { e.again = true; sk[k] = S.wind + 1.1; } else e.again = false; // investida/salto em dobro
+            this.cast(k, e, T); break;
+          }
         }
         continue;
       }
@@ -88,9 +95,20 @@ export class BossSkills {
     }
   }
 
+  // Fúria: abaixo de 50% de vida o chefe fica mais rápido nas habilidades e ganha versões mais fortes.
+  _enrage(e, G) {
+    if (e.maxHp == null) e.maxHp = e.hp;
+    if (e.enraged || e.hp > e.maxHp * 0.5) return;
+    e.enraged = true;
+    if (G.enemyNet) G.enemyNet.banner(`${e.def.nome.toUpperCase()} ENFURECIDO`, 'Ataques mais fortes e em sequência — fique esperto!', 'pirate');
+    if (G.vfx) { const p = e.body.pos; G.vfx.flash({ x: p.x, y: p.y + 1.2, z: p.z }, { color: 0xff4a2a, size: 3, life: 0.35 }); G.vfx.ring(p, { color: 0xff4a2a, from: 0.5, to: 7, life: 0.6 }); }
+  }
   cast(s, e, T) {
     const G = this.G, p = e.body.pos;
-    const m = { t: 'fx', k: 'skill', s, id: e.id, o: [r1(p.x), r1(p.y), r1(p.z)], tg: [r1(T.pos.x), r1(T.pos.y), r1(T.pos.z)], seed: Math.floor(Math.random() * 1e6) };
+    // mira preditiva: onde você VAI estar quando o ataque chegar (limitado a 6 m de antecipação)
+    const LEAD = { jet: 1.3, slag: 1.1, cloud: 0.9, zap: 0.8, charge: 0.45, bomb: 0.9, grenade: 0.9, vent: 0.9, snipe: 0.5 }[s] || 0;
+    const v = T.vel || { x: 0, z: 0 }, lx = Math.max(-6, Math.min(6, (v.x || 0) * LEAD)), lz = Math.max(-6, Math.min(6, (v.z || 0) * LEAD));
+    const m = { t: 'fx', k: 'skill', s, id: e.id, o: [r1(p.x), r1(p.y), r1(p.z)], tg: [r1(T.pos.x + lx), r1(T.pos.y), r1(T.pos.z + lz)], seed: Math.floor(Math.random() * 1e6), en: e.enraged ? 1 : 0 };
     const S = SKILLS[s];
     e.skillHold = (S.wind || 0.6) + 0.3 + (s === 'flame' ? S.dur : s === 'quake' ? S.gap * (S.rings - 1) : 0);
     e.skillPose = POSE[s] || 'aim';
@@ -124,6 +142,8 @@ export class BossSkills {
   // ---------- chefes da Leviatã: montagem dos efeitos ----------
   _startBoss(m, fx, add, o, tg, S) {
     if (!Object.values(BOSS_SKILLS).some((l) => l.includes(m.s))) return; // só os chefes da Leviatã
+    if (m.en) S = { ...S, n: (S.n || 0) + 2, rings: (S.rings || 0) + 1, dur: (S.dur || 0) * 1.4, gap: (S.gap || 0) * (m.s === 'vent' ? 0.85 : 0.8), radius: (S.radius || 0) * 1.2 }; // fúria
+    fx.P = S; fx.sweep = m.en && m.s === 'flame' ? (rngOf(m.seed + 3)() < 0.5 ? 1 : -1) * 1.0 : 0; // maçarico que varre
     const G = this.G, rnd = rngOf(m.seed || 1), gy = (x, z, y) => this._ground(x, z, y) + 0.07;
     const decal = (geo, color, op = 0.55) => add(new THREE.Mesh(geo, new THREE.MeshBasicMaterial({ color, transparent: true, opacity: op, side: THREE.DoubleSide, depthWrite: false })));
     const dir = new THREE.Vector3(tg.x - o.x, 0, tg.z - o.z); if (dir.lengthSq() < 1e-4) dir.set(0, 0, 1); dir.normalize();
@@ -200,9 +220,14 @@ export class BossSkills {
     const tick = (key, every) => { f[key] = (f[key] || 0) - dt; if (f[key] > 0) return false; f[key] = every; return true; };
     if (f.s === 'flame') {
       const on = f.t - S.wind;
+      if (f.sweep) { // furioso: o cone varre de um lado a outro enquanto queima
+        const a0 = Math.atan2(f.dir0 ? f.dir0.z : f.dir.z, f.dir0 ? f.dir0.x : f.dir.x); if (!f.dir0) f.dir0 = f.dir.clone();
+        const a = a0 + f.sweep * (Math.max(0, Math.min(1, on / S.dur)) - 0.5); f.dir.set(Math.cos(a), 0, Math.sin(a)); f.cone.rotation.y = Math.atan2(-f.dir.z, f.dir.x);
+      }
       f.cone.material.opacity = on < 0 ? 0.2 + 0.3 * Math.abs(Math.sin(f.t * 14)) : 0.15;
       if (on >= 0) {
-        if (!f.lit) { f.lit = true; sfx.explosion(f.o, 0.35); }
+        if (!f.lit) { f.lit = true; sfx.explosion(f.o, 0.35); if (G.vfx) G.vfx.flash({ x: f.o.x + f.dir.x, y: f.o.y + 1.2, z: f.o.z + f.dir.z }, { color: 0xffa040, size: 1.6 }); }
+        if (G.vfx && Math.random() < dt * 20) { const d2 = Math.random() * S.reach; G.vfx.embers({ x: f.o.x + f.dir.x * d2, y: f.o.y + 0.3, z: f.o.z + f.dir.z * d2 }, 2); }
         for (let k = 0; k < 6 && flames; k++) { // labaredas saindo do maçarico ao longo do cone
           const a = Math.atan2(f.dir.z, f.dir.x) + (Math.random() - 0.5) * 2 * S.arc, sp = 6 + Math.random() * 6;
           flames.emit(f.o.x + f.dir.x * 0.8, f.o.y + 1.2, f.o.z + f.dir.z * 0.8, Math.cos(a) * sp, 0.6 + Math.random(), Math.sin(a) * sp, 0.55, 1.1 + Math.random() * 0.6, 0, 1.4);
@@ -217,7 +242,7 @@ export class BossSkills {
       const u = Math.min(1, Math.max(0, (f.t - S.wind) / S.fly));
       f.blobs.forEach((b, k) => { const q = f.pts[k]; b.position.lerpVectors(f.o.clone().setY(f.o.y + 2), q, u); b.position.y += Math.sin(u * Math.PI) * 3; b.visible = u < 1; });
       if (u >= 1) {
-        if (!f.landed) { f.landed = true; sfx.splash(f.pts[0], false); for (const mk of f.marks) mk.visible = false; }
+        if (!f.landed) { f.landed = true; sfx.splash(f.pts[0], false); for (const mk of f.marks) mk.visible = false; if (G.vfx) for (const q of f.pts) { G.vfx.embers(q, 10, 0xffb040, 1.2); G.vfx.ring(q, { color: 0xff7a1a, from: 0.3, to: S.radius * 1.4, life: 0.4 }); } }
         const left = S.wind + S.fly + S.life - f.t;
         for (const pool of f.pools) pool.material.opacity = 0.65 * Math.min(1, left / 1.5) * (0.85 + 0.15 * Math.sin(f.t * 9));
         if (flames && Math.random() < dt * 8) { const q = f.pts[(Math.random() * f.pts.length) | 0]; flames.emit(q.x + (Math.random() - 0.5), q.y, q.z + (Math.random() - 0.5), 0, 1.2, 0, 0.5, 0.6, 0, 0.5); }
@@ -230,7 +255,7 @@ export class BossSkills {
       f.mark.material.opacity = 0.35 + 0.4 * Math.abs(Math.sin(f.t * 8));
       const on = f.t - S.fuse;
       if (on >= 0) {
-        if (!f.popped) { f.popped = true; sfx.splash(f.mark.position, false); f.nade.visible = false; }
+        if (!f.popped) { f.popped = true; sfx.splash(f.mark.position, false); f.nade.visible = false; if (G.vfx) { G.vfx.ring(f.mark.position, { color: 0x8adf4a, from: 0.4, to: S.radius * 1.3, life: 0.6, additive: false }); G.vfx.chips(f.mark.position, 14, 0x7acf3a, 4); } }
         const grow = Math.min(1, on / 1.2), fade = Math.min(1, (S.life - on) / 1.5), c = f.mark.position;
         f.puffs.forEach((p, k) => { const [a, b, cc, s2] = p.userData.o; p.visible = true; p.position.set(c.x + a * S.radius * 1.2 + Math.sin(f.t * 0.7 + k) * 0.4, c.y + 0.6 + b * 1.6, c.z + cc * S.radius * 1.2); p.scale.setScalar(S.radius * 0.55 * s2 * (0.4 + 0.6 * grow)); p.material.opacity = 0.32 * fade; });
         if (me && tick('tk', S.tick) && this._inside(c, S.radius, pp, 2.4)) { G.survival.damage(S.dmg, 'Gás tóxico'); this.blind(0.9, 'gas'); }
@@ -242,6 +267,7 @@ export class BossSkills {
       if (on >= 0) {
         if (!f.burst) {
           f.burst = true; sfx.explosion(f.tg, 0.5); G.events.shake = Math.max(G.events.shake, 0.25);
+          if (G.vfx) for (const L of f.lines) for (let k = -3; k <= 3; k++) { const q = L.c.clone().addScaledVector(L.side, k * S.len / 7); q.y = L.mesh.position.y; G.vfx.dust(q, 4, 0xa8e07a, 3); }
           for (const L of f.lines) for (let k = -4; k <= 4; k++) { // jatos de gás ao longo da faixa
             const jet = new THREE.Mesh(new THREE.CylinderGeometry(0.25, 0.5, 3.2, 8, 1, true), new THREE.MeshBasicMaterial({ color: 0xb6ff5a, transparent: true, opacity: 0.55, depthWrite: false, side: THREE.DoubleSide }));
             jet.position.copy(L.c).addScaledVector(L.side, k * S.len / 9); jet.position.y = L.mesh.position.y + 1.6; G.scene.add(jet); f.objs.push(jet); f.jets.push(jet);
@@ -259,10 +285,11 @@ export class BossSkills {
       f.lane.material.opacity = go < 0 ? 0.25 + 0.4 * Math.abs(Math.sin(f.t * (8 + f.t * 8))) : 0.18;
       if (go >= 0) {
         if (!f.started) {
-          f.started = true; sfx.kick(f.o); G.events.shake = Math.max(G.events.shake, 0.3);
+          f.started = true; sfx.kick(f.o); G.events.shake = Math.max(G.events.shake, 0.3); if (G.vfx) G.vfx.shock(f.o, 0xd8b070, 4);
           if (E.auth && boss && boss.state !== 'dead') { boss.dashV = { x: f.dir.x * S.speed, z: f.dir.z * S.speed, t: S.len / S.speed }; boss.skillPose = 'leap'; boss.skillHold = S.len / S.speed; }
         }
         const head = f.o.clone().addScaledVector(f.dir, Math.min(S.len, go * S.speed));
+        if (G.vfx && go * S.speed < S.len && Math.random() < dt * 30) { G.vfx.dust(head, 3, 0xbfae8a, 2.5); G.vfx.sparks({ x: head.x, y: head.y + 0.6, z: head.z }, 2, 0xffd27a, 4, 0.25); }
         if (me && !f.hitMe && this._inside(head, S.width + 0.4, pp, 2.2) && !(G.melee && G.melee.iframes > 0)) { f.hitMe = true; if (this._hit(S.dmg, 'Broca', head, 7)) { G.hud.msg('Saia da faixa vermelha antes da investida!'); if (G.melee) G.melee.stunT = Math.max(G.melee.stunT, 0.5); } }
         if (go * S.speed > S.len + 1) return true;
       }
@@ -271,7 +298,7 @@ export class BossSkills {
       f.rings.forEach((ring, k) => {
         const go = f.t - S.wind - k * S.gap;
         if (go < 0) { all = false; return; }
-        if (!ring.userData.bang) { ring.userData.bang = true; sfx.kick(f.o); G.events.shake = Math.max(G.events.shake, 0.35); if (boss) boss.skillPose = 'heavyWindup'; }
+        if (!ring.userData.bang) { ring.userData.bang = true; sfx.kick(f.o); G.events.shake = Math.max(G.events.shake, 0.35); if (boss) boss.skillPose = 'heavyWindup'; if (G.vfx) G.vfx.shock(f.o, 0xe8b060, 5); }
         const R2 = 1 + go * S.speed; if (R2 > S.maxR) { ring.visible = false; return; }
         all = false; ring.visible = true; ring.position.set(f.o.x, this._ground(f.o.x, f.o.z, f.o.y) + 0.08, f.o.z); ring.scale.setScalar(R2); ring.material.opacity = 0.9 * (1 - R2 / S.maxR);
         const dp = Math.hypot(pp.x - f.o.x, pp.z - f.o.z);
@@ -283,7 +310,7 @@ export class BossSkills {
       for (const r2 of f.rings) r2.material.opacity = on < 0 ? 0.35 + 0.5 * Math.abs(Math.sin(f.t * (8 + f.t * 10))) : 0.0;
       if (on >= 0 && !f.struck) {
         f.struck = true; sfx.thunder(0.1, 0); G.hud.flash('lightning');
-        for (const q of f.pts) { this._bolt(q); if (flames) for (let k = 0; k < 8; k++) flames.emit(q.x, q.y + 0.2, q.z, (Math.random() - 0.5) * 4, 2 + Math.random() * 3, (Math.random() - 0.5) * 4, 0.35, 0.5, 6, 0); }
+        for (const q of f.pts) { this._bolt(q); if (G.vfx) { G.vfx.zap({ x: q.x, y: q.y + 0.3, z: q.z }); G.vfx.ring(q, { color: 0x6ac0ff, from: 0.3, to: S.radius * 1.6, life: 0.35 }); } }
         if (me && f.pts.some((q) => this._inside(q, S.radius, pp, 2.4)) && !(G.melee && G.melee.iframes > 0)) { this._hit(S.dmg, 'Arco elétrico', f.pts[0], 5); if (G.melee) G.melee.stunT = Math.max(G.melee.stunT, 0.6); }
       }
       if (on > 0.35) return true;
@@ -293,6 +320,7 @@ export class BossSkills {
       f.mark.material.opacity = 0.3 + 0.5 * Math.abs(Math.sin(f.t * 16));
       if (on >= 0 && !f.jumped) {
         f.jumped = true; sfx.thunder(0.1, 0); this._bolt(f.land, 0x9fd8ff);
+        if (G.vfx) { G.vfx.zap({ x: f.o.x, y: f.o.y + 1, z: f.o.z }); G.vfx.zap({ x: f.land.x, y: f.land.y + 1, z: f.land.z }); G.vfx.ring(f.land, { color: 0x6ac0ff, from: 0.3, to: S.radius * 1.8, life: 0.35 }); }
         if (E.auth && boss && boss.state !== 'dead') { boss.body.pos.x = f.land.x; boss.body.pos.z = f.land.z; boss.body.pos.y = Math.max(boss.body.pos.y, f.land.y); boss.skillPose = 'slashR'; boss.skillHold = 0.35; }
       }
       if (on >= 0.15 && !f.shocked) {
@@ -312,6 +340,12 @@ export class BossSkills {
   update(dt) {
     const G = this.G;
     this.think(dt);
+    // aura vermelha dos chefes enfurecidos (todos os clientes; réplica estima pela vida)
+    if (G.vfx) for (const e of G.enemies.list) {
+      if (!e.def.boss || e.state === 'dead') continue;
+      if (e.maxHp == null) e.maxHp = e.hp;
+      if ((e.enraged || e.hp < e.maxHp * 0.5) && Math.random() < dt * 14) { const p = e.body.pos, a = Math.random() * 6.28; G.vfx.glow.emit(p.x + Math.cos(a) * 0.6, p.y + 0.2 + Math.random() * 1.6, p.z + Math.sin(a) * 0.6, 0, 1.6, 0, 0.6, 0.18, 0xff4a2a, -0.5, 0.5); }
+    }
     const pl = G.player, pp = pl.body.pos;
     for (let i = this.active.length - 1; i >= 0; i--) {
       const f = this.active[i], S = SKILLS[f.s]; f.t += dt;
@@ -338,7 +372,7 @@ export class BossSkills {
       } else if (f.s === 'stomp') {
         const go = f.t - S.wind;
         if (go > 0) {
-          if (!f.bang) { f.bang = true; sfx.kick(f.o); G.events.shake = Math.max(G.events.shake, 0.4); }
+          if (!f.bang) { f.bang = true; sfx.kick(f.o); G.events.shake = Math.max(G.events.shake, 0.4); if (G.vfx) G.vfx.shock(f.o, 0xe8d2a0, 5); }
           const R = 1 + go * S.speed; f.ring.visible = true;
           f.ring.position.set(f.o.x, this._ground(f.o.x, f.o.z, f.o.y) + 0.08, f.o.z); f.ring.scale.setScalar(R);
           f.ring.material.opacity = 0.9 * (1 - R / S.maxR);
@@ -370,7 +404,7 @@ export class BossSkills {
           done = true;
         }
       }
-      if (!done && f.dir) done = this._updateBoss(f, S, dt, pl, pp);
+      if (!done && f.dir) done = this._updateBoss(f, f.P || S, dt, pl, pp);
       if (done) { for (const o of f.objs) G.scene.remove(o); this.active.splice(i, 1); }
     }
     // cegueira (tela azul de água / preta de tinta)

@@ -246,7 +246,8 @@ export class Enemies {
 
   spawn(id, type, isl, x, z) {
     const def = ENEMY_TYPES[type];
-    const mesh = makeEnemyPill(type); // pílula malvada (visual por tipo)
+    let seed = 0; for (let i = 0; i < id.length; i++) seed = (seed * 31 + id.charCodeAt(i)) | 0;
+    const mesh = makeEnemyPill(type, seed); // pílula malvada (visual por tipo + variação sorteada pelo id)
     mesh.scale.setScalar(def.scale);
     mesh.rotation.order = 'YXZ';
     const e = {
@@ -312,6 +313,9 @@ export class Enemies {
       n *= e.def.armor;
       if (G.melee && Math.random() < 0.35) G.melee.say(e.body.pos.clone().setY(e.body.pos.y + 1.6), 'CASCO', '#c8d2da');
     }
+    if (G.vfx && n > 0 && !e.creature) { // faíscas e pedacinhos da cor do inimigo no acerto
+      const p = e.body.pos; G.vfx.hit({ x: p.x, y: p.y + 1.1 * (e.def.scale || 1), z: p.z }, e.def.cor || 0xaa3333, n >= 25);
+    }
     if (e.replica) { // inimigo de outro jogador (host): o acerto vai para ele decidir
       e.hp -= n; e.hitT = 0.22;
       G.net.send({ t: 'ehit', id: e.id, n: Math.round(n) });
@@ -323,6 +327,7 @@ export class Enemies {
     if (e.hp <= 0) {
       e.state = 'dead'; e.timer = 5; e.deathT = 0;
       sfx.enemyDown(e.body.pos);
+      if (G.vfx) { const p = e.body.pos; G.vfx.death({ x: p.x, y: p.y + 1.0 * (e.def.scale || 1), z: p.z }, e.def.cor || 0xaa3333); }
       if (this.G.melee) { this.G.melee.tokens.delete(e); this.G.melee.setTell(e, null); this.G.melee.updateStars(e, 0, false); }
       this.G.world.collected.add(e.id);
       const r = Math.random();

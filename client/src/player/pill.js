@@ -502,6 +502,25 @@ const HATS = {
     g.add(at(new THREE.Mesh(new THREE.IcosahedronGeometry(0.1, 2), matte(0xf4f1ea, 1)), 0, (HAT_R + 0.025) * 1.12 + 0.06, 0));
     return g;
   },
+  // (inimigos) cor em hex ou índice da paleta
+  boina(color) { // boina militar: disco achatado caído para o lado, com distintivo
+    const hex = color > 64 ? color : (PILL_COLORS[color] || PILL_COLORS[0]).hex, m = matte(hex, 0.95);
+    const g = new THREE.Group();
+    const top = new THREE.Mesh(new THREE.SphereGeometry(HAT_R + 0.06, 20, 10, 0, Math.PI * 2, 0, Math.PI / 2), m);
+    top.scale.set(1.08, 0.38, 1.02); top.position.set(-0.05, 0.12, -0.02); top.rotation.z = 0.18; g.add(top);
+    g.add(hatBand(0.03, 0.06, 0.1, matte(0x1a1a1a, 0.9)));
+    g.add(at(new THREE.Mesh(new THREE.CircleGeometry(0.05, 12), new THREE.MeshStandardMaterial({ color: 0xd8b04a, metalness: 0.8, roughness: 0.3 })), 0.12, 0.12, domeR(0.12) + 0.035));
+    return g;
+  },
+  capuz(color) { // capuz largo cobrindo a cabeça e caindo nas costas
+    const hex = color > 64 ? color : (PILL_COLORS[color] || PILL_COLORS[7]).hex, m = new THREE.MeshStandardMaterial({ color: hex, roughness: 1, side: THREE.DoubleSide });
+    const g = new THREE.Group();
+    const hood = new THREE.Mesh(new THREE.SphereGeometry(HAT_R + 0.07, 22, 12, Math.PI * 0.18, Math.PI * 1.64, 0, Math.PI * 0.62), m);
+    hood.rotation.y = Math.PI; hood.position.y = -0.02; g.add(hood);
+    const drape = new THREE.Mesh(new THREE.CylinderGeometry(HAT_R + 0.07, HAT_R + 0.12, 0.35, 22, 1, true, Math.PI * 0.35, Math.PI * 1.3), m);
+    drape.rotation.y = Math.PI; drape.position.y = -0.2; g.add(drape);
+    return g;
+  },
 };
 
 // ---------- montagem ----------
@@ -562,11 +581,11 @@ export function makePill(options = {}) {
     }
   }
   // roupa (tronco + mangas nos ombros) e acessório (costas / ombro esquerdo)
-  if (!options.npc) {
+  if (!options.npc || (o.outfit && o.outfit !== 'nenhuma') || (o.back && o.back !== 'nenhum')) { // inimigos também vestem (cores em hex)
     const anims = [];
-    const outfit = makeOutfit(o.outfit, PILL_COLORS[o.outfitColor] ? PILL_COLORS[o.outfitColor].hex : 0x7a4a2a);
+    const outfit = makeOutfit(o.outfit, o.outfitHex ?? (PILL_COLORS[o.outfitColor] ? PILL_COLORS[o.outfitColor].hex : 0x7a4a2a), o.outfitHex != null);
     if (outfit) { body.add(outfit.body); if (outfit.sleeves.R) parts.armR.add(outfit.sleeves.R); if (outfit.sleeves.L) parts.armL.add(outfit.sleeves.L); }
-    const back = makeBack(o.back, PILL_COLORS[o.outfitColor] ? PILL_COLORS[o.outfitColor].hex : 0xa83a2c, OUTFIT_DEPTH[o.outfit] || 0);
+    const back = makeBack(o.back, o.backHex ?? (PILL_COLORS[o.outfitColor] ? PILL_COLORS[o.outfitColor].hex : 0xa83a2c), OUTFIT_DEPTH[o.outfit] || 0);
     if (back) { body.add(back.body); if (back.shoulderL) parts.armL.add(back.shoulderL); if (back.anim) anims.push(back.anim); }
     if (anims.length) parts.clothesAnim = anims;
   }
