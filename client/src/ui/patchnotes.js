@@ -5,6 +5,20 @@
 // Nos textos, **assim** vira negrito.
 export const PATCH_NOTES = [
   {
+    id: '0.24', versao: 'v0.24', data: '24/11/2026', titulo: 'A queda do helicóptero',
+    destaques: [
+      { tag: 'Cutscene', titulo: 'Abertura: o voo 47', texto: 'Toda partida começa num **helicóptero de resgate com todos os jogadores da sala**. Um raio acerta o rotor, ele cai em espiral e vocês despencam na ilha. Você **acorda em 1ª pessoa** ao lado dos destroços. Espaço ou clique pula.' },
+      { tag: 'Mar', titulo: 'Ondas do norte e jangada colada na água', texto: 'As ondas agora **vêm só do norte**, a jangada **acompanha a água sem atraso** e, no multiplayer, todos usam **o relógio do servidor**: as ondas são iguais para todo mundo.' },
+    ],
+    secoes: [
+      { icone: '🗺', nome: 'Zonas', itens: ['Ao entrar numa zona nova (**Zona Pirata, Zona Militar, Zona 51**) o nome aparece no meio da tela **na fonte do logo**, com fade in e fade out — inclusive ao acordar na ilha.', 'Saiu a **etiqueta fixa da zona** no topo da tela e o aviso grande no painel.'] },
+      { icone: '🚁', nome: 'Ilha inicial', itens: ['**Destroços do helicóptero** na beira da ilha, pegando fogo e soltando fumaça (a cauda caiu na água).'] },
+      { icone: '🌊', nome: 'Mar', itens: ['Ondas **só do norte**, num leque estreito.', 'Perto das ilhas a água é rasa e as ondas **perdem força**.', 'A jangada **sobe e desce junto com a onda** (antes chegava atrasada).', 'Multiplayer: **relógio acertado pelo servidor** e jangada **prevista entre pacotes** (sem trancos nem atraso por ping).'] },
+      { icone: '🌀', nome: 'Ondas gigantes', itens: ['Onda gigante e ondas da tempestade **também vêm do norte**: dá para vê-las chegando pela proa.', 'Frente **mais íngreme** (parede de água) e encosta longa atrás.', 'A jangada **sobe a onda de verdade** em vez de ser engolida e subir depois.'] },
+      { icone: '💧', nome: 'Enchente inicial', itens: ['A água **sobe suave** (sem pular para o nível máximo).', 'O chão da ilha **não some mais de uma vez**: fica visível debaixo da água rasa.', 'Para quem não é host a água **acompanha o host sem degraus**.'] },
+    ],
+  },
+  {
     id: '0.16', versao: 'v0.16', data: '24/11/2026', titulo: 'BIG UPDATE: Zonas, Leviatã, Twins e 30 ilhas novas',
     destaques: [
       { tag: 'Mundo', titulo: 'Três zonas e 30 ilhas', texto: '**Zona Pirata** (fácil), **Zona Militar** (médio) e **Zona 51** (difícil), cada uma com **10 modelos de ilha** — construções, cômodos, tamanhos, cores e inimigos próprios. As ilhas agora são **morros de verdade**: dá para **subir a pé na seca** e a jangada **desvia sozinha** em vez de atolar.' },

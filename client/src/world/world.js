@@ -13,6 +13,7 @@ import { buildSeaTower, buildLeaningBuilding, buildJunkTower, buildScrapShack } 
 import { makePieceMesh, PIECES } from '../boat/pieces.js';
 import { makeHookTurretMesh } from './navalmodels.js';
 import { makePalm, makeRock, makeBush, makeGrassTufts } from './models.js';
+import { buildHeliWreck, wreckSpot } from './helicopter.js';
 import { ZONES, zoneOf } from '../systems/zones.js';
 import { IslandHill, makeHillMesh } from './islandterrain.js';
 import { ZONE_PAL, pickIslandType } from './islandtypes.js';
@@ -148,7 +149,10 @@ export class World {
     for (const w of this.wrecks) for (const c of w.crates) c.submerged = level > c.y + 0.3;
     for (const c of this.crates) if (c.sea) c.submerged = level > c.y + 0.3;
     for (const island of this.islands) {
-      for (const layer of island.landLayers) layer.mesh.visible = level < layer.top;
+      // O patamar continua visível um tempo debaixo d'água (a água rasa é translúcida). Antes ele
+      // sumia no instante em que a água passava do topo: o chão inteiro da ilha desaparecia de uma
+      // vez e parecia que a enchente tinha "teleportado" para o nível máximo.
+      for (const layer of island.landLayers) layer.mesh.visible = level < layer.top + 1.6;
       const tier = island.allItems.filter((item) => item.floodTop == null || item.floodTop > level);
       const changed = island.floodTier !== tier.length;
       island.flooded = level >= island.maxGround;
@@ -192,6 +196,11 @@ export class World {
         flame.scale.set(1 - (s - 1) * 0.5, s, 1 - (s - 1) * 0.5);
         flame.rotation.y = t * (1.5 + i);
       });
+    }
+    // Destroços do helicóptero: fogo e fumaça (só perto, para não gastar à toa).
+    for (const isl of this.islands) if (isl.wreck) {
+      const cam = G.camera.position;
+      if (Math.hypot(cam.x - isl.x, cam.z - isl.z) < 220) isl.wreck.update(dt, G.startup ? G.startup.waterLevel : 0);
     }
     // Vento: a copa das palmeiras balança de leve (defasada por palmeira).
     for (const isl of this.islands) for (const p of isl.palms || []) {
@@ -609,6 +618,9 @@ export class World {
     if (starterIsland) {
       crates.splice(0, crates.length, ...starterCratePositions);
     }
+    // destroços do helicóptero da abertura (ilha inicial): nada nasce em cima deles
+    const wreckAt = starterIsland ? wreckSpot(R) : null;
+    const nearWreck = (lx, lz, pad) => !!wreckAt && Math.hypot(lx - wreckAt.x, lz - wreckAt.z) < 5.2 + pad;
     // Palmeiras.
     const areaK = starterIsland ? 1 : Math.min(2.2, Math.max(0.8, (R / 11) ** 1.6)); // ilhas maiores = mais vegetação
     const palms = Math.round((2 + ((r() * 3) | 0)) * (itype && itype.palms != null ? itype.palms : zone.palms) * areaK); // Zona 51: sem palmeiras; militar: poucas
@@ -625,6 +637,7 @@ export class World {
           if (starterCratePositions.some(([cx, cz]) => Math.hypot(candidateX - cx, candidateZ - cz) < 3.8)) continue;
           if (houseCenters.some(([cx, cz]) => Math.hypot(candidateX - cx, candidateZ - cz) < 4.5)) continue;
           if (palmCenters.some(([cx, cz]) => Math.hypot(candidateX - cx, candidateZ - cz) < 4.5)) continue;
+          if (nearWreck(candidateX, candidateZ, 0.5)) continue;
           px = candidateX; pz = candidateZ; found = true; break;
         }
         if (!found) continue;
@@ -648,7 +661,7 @@ export class World {
         !(starterIsland && inStarterBuildClearance(lx, lz, pad)) &&
         !palmCenters.some(([cx, cz]) => Math.hypot(lx - cx, lz - cz) < 1.3) &&
         !starterCratePositions.some(([cx, cz]) => Math.hypot(lx - cx, lz - cz) < 1.6) &&
-        !houseCenters.some(([cx, cz]) => Math.hypot(lx - cx, lz - cz) < 3.6) && !nearCamp(lx, lz, pad);
+        !houseCenters.some(([cx, cz]) => Math.hypot(lx - cx, lz - cz) < 3.6) && !nearCamp(lx, lz, pad) && !nearWreck(lx, lz, pad);
       for (let i = 0, n = 6 + ((dec() * 5) | 0); i < n; i++) {
         const a = dec() * 6.283, d = R * (0.76 + dec() * 0.22), lx = Math.cos(a) * d, lz = Math.sin(a) * d, sz = 0.28 + dec() * 0.5;
         if (!free(lx, lz, 0.6)) continue;
@@ -699,8 +712,15 @@ export class World {
       group.add(campfire);
       fireRef = flames;
     }
+    let wreck = null;
+    if (starterIsland) {
+      wreck = buildHeliWreck(R, TOP);
+      group.add(wreck.group);
+      set.items.push(...wreck.items);
+      wreck.group.traverse((o) => { if (o.isMesh && !o.material.transparent && !o.isSprite) solids.push(o); });
+    }
     const isl = {
-      id, x, z, R, diff, group, set, solids, crates: [], enemies: [], palms: palmList,
+      id, x, z, R, diff, group, set, solids, crates: [], enemies: [], palms: palmList, wreck,
       starter: starterIsland, zone: zone.id, siteType, siteCenter, rooms, towers, spawnSpots, ladders, bossSpot, towerFrame, landLayers, allItems: set.items.slice(),
       maxGround: islandElevation + 0.61, floodTier: null,
       fire: fireRef, hill: starterIsland ? null : hill, model: itype ? itype.id : 'inicial', modelName: itype ? itype.nome : 'Ilha inicial',

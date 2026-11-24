@@ -254,8 +254,14 @@ export class Boat {
       this.speed = 0;
       this.sailUp = false;
     } else if (net.online && !net.isHost && this.netTarget) {
-      const n = this.netTarget, k = Math.min(1, 8 * dt);
-      this.x += (n.x - this.x) * k; this.z += (n.z - this.z) * k;
+      // Previsão (dead reckoning): a última foto do host chegou há "age" segundos (+ meio ping);
+      // avança a posição dela pela velocidade e rumo, então a jangada não fica atrasada nem
+      // anda aos trancos entre um pacote e outro.
+      const n = this.netTarget, k = 1 - Math.exp(-6 * dt);
+      const age = Math.min(0.6, (performance.now() - (this.netAt || performance.now())) / 1000 + (net.rtt || 0) / 2000);
+      const px = n.x + Math.sin(n.yaw) * (n.speed || 0) * age, pz = n.z + Math.cos(n.yaw) * (n.speed || 0) * age;
+      if (Math.hypot(px - this.x, pz - this.z) > 12) { this.x = px; this.z = pz; } // longe demais: encaixa
+      this.x += (px - this.x) * k; this.z += (pz - this.z) * k;
       this.yaw = lerpAngle(this.yaw, n.yaw, k);
       this.speed = n.speed; this.sailUp = n.up; this.sailAngle = n.angle;
     } else {
@@ -360,6 +366,7 @@ export class Boat {
     };
     if (anchored && sea.level <= 0.55) {
       this.bob = this.pitch = this.roll = 0;
+      this._floatReset = true;
     } else {
       const points = [
         [0, R], [0, -R], [-R, 0], [R, 0],
@@ -367,14 +374,20 @@ export class Boat {
         [-R * 0.7, -R * 0.7], [R * 0.7, -R * 0.7],
       ];
       const he = points.map(([lx, lz]) => sample(lx, lz));
-      const avg = he.reduce((sum, value) => sum + value, 0) / he.length;
+      // o centro pesa o dobro: é ali que o jogador olha a água encostando na jangada
+      const avg = (he.reduce((sum, value) => sum + value, 0) + 2 * sample(0, 0)) / (he.length + 2);
       const tilt = this.G.events ? this.G.events.tiltMax : 0.12;
-      const pitchTarget = clamp(-Math.atan2(sample(0, R) - sample(0, -R), 2 * R) * (tilt > 0.12 ? 1.6 : 1), -tilt, tilt);
-      const rollTarget = clamp(Math.atan2(sample(R, 0) - sample(-R, 0), 2 * R) * (tilt > 0.12 ? 1.6 : 1), -tilt, tilt);
-      const k = Math.min(1, (tilt > 0.12 ? 5 : 3) * dt);
-      this.bob += ((avg - sea.level) - this.bob) * k;
-      this.pitch += (pitchTarget - this.pitch) * k;
-      this.roll += (rollTarget - this.roll) * k;
+      const pitchTarget = clamp(-Math.atan2(he[0] - he[1], 2 * R) * (tilt > 0.12 ? 1.3 : 1), -tilt, tilt);
+      const rollTarget = clamp(Math.atan2(he[3] - he[2], 2 * R) * (tilt > 0.12 ? 1.3 : 1), -tilt, tilt);
+      // Antes a altura seguia a onda com um filtro lento (3/s): a água subia e a jangada só
+      // subia ~⅓ s depois (e menos do que devia) — parecia fora de sincronia, pior na onda
+      // gigante. Agora a altura praticamente cola na superfície; a inclinação continua um
+      // pouco amortecida para não tremer.
+      const kb = 1 - Math.exp(-16 * dt), kt = 1 - Math.exp(-(tilt > 0.12 ? 9 : 7) * dt);
+      if (this._floatReset) { this.bob = avg - sea.level; this._floatReset = false; }
+      this.bob += ((avg - sea.level) - this.bob) * kb;
+      this.pitch += (pitchTarget - this.pitch) * kt;
+      this.roll += (rollTarget - this.roll) * kt;
     }
 
     const raftLevel = anchored ? Math.max(0.55, sea.level) : sea.level;

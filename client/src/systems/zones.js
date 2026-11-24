@@ -6,7 +6,8 @@
 //   • ZONA 51      (difícil, dif. 3–4, ~2,55 km+): ilhas cinzentas sem palmeiras com laboratórios
 //     secretos (OVNI caído, tanques de contenção); agentes, cientistas, mutantes e ciborgues. É onde a
 //     plataforma Leviatã (SOS) aparece.
-// O HUD mostra a zona atual e um aviso grande ao entrar numa nova; o céu/neblina ganha um tom próprio.
+// Ao entrar numa zona nova o nome aparece animado no centro da tela (ui/zonetitle.js); o céu/neblina
+// ganha um tom próprio.
 import * as THREE from '../three.js';
 
 export const ZONES = {
@@ -38,14 +39,9 @@ export class Zones {
     const z = zoneOf(G.world.difficulty(G.boat.x, G.boat.z));
     if (z !== this.cur) {
       const first = !this.cur; this.cur = z;
-      this.el.innerHTML = `<b style="color:${z.cor}">${z.nome}</b><span>${z.nivel}</span>`;
-      if (!first || z !== ZONES.pirata) {
-        if (G.hud.banner) G.hud.banner(z.nome.toUpperCase(), z.id === 'pirata' ? 'Mar dos piratas — ilhas tropicais. Dificuldade: fácil.'
-          : z.id === 'militar' ? 'Território militar — bunkers, vigias e soldados. Dificuldade: média.'
-            : 'Área restrita — laboratórios secretos, agentes e criaturas estranhas. Dificuldade: difícil.', z.id === 'z51' ? 'storm' : 'pirate', 7);
-      }
+      void first; // o nome da zona aparece animado no centro da tela (ui/zonetitle.js); sem etiqueta fixa
     }
-    this.el.hidden = false;
+    this.el.hidden = true;
     // tom do céu/neblina da zona (sobe aos poucos ao entrar)
     const want = z.fog ? z.tint : 0;
     this.tintK += (want - this.tintK) * Math.min(1, dt * 0.25);

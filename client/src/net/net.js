@@ -2,7 +2,7 @@
 // Host (primeiro da sala) simula o barco; os outros interpolam. Posições a bordo são
 // enviadas em coordenadas locais do barco, então ninguém "escorrega" no convés alheio.
 import * as THREE from '../three.js';
-import { lerpAngle } from '../core/util.js';
+import { lerpAngle, setClockOffset } from '../core/util.js';
 import { makeHumanoid, animateHumanoid } from '../player/model.js';
 import { makePill, animatePill, disposePill, decodePill, encodePill, PILL_SCALE } from '../player/pill.js';
 import { buildWeapon } from '../player/viewmodel-parts.js';
@@ -54,12 +54,37 @@ export class Net {
       };
       ws.onmessage = (ev) => {
         let m; try { m = JSON.parse(ev.data); } catch { return; }
-        if (m.t === 'welcome') { clearTimeout(timer); done = true; this.id = m.id; this.isHost = m.host === m.id; this.online = true; resolve(m); }
+        if (m.t === 'time') { this._timeReply(m); return; }
+        if (m.t === 'welcome') { clearTimeout(timer); done = true; this.id = m.id; this.isHost = m.host === m.id; this.online = true; this._startTimeSync(); resolve(m); }
         else if (m.t === 'full') fail('Sala cheia');
         else if (m.t === 'join-error') { const e = new Error(m.reason || 'Não foi possível entrar'); e.needPassword = !!m.needPassword; if (!done) { done = true; reject(e); } ws.close(); }
         else if (this.G.started) this.handle(m);
       };
     });
+  }
+
+  // Acerto de relógio com o servidor (estilo NTP): manda a hora local, o servidor devolve a dele;
+  // a amostra com o menor ping é a mais confiável. Repete de tempos em tempos.
+  _startTimeSync() {
+    this.timeSamples = [];
+    clearInterval(this._timeTimer);
+    let burst = 0;
+    const ping = () => this.send({ t: 'time', c: Date.now() });
+    ping();
+    this._timeTimer = setInterval(() => {
+      if (!this.online) { clearInterval(this._timeTimer); return; }
+      if (burst < 6 || (burst % 25) === 0) ping(); // 6 rápidas no começo, depois 1 a cada ~10 s
+      burst++;
+    }, 400);
+  }
+  _timeReply(m) {
+    const now = Date.now();
+    if (!Number.isFinite(m.c) || !Number.isFinite(m.s) || m.c > now) return;
+    const rtt = now - m.c, offset = m.s + rtt / 2 - now;
+    this.timeSamples = (this.timeSamples || []).concat({ rtt, offset }).slice(-8);
+    const best = this.timeSamples.reduce((a, b) => (b.rtt < a.rtt ? b : a));
+    this.rtt = best.rtt;
+    setClockOffset(best.offset);
   }
 
   handle(m) {
@@ -69,7 +94,7 @@ export class Net {
         const wasHost = this.isHost;
         this.isHost = m.host === this.id;
         if (this.isHost && !wasHost) G.hud.msg('Você agora é o host');
-        if (!this.isHost && m.boat) G.boat.netTarget = m.boat;
+        if (!this.isHost && m.boat) { G.boat.netTarget = m.boat; G.boat.netAt = performance.now(); }
         for (const id in m.players) {
           if (id === this.id) continue;
           let r = this.remotes.get(id);

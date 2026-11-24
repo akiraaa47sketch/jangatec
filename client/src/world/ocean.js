@@ -17,9 +17,10 @@ export function eventHeight(x, z, t) {
   const s = sea.surge;
   if (s.A > 0) {
     const d = (x - s.ox) * s.dx + (z - s.oz) * s.dz - s.front;
-    const a = d / s.sigma, b = (d + s.sigma * 2.2) / (s.sigma * 1.6);
-    // crista íngreme na frente, cava atrás (a água "puxada" pela onda)
-    h += s.A * (Math.exp(-a * a) * 1 - 0.32 * Math.exp(-b * b));
+    // parede íngreme na frente (d > 0: água que a onda ainda vai alcançar), encosta longa atrás
+    // e uma cava depois dela (a água "puxada" pela onda)
+    const a = d / (s.sigma * (d > 0 ? 0.55 : 1.35)), b = (d + s.sigma * 2.6) / (s.sigma * 1.6);
+    h += s.A * (Math.exp(-a * a) - 0.28 * Math.exp(-b * b));
   }
   const v = sea.vortex;
   if (v.k > 0) {
@@ -38,14 +39,16 @@ export function eventHeight(x, z, t) {
 // ---- Ondas ----
 // UMA tabela alimenta a física (JS) e o shader (GLSL): o que você vê é o que o barco sente.
 // Ondas direcionais com dispersão de águas profundas (ω = √(g·k)) e cristas mais agudas.
+// TODAS vêm do NORTE (+Z) e andam para o sul (−Z), abertas em leque de no máximo ~25°:
+// marulho com cristas longas em vez de um mar picado vindo de todos os lados.
 // [direção x, direção z, comprimento (m), amplitude (m)]
 const WAVES = [
-  [1.0, 0.30, 46, 0.16],
-  [-0.4, 1.0, 31, 0.12],
-  [0.7, 0.70, 19, 0.07],
-  [-0.9, 0.40, 11, 0.045],
-  [0.2, -1.0, 6.5, 0.025],
-  [1.0, -0.6, 3.8, 0.012],
+  [0.10, -1.0, 46, 0.16],
+  [-0.30, -1.0, 31, 0.12],
+  [0.35, -1.0, 19, 0.07],
+  [-0.18, -1.0, 11, 0.045],
+  [0.45, -1.0, 6.5, 0.025],
+  [-0.42, -1.0, 3.8, 0.012],
 ].map(([dx, dz, L, A], i) => {
   const n = Math.hypot(dx, dz), k = (2 * Math.PI) / L;
   return { kx: (dx / n) * k, kz: (dz / n) * k, w: Math.sqrt(9.8 * k), A, ph: i * 1.7 };
@@ -58,7 +61,22 @@ export function waveHeight(x, z, t) {
     const u = 0.5 + 0.5 * Math.sin(w.kx * x + w.kz * z - w.w * t + w.ph);
     h += w.A * (2 * u * u - 0.75);
   }
-  return sea.level + sea.amp * h + eventHeight(x, z, t);
+  return sea.level + sea.amp * h * shoreDamp(x, z) + eventHeight(x, z, t);
+}
+
+// Perto das ilhas a água fica rasa e as ondas perdem força (mesma conta em SHORE_GLSL).
+// SHORE guarda as mesmas ilhas que o shader recebe em uIsl (x, z, raio da praia), atualizadas
+// em Ocean.update: física e visual sempre concordam.
+export const SHORE = Array.from({ length: 6 }, () => [0, 0, -1e4]);
+export const SHORE_MIN = 0.3;
+export function shoreDamp(x, z) {
+  let k = 1;
+  for (const s of SHORE) {
+    if (s[2] < 0) continue;
+    const d = Math.hypot(x - s[0], z - s[1]) - s[2];
+    if (d < 10) k = Math.min(k, SHORE_MIN + (1 - SHORE_MIN) * sstep(-8, 10, d));
+  }
+  return k;
 }
 
 const f = (v) => v.toFixed(6);
@@ -89,8 +107,8 @@ float eventH(vec2 p, float t) {
   float h = 0.0;
   if (uSurge2.x > 0.0) {
     float d = dot(p - uSurge.xy, uSurge.zw) - uSurge2.z;
-    float a = d / uSurge2.y, b = (d + uSurge2.y * 2.2) / (uSurge2.y * 1.6);
-    h += uSurge2.x * (exp(-a * a) - 0.32 * exp(-b * b));
+    float a = d / (uSurge2.y * (d > 0.0 ? 0.55 : 1.35)), b = (d + uSurge2.y * 2.6) / (uSurge2.y * 1.6);
+    h += uSurge2.x * (exp(-a * a) - 0.28 * exp(-b * b));
   }
   if (uVortexK > 0.0) {
     vec2 dv = p - uVortex.xy; float r = length(dv), q = r / uVortex.z;
@@ -109,13 +127,23 @@ float eventH(vec2 p, float t) {
 
 const VERT = /* glsl */`
 uniform float uTime; uniform float uAmp; uniform float uLevel;
+uniform vec3 uIsl[6];
 varying vec3 vWorld; varying vec3 vN; varying float vHn; varying float vEv; varying vec2 vVx;
 #include <fog_pars_vertex>
 ${WAVES_GLSL}
 ${EVENTS_GLSL}
+float shoreDamp(vec2 p) {
+  float k = 1.0;
+  for (int i = 0; i < 6; i++) {
+    if (uIsl[i].z < 0.0) continue;
+    float d = length(p - uIsl[i].xy) - uIsl[i].z;
+    k = min(k, mix(${SHORE_MIN.toFixed(3)}, 1.0, smoothstep(-8.0, 10.0, d)));
+  }
+  return k;
+}
 void main() {
   vec4 wp = modelMatrix * vec4(position, 1.0);
-  vec3 w = waves(wp.xz, uTime);
+  vec3 w = waves(wp.xz, uTime) * shoreDamp(wp.xz);
   float e = eventH(wp.xz, uTime);
   vVx = vec2(vortexStripe, vortexDeep);
   vec2 eg = vec2(0.0);
@@ -314,6 +342,7 @@ export class Ocean {
     for (let k = 0; k < 6; k++) {
       const s = near[k];
       if (s) u.uIsl.value[k].set(s.i.x, s.i.z, s.i.shoreR || s.i.R + 7.5); else u.uIsl.value[k].set(0, 0, -1e4);
+      const v = u.uIsl.value[k]; SHORE[k][0] = v.x; SHORE[k][1] = v.y; SHORE[k][2] = v.z;
     }
   }
 }

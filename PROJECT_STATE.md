@@ -1,4 +1,4 @@
-# PROJECT STATE — Maré Alta (protótipo v0.1)
+# PROJECT STATE — Jangatec (protótipo v0.1)
 
 Cole este bloco no início de uma nova conversa para continuar o projeto.
 

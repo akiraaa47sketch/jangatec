@@ -1,5 +1,5 @@
 import * as THREE from '../three.js';
-import { clamp, mulberry32 } from '../core/util.js';
+import { clamp, mulberry32, clock } from '../core/util.js';
 import { sea } from '../world/ocean.js';
 const GHOST_FOG = new THREE.Color(0x6f9a8e);
 import { Tide } from './tide.js';
@@ -19,7 +19,7 @@ export function swellAt(t) {
   const A = SWELL.A[0] + (SWELL.A[1] - SWELL.A[0]) * (h / SWELL.chance);
   return A * Math.sin(Math.PI * u) ** 2;
 }
-const clockNow = () => (Date.now() / 1000) % CLOCK_WRAP; // o mesmo relógio comum de main.js
+const clockNow = clock; // o mesmo relógio comum de main.js
 
 export class Startup {
   constructor(G, { sun, hemisphere }) {
@@ -95,6 +95,7 @@ export class Startup {
     this.anchor = savedState && Array.isArray(savedState.anchor)
       ? { x: savedState.anchor[0], z: savedState.anchor[1] }
       : island ? { x: island.x, z: island.z } : { x: 0, z: 0 };
+    this.netWater = null;
     if (savedState) this.applyState(savedState);
     else {
       this.phase = 'build';
@@ -143,8 +144,13 @@ export class Startup {
     this.phase = state.phase;
     this.elapsed = Number.isFinite(state.elapsed) ? Math.max(0, state.elapsed) : 0;
     if (Number.isFinite(state.departAt)) this.departAt = state.departAt;
-    if (state.phase !== 'depart' || this.phase !== 'depart') {
-      this.waterLevel = Number.isFinite(state.waterLevel) ? clamp(state.waterLevel, 0, FLOOD_LEVEL) : 0;
+    // Depois da partida cada cliente calcula a maré pelo relógio comum: o nível do host não vale.
+    // Antes disso o nível do host vira um ALVO (netWater) que a água persegue suavemente; aplicar
+    // direto fazia a água pular a cada pacote (e de uma vez quando um pacote atrasava).
+    if (state.phase !== 'depart') {
+      const lvl = Number.isFinite(state.waterLevel) ? clamp(state.waterLevel, 0, FLOOD_LEVEL) : 0;
+      this.netWater = lvl;
+      if (!this.G.started || Math.abs(lvl - this.waterLevel) > 0.35) this.waterLevel = lvl; // entrada na sala: encaixa
     }
     if (Array.isArray(state.anchor) && state.anchor.length === 2 &&
         state.anchor.every(Number.isFinite)) {
@@ -202,7 +208,9 @@ export class Startup {
       } else if (this.phase === 'storm' && this.elapsed >= STORM_DURATION) {
         this._transition('flood', 'A inundação global começou — suba na jangada!');
       } else if (this.phase === 'flood') {
-        this.waterLevel = FLOOD_LEVEL * clamp(this.elapsed / FLOOD_DURATION, 0, 1);
+        // sobe devagar no começo, mais rápido no meio e assenta no fim (sem degrau na chegada)
+        const u = clamp(this.elapsed / FLOOD_DURATION, 0, 1);
+        this.waterLevel = FLOOD_LEVEL * u * u * (3 - 2 * u);
         if (this.elapsed >= FLOOD_DURATION) {
           this.waterLevel = FLOOD_LEVEL;
           this._transition('board', 'A terra foi inundada. Embarque para partir.');
@@ -215,6 +223,10 @@ export class Startup {
       this._sync();
     }
 
+    // Quem não é host: a água persegue o nível que o host mandou (a ~10 Hz), sem degraus.
+    if (!isHost && !this.departed && Number.isFinite(this.netWater)) {
+      this.waterLevel += (this.netWater - this.waterLevel) * (1 - Math.exp(-6 * dt));
+    }
     // Depois da partida a maré segue o ciclo (calculado localmente pelo relógio comum).
     if (this.departed) {
       if (this.departAt === null) this.departAt = t;
@@ -229,7 +241,9 @@ export class Startup {
       ? clamp(this.elapsed / STORM_DURATION, 0, 1)
       : this.departed ? Math.max(1 - 0.7 * clamp(this.departT / 45, 0, 1), boost, this.G.benchStorm || 0)
         : ['flood', 'board'].includes(this.phase) ? 1 : 0;
-    this._updateWeather(storm, t, dt);
+    // cutscene de abertura: ela decide o céu (tempestade no voo, limpo no despertar)
+    const cut = this.G.cutscene && this.G.cutscene.active ? this.G.cutscene.storm : null;
+    this._updateWeather(cut ?? storm, t, dt);
   }
 
   _updateWeather(storm, t, dt = 0) {
@@ -258,7 +272,8 @@ export class Startup {
     sea.amp = 1 + storm * 0.7 + swell + (this.departed ? 0.3 : 0); // depois da partida o mar nunca fica liso
     if (G.boat.sailInstalled) G.boat.sailGroup.rotation.z = Math.sin(t * 6) * storm * 0.045;
 
-    const player = G.player.body.pos;
+    // chuva e nuvens em volta de quem está olhando (na cutscene a câmera está longe do jogador)
+    const player = G.cutscene && G.cutscene.active ? G.camera.position : G.player.body.pos;
     // ângulo ACUMULADO (antes era relógio × velocidade: quando a tempestade mudava a velocidade, o
     // relógio enorme multiplicava a diferença e as nuvens giravam muito rápido no céu)
     this.cloudAngle = (this.cloudAngle || 0) + dt * (0.006 + storm * 0.018);

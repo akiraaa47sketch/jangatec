@@ -44,6 +44,9 @@ import { Zones } from './systems/zones.js';
 import { Sos } from './systems/sos.js';
 import { Endgame } from './systems/endgame.js';
 import { Inventory } from './ui/inventory.js';
+import { clock } from './core/util.js';
+import { Intro } from './systems/intro.js';
+import { ZoneTitle } from './ui/zonetitle.js';
 
 const $ = (id) => document.getElementById(id);
 const canvas = $('c');
@@ -111,6 +114,7 @@ G.seaEvents = new SeaEvents(G); // kraken, tubarões, peixes voadores e raios
 G.sos = new Sos(G); // plataforma de petróleo do SOS (fim da jornada)
 G.endgame = new Endgame(G); // coordenadas do abrigo, navegação 360° e os Twins
 G.inventory = new Inventory(G); // tela de inventário (Tab)
+G.zoneTitle = new ZoneTitle(G); // nome da zona ao entrar numa zona nova
 const atmo = new Atmosphere(renderer, scene, { sun, hemisphere }); // céu, IBL e sombras
 const ocean = new Ocean(scene, atmo);
 ocean.islandSource = () => G.world.islands.filter((i) => !i.seaSite); // estruturas do mar não têm água rasa
@@ -177,7 +181,7 @@ const characterAppearance = () => charMenu.appearance;
 G.player.setAppearance(characterAppearance());
 
 
-function start(seed, welcome) {
+function start(seed, welcome, opts = {}) {
   G.player.setAppearance(characterAppearance());
   if (G.world && G.world.farSeabed) scene.remove(G.world.farSeabed); // o mundo do menu sai de cena
   G.world = new World(G, seed);
@@ -213,10 +217,19 @@ function start(seed, welcome) {
   G.combat.startWithRandomImprovisedWeapon();
   G.combat.setBuildMode(false);
   G.started = true;
-  G.input.enabled = true;
+  G.zoneTitle.current = null;
   $('menu').hidden = true;
-  G.hud.show();
-  G.hud.msg(`${G.combat.weapon.nome} ${'★'.repeat(G.combat.weapon.stars)} equipada · complete a jangada e procure as caixas`);
+  if (G.cutscene) G.cutscene.finish();
+  const play = () => {
+    G.input.enabled = true;
+    G.hud.show();
+    G.hud.msg(`${G.combat.weapon.nome} ${'★'.repeat(G.combat.weapon.stars)} equipada · complete a jangada e procure as caixas`);
+  };
+  // Cutscene de abertura (helicóptero → raio → queda → acordar na ilha) só no começo da partida.
+  if (opts.intro && G.startup.phase === 'build' && starterIsland) {
+    G.input.enabled = false;
+    G.cutscene = new Intro(G, starterIsland, () => { G.cutscene = null; play(); });
+  } else play();
   G.input.requestLock();
 }
 // Benchmark: mundo fixo (seed 4242), câmera roteirizada e relatório de FPS no fim.
@@ -232,13 +245,13 @@ for (const [id, url] of [['pistola', './models/pistola.glb'], ['revolver', './mo
     if (ok && G.started && G.combat.weaponId === wid) { G.combat.equip(wid); if (G.viewmodel.shownId === wid) G.viewmodel.showWeapon(wid); }
   });
 }
-G.mainMenu = new MainMenu(G, { solo: (seed) => start(seed), multi: (welcome) => start(welcome.seed, welcome), bench: startBenchmark });
+G.mainMenu = new MainMenu(G, { solo: (seed) => start(seed, null, { intro: true }), multi: (welcome) => start(welcome.seed, welcome, { intro: true }), bench: startBenchmark });
 $('help').onclick = () => { $('help').hidden = true; };
 try { if (sessionStorage.getItem('mare-alta-bench')) { sessionStorage.removeItem('mare-alta-bench'); setTimeout(startBenchmark, 600); } } catch { /* ok */ }
 
 // ---------- Loop ----------
 let last = performance.now();
-const now = () => (Date.now() / 1000) % 100000; // relógio comum: ondas parecidas entre clientes
+const now = clock; // relógio comum (acertado pelo servidor quando online): ondas iguais entre clientes
 
 function hotkeys() {
   const inp = G.input;
@@ -289,13 +302,16 @@ function frame() {
     const dyaw = boat.carry(player.body);
     player.yaw += dyaw; player.camYaw += dyaw;
   }
-  G.inventory.update();
-  hotkeys();
-  player.update(dt, t);
-  G.viewmodel.update(dt, t);
-  player.updateCamera(dt, t);
-  G.events.applyShake(camera, dt);
-  G.build.update();
+  const cut = G.cutscene; // durante a cutscene o jogador fica parado e a câmera é dela
+  if (!cut) {
+    G.inventory.update();
+    hotkeys();
+    player.update(dt, t);
+    G.viewmodel.update(dt, t);
+    player.updateCamera(dt, t);
+    G.events.applyShake(camera, dt);
+    G.build.update();
+  }
   G.world.update(dt, t);
   G.world.updateFloodLevel(G.startup.waterLevel);
   G.physics.update(dt, t);
@@ -312,21 +328,25 @@ function frame() {
   G.sos.update(dt, t);
   G.endgame.update(dt, t);
   if (G.bench) G.bench.update(dt);
-  G.interact.update(dt);
-  G.combat.update(dt);
-  G.melee.update(dt);
-  G.survival.update(dt);
+  if (!cut) {
+    G.interact.update(dt);
+    G.combat.update(dt);
+    G.melee.update(dt);
+    G.survival.update(dt);
+  }
   G.net.update(dt);
   G.enemyNet.update(dt);
   G.voice.update(dt);
+  if (cut) cut.update(dt, t);
   atmo.update(dt, camera);
   ocean.update(t, camera.position.x, camera.position.z);
   G.hud.update(dt);
-  if (G.touch) G.touch.update();
+  G.zoneTitle.update(dt);
+  if (G.touch && !cut) G.touch.update();
   sunVisual.update(camera, t);
   G.gfx.render(dt);
   G.gfxMenu.update();
-  G.viewmodel.render(renderer); // 2º passe: braços e arma por cima do mundo
+  if (!cut) G.viewmodel.render(renderer); // 2º passe: braços e arma por cima do mundo
   G.input.endFrame();
 }
 frame();

@@ -4,7 +4,7 @@
 //   • Redemoinho (id 'furacao' na rede, por compatibilidade): o mar se abre num REDEMOINHO gigante ao
 //     lado da rota que gira e vai sugando a jangada aos poucos. Levante a vela e gire-a para o lado
 //     OPOSTO ao redemoinho para escapar. Sem vento: ninguém é empurrado nem arremessado da jangada.
-//   • Tempestade forte: céu fecha, raios e uma SÉRIE de ondas gigantes vindas de lados diferentes que
+//   • Tempestade forte: céu fecha, raios e uma SÉRIE de ondas gigantes (todas do norte) que
 //     chacoalham a jangada (segure no mastro!).
 // Nada é anunciado: os eventos são raros, chegam do nada e cada um sai um pouco diferente.
 // O host sorteia e anuncia o evento pela rede; todos os clientes derivam o estado do mesmo
@@ -175,7 +175,7 @@ export class Events {
     const B = EVENT_BALANCE.tempestade, r = mulberry32(e.seed | 0), list = [];
     let at = 12 + r() * 6;
     for (let i = 0; i < e.n && at < e.dur - 14; i++) {
-      const rel = (r() - 0.5) * Math.PI * 1.7, a = Math.atan2(e.fx, e.fz) + Math.PI + rel; // de onde vem (raramente por trás)
+      const a = (r() - 0.5) * 1.0; // de onde vem: sempre do NORTE (+Z), no máximo ~30° para os lados (como o marulho)
       list.push({ at, ang: a, A: B.A[0] + r() * (B.A[1] - B.A[0]), speed: B.speed[0] + r() * (B.speed[1] - B.speed[0]), sigma: B.sigma[0] + r() * (B.sigma[1] - B.sigma[0]), hit: false });
       at += (e.gap || 8) + r() * (e.gap ? 4 : 7);
     }
@@ -184,9 +184,9 @@ export class Events {
 
   _makeTsunami(t) {
     const B = EVENT_BALANCE.tsunami, boat = this.G.boat;
-    // Vem de qualquer lado, menos exatamente por trás (assim dá para ver a parede chegando).
-    const rel = (Math.random() < 0.5 ? 1 : -1) * (0.35 + Math.random() * 2.1);
-    const a = boat.yaw + Math.PI + rel; // direção de onde a onda vem
+    // Vem do NORTE (+Z), como o resto das ondas, com até ~25° de desvio. A rota também aponta
+    // para o norte: a parede de água aparece à frente da jangada e dá para se preparar.
+    const a = (Math.random() - 0.5) * 0.9; // direção de onde a onda vem
     const sx = Math.sin(a), sz = Math.cos(a), speed = between(B.speed);
     return {
       id: `ev${Math.floor(t * 10)}`, kind: 'tsunami', t0: t, dur: (B.startDist + 170) / speed,

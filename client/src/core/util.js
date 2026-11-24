@@ -28,5 +28,10 @@ export function hash2(seed, x, y) {
   return (h ^ (h >>> 16)) >>> 0;
 }
 
-// Relógio comum a todos os clientes (mesmo usado pelas ondas em main.js).
-export const clock = () => (Date.now() / 1000) % 100000;
+// Relógio comum a todos os clientes (ondas, maré, eventos). Online ele é acertado pelo relógio do
+// servidor (Net mede a diferença): antes cada um usava o relógio do próprio PC, e um PC com o
+// relógio 2 s adiantado via as ondas e a onda gigante em outro lugar — a jangada parecia
+// fora de sincronia com o mar.
+let clockOffsetMs = 0;
+export function setClockOffset(ms) { clockOffsetMs = Number.isFinite(ms) ? ms : 0; }
+export const clock = () => ((Date.now() + clockOffsetMs) / 1000) % 100000;

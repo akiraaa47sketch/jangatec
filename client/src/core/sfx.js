@@ -206,3 +206,47 @@ export function ambience(strength = 0, sea = 1) {
   amb.wind.g.gain.setTargetAtTime(0.012 + 0.07 * strength, now, 0.5);
   amb.wind.fl.frequency.setTargetAtTime(500 + 500 * Math.sin(amb.t * 0.31) ** 2 + 600 * strength, now, 0.5);
 }
+
+// ---------- cutscene de abertura: rotor do helicóptero e zumbido no ouvido ----------
+// rotor: ruído grave pulsando (o "tuc-tuc" das pás). heliRotor(on 0..1, rate = pulsos/s)
+let rotor = null;
+export function heliRotor(level = 0, rate = 9) {
+  if (!ac()) return;
+  if (!rotor) {
+    const s = ctx.createBufferSource(); s.buffer = noiseBuf; s.loop = true;
+    const fl = ctx.createBiquadFilter(); fl.type = 'lowpass'; fl.frequency.value = 380; fl.Q.value = 0.9;
+    const g = ctx.createGain(); g.gain.value = 0;
+    const lfo = ctx.createOscillator(); lfo.type = 'sawtooth'; lfo.frequency.value = rate;
+    const depth = ctx.createGain(); depth.gain.value = 0;
+    const pulse = ctx.createGain(); pulse.gain.value = 0.5; // ganho base que o LFO modula
+    lfo.connect(depth); depth.connect(pulse.gain);
+    const hum = ctx.createOscillator(); hum.type = 'triangle'; hum.frequency.value = 62;
+    const humG = ctx.createGain(); humG.gain.value = 0;
+    s.connect(fl); fl.connect(pulse); pulse.connect(g); hum.connect(humG); humG.connect(g); g.connect(out);
+    s.start(); lfo.start(); hum.start();
+    rotor = { g, lfo, depth, fl, humG, hum };
+  }
+  const now = ctx.currentTime, v = Math.max(0, level) * (volume > 0 ? 1 : 0);
+  rotor.g.gain.setTargetAtTime(v * 0.55, now, 0.15);
+  rotor.depth.gain.setTargetAtTime(0.5, now, 0.1);
+  rotor.lfo.frequency.setTargetAtTime(Math.max(0.5, rate), now, 0.25);
+  rotor.humG.gain.setTargetAtTime(v * 0.12, now, 0.2);
+  rotor.hum.frequency.setTargetAtTime(40 + rate * 2.4, now, 0.3);
+  rotor.fl.frequency.setTargetAtTime(240 + rate * 22, now, 0.3);
+}
+// zumbido agudo depois do acidente (some aos poucos)
+export function earRing(dur = 5) {
+  const b = bus(null, 0.22); if (!b) return;
+  const t = ctx.currentTime;
+  const o = ctx.createOscillator(); o.type = 'sine'; o.frequency.value = 3900;
+  const g = ctx.createGain(); g.gain.setValueAtTime(0.0001, t); g.gain.linearRampToValueAtTime(0.5, t + 0.4); g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+  o.connect(g); g.connect(b); o.start(t); o.stop(t + dur + 0.1);
+}
+// pancada da queda + estilhaços de metal
+export function heliCrash() {
+  const b = bus(null, 1); if (!b) return;
+  const t = ctx.currentTime;
+  tone(t, 55, 1.2, 1, b, 'sine', 0.5);
+  noise(t, 1.6, 'lowpass', 2200, 90, 0.7, 1, b);
+  for (let i = 0; i < 5; i++) setTimeout(() => metal(null, 300 + Math.random() * 500, 0.5, 0.5), 80 + i * 120 + Math.random() * 80);
+}
