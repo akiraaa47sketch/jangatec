@@ -7,7 +7,7 @@ export const PATCH_NOTES = [
   {
     id: '0.17', versao: 'v0.17', data: '24/11/2026', titulo: 'Leviatã: quatro andares, quatro chefes',
     destaques: [
-      { tag: 'Fim da jornada', titulo: 'Plataforma Leviatã', texto: 'O SOS agora leva a uma **plataforma colossal de 4 andares** (48 × 48 m). Cada andar tem um **chefe com tema e habilidades próprias**, e a escada para o próximo andar só abre quando o chefe cai. Derrote os quatro e o arsenal deles é seu.' },
+      { tag: 'Fim da jornada', titulo: 'Plataforma Leviatã', texto: 'O SOS agora leva a uma **plataforma gigantesca de 4 andares** (~82 × 82 m, topo a 53 m da água e torre de perfuração de ~110 m). Cada andar tem um **chefe com tema e habilidades próprias**, e a escada para o próximo andar só abre quando o chefe cai. Derrote os quatro e o arsenal deles é seu.' },
       { tag: 'Combate', titulo: 'Golpes mais responsivos', texto: 'O golpe agora **puxa você até o inimigo da frente** e acerta mesmo com a mira um pouco fora. O combo **emenda mais rápido** e os cliques guardados não se perdem.' },
     ],
     secoes: [

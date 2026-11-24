@@ -10,7 +10,7 @@ import { buildOilRig, RIG } from '../world/oilrig.js';
 import { bakeStatic } from '../core/bake.js';
 import { sfx } from '../core/sfx.js';
 
-export const SOS = { minProgress: 0.7, ahead: 190, side: 70, keepDist: 650 };
+export const SOS = { minProgress: 0.7, ahead: 230, side: 90, keepDist: 800 };
 const TYPES = [['soldado', 4], ['escopeteiro', 2], ['pesado', 2], ['melee', 2]];
 const FLOOR_NAMES = ['Convés de carga', 'Refinaria', 'Casa de perfuração', 'Heliporto'];
 const pickType = (r) => { let x = r() * 10; for (const [t, w] of TYPES) { x -= w; if (x <= 0) return t; } return 'soldado'; };
@@ -24,7 +24,7 @@ export class Sos {
     for (let k = 0; k < 12; k++) {
       const side = (k % 2 ? 1 : -1) * (SOS.side + k * 8), ahead = SOS.ahead + k * 12;
       const x = b.x + fx * ahead + fz * side, z = b.z + fz * ahead - fx * side;
-      if (G.world.islands.every((i) => Math.hypot(i.x - x, i.z - z) > (i.R || 20) + 45)) return { x, z, yaw: Math.random() * 6.28 };
+      if (G.world.islands.every((i) => Math.hypot(i.x - x, i.z - z) > (i.R || 20) + RIG.half * RIG.SC * 1.42 + 15)) return { x, z, yaw: Math.random() * 6.28 };
     }
     return null;
   }
@@ -94,7 +94,8 @@ export class Sos {
     rig.t += dt;
     const b = rig.b;
     // chama do queimador tremulando, luz vermelha piscando, luz do rádio
-    b.flame.scale.set(1 + Math.sin(t * 13) * 0.08, 1 + Math.sin(t * 7.3) * 0.18 + Math.sin(t * 17) * 0.06, 1 + Math.cos(t * 11) * 0.08);
+    const k = RIG.SC; // a plataforma inteira é escalada
+    b.flame.scale.set(k * (1 + Math.sin(t * 13) * 0.08), k * (1 + Math.sin(t * 7.3) * 0.18 + Math.sin(t * 17) * 0.06), k * (1 + Math.cos(t * 11) * 0.08));
     b.beacon.visible = (t % 1.2) < 0.6;
     b.radioLight.visible = (t % 0.5) < 0.3;
     const d = Math.hypot(G.boat.x - rig.isl.x, G.boat.z - rig.isl.z);

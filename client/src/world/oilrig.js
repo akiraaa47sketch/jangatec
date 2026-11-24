@@ -12,14 +12,16 @@ import { rot } from '../core/util.js';
 import { mats as scrapMats } from './scrap.js';
 
 const TOP = 0.55;
-export const RIG = { deck: 8, half: 24, floorH: 8, floors: 4 };
+// SC: escala da estrutura inteira (o desenho é feito em "unidades de projeto" e tudo — malhas,
+// colisores, escadas, portões e pontos dos inimigos — é multiplicado por SC). deck = altura real do 1º andar.
+export const RIG = { deck: 12, half: 24, floorH: 8, floors: 4, SC: 1.7 };
 
 export function buildOilRig(ctx) {
-  const m = scrapMats(), r = ctx.r, deckY = RIG.deck, H = RIG.half, FH = RIG.floorH;
+  const m = scrapMats(), r = ctx.r, deckY = RIG.deck, H = RIG.half, FH = RIG.floorH, SC = RIG.SC;
   const group = new THREE.Group(); group.position.set(ctx.x, deckY - TOP, ctx.z);
-  const set = { x: ctx.x, z: ctx.z, yaw: 0, y: deckY - TOP, radius: 40, items: [] };
+  const set = { x: ctx.x, z: ctx.z, yaw: 0, y: deckY - TOP, radius: 40 * SC, items: [] };
   const solids = [], ladders = [];
-  const P = (lx, lz) => rot(lx, lz, ctx.yaw);
+  const P = (lx, lz) => rot(lx * SC, lz * SC, ctx.yaw); // unidades de projeto → metros (escala SC)
   const M = (color, extra = {}) => new THREE.MeshStandardMaterial({ color, roughness: 0.6, ...extra });
   const steel = M(0x6f767a, { metalness: 0.55, roughness: 0.55 }), dark = M(0x3a3e42, { metalness: 0.5 });
   const yellow = M(0xd8a72a, { metalness: 0.3 }), red = M(0xa8321f), white = M(0xd9d6cc, { roughness: 0.8 });
@@ -30,17 +32,17 @@ export function buildOilRig(ctx) {
   const solid = (lx, y0, lz, w, h, l, mat, yaw = 0, collide = true) => {
     const [x, z] = P(lx, lz), Y = ctx.yaw + yaw;
     const mesh = new THREE.Mesh(new THREE.BoxGeometry(w, h, l), mat);
-    mesh.position.set(x, TOP + y0 + h / 2, z); mesh.rotation.y = Y; mesh.castShadow = mesh.receiveShadow = true;
+    mesh.position.set(x, TOP + (y0 + h / 2) * SC, z); mesh.rotation.y = Y; mesh.scale.setScalar(SC); mesh.castShadow = mesh.receiveShadow = true;
     group.add(mesh); solids.push(mesh);
-    const it = collide ? { type: 'box', x, y: TOP + y0 + h / 2, z, hx: w / 2, hy: h / 2, hz: l / 2, yaw: Y } : null;
+    const it = collide ? { type: 'box', x, y: TOP + (y0 + h / 2) * SC, z, hx: w / 2 * SC, hy: h / 2 * SC, hz: l / 2 * SC, yaw: Y } : null;
     if (it) set.items.push(it);
     return { mesh, it };
   };
   const decor = (mesh, lx, y, lz, yaw = 0) => {
     const [x, z] = P(lx, lz); mesh.rotation.order = 'YXZ';
-    mesh.position.set(x, TOP + y, z); mesh.rotation.y += ctx.yaw + yaw; mesh.castShadow = true; group.add(mesh); return mesh;
+    mesh.position.set(x, TOP + y * SC, z); mesh.rotation.y += ctx.yaw + yaw; mesh.scale.multiplyScalar(SC); mesh.castShadow = true; group.add(mesh); return mesh;
   };
-  const cylC = (lx, lz, rad, y0, h) => { const [x, z] = P(lx, lz); const it = { type: 'cyl', x, y: TOP + y0 + h / 2, z, hx: rad, hy: h / 2, hz: rad }; set.items.push(it); return it; };
+  const cylC = (lx, lz, rad, y0, h) => { const [x, z] = P(lx, lz); const it = { type: 'cyl', x, y: TOP + (y0 + h / 2) * SC, z, hx: rad * SC, hy: h / 2 * SC, hz: rad * SC }; set.items.push(it); return it; };
   const tank = (lx, lz, rad, y0, h, mat) => { const t = new THREE.Mesh(new THREE.CylinderGeometry(rad, rad, h, 20), mat); decor(t, lx, y0 + h / 2, lz); solids.push(t); cylC(lx, lz, rad, y0, h); return t; };
   const rail = (along, at, u0, u1, y0, gaps = []) => { // guarda-corpo 1,1 m
     const cuts = [u0, u1]; for (const [a, b] of gaps) cuts.push(a, b);
@@ -50,9 +52,9 @@ export function buildOilRig(ctx) {
       if (along === 'x') solid((a + b) / 2, y0, at, b - a, 1.1, 0.08, yellow); else solid(at, y0, (a + b) / 2, 0.08, 1.1, b - a, yellow);
     }
   };
-  const bedY = ctx.seabed(ctx.x, ctx.z) - deckY; // fundo, relativo ao 1º andar
-  const zoneOf = (lx, lz, hw, hd) => { const [x, z] = P(lx, lz); return { x, z, yaw: ctx.yaw, hw, hd }; };
-  const spot = (lx, lz, y) => { const [x, z] = P(lx, lz); return { x, z, y }; };
+  const bedY = (ctx.seabed(ctx.x, ctx.z) - deckY) / SC; // fundo, relativo ao 1º andar (unidades de projeto)
+  const zoneOf = (lx, lz, hw, hd) => { const [x, z] = P(lx, lz); return { x, z, yaw: ctx.yaw, hw: hw * SC, hd: hd * SC }; };
+  const spot = (lx, lz, y) => { const [x, z] = P(lx, lz); return { x, z, y: y * SC }; };
 
   // ---------- pernas colossais (passam por todos os andares) e travamento ----------
   const LEG = H - 4.5;
@@ -107,7 +109,7 @@ export function buildOilRig(ctx) {
   STAIRS.forEach((st, f) => {
     const y0 = f * FH, y1 = y0 + FH, len = Math.abs(st.z1 - st.z0), up = st.z1 > st.z0 ? 1 : -1, zc = (st.z0 + st.z1) / 2;
     const [x, z] = P(st.x, zc);
-    set.items.push({ type: 'ramp', x, y: TOP + (y0 + y1) / 2, z, hx: 1.6, hy: FH / 2, hz: len / 2, yaw: ctx.yaw + (up > 0 ? 0 : Math.PI) });
+    set.items.push({ type: 'ramp', x, y: TOP + (y0 + y1) / 2 * SC, z, hx: 1.6 * SC, hy: FH / 2 * SC, hz: len / 2 * SC, yaw: ctx.yaw + (up > 0 ? 0 : Math.PI) });
     const steps = Math.round(len / 0.42);
     for (let i = 0; i < steps; i++) {
       const s = new THREE.Mesh(new THREE.BoxGeometry(3.2, 0.12, len / steps + 0.02), i % 2 ? steel : dark);
@@ -128,12 +130,12 @@ export function buildOilRig(ctx) {
   });
 
   // ---------- cais flutuante + escada até o 1º andar ----------
-  { const dockTop = 0.9 + 0.45 - deckY;
+  { const dockTop = (0.9 + 0.45 - deckY) / SC; // cais na linha d'água (unidades de projeto)
     solid(0, dockTop - 0.45, H + 2.4, 5, 0.45, 4, m.plank);
     for (const sx of [-2.2, 2.2]) for (const sz of [H + 0.8, H + 4]) { const post = new THREE.Mesh(new THREE.CylinderGeometry(0.16, 0.16, -bedY + dockTop, 6), steel); decor(post, sx, (bedY + dockTop) / 2, sz); }
     for (let y = bedY + 0.4; y < 0; y += 0.38) decor(new THREE.Mesh(new THREE.BoxGeometry(0.6, 0.05, 0.05), steel), 0, y, H + 0.12);
     for (const sx of [-0.32, 0.32]) decor(new THREE.Mesh(new THREE.CylinderGeometry(0.035, 0.035, -bedY + 1.2, 5), steel), sx, (bedY + 1.2) / 2, H + 0.12);
-    const [x, z] = P(0, H + 0.4); ladders.push({ x: ctx.x + x, z: ctx.z + z, y0: deckY + bedY, top: deckY + 0.05, yaw: ctx.yaw, dir: 1 });
+    const [x, z] = P(0, H + 0.4); ladders.push({ x: ctx.x + x, z: ctx.z + z, y0: deckY + bedY * SC, top: deckY + 0.05, yaw: ctx.yaw, dir: 1 });
   }
 
   // ---------- painéis de fechamento (lados parcialmente fechados) ----------
@@ -226,7 +228,7 @@ export function buildOilRig(ctx) {
 
   return {
     group, set, solids, ladders, flame, beacon, radioLight, gates, floors: FLOORS,
-    radio: (() => { const [x, z] = P(-12, -15); return { x, z, y: y4 }; })(),
-    R: H * 1.42, block: { x: ctx.x, z: ctx.z, yaw: ctx.yaw, hx: H + 1, hz: H + 5 },
+    radio: (() => { const [x, z] = P(-12, -15); return { x, z, y: y4 * SC }; })(),
+    R: H * 1.42 * SC, block: { x: ctx.x, z: ctx.z, yaw: ctx.yaw, hx: (H + 1) * SC, hz: (H + 5) * SC },
   };
 }
