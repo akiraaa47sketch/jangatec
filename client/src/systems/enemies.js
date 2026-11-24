@@ -210,6 +210,9 @@ export class Enemies {
       const b = this.spawn(`${isl.id}boss`, 'metralhador', isl, isl.x + isl.siteCenter[0], isl.z + isl.siteCenter[1]);
       b.yaw = r() * 6.28;
     }
+    // o modelo nasce na altura certa (quem está longe "dorme" e não atualiza a malha até acordar:
+    // sem isto o boneco ficava enfiado no chão/rampa embaixo do andar dele)
+    for (const e of isl.enemies) { e.mesh.position.copy(e.body.pos); e.mesh.rotation.y = e.yaw; }
   }
 
   // Estruturas no meio do mar: torre = artilheiro de morteiro + 1–2 atiradores no pontão;
@@ -219,7 +222,7 @@ export class Enemies {
     const put = (id, type, sp, y) => {
       if (G.world.collected.has(id)) return null;
       const e = this.spawn(id, type, isl, isl.x + sp.x, isl.z + sp.z);
-      e.body.pos.y = y; e.yaw = r() * 6.28; return e;
+      e.body.pos.y = y; e.yaw = r() * 6.28; e.mesh.position.copy(e.body.pos); e.mesh.rotation.y = e.yaw; return e;
     };
     if (isl.siteType === 'seatower') {
       for (const t of isl.towers || []) {
