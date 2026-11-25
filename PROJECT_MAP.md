@@ -75,6 +75,7 @@ Convenção das armas: origem na empunhadura, cano em **-Z**, +Y cima, +X direit
 ## 7. Rede (resumo)
 Cliente→servidor: `join`, `state` (posição/yaw/a bordo/nadando/vel/morto), `boat` (só host), `physics` (só host), `sail`, `sail-install`, `carry`, `place`, `weld`, `unweld`, `crate:open/take`, `add/remove/collect`.
 Servidor→cliente: `welcome`, `full`, `snap` (jogadores+barco), e reenvios dos itens acima.
+**Lobby:** sala criada pelo menu (`join` com `create`) nasce com `room.lobby = true`; `welcome.lobby` traz `{host, max, players:[{id,name,ap}]}` e o menu abre `#lobbyModal` em vez de iniciar. Atualizações chegam por `lobby`; o capitão manda `lobby:start` e o servidor responde a todos `lobby:go` com `at` (hora do servidor, +1,5 s). Cada cliente espera até `at` (`serverNow()` em `core/util.js`) e chama `start()` → cutscene começa junta, já com os passageiros do lobby (`G.net.lobbyPlayers`). Quem entra depois do início vai direto para a partida.
 **Não sincronizado ainda:** inimigos, dano, inventário, arma equipada e ataques (cada cliente simula os seus).
 Jogadores remotos usam `makeHumanoid` (sem arma). Para mostrar ataque/arma dos outros: enviar `weaponId` + evento de ataque em `net.update` e animar o remoto.
 

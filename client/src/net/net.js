@@ -45,6 +45,7 @@ export class Net {
       ws.onerror = () => fail('Não foi possível conectar');
       ws.onclose = () => {
         clearTimeout(timer); fail('Conexão fechada');
+        if (this.online && this.onLobby) { this.online = false; this.isHost = true; const cb = this.onLobby; this.onLobby = null; cb({ t: 'closed' }); return; }
         if (this.online) {
           this.online = false; this.isHost = true;
           for (const r of this.remotes.values()) r.mesh.parent && r.mesh.parent.remove(r.mesh);
@@ -58,9 +59,17 @@ export class Net {
         if (m.t === 'welcome') { clearTimeout(timer); done = true; this.id = m.id; this.isHost = m.host === m.id; this.online = true; this._startTimeSync(); resolve(m); }
         else if (m.t === 'full') fail('Sala cheia');
         else if (m.t === 'join-error') { const e = new Error(m.reason || 'Não foi possível entrar'); e.needPassword = !!m.needPassword; if (!done) { done = true; reject(e); } ws.close(); }
+        else if (m.t === 'lobby' || m.t === 'lobby:go') { if (this.onLobby) this.onLobby(m); }
         else if (this.G.started) this.handle(m);
       };
     });
+  }
+
+  // Sai da sala (ex.: botão "Sair" do lobby) sem o aviso de "desconectado".
+  disconnect() {
+    this.online = false; this.isHost = true; this.id = 'local'; this.onLobby = null;
+    clearInterval(this._timeTimer);
+    if (this.ws) { try { this.ws.close(); } catch { /* ok */ } this.ws = null; }
   }
 
   // Acerto de relógio com o servidor (estilo NTP): manda a hora local, o servidor devolve a dele;

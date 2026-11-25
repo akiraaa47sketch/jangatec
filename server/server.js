@@ -27,7 +27,7 @@ function roomList() {
     const host = r.players.get(r.hostId);
     return {
       id: r.name, title: r.title || r.name, players: r.players.size, max: r.max || MAX_PLAYERS,
-      locked: !!r.passHash, host: host ? host.name : '', phase: r.start ? r.start.phase : 'build',
+      locked: !!r.passHash, host: host ? host.name : '', phase: r.lobby ? 'lobby' : r.start ? r.start.phase : 'build',
       dist: r.boat ? Math.round(Math.hypot(r.boat.x || 0, r.boat.z || 0)) : 0, age: Math.round((Date.now() - (r.created || Date.now())) / 1000),
     };
   }).sort((a, b) => b.players - a.players || a.age - b.age).slice(0, 60);
@@ -42,11 +42,17 @@ function getRoom(name, meta = {}) {
       seed: Number.isFinite(meta.seed) ? Math.floor(Math.abs(meta.seed)) % 1e9 : Math.floor(Math.random() * 1e9), players: new Map(), hostId: null,
       added: [], removed: [], collected: [], placed: new Map(), welded: new Map(),
       crates: new Map(), drops: new Map(), props: [], boat: null, start: null,
+      lobby: !!meta.lobby, // sala criada no menu: espera no lobby até o capitão iniciar
     };
     rooms.set(name, r);
   }
   return r;
 }
+// Lobby: lista de quem está esperando (nome + aparência) e quem é o capitão.
+function lobbyInfo(room) {
+  return { host: room.hostId, max: room.max || MAX_PLAYERS, players: [...room.players.entries()].map(([id, p]) => ({ id, name: p.name, ap: p.ap || '' })) };
+}
+function lobbyUpdate(room) { if (room.lobby) broadcast(room, { t: 'lobby', lobby: lobbyInfo(room) }); }
 const send = (ws, m) => { if (ws.readyState === 1) ws.send(JSON.stringify(m)); };
 function broadcast(room, m, except) {
   const s = JSON.stringify(m);
@@ -120,6 +126,7 @@ function leave(ws) {
   if (room.players.size === 0) { rooms.delete(room.name); return; }
   if (room.hostId === ws.id) room.hostId = room.players.keys().next().value; // migração de host
   broadcast(room, { t: 'msg', text: `${ws.name} saiu` });
+  lobbyUpdate(room);
 }
 
 function handle(ws, m) {
@@ -136,26 +143,35 @@ function handle(ws, m) {
     const max = Math.max(1, Math.min(MAX_PLAYERS, m.max | 0 || MAX_PLAYERS));
     const room = getRoom(id, m.create ? {
       title: String(m.title || m.room).slice(0, 28), password: m.password ? String(m.password).slice(0, 32) : '', max,
-      seed: Number(m.seed),
+      seed: Number(m.seed), lobby: true,
     } : { title: String(m.room || 'Pública').slice(0, 28) });
     if (room.passHash && hashPw(id, m.password || '') !== room.passHash) { send(ws, { t: 'join-error', reason: 'Senha incorreta', needPassword: true }); return; }
     if (room.players.size >= (room.max || MAX_PLAYERS)) { send(ws, { t: 'full' }); ws.close(); return; }
     ws.name = String(m.name || 'Náufrago').slice(0, 16);
     ws.room = room;
-    room.players.set(ws.id, { ws, name: ws.name, state: null });
+    room.players.set(ws.id, { ws, name: ws.name, state: null, ap: typeof m.ap === 'string' ? m.ap.slice(0, 60) : '' });
     if (!room.hostId) room.hostId = ws.id;
     send(ws, {
       t: 'welcome', id: ws.id, seed: room.seed, host: room.hostId, room: { id: room.name, title: room.title, locked: !!room.passHash, max: room.max },
       added: room.added, removed: room.removed, collected: room.collected,
       placed: [...room.placed.values()], welded: [...room.welded.values()],
       crates: [...room.crates.values()], drops: [...room.drops.values()], props: room.props, boat: room.boat, start: room.start, event: room.event || null,
+      lobby: room.lobby ? lobbyInfo(room) : null,
     });
     broadcast(room, { t: 'msg', text: `${ws.name} entrou` }, ws);
+    lobbyUpdate(room);
     return;
   }
   const room = ws.room;
   if (!room) return;
   switch (m.t) {
+    case 'lobby:start': {
+      // o capitão iniciou: todos começam a cutscene no mesmo instante (hora do servidor)
+      if (!room.lobby || room.hostId !== ws.id) break;
+      room.lobby = false;
+      broadcast(room, { t: 'lobby:go', at: Date.now() + 1500, lobby: lobbyInfo(room) });
+      break;
+    }
     case 'state': room.players.get(ws.id).state = m.s; break;
     case 'boat': if (room.hostId === ws.id) room.boat = m.b; break;
     case 'sail': broadcast(room, { t: 'sail', up: !!m.up, angle: +m.angle || 0 }); break;

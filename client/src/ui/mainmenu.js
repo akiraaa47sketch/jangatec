@@ -2,11 +2,12 @@
 // Opções (gráficos e chat de voz) · Controles. O fundo é a cena 3D da jangada girando.
 import { Net } from '../net/net.js';
 import { DEFAULT_SERVER } from '../config.js';
+import { serverNow } from '../core/util.js';
 import { renderPatchNotes, NEWS_VERSION } from './patchnotes.js';
 
 const $ = (id) => document.getElementById(id);
 const esc = (t) => String(t).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
-const PHASE = { build: 'montando a jangada', install: 'instalando a vela', calm: 'calmaria', storm: 'tempestade chegando', flood: 'inundação', board: 'embarcando', depart: 'navegando' };
+const PHASE = { lobby: 'no lobby, esperando o capitão', build: 'montando a jangada', install: 'instalando a vela', calm: 'calmaria', storm: 'tempestade chegando', flood: 'inundação', board: 'embarcando', depart: 'navegando' };
 const NAME_KEY = 'jangatec-nome', SERVER_KEY = 'jangatec-servidor';
 const NEWS_KEY = 'jangatec-novidades-vistas'; // selo "NOVO" some depois de abrir a versão atual (ui/patchnotes.js)
 
@@ -41,6 +42,9 @@ export class MainMenu {
       const room = this.rooms.find((r) => r.id === b.dataset.room); if (!room) return;
       if (room.locked) this.askPassword(room); else this.join(room.id, { mustExist: true });
     };
+    // lobby
+    $('lobbyLeave').onclick = () => this.leaveLobby();
+    $('lobbyStart').onclick = () => { if (this.G.net.isHost) { $('lobbyStart').disabled = true; this.G.net.send({ t: 'lobby:start' }); } };
     // senha
     $('pwCancel').onclick = () => { $('pwModal').hidden = true; };
     $('pwForm').onsubmit = (e) => { e.preventDefault(); const r = this.pwRoom; if (r) this.join(r.id, { password: $('pwInput').value, mustExist: true }, true); };
@@ -119,8 +123,11 @@ export class MainMenu {
     if (this.busy) return;
     this.busy = true;
     this.status('Conectando… (o servidor grátis pode levar até 1 min para acordar)');
-    this.G.net.connect(this.url(), this.name(), room, opts)
-      .then((m) => { this.busy = false; clearInterval(this.pollT); $('pwModal').hidden = true; this.status(''); this.actions.multi(m); })
+    this.G.net.connect(this.url(), this.name(), room, { ...opts, ap: this.G.net.localLook() })
+      .then((m) => {
+        this.busy = false; clearInterval(this.pollT); $('pwModal').hidden = true; this.status('');
+        if (m.lobby) this.openLobby(m); else this.actions.multi(m);
+      })
       .catch((e) => {
         this.busy = false;
         if (e.needPassword) {
@@ -133,6 +140,56 @@ export class MainMenu {
         if (fromModal) $('pwErr').textContent = e.message;
         this.refresh();
       });
+  }
+
+  // ---------- lobby (sala criada: espera todo mundo e o capitão inicia) ----------
+  openLobby(welcome) {
+    const net = this.G.net;
+    this.lobby = { welcome, going: false };
+    $('lobbyTitle').textContent = (welcome.room && welcome.room.title) || 'Sala';
+    $('lobbyStart').disabled = false;
+    $('lobbyModal').hidden = false;
+    this.renderLobby(welcome.lobby);
+    net.onLobby = (m) => {
+      if (!this.lobby || this.lobby.going) return;
+      if (m.t === 'closed') { this.lobby = null; $('lobbyModal').hidden = true; this.status('A conexão com a sala caiu. Tente entrar de novo.'); return; }
+      if (m.t === 'lobby') { this.renderLobby(m.lobby); return; }
+      // lobby:go — todos entram na cutscene no mesmo instante marcado pelo servidor
+      this.lobby.going = true;
+      this.renderLobby(m.lobby);
+      $('lobbyStart').hidden = true;
+      $('lobbyLeave').disabled = true;
+      $('lobbyTip').textContent = 'Decolando…';
+      const wait = Math.max(0, Math.min(5000, m.at - serverNow()));
+      setTimeout(() => {
+        $('lobbyModal').hidden = true; $('lobbyLeave').disabled = false; net.onLobby = null;
+        net.lobbyPlayers = m.lobby.players.filter((p) => p.id !== net.id); // passageiros da cutscene
+        this.lobby = null;
+        this.actions.multi(welcome);
+      }, wait);
+    };
+  }
+  renderLobby(info) {
+    if (!info) return;
+    const net = this.G.net;
+    net.isHost = info.host === net.id;
+    $('lobbyCount').textContent = `${info.players.length}/${info.max}`;
+    const rows = info.players.map((p) => `<li>${esc(p.name)}${p.id === net.id ? ' <span class="you">(você)</span>' : ''}${p.id === info.host ? '<span class="cap">capitão</span>' : ''}</li>`);
+    for (let i = info.players.length; i < info.max; i++) rows.push('<li class="empty">vaga livre</li>');
+    $('lobbyList').innerHTML = rows.join('');
+    if (this.lobby && this.lobby.going) return;
+    $('lobbyStart').hidden = !net.isHost;
+    $('lobbyTip').textContent = net.isHost
+      ? (info.players.length > 1 ? 'Todo mundo pronto? Aperte iniciar — a cutscene começa para todos juntos.' : 'Chame a tripulação ou inicie sozinho. A cutscene começa para todos juntos.')
+      : 'Aguardando o capitão iniciar a partida…';
+  }
+  leaveLobby() {
+    if (!this.lobby || this.lobby.going) return;
+    this.lobby = null;
+    this.G.net.disconnect();
+    $('lobbyModal').hidden = true;
+    this.refresh(true);
+    if (this.tab === 'servers') { clearInterval(this.pollT); this.pollT = setInterval(() => this.refresh(), 4000); }
   }
 
   // ---------- chat de voz ----------
