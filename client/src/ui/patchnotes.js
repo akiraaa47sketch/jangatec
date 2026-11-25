@@ -12,6 +12,7 @@ export const PATCH_NOTES = [
       { tag: 'Seca', titulo: 'Canhões e arpões no fundo do mar', texto: 'Canhões e a torreta-arpão **não saem mais de caixas**: ficam **jogados no chão da seca**, meio enterrados, com um **anel dourado** em volta. Pegue com [E].' },
     ],
     secoes: [
+      { icone: '🌧', nome: 'Chuva', itens: ['**Chuva nova**: gotas em **riscos** compridos, caindo rápido e inclinadas pelo vento (antes eram pontinhos que pareciam neve).', '**Respingos** onde a chuva bate na água e no convés; quanto mais forte a tempestade, mais grossa a chuva.'] },
       { icone: '🐟', nome: 'Peixes-voadores', itens: ['Bem mais **raros** (~1/5 da chance dos outros eventos).', '**Modelo novo**: dorso azul e barriga prateada, olhos grandes, "asas" com raios, nadadeiras e cauda bifurcada.'] },
       { icone: '⚡', nome: 'Raios', itens: ['Raios **muito mais visíveis**: tronco grosso com brilho, **galhos**, clarão na nuvem e no impacto, faíscas e 2–3 piscadas como raio de verdade.', 'Nas tempestades e no redemoinho os relâmpagos agora mostram o **raio caindo no mar** ao longe.'] },
       { icone: '💣', nome: 'Canhões e arpão', itens: ['Canhão improvisado em qualquer lugar do fundo; **canhão de ferro** do meio da rota em diante; **torreta-arpão** a partir da 2ª região (rara antes).'] },

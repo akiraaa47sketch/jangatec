@@ -3,6 +3,7 @@ import { clamp, mulberry32, clock } from '../core/util.js';
 import { sea } from '../world/ocean.js';
 const GHOST_FOG = new THREE.Color(0x6f9a8e);
 import { Tide } from './tide.js';
+import { Rain } from '../world/rain.js';
 
 const PHASES = new Set(['build', 'install', 'calm', 'storm', 'flood', 'board', 'depart']);
 const CALM_DURATION = 7;
@@ -41,7 +42,7 @@ export class Startup {
     this.clearSun = new THREE.Color(0xfff1d0);
     this.stormSun = new THREE.Color(0x8795a3);
     this.clouds = this._makeClouds();
-    this.rain = this._makeRain();
+    this.rain = new Rain(G); // chuva em riscos com respingos (world/rain.js)
   }
 
   get departed() { return this.phase === 'depart'; }
@@ -72,23 +73,7 @@ export class Startup {
     return clouds;
   }
 
-  _makeRain() {
-    const count = 420, positions = new Float32Array(count * 3);
-    for (let i = 0; i < count; i++) {
-      positions[i * 3] = (Math.random() - 0.5) * 36;
-      positions[i * 3 + 1] = Math.random() * 22;
-      positions[i * 3 + 2] = (Math.random() - 0.5) * 36;
-    }
-    const geometry = new THREE.BufferGeometry();
-    geometry.setAttribute('position', new THREE.BufferAttribute(positions, 3));
-    const material = new THREE.PointsMaterial({
-      color: 0xc3d3de, size: 0.075, transparent: true, opacity: 0, depthWrite: false,
-    });
-    const rain = new THREE.Points(geometry, material);
-    rain.visible = false;
-    this.G.scene.add(rain);
-    return rain;
-  }
+
 
   begin(island, savedState = null) {
     this.island = island || null;
@@ -289,21 +274,8 @@ export class Startup {
       cloud.children[0].material.opacity = storm * 0.78;
     }
 
-    const rainOpacity = clamp((storm - 0.38) * 1.35, 0, 0.72);
-    this.rain.visible = rainOpacity > 0.01;
-    this.rain.material.opacity = rainOpacity;
-    this.rain.position.set(player.x, player.y - 7, player.z);
-    const positions = this.rain.geometry.attributes.position.array;
-    for (let i = 0; i < positions.length; i += 3) {
-      positions[i] += (1.5 + storm * 8) * dt;
-      positions[i + 1] -= (12 + storm * 12) * dt;
-      if (positions[i + 1] < -7) {
-        positions[i] = (Math.random() - 0.5) * 36;
-        positions[i + 1] = 15 + Math.random() * 14;
-        positions[i + 2] = (Math.random() - 0.5) * 36;
-      }
-    }
-    this.rain.geometry.attributes.position.needsUpdate = true;
+    // chuva: começa com a tempestade passando da metade e engrossa até o máximo
+    this.rain.update(dt, clamp((storm - 0.35) * 1.6, 0, 1), storm);
   }
 
   spawnPosition() {
