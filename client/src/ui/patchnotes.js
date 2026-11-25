@@ -5,6 +5,12 @@
 // Nos textos, **assim** vira negrito.
 export const PATCH_NOTES = [
   {
+    id: '0.30', versao: 'v0.30', data: '25/11/2026', titulo: 'Inimigos armados balanceados',
+    secoes: [
+      { icone: '🔫', nome: 'Inimigos armados', itens: ['**Não atiram mais através de paredes**: a linha de visão é conferida em cada tiro (os piratas no convés atiravam através das paredes da jangada). O tiro do atirador de elite também para na parede.', '**Erram bem mais**: a pontaria começa ruim e melhora enquanto eles te veem (~1,6 s); perde mais com a distância e quando você anda ou corre. Tiro errado passa longe.', '**Dano por zona**: na **Zona Pirata** os tiros tiram 55–70% do dano normal; Zona Militar 90%; Zona 51 100%.', 'Pistoleiro pirata: 13 → **9** de dano (≈5 na Zona Pirata). Soldado e agente com pontaria menor.'] },
+    ],
+  },
+  {
     id: '0.29', versao: 'v0.29', data: '25/11/2026', titulo: 'Seis eventos novos',
     destaques: [
       { tag: 'Evento', titulo: 'Águas-vivas bioluminescentes', texto: 'O céu escurece e dezenas de **águas-vivas brilhando** cercam a jangada, com o mar cintilando em volta. Lindo — mas quem cair na água leva queimadura.' },
