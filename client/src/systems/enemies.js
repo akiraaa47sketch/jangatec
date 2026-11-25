@@ -942,16 +942,11 @@ export class Enemies {
       if (e.cd <= 0 && distance < e.def.range) { e.cd = e.def.cd * (0.85 + Math.random() * 0.4); e.burstLeft = e.def.burst ?? 1; e.burstT = 0.35; }
       e.los = true; this._burst(e, T, distance, dt);
     }
+    const preX = e.local.x, preZ = e.local.z; // onde ele estava antes de andar neste quadro
     if (!T.dead && !T.downed && distance > stopAt && !(mres && mres.hold)) {
       moved = Math.min(distance - stopAt, (e.engaged === false ? 0.45 : 1) * e.def.speed * dt);
       e.local.x += dx / distance * moved;
       e.local.z += dz / distance * moved;
-      const radius = Math.max(1.5, Math.min(boat.set.radius - 0.75, 3.8));
-      const localLength = Math.hypot(e.local.x, e.local.z);
-      if (localLength > radius) {
-        e.local.x *= radius / localLength;
-        e.local.z *= radius / localLength;
-      }
     }
     if (!(mres && mres.hold)) { // no convés também não se empilham
       for (const o of this.list) {
@@ -960,14 +955,14 @@ export class Enemies {
         if (d > 0.001 && d < 1.2) { e.local.x += ox / d * (1.2 - d) * 3 * dt; e.local.z += oz / d * (1.2 - d) * 3 * dt; }
       }
     }
-    // Borda do convés: andando sozinhos, os piratas não saem da jangada. Fora do piso, voltam para o
-    // ponto de convés MAIS PERTO (antes voltavam para uma posição antiga guardada — com a jangada
-    // balançando na onda isso virava um "teleporte" de até 4 m para o meio dela). Um empurrão
-    // (golpe, chute) pode jogá-los no mar: aí eles nadam de volta e escalam a borda.
-    if (!this.isDry(boat.x, boat.z) && !e.knock && !this._deckUnder(e.local.x, e.local.z, e.local.y)) {
-      const [wx, wz] = boat.toWorld(e.local.x, e.local.z);
-      const L = this._findPirateLanding({ x: wx, z: wz }, boat);
-      if (L && L.distance < 2.5) { e.local.x = L.x; e.local.z = L.z; }
+    // Borda do convés: andando sozinhos, os piratas não saem da jangada — o passo que o levaria para
+    // fora do piso simplesmente não acontece (como uma parede). NUNCA reposiciona: antes ele era
+    // colocado de volta numa posição guardada (ou puxado para um raio fixo) e "teleportava" para o
+    // meio da jangada quando relava na água ou a jangada balançava. Um empurrão (golpe, chute) pode
+    // jogá-lo no mar: aí ele nada de volta e escala a borda.
+    if (!this.isDry(boat.x, boat.z) && !e.knock && (e.local.x !== preX || e.local.z !== preZ) &&
+        !this._deckUnder(e.local.x, e.local.z, e.local.y, 0) && this._deckUnder(preX, preZ, e.local.y, 0)) {
+      e.local.x = preX; e.local.z = preZ;
     }
     const [x, z] = boat.toWorld(e.local.x, e.local.z);
     const previousY = p.y;
@@ -1034,7 +1029,7 @@ export class Enemies {
       if (c.type === 'cyl') { if (Math.hypot(x, z) > c.hx) continue; }
       else if (Math.abs(x) > c.hx - margin || Math.abs(z) > c.hz - margin) continue;
       const top = c.y + c.hy;
-      if (top <= ly + 0.6 && top >= ly - 1.5) return true;
+      if (top <= ly + 1.0 && top >= ly - 2.0) return true;
     }
     return false;
   }
