@@ -208,3 +208,49 @@ export function scaleBoxUVs(geo, w, h, l) {
   uv.needsUpdate = true;
   return geo;
 }
+
+// Pano da vela: lona clara com painéis costurados, faixa vermelha com emblema (sol sobre ondas),
+// linha de rizo com os pontinhos de amarração, reforços nos cantos e corda de borda escura.
+export function sailTexture() {
+  return once('sail', () => {
+    const S = 512, [c, g] = canvas(S), r = mulberry32(57);
+    g.fillStyle = '#f1e9d6'; g.fillRect(0, 0, S, S);
+    for (let y = 0; y < S; y += 2) { g.fillStyle = `rgba(120,100,70,${0.025 + r() * 0.035})`; g.fillRect(0, y, S, 1); }
+    for (let x = 0; x < S; x += 2) { g.fillStyle = `rgba(120,100,70,${0.02 + r() * 0.03})`; g.fillRect(x, 0, 1, S); }
+    // painéis verticais costurados
+    for (let x = S / 6; x < S - 4; x += S / 6) {
+      g.fillStyle = 'rgba(110,90,60,0.18)'; g.fillRect(x - 3, 0, 6, S);
+      g.strokeStyle = 'rgba(90,70,45,0.55)'; g.setLineDash([5, 4]); g.lineWidth = 1;
+      g.beginPath(); g.moveTo(x - 6, 0); g.lineTo(x - 6, S); g.moveTo(x + 6, 0); g.lineTo(x + 6, S); g.stroke();
+    }
+    g.setLineDash([]);
+    // faixa vermelha e emblema
+    const by = S * 0.56;
+    g.fillStyle = '#b23a2a'; g.fillRect(0, by, S, S * 0.09);
+    g.fillStyle = 'rgba(255,255,255,0.12)'; g.fillRect(0, by + 4, S, 3);
+    g.save(); g.translate(S / 2, S * 0.36);
+    g.fillStyle = '#c7462f'; g.beginPath(); g.arc(0, 0, S * 0.12, 0, Math.PI * 2); g.fill();          // sol
+    g.strokeStyle = '#c7462f'; g.lineWidth = 6;
+    for (let i = 0; i < 12; i++) { const a = i / 12 * Math.PI * 2; g.beginPath(); g.moveTo(Math.cos(a) * S * 0.15, Math.sin(a) * S * 0.15); g.lineTo(Math.cos(a) * S * 0.19, Math.sin(a) * S * 0.19); g.stroke(); }
+    g.strokeStyle = '#f1e9d6'; g.lineWidth = 7;                                                         // ondas cortando o sol
+    for (const yy of [S * 0.03, S * 0.075]) { g.beginPath(); for (let x = -S * 0.16; x <= S * 0.16; x += 4) g.lineTo(x, yy + Math.sin(x / 14) * 5); g.stroke(); }
+    g.restore();
+    // linha de rizo com pontos de amarração
+    const ry = S * 0.78;
+    g.strokeStyle = 'rgba(90,70,45,0.6)'; g.lineWidth = 2; g.beginPath(); g.moveTo(0, ry); g.lineTo(S, ry); g.stroke();
+    for (let x = S / 16; x < S; x += S / 8) { g.fillStyle = '#5a4126'; g.beginPath(); g.arc(x, ry, 4, 0, Math.PI * 2); g.fill(); g.fillRect(x - 1, ry, 2, 16); }
+    // reforços nos cantos e manchas de sal
+    g.fillStyle = 'rgba(200,185,150,0.85)';
+    for (const [x, y, sx, sy] of [[0, 0, 1, 1], [S, 0, -1, 1], [0, S, 1, -1], [S, S, -1, -1]]) { g.beginPath(); g.moveTo(x, y); g.lineTo(x + sx * 70, y); g.lineTo(x, y + sy * 70); g.fill(); }
+    for (let i = 0; i < 30; i++) {
+      const x = r() * S, y = r() * S, rad = 10 + r() * 40, grad = g.createRadialGradient(x, y, 0, x, y, rad);
+      grad.addColorStop(0, `rgba(110,90,60,${0.04 + r() * 0.06})`); grad.addColorStop(1, 'rgba(110,90,60,0)');
+      g.fillStyle = grad; g.fillRect(x - rad, y - rad, rad * 2, rad * 2);
+    }
+    // corda de borda
+    g.strokeStyle = '#6b5235'; g.lineWidth = 10; g.strokeRect(5, 5, S - 10, S - 10);
+    g.strokeStyle = 'rgba(255,255,255,0.15)'; g.lineWidth = 2; g.strokeRect(8, 8, S - 16, S - 16);
+    const t = new THREE.CanvasTexture(c); t.colorSpace = THREE.SRGBColorSpace; t.anisotropy = 4;
+    return t;
+  });
+}

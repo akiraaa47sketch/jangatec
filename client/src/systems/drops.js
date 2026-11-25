@@ -7,6 +7,7 @@ import { WEAPONS } from './combat.js';
 import { waveHeight } from '../world/ocean.js';
 import { clock } from '../core/util.js';
 import { sfx } from '../core/sfx.js';
+import { makeItemModel } from '../world/itemmodels.js';
 
 export const lootLabel = (loot) => Object.entries(loot).map(([k, n]) => {
   if (k.startsWith('arma_')) { const w = WEAPONS.find((e) => e.id === k.slice(5)); return w ? w.nome : 'Arma'; }
@@ -58,7 +59,10 @@ export class Drops {
 
   spawn(d) {
     if (!d || this.list.has(d.id)) return;
-    const mesh = makeSack(Object.keys(d.loot).some((k) => k.startsWith('arma_')));
+    // o item aparece com o modelo dele (arma, bandagem, kit, colete...) — não mais um saquinho
+    let mesh, glint = null;
+    try { const m = makeItemModel(d.loot); mesh = m.group; glint = m.glint; } catch (e) { mesh = makeSack(Object.keys(d.loot).some((k) => k.startsWith('arma_'))); }
+    mesh.userData.glint = glint;
     this.G.scene.add(mesh);
     this.list.set(d.id, { ...d, mesh, t: Math.random() * 6 });
     this.place(this.list.get(d.id), 0);
@@ -67,8 +71,7 @@ export class Drops {
   remove(id) {
     const d = this.list.get(id);
     if (!d) return;
-    this.G.scene.remove(d.mesh);
-    d.mesh.traverse((o) => { if (o.isMesh) o.material.dispose(); });
+    this.G.scene.remove(d.mesh); // (materiais/geometrias são compartilhados com as armas na mão: não descarta)
     this.list.delete(id);
   }
 
@@ -107,8 +110,10 @@ export class Drops {
       y = h - 0.12;
     }
     m.position.set(x, y, z);
-    m.rotation.y = (d.ab ? G.boat.yaw : 0) + d.t * 0.3;
-    m.userData.ring.material.opacity = 0.35 + Math.sin(d.t * 3) * 0.2;
+    m.rotation.y = (d.ab ? G.boat.yaw : 0) + (d.yaw0 ??= Math.random() * 6.28); // parado, deitado no chão
+    if (m.userData.ring) m.userData.ring.material.opacity = 0.35 + Math.sin(d.t * 3) * 0.2;
+    const gl = m.userData.glint; // brilho branco que pisca de vez em quando
+    if (gl) { const ph = (d.t * 0.45 + (d.yaw0 || 0)) % 1; gl.material.opacity = ph < 0.12 ? Math.sin(ph / 0.12 * Math.PI) * 0.9 : 0; gl.material.rotation = d.t; }
   }
 
   update(dt) { for (const d of this.list.values()) this.place(d, dt); }

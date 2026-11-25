@@ -5,6 +5,15 @@
 // Nos textos, **assim** vira negrito.
 export const PATCH_NOTES = [
   {
+    id: '0.32', versao: 'v0.32', data: '25/11/2026', titulo: 'Vela nova, caixas e itens no chão',
+    secoes: [
+      { icone: '⛵', nome: 'Vela', itens: ['**Corrigida**: a borda de cima fica presa na verga (antes ela se descolava e sacudia solta, pior com a vela baixada).', '**Mais detalhada**: painéis costurados, faixa vermelha com emblema, linha de rizo, reforços e corda de borda; barriga de vento de verdade.', 'Baixada, ela fica **enrolada e amarrada** embaixo da verga. Escotas ligam os cantos ao convés e amantilhos seguram a verga.'] },
+      { icone: '📦', nome: 'Caixas', itens: ['**Janela nova**: cartões com ícone, cor de raridade, estrelas e quantidade; animação ao abrir e ao pegar.', '**Pegar tudo** com um botão ou com [E].', 'A caixa **estoura ao abrir**: poeira, brilho dourado e um tranco; a janela aparece depois que a tampa abre.'] },
+      { icone: '🎒', nome: 'Itens largados', itens: ['Aparecem com o **modelo do item** (a arma, a bandagem, o kit, o colete, o peixe, o canhão...) deitados no chão, no lugar do saquinho com anel amarelo.', 'Um brilho branco pisca de vez em quando para dar para achar.'] },
+      { icone: '✨', nome: 'Correção', itens: ['Com o reflexo em **tempo real** a tela podia ficar **preta** quando havia itens no chão (o reflexo lia a própria imagem). Agora só a jangada usa o reflexo em tempo real; os outros metais refletem o céu.'] },
+    ],
+  },
+  {
     id: '0.31', versao: 'v0.31', data: '25/11/2026', titulo: 'Colete balístico',
     destaques: [
       { tag: 'Item novo', titulo: 'Colete balístico', texto: 'Só na **Zona Militar**, **um por ilha** (numa das caixas). Vestido, corta **metade do dano de tiros** — só projéteis: explosões, canhão, morteiro e golpes passam normal. **Não se gasta**: vestiu, fica.' },

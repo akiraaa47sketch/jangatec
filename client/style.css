@@ -171,18 +171,46 @@ body.touch #banjoPanel { bottom: 8px; padding: 8px; } body.touch #banjoPanel .ti
 
 /* ---------- caixa de loot ---------- */
 #lootPanel { position: fixed; z-index: 5; left: 50%; top: 50%; transform: translate(-50%, -50%);
-  width: min(400px, 92vw); max-height: 80vh; overflow-y: auto; padding: 18px;
-  background: var(--panel); border: 1px solid var(--line); border-radius: 12px;
-  box-shadow: inset 0 0 0 4px rgba(13, 34, 48, 0.9), inset 0 0 0 5px rgba(224, 172, 76, 0.3), 0 12px 50px rgba(0, 0, 0, 0.5); }
+  width: min(460px, 94vw); max-height: 82vh; overflow-y: auto; padding: 18px 18px 16px;
+  background: radial-gradient(120% 80% at 50% 0%, rgba(224, 172, 76, 0.16), transparent 60%), var(--panel);
+  border: 1px solid var(--line); border-radius: 14px;
+  box-shadow: inset 0 0 0 4px rgba(13, 34, 48, 0.9), inset 0 0 0 5px rgba(224, 172, 76, 0.3), 0 16px 60px rgba(0, 0, 0, 0.55); }
+#lootPanel.pop { animation: lootPop 0.32s cubic-bezier(.2, 1.4, .4, 1) both; }
+@keyframes lootPop { from { opacity: 0; transform: translate(-50%, -46%) scale(0.86); } to { opacity: 1; transform: translate(-50%, -50%) scale(1); } }
 #lootPanel header { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
-#lootPanel h2 { margin: 0; font: 400 28px var(--display); color: var(--brass-2); }
-#lootClose, #lootItems button { border: 1px solid var(--line); border-radius: 7px; padding: 9px 11px;
-  color: var(--ink); background: rgba(255, 255, 255, 0.06); font: inherit; cursor: pointer; }
-#lootClose:hover, #lootItems button:hover { background: rgba(224, 172, 76, 0.22); }
-#lootItems button:disabled { opacity: 0.45; cursor: not-allowed; }
-#lootStatus { min-height: 1.4em; margin: 12px 0 8px; color: var(--ink-dim); }
-#lootItems { display: grid; gap: 7px; }
-#lootItems button { text-align: left; }
+#lootPanel h2 { margin: 0; font: 400 30px var(--display); color: var(--brass-2); display: flex; align-items: center; gap: 10px; }
+#lootPanel h2::before { content: '📦'; font-size: 24px; filter: drop-shadow(0 2px 3px rgba(0,0,0,0.5)); }
+#lootClose, #lootAll { border: 1px solid var(--line); border-radius: 8px; padding: 8px 12px; color: var(--ink);
+  background: rgba(255, 255, 255, 0.06); font: 700 13px var(--ui); cursor: pointer; }
+#lootClose:hover { background: rgba(255, 255, 255, 0.14); }
+#lootAll { width: 100%; margin-top: 12px; padding: 11px; font-size: 15px; letter-spacing: 0.04em; text-transform: uppercase;
+  background: linear-gradient(180deg, #f0c76a, #c8902f); color: #2b1c08; border-color: #f3cf7e; box-shadow: 0 3px 0 #7a5418; }
+#lootAll:hover { filter: brightness(1.08); } #lootAll:active { transform: translateY(2px); box-shadow: 0 1px 0 #7a5418; }
+#lootStatus { min-height: 1.4em; margin: 10px 0 10px; color: var(--ink-dim); font-size: 13px; }
+#lootItems { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+@media (max-width: 460px) { #lootItems { grid-template-columns: 1fr; } }
+.loot-card { position: relative; display: grid; grid-template-columns: 44px 1fr auto; align-items: center; gap: 10px; text-align: left;
+  padding: 8px 10px 8px 8px; border-radius: 10px; cursor: pointer; color: var(--ink); font: inherit; overflow: hidden;
+  background: linear-gradient(90deg, color-mix(in srgb, var(--rar) 22%, transparent), rgba(255, 255, 255, 0.04) 70%);
+  border: 1px solid color-mix(in srgb, var(--rar) 55%, transparent); border-left: 4px solid var(--rar);
+  animation: lootCard 0.35s cubic-bezier(.2, 1.2, .4, 1) both; transition: transform 0.12s, background 0.12s; }
+.loot-card:hover { transform: translateY(-2px); background: linear-gradient(90deg, color-mix(in srgb, var(--rar) 34%, transparent), rgba(255, 255, 255, 0.08) 70%); }
+.loot-card .ic { width: 44px; height: 44px; display: grid; place-items: center; font-size: 26px; border-radius: 9px;
+  background: rgba(0, 0, 0, 0.28); box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--rar) 60%, transparent), inset 0 0 14px color-mix(in srgb, var(--rar) 35%, transparent); }
+.loot-card .nm { display: flex; flex-direction: column; min-width: 0; }
+.loot-card .nm b { font-weight: 800; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.loot-card .nm span { font-size: 11px; color: var(--ink-dim); text-transform: uppercase; letter-spacing: 0.08em; }
+.loot-card .nm .stars { color: var(--rar); letter-spacing: 1px; font-size: 12px; }
+.loot-card .qt { font: 400 20px var(--display); color: var(--brass-2); }
+.loot-card .take { position: absolute; right: 8px; bottom: 4px; font-size: 10px; text-transform: uppercase; letter-spacing: 0.1em; color: var(--rar); opacity: 0; transition: opacity 0.12s; }
+.loot-card:hover .take { opacity: 1; }
+.loot-card.taken { animation: lootTaken 0.18s ease-in forwards; pointer-events: none; }
+@keyframes lootCard { from { opacity: 0; transform: translateY(10px) scale(0.92); } to { opacity: 1; transform: none; } }
+@keyframes lootTaken { to { opacity: 0; transform: translateY(-14px) scale(0.9); } }
+.loot-loading { grid-column: 1 / -1; display: flex; justify-content: center; gap: 8px; padding: 18px; }
+.loot-loading i { width: 10px; height: 10px; border-radius: 50%; background: var(--brass); animation: lootDot 0.9s infinite ease-in-out; }
+.loot-loading i:nth-child(2) { animation-delay: 0.15s; } .loot-loading i:nth-child(3) { animation-delay: 0.3s; }
+@keyframes lootDot { 0%, 100% { opacity: 0.25; transform: scale(0.7); } 50% { opacity: 1; transform: scale(1); } }
 
 /* ---------- menu principal (Jangatec) ---------- */
 #menu, #help { position: fixed; inset: 0; display: flex; align-items: center; justify-content: center; }

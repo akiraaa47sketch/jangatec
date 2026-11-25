@@ -1,7 +1,11 @@
 // HUD em DOM, enxuto: vitais, arma, hotbar, objetivo curto, avisos e prompts.
 import { ITEM_NAMES, BUFFS } from '../systems/survival.js';
 import { WEAPONS } from '../systems/combat.js';
-import { keyOf } from '../core/keybinds.js';
+import { keyOf, binds } from '../core/keybinds.js';
+
+// ícones e cores da janela das caixas (raridade das armas pelas estrelas)
+const LOOT_ICON = { bandagem: '🩹', kit: '⛑️', municao: '🟡', cartucho: '🔴', bala_canhao: '⚫', canhao: '💣', canhao_ferro: '💣', gancho: '⚓', barra_proteina: '🍫', energetico: '🥤', chocolate: '🍫', peixe: '🐟', metal: '🔩', colete: '🦺' };
+const WEAPON_ICON = (w) => (w.tool ? '🛠️' : w.melee ? '🗡️' : w.id === 'escopeta' ? '💥' : '🔫');
 
 const $ = (id) => document.getElementById(id);
 const LIFE_C = 2 * Math.PI * 27, STAM_C = 2 * Math.PI * 21; // circunferências dos anéis (r=27 e r=21)
@@ -82,37 +86,56 @@ export class Hud {
   }
 
   openLoot(title, loot, onTake, onClose, pending = false) {
+    const panel = $('lootPanel'), wasOpen = !panel.hidden;
     $('lootTitle').textContent = title;
-    $('lootPanel').hidden = false;
-    this.renderLoot(loot, onTake, pending);
+    panel.hidden = false;
+    if (!wasOpen) { panel.classList.remove('pop'); void panel.offsetWidth; panel.classList.add('pop'); } // entra com animação
+    this.renderLoot(loot, onTake, pending, !wasOpen);
     $('lootClose').onclick = onClose;
+    $('lootClose').textContent = 'Fechar [Esc]';
+    // [E] pega tudo enquanto a janela está aberta
+    if (!this._lootKey) {
+      this._lootKey = (e) => { if (!$('lootPanel').hidden && e.code === binds.interact && !e.repeat) { e.preventDefault(); e.stopPropagation(); if (this._takeAll) this._takeAll(); } };
+      addEventListener('keydown', this._lootKey, true);
+    }
   }
 
-  renderLoot(loot, onTake, pending = false) {
+  renderLoot(loot, onTake, pending = false, stagger = false) {
     const list = $('lootItems');
     list.replaceChildren();
     const items = Object.entries(loot || {}).filter(([, amount]) => amount > 0);
+    const all = $('lootAll');
     if (pending) {
-      $('lootStatus').textContent = 'Carregando inventário da caixa…';
+      $('lootStatus').textContent = 'Abrindo a caixa…';
+      list.innerHTML = '<div class="loot-loading"><i></i><i></i><i></i></div>';
+      if (all) all.hidden = true;
+      this._takeAll = null;
       return;
     }
-    $('lootStatus').textContent = items.length ? 'Selecione um item para coletar' : 'Esta caixa está vazia';
-    for (const [id, amount] of items) {
+    $('lootStatus').textContent = items.length ? `${items.length} ${items.length === 1 ? 'item' : 'itens'} — clique para pegar` : 'Esta caixa está vazia';
+    this._takeAll = items.length && onTake ? () => { for (const [id, amount] of items) onTake(id, amount); } : null;
+    if (all) { all.hidden = !items.length; all.textContent = `Pegar tudo [${keyOf('interact')}]`; all.onclick = () => this._takeAll && this._takeAll(); }
+    // armas primeiro, depois pelo nome
+    items.sort((a, b) => (b[0].startsWith('arma_') - a[0].startsWith('arma_')) || a[0].localeCompare(b[0]));
+    items.forEach(([id, amount], i) => {
       const weapon = id.startsWith('arma_') && WEAPONS.find((entry) => entry.id === id.slice(5));
-      const label = weapon
-        ? `${weapon.nome} ${'★'.repeat(weapon.stars)}`
-        : ITEM_NAMES[id] || id;
-      const button = document.createElement('button');
-      button.type = 'button';
-      button.textContent = `${label}  × ${amount}  ·  Pegar`;
-      button.onclick = () => onTake && onTake(id, amount);
-      list.append(button);
-    }
+      const name = weapon ? weapon.nome : ITEM_NAMES[id] || id;
+      const color = weapon ? RARITY[Math.min(5, weapon.stars)] : id === 'colete' || id.startsWith('canhao') || id === 'gancho' ? RARITY[3] : id === 'kit' ? RARITY[2] : RARITY[1];
+      const sub = weapon ? `<span class="stars">${'★'.repeat(weapon.stars)}${'☆'.repeat(Math.max(0, 5 - weapon.stars))}</span>` : `<span>${id === 'colete' ? 'equipamento' : ['bandagem', 'kit'].includes(id) ? 'cura' : ['barra_proteina', 'energetico', 'chocolate', 'peixe'].includes(id) ? 'comida' : ['municao', 'cartucho', 'bala_canhao'].includes(id) ? 'munição' : 'item'}</span>`;
+      const card = document.createElement('button');
+      card.type = 'button'; card.className = 'loot-card';
+      card.style.setProperty('--rar', color);
+      if (stagger) card.style.animationDelay = `${0.08 + i * 0.06}s`; else card.style.animation = 'none';
+      card.innerHTML = `<span class="ic">${weapon ? WEAPON_ICON(weapon) : LOOT_ICON[id] || '📦'}</span><span class="nm"><b>${name}</b>${sub}</span><span class="qt">×${amount}</span><span class="take">Pegar</span>`;
+      card.onclick = () => { card.classList.add('taken'); setTimeout(() => onTake && onTake(id, amount), 160); };
+      list.append(card);
+    });
   }
 
   closeLoot() {
     $('lootPanel').hidden = true;
     $('lootItems').replaceChildren();
+    this._takeAll = null;
   }
 
   update(dt) {

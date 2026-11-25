@@ -59,21 +59,24 @@ export class Reflections {
 
   // ---------- materiais ----------
   // Metais: com reflexo ligado, recebem o mapa de ambiente com intensidade alta (refletem de verdade).
-  _tuneMetals(env, near) {
-    const scan = (root, local) => root.traverse((o) => {
+  // IMPORTANTE: metais fora da jangada usam SEMPRE o céu, nunca a câmera de reflexo. Materiais são
+  // compartilhados (arma na mão = arma largada no chão); se um objeto visível durante a foto da câmera
+  // de reflexo usasse o próprio reflexo, ela leria o que está desenhando e a imagem ficava preta/branca.
+  // Só a jangada (escondida durante a foto, com materiais próprios) usa o reflexo em tempo real.
+  _tuneMetals(env) {
+    const scan = (root) => root.traverse((o) => {
       if (!o.isMesh || !o.material) return;
       for (const m of Array.isArray(o.material) ? o.material : [o.material]) {
         if (!m.isMeshStandardMaterial || m.userData.raftMat || (m.metalness || 0) < METAL) continue;
         const ud = m.userData;
         if (ud.reflBase === undefined) ud.reflBase = { env: m.envMap, i: m.envMapIntensity };
-        const want = env ? (local && near ? near : (this.G.scene.environment || env)) : ud.reflBase.env;
+        const want = env ? (this.G.scene.environment || ud.reflBase.env) : ud.reflBase.env;
         if (m.envMap !== want) { m.envMap = want; m.needsUpdate = true; }
         m.envMapIntensity = env ? 0.9 + 0.6 * m.metalness : ud.reflBase.i;
       }
     });
-    scan(this.G.scene, false);
-    for (const p of this.G.boat.pieces.values()) if (p.mesh) scan(p.mesh, true);
-    if (this.G.viewmodel && this.G.viewmodel.scene) scan(this.G.viewmodel.scene, true); // arma na mão
+    scan(this.G.scene);
+    if (this.G.viewmodel && this.G.viewmodel.scene) scan(this.G.viewmodel.scene); // arma na mão
   }
   // Peças da jangada ganham material próprio (clonado) para poder molhar sem molhar o mundo todo.
   _collectRaft() {
@@ -162,7 +165,7 @@ export class Reflections {
       this._scanT = 1.5;
       this._collectRaft();
       if (G.boat.pieces.size !== this._pieceN) { this._pieceN = G.boat.pieces.size; this._makePuddles(); }
-      this._tuneMetals(env, env);
+      this._tuneMetals(env);
     }
     this._applyWet(env);
   }

@@ -194,7 +194,7 @@ function fishParts() {
   };
   return FISH;
 }
-function makeFish() {
+export function makeFish() {
   const F = fishParts(), g = new THREE.Group();
   const body = new THREE.Mesh(F.body, F.bodyMat); g.add(body);
   for (const s of [-1, 1]) { // olhos
