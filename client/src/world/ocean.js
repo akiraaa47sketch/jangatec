@@ -12,7 +12,23 @@ export const sea = {
 
 const sstep = (a, b, x) => { const u = Math.min(1, Math.max(0, (x - a) / (b - a))); return u * u * (3 - 2 * u); };
 // Altura extra dos eventos. Mesma fórmula em EVENTS_GLSL logo abaixo.
+// Perto das ilhas a onda gigante e o redemoinho perdem força (a água fica no nível normal na orla):
+// eles ficaram enormes e, sem isso, uma ilha ficaria "pendurada" no buraco do redemoinho ou
+// engolida pela muralha de água. Mesma conta no shader (islandGuard). Usa as mesmas ilhas de SHORE.
+function islandGuard(x, z) {
+  let k = 1;
+  for (const s of SHORE) {
+    if (s[2] < 0) continue;
+    const d = Math.hypot(x - s[0], z - s[1]) - s[2];
+    if (d < 45) k = Math.min(k, sstep(3, 45, d));
+  }
+  return k;
+}
 export function eventHeight(x, z, t) {
+  if (sea.surge.A <= 0 && sea.vortex.k <= 0) return 0;
+  return eventHeightRaw(x, z, t) * islandGuard(x, z);
+}
+function eventHeightRaw(x, z, t) {
   let h = 0;
   const s = sea.surge;
   if (s.A > 0) {
@@ -103,6 +119,15 @@ uniform vec3 uSurge2; // A, sigma, front
 uniform vec4 uVortex; // x, z, R, depth
 uniform float uVortexK; uniform float uVortexS;
 float vortexStripe = 0.0, vortexDeep = 0.0;
+float islandGuard(vec2 p) {
+  float k = 1.0;
+  for (int i = 0; i < 6; i++) {
+    if (uIsl[i].z < 0.0) continue;
+    float d = length(p - uIsl[i].xy) - uIsl[i].z;
+    k = min(k, smoothstep(3.0, 45.0, d));
+  }
+  return k;
+}
 float eventH(vec2 p, float t) {
   float h = 0.0;
   if (uSurge2.x > 0.0) {
@@ -122,7 +147,7 @@ float eventH(vec2 p, float t) {
       vortexDeep = uVortexK * exp(-q * q * 1.8);
     }
   }
-  return h;
+  return h * ((uSurge2.x > 0.0 || uVortexK > 0.0) ? islandGuard(p) : 1.0);
 }`;
 
 const VERT = /* glsl */`
@@ -153,7 +178,10 @@ void main() {
   wp.y = uLevel + uAmp * w.x + e;
   vHn = w.x;
   // espuma do evento: crista da onda gigante e bordas da espiral do furacão
-  vEv = clamp(length(eg) * 0.9 + max(e, 0.0) * 0.12, 0.0, 1.0);
+  // (a onda gigante agora tem 16–24 m: espuma só na CRISTA e onde a água fica muito íngreme — antes a
+  // parede inteira ficava branca)
+  float crestF = uSurge2.x > 0.5 ? smoothstep(0.78, 0.98, e / uSurge2.x) : 0.0;
+  vEv = clamp(crestF + max(length(eg) - 1.0, 0.0) * 0.45, 0.0, 1.0);
   vN = normalize(vec3(-uAmp * w.y - eg.x, 1.0, -uAmp * w.z - eg.y));
   vWorld = wp.xyz;
   vec4 mvPosition = viewMatrix * wp;

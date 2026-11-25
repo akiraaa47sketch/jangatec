@@ -33,6 +33,21 @@ export function seabedCratesFor(seed, cx, cz) {
   return out;
 }
 
+// CANHÕES E ARPÕES NO FUNDO DO MAR: ficam jogados no chão da seca (meio enterrados) e se pegam com E
+// quando o mar baixa. Canhão improvisado em qualquer lugar; canhão de ferro do meio da rota em diante
+// (região 2+); torreta-arpão a partir da região 1. Por chunk de 90 m (fora de ilhas e da largada).
+export const SEABED_FINDS = { canhao: 0.1, canhao_ferro: 0.06, gancho: 0.06 };
+export function seabedFindsFor(seed, cx, cz) {
+  if (Math.abs(cx) + Math.abs(cz) <= 1 || chunkHasIsland(seed, cx, cz)) return [];
+  const r = mulberry32(hash2(seed ^ 0x5be0cd19, cx, cz)), S = WORLD_LOOT_PARAMS.chunkSize, out = [];
+  const diff = Math.min(4, Math.floor(Math.hypot(cx * S, cz * S) / WORLD_LOOT_PARAMS.diffStep));
+  const spot = (kind) => out.push({ kind, x: cx * S + (r() - 0.5) * (S - 20), z: cz * S + (r() - 0.5) * (S - 20), yaw: r() * 6.28, tilt: (r() - 0.5) * 0.5 });
+  if (r() < SEABED_FINDS.canhao) spot('canhao');
+  if (r() < (diff >= 2 ? SEABED_FINDS.canhao_ferro : 0)) spot('canhao_ferro');
+  if (r() < (diff >= 1 ? SEABED_FINDS.gancho : SEABED_FINDS.gancho * 0.4)) spot('gancho');
+  return out;
+}
+
 // Estruturas no MEIO DO MAR (sem ilha): torre de sucata com morteiro (derrubável a canhão) ou
 // prédio afundado e inclinado (sobe pela face torta; às vezes tem inimigos; caixotes p<cx>,<cz>c<n>).
 // RNG próprio; nunca no mesmo chunk de ilha ou naufrágio.
@@ -150,7 +165,7 @@ export function generateCrateLoot(seed, id, difficulty, playerCount = 1) {
     const foods = ['barra_proteina', 'energetico', 'chocolate'];
     if (random() < 0.7) add(foods[Math.floor(random() * 3)], 1);
     if (regionIndex >= 2 && random() < 0.1) add('kit', 1);
-    if (random() < 0.12) add('canhao', 1); // às vezes um canhão enterrado na seca
+    random(); // (antes: canhão no caixote — agora canhões e arpões ficam soltos no fundo, ver seabedFindsFor)
     return loot;
   }
   const region = LOOT_CONFIG.regions[regionIndex];
@@ -187,11 +202,11 @@ export function generateCrateLoot(seed, id, difficulty, playerCount = 1) {
   const wreck = id.startsWith('b');
   // Canhão improvisado (galão d'água): já no começo da jornada (região 0), mais comum em naufrágios e
   // mais longe na rota. As balas são infinitas (o canhão só tem recarga longa).
-  if (random() < (wreck ? 0.5 : regionIndex === 0 ? 0.24 : 0.3) + Math.max(0, regionIndex - 1) * 0.04) add('canhao', 1);
-  // CANHÃO DE FERRO (mais forte, recarga menor): do meio da rota em diante (região 2+)
-  if (regionIndex >= 2 && random() < (wreck ? 0.22 : 0.09) + (regionIndex - 2) * 0.05) add('canhao_ferro', 1);
-  // Ferramentas: o GANCHO sai principalmente de destroços/naufrágios; BANJO e martelo extra em caixas.
-  if (random() < (wreck ? 0.4 : regionIndex >= 1 ? 0.07 : 0)) add('gancho', 1); // torreta-arpão (aparece como peça para soldar)
+  // Canhões e torreta-arpão NÃO saem mais de caixas: ficam jogados no fundo do mar e são achados
+  // na seca, como os outros objetos (seabedFindsFor). Os sorteios continuam aqui só para o resto do
+  // loot sair igual ao de antes.
+  random(); if (regionIndex >= 2) random(); random();
+  // Ferramentas: BANJO e martelo extra em caixas.
   if (random() < (wreck ? 0.15 : regionIndex >= 1 ? 0.08 : 0.03)) add('arma_banjo', 1);
   if (regionIndex >= 1 && random() < 0.05) add('arma_martelo', 1);
 
