@@ -163,7 +163,7 @@ export class Enemies {
   }
   // Dano de inimigo num jogador: o local leva aqui; o aliado recebe pela rede (e se defende lá).
   hurt(T, dmg, src, e, extra = {}) {
-    if (T.local) { this.G.survival.damage(dmg, src); return; }
+    if (T.local) { this.G.survival.damage(dmg, src, extra.k === 'shot' ? 'bala' : null); return; } // tiro: o colete segura parte
     this.G.net.send({ t: 'pdmg', to: T.id, dmg: Math.round(dmg * 10) / 10, src, eid: e.id, ex: Math.round(e.body.pos.x * 10) / 10, ez: Math.round(e.body.pos.z * 10) / 10, ...extra });
   }
 
@@ -359,7 +359,8 @@ export class Enemies {
       if (this.G.melee) { this.G.melee.tokens.delete(e); this.G.melee.setTell(e, null); this.G.melee.updateStars(e, 0, false); }
       this.G.world.collected.add(e.id);
       const r = Math.random();
-      const loot = r < 0.4 ? { municao: 6 } : r < 0.52 ? { bandagem: 1 } : r < 0.64 ? { cartucho: 4 } : null; // curativo só às vezes
+      let loot = r < 0.4 ? { municao: 6 } : r < 0.52 ? { bandagem: 1 } : r < 0.64 ? { cartucho: 4 } : null; // curativo só às vezes
+      if (['soldado', 'escopeteiro', 'elite', 'agente'].includes(e.type) && Math.random() < 0.08) loot = { ...(loot || {}), colete: 1 }; // às vezes larga o colete
       // piratas (e às vezes saqueadores) largam o sabre
       const dropChance = e.type === 'pirata' || e.type === 'fantasma' ? 0.45 : e.type === 'melee' ? 0.12 : 0;
       const sabre = dropChance && Math.random() < dropChance;

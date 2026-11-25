@@ -9,6 +9,7 @@ import { makeHumanoid, animateHumanoid } from './model.js';
 import { makePill, animatePill, disposePill, PILL_DEFAULT, PILL_SCALE } from './pill.js';
 import { sfx } from '../core/sfx.js';
 import { cam as camSet } from '../core/camsettings.js';
+import { setPillVest } from './vest.js';
 
 // tipo de empunhadura das armas de fogo em 3ª pessoa
 const GUN_TYPE = { minigun: 'long', revolver: 'pistol', pistola: 'pistol', escopeta: 'long', rifle: 'long', rifle_precisao: 'long' };
@@ -57,6 +58,9 @@ export class Player {
     if (this.G.hud) this.G.hud.msg(this.firstPerson ? 'Câmera em primeira pessoa' : 'Câmera em terceira pessoa');
   }
 
+  // colete balístico aparece no corpo (e os aliados veem pela rede)
+  setVest(on) { if (this.pillVisual) setPillVest(this.pillVisual.children[0], on); }
+
   setAppearance(appearance) {
     this.appearance = { ...this.appearance, ...appearance };
     this.applyAppearance();
@@ -83,6 +87,7 @@ export class Player {
     this.chestMount.rotation.set(0.15, Math.PI, 0);
     this.chestMount.scale.setScalar(1.15 / PILL_SCALE);
     pill.userData.onHands = () => this.fitWeapon3P(); // as mãos 3D chegaram depois: reencaixa a arma
+    if (this.G.survival && this.G.survival.armor > 0) setPillVest(pill, true); // colete continua vestido
     this.fitWeapon3P();
     if (this.G.viewmodel) this.G.viewmodel.setGloveColor(this.appearance.pill);
   }

@@ -66,7 +66,7 @@ function placementState(id, state) {
   return { id, p: state.p, q: state.q, placed: true, water: !!state.water };
 }
 
-const ITEM_RE = /^(metal|bandagem|kit|municao|cartucho|canhao|canhao_ferro|gancho|bala_canhao|barra_proteina|energetico|chocolate|peixe|arma_[a-z0-9_]+)$/;
+const ITEM_RE = /^(colete|metal|bandagem|kit|municao|cartucho|canhao|canhao_ferro|gancho|bala_canhao|barra_proteina|energetico|chocolate|peixe|arma_[a-z0-9_]+)$/;
 function cleanDrop(d) {
   if (!d || typeof d.id !== 'string' || d.id.length > 64 || !Array.isArray(d.p) || d.p.length !== 3 || !d.p.every(Number.isFinite) || !d.loot || typeof d.loot !== 'object') return null;
   const loot = {};
@@ -276,7 +276,7 @@ function handle(ws, m) {
       const crate = room.crates.get(m.id);
       if (!validCrateId(m.id, room.seed, m) || !ws.openedCrates.has(m.id) || !crate ||
           !canReachCrate(room, ws, m) || typeof m.item !== 'string' ||
-          !/^(metal|bandagem|kit|municao|cartucho|canhao|gancho|bala_canhao|barra_proteina|energetico|chocolate|peixe|arma_[a-z0-9_]+)$/.test(m.item)) {
+          !/^(colete|metal|bandagem|kit|municao|cartucho|canhao|canhao_ferro|gancho|bala_canhao|barra_proteina|energetico|chocolate|peixe|arma_[a-z0-9_]+)$/.test(m.item)) {
         send(ws, { t: 'crate:error', id: m.id });
         break;
       }

@@ -461,7 +461,7 @@ export class BossSkills {
           // a bala para na parede: escondido atrás de algo, você não é atingido
           const blocked = me && G.colliders.segmentBlocked(from.x, from.y, from.z, pp.x, pp.y + 1.1, pp.z);
           if (me && !blocked && Math.hypot(pp.x - f.tg.x, pp.z - f.tg.z) < S.radius && Math.abs(pp.y - f.tg.y) < 2 && !(G.melee && G.melee.iframes > 0)) {
-            G.survival.damage(S.dmg, 'Atirador de elite'); sfx.hit(pp, true);
+            G.survival.damage(S.dmg, 'Atirador de elite', 'bala'); sfx.hit(pp, true);
           }
           done = true;
         }

@@ -5,6 +5,7 @@ import * as THREE from '../three.js';
 import { lerpAngle, setClockOffset } from '../core/util.js';
 import { makeHumanoid, animateHumanoid } from '../player/model.js';
 import { makePill, animatePill, disposePill, decodePill, encodePill, PILL_SCALE } from '../player/pill.js';
+import { setPillVest } from '../player/vest.js';
 import { buildWeapon } from '../player/viewmodel-parts.js';
 import { fitWeaponToHand } from '../player/pillhands.js';
 
@@ -231,7 +232,7 @@ export class Net {
       let x = b.pos.x, y = b.pos.y, z = b.pos.z, yaw = pl.yaw;
       if (pl.aboard) { [x, z] = boat.toLocal(x, z); y -= boat.set.y; yaw -= boat.yaw; }
       const r2 = (v) => Math.round(v * 100) / 100;
-      this.send({ t: 'state', s: { p: [r2(x), r2(y), r2(z)], yaw: r2(yaw), ab: pl.aboard ? 1 : 0, sw: pl.swimming ? 1 : 0, sp: r2(Math.hypot(b.vel.x, b.vel.z)), dead: pl.dead ? 1 : 0, dn: pl.downed ? 1 : 0, mu: G.tools && G.tools.playT > 0 ? 1 : 0, vc: G.voice && G.voice.on ? 1 : 0, po: pl.anim ? pl.anim.pose : 'walk', pp: pl.anim ? Math.round(pl.anim.progress * 100) / 100 : 0, ar: pl.anim ? pl.anim.armed : 'none', tk: G.voice && G.voice.talking ? 1 : 0, ap: this.localLook(), w: G.combat.weaponId || '', bm: G.combat.buildMode || G.build.active ? 1 : 0 } });
+      this.send({ t: 'state', s: { p: [r2(x), r2(y), r2(z)], yaw: r2(yaw), ab: pl.aboard ? 1 : 0, sw: pl.swimming ? 1 : 0, sp: r2(Math.hypot(b.vel.x, b.vel.z)), dead: pl.dead ? 1 : 0, dn: pl.downed ? 1 : 0, mu: G.tools && G.tools.playT > 0 ? 1 : 0, vc: G.voice && G.voice.on ? 1 : 0, po: pl.anim ? pl.anim.pose : 'walk', pp: pl.anim ? Math.round(pl.anim.progress * 100) / 100 : 0, ar: pl.anim ? pl.anim.armed : 'none', tk: G.voice && G.voice.talking ? 1 : 0, ap: this.localLook(), cv: G.survival && G.survival.armor > 0 ? 1 : 0, w: G.combat.weaponId || '', bm: G.combat.buildMode || G.build.active ? 1 : 0 } });
       if (this.isHost) this.send({ t: 'boat', b: { x: r2(boat.x), z: r2(boat.z), yaw: Math.round(boat.yaw * 1000) / 1000, speed: r2(boat.speed), up: boat.sailUp, angle: boat.sailAngle } });
     }
     // Interpola os aliados.
@@ -255,6 +256,7 @@ export class Net {
         pd.armed = typeof s.ar === 'string' ? s.ar : 'none'; pd.gunType = pd.armed === 'long' ? 'long' : 'pistol';
         const remotePose = s.sw ? 'swim' : s.dn ? 'crawl' : typeof s.po === 'string' ? s.po : 'walk';
         animatePill(r.pill.children[0], s.sp, dt, remotePose, +s.pp || 0); // mesma animação que o jogador vê
+        if (!!s.cv !== !!r.vest) { r.vest = !!s.cv; setPillVest(r.pill.children[0], r.vest); } // colete do aliado
         this._remoteWeapon(r, s);
         if (r.wMesh) r.wMesh.visible = !s.bm && !s.dead && !s.sw;
         if (r.flashT > 0 && (r.flashT -= dt) <= 0 && r.wFlash) r.wFlash.visible = false;

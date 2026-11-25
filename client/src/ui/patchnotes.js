@@ -5,6 +5,15 @@
 // Nos textos, **assim** vira negrito.
 export const PATCH_NOTES = [
   {
+    id: '0.31', versao: 'v0.31', data: '25/11/2026', titulo: 'Colete balístico',
+    destaques: [
+      { tag: 'Item novo', titulo: 'Colete balístico', texto: 'Ache nas **caixas da Zona Militar** (e às vezes com soldados abatidos). Vestido, corta **metade do dano de tiros** — só projéteis: explosões, canhão, morteiro e golpes passam normal. Ele **se gasta** a cada tiro segurado e quebra em 0%.' },
+    ],
+    secoes: [
+      { icone: '🦺', nome: 'Colete', itens: ['Aparece **vestido no personagem** (os aliados também veem).', 'Medidor ⛨ com quanto resta, ao lado da vida.', 'Pegou um sem estar vestido: **veste sozinho**. Extras ficam na mochila — no inventário, "Vestir" troca o gasto por um novo; quando um quebra, o próximo é vestido na hora.', 'Onde achar: ~22% das caixas da Zona Militar, ~10% na Zona 51, 8% dos soldados/agentes abatidos.'] },
+    ],
+  },
+  {
     id: '0.30', versao: 'v0.30', data: '25/11/2026', titulo: 'Inimigos armados balanceados',
     secoes: [
       { icone: '🔫', nome: 'Inimigos armados', itens: ['**Não atiram mais através de paredes**: a linha de visão é conferida em cada tiro (os piratas no convés atiravam através das paredes da jangada). O tiro do atirador de elite também para na parede.', '**Erram bem mais**: a pontaria começa ruim e melhora enquanto eles te veem (~1,6 s); perde mais com a distância e quando você anda ou corre. Tiro errado passa longe.', '**Dano por zona**: na **Zona Pirata** os tiros tiram 55–70% do dano normal; **Zona Militar 78%**; Zona 51 100%.', 'Pistoleiro pirata: 13 → **9** de dano (≈5 na Zona Pirata). Soldado e agente com pontaria menor.'] },
