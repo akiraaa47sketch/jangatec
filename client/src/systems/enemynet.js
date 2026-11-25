@@ -14,7 +14,7 @@ import { ghostify } from './enemies.js';
 import { sfx } from '../core/sfx.js';
 
 const MS = ['idle', 'windup', 'strike', 'recover', 'guard', 'stagger', 'clashed', 'evade'];
-const POSES = ['walk', 'aim', 'attack', 'windup', 'heavyWindup', 'kick', 'slashR', 'slashL', 'thrust', 'uppercut', 'slam', 'guard', 'stagger', 'clash', 'sidestep', 'row', 'leap', 'throw'];
+const POSES = ['walk', 'aim', 'attack', 'windup', 'heavyWindup', 'kick', 'slashR', 'slashL', 'thrust', 'uppercut', 'slam', 'guard', 'stagger', 'clash', 'sidestep', 'row', 'leap', 'throw', 'swim'];
 const r1 = (x) => Math.round(x * 10) / 10, r2 = (x) => Math.round(x * 100) / 100;
 const SEND_EVERY = 0.1, RANGE = 140;
 

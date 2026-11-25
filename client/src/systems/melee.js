@@ -322,7 +322,13 @@ export class Melee {
       else if (sound === 'break') sfx.guardBreak(at);
       else sfx.hit(at, heavy || finisher);
       G.enemies.damage(e, Math.round(dmg));
-      this.knockEnemy(e, dx / d * knock, dz / d * knock);
+      // golpe pesado ou final do combo que entrou limpo: derruba (cai de costas e levanta)
+      if ((heavy || finisher) && sound === 'hit' && e.state !== 'dead' && G.enemies.knockDown(e, heavy ? 1.35 : 1.1)) {
+        this.staggerEnemy(e, heavy ? 1.35 : 1.1); e.downKnock = 1.35;
+        if (!label) { label = 'DERRUBOU'; color = '#ffb347'; }
+      }
+      const kn = knock * (e.downKnock || 1); e.downKnock = 0;
+      this.knockEnemy(e, dx / d * kn, dz / d * kn);
       this.num(e.body.pos, Math.round(dmg), color, label);
     }
     // martelo: martelar uma peça da jangada conserta ela

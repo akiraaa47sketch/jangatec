@@ -183,6 +183,7 @@ export class Player {
     if (this.downed) speed = this.swimming ? CFG.swim * 0.6 : 0.9; // caído: só se arrasta
     if (aiming) speed = Math.min(speed, 3);
     speed *= this.speedMul || 1; // bloqueando/carregando golpe anda devagar
+    if (this.G.survival.buffs.agua_viva > 0) speed *= 0.5; // queimadura de água-viva: lento
     // furacão: andar CONTRA o empurrão = se firmar (anda devagar e não escorrega)
     this.bracing = 0;
     if (this.drift && moving && this.aboard) {
