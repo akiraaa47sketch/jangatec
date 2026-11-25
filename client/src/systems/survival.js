@@ -26,9 +26,9 @@ const USE = {
   peixe: (s) => { s.vida = clamp(s.vida + 20, 0, 100); sfx.pickup(); return 'Peixe: +20 de vida'; },
 };
 const FOODS = ['barra_proteina', 'energetico', 'chocolate'];
-// COLETE BALÍSTICO (Zona Militar): vestido, corta METADE do dano de TIROS (só projéteis — explosões,
-// canhão, golpes e mordidas passam normal). Cada dano absorvido gasta o colete; em 0 ele quebra.
-export const ARMOR = { absorb: 0.5, max: 100, wear: 1.6 };
+// COLETE BALÍSTICO (Zona Militar, um por ilha): vestido, corta METADE do dano de TIROS (só projéteis —
+// explosões, canhão, golpes e mordidas passam normal). Não tem durabilidade: vestiu, fica.
+export const ARMOR = { absorb: 0.5, max: 100 };
 
 export class Survival {
   static BLEED = 45; // segundos caído até morrer sem ajuda
@@ -83,7 +83,7 @@ export class Survival {
   // veste um colete da mochila (troca o gasto por um novo)
   wearVest() {
     if (!this.inv.colete || this.G.player.dead) return false;
-    if (this.armor >= ARMOR.max * 0.98) { this.G.hud.msg('Seu colete ainda está novo'); return false; }
+    if (this.armor > 0) { this.G.hud.msg('Você já está de colete'); return false; }
     this.inv.colete--; this.armor = ARMOR.max; sfx.pickup();
     this.G.hud.msg('Colete balístico vestido: tiros tiram metade do dano');
     if (this.G.player.setVest) this.G.player.setVest(true);
@@ -102,14 +102,8 @@ export class Survival {
   damage(n, source, kind = null) {
     if (this.G.player.dead) return;
     if (kind === 'bala' && this.armor > 0 && n > 0) { // colete segura parte do tiro
-      const absorbed = n * ARMOR.absorb;
-      n -= absorbed; this.armor -= absorbed * ARMOR.wear;
+      n -= n * ARMOR.absorb;
       if (this.G.melee && Math.random() < 0.35) this.G.melee.say(this.G.player.body.pos, 'COLETE', '#c8d2a0');
-      if (this.armor <= 0) {
-        this.armor = 0; this.G.hud.msg('Seu colete balístico quebrou!');
-        if (this.G.player.setVest) this.G.player.setVest(false);
-        if (this.inv.colete > 0) this.wearVest(); // tem outro na mochila: veste na hora
-      }
     }
     if (this.G.player.downed) { this.bleed -= n * 0.15; return; } // apanhar caído encurta o tempo
     this.vida -= n;

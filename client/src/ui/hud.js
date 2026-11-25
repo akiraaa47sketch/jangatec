@@ -155,8 +155,8 @@ export class Hud {
       chip('●', 'Balas de canhão', inv.bala_canhao || 0);
     if (invHtml !== this._inv) { $('inv').innerHTML = invHtml; this._inv = invHtml; }
     // buffs ativos com o tempo que falta
-    const arm = G.survival.armor || 0; // colete balístico vestido: quanto ainda resta
-    const armorHtml = arm > 0 ? `<span class="buff armor${arm < 25 ? ' low' : ''}" title="Colete balístico: corta metade do dano de tiros"><i>⛨</i>${Math.ceil(arm)}%</span>` : '';
+    const arm = G.survival.armor || 0; // colete balístico vestido
+    const armorHtml = arm > 0 ? '<span class="buff armor" title="Colete balístico: corta metade do dano de tiros"><i>⛨</i>Colete</span>' : '';
     const bf = G.survival.buffs, buffHtml = armorHtml + Object.keys(bf).map((k) => {
       const t = Math.ceil(bf[k]), b = BUFFS[k];
       return `<span class="buff${b.debuff ? ' debuff' : t <= 20 ? ' low' : ''}" title="${b.nome}: ${b.desc}"><i>${b.icon}</i>${Math.floor(t / 60)}:${String(t % 60).padStart(2, '0')}</span>`;

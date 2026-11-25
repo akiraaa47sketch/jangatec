@@ -360,7 +360,6 @@ export class Enemies {
       this.G.world.collected.add(e.id);
       const r = Math.random();
       let loot = r < 0.4 ? { municao: 6 } : r < 0.52 ? { bandagem: 1 } : r < 0.64 ? { cartucho: 4 } : null; // curativo só às vezes
-      if (['soldado', 'escopeteiro', 'elite', 'agente'].includes(e.type) && Math.random() < 0.08) loot = { ...(loot || {}), colete: 1 }; // às vezes larga o colete
       // piratas (e às vezes saqueadores) largam o sabre
       const dropChance = e.type === 'pirata' || e.type === 'fantasma' ? 0.45 : e.type === 'melee' ? 0.12 : 0;
       const sabre = dropChance && Math.random() < dropChance;

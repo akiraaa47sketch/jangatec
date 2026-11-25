@@ -10,7 +10,7 @@ const $ = (id) => document.getElementById(id);
 const RARITY = ['', '#b9c0c4', '#6fdc8c', '#5fb4ff', '#c58bff', '#ffc94d'];
 const ICON = { colete: '⛨', bandagem: '✚', kit: '♥', municao: '•', cartucho: '▮', bala_canhao: '●', canhao: '⊛', canhao_ferro: '◉', gancho: '⚓', barra_proteina: 'P', energetico: 'E', chocolate: 'C', peixe: '~', metal: '▤' };
 const DESC = {
-  colete: 'Colete balístico: vestido, corta METADE do dano de tiros (só projéteis) até se gastar. Use para vestir um novo.',
+  colete: 'Colete balístico: vestido, corta METADE do dano de tiros (só projéteis). Não se gasta. Um extra pode ser largado para um aliado.',
   bandagem: 'Recupera 30 de vida.', kit: 'Recupera toda a vida.', municao: 'Munição de pistola, revólver e rifles.',
   cartucho: 'Cartuchos de escopeta.', bala_canhao: 'Munição dos canhões da jangada.', canhao: 'Instale a bordo, num ponto livre.', canhao_ferro: 'Canhão de verdade: recarrega mais rápido e bate quase 2× mais forte. Instale a bordo.',
   gancho: 'Torreta-arpão: carregue e solde na jangada.', barra_proteina: '+25% de dano por 4 min.', energetico: 'Estamina gasta pela metade por 4 min.',
