@@ -9,7 +9,7 @@ import { CFG } from '../config.js';
 import { orientedBox } from '../world/colliders.js';
 import { sea, waveHeight } from '../world/ocean.js';
 import { PIECES, STARTER_PLATFORM_SIZE, makePieceMesh } from './pieces.js';
-import { woodTexture, woodBump, metalTexture, clothTexture, repeated } from '../world/textures.js';
+import { woodTexture, woodBump, metalTexture, clothTexture, sailTexture, repeated } from '../world/textures.js';
 // Leme pesado: gain = quanto do desvio vira giro desejado (rad/s por rad), max = giro máximo (rad/s,
 // ~8°/s), accel = quão rápido o giro aumenta/diminui (rad/s²).
 export const BOAT_TURN = { gain: 0.35, max: 0.14, accel: 0.1 };
@@ -86,12 +86,40 @@ export class Boat {
       tip.rotation.y = Math.PI / 2; tip.position.set(x, 5, 0.2); this.sailGroup.add(tip);
     }
     this.cloth = new THREE.Mesh(
-      new THREE.PlaneGeometry(3.2, 3, 20, 20),
-      new THREE.MeshStandardMaterial({ color: 0xffffff, map: clothTexture(), side: THREE.DoubleSide, roughness: 0.95 })
+      new THREE.PlaneGeometry(3.2, 3, 24, 20),
+      new THREE.MeshStandardMaterial({ color: 0xffffff, map: sailTexture(), side: THREE.DoubleSide, roughness: 0.92 })
     );
-    this.cloth.position.z = 0.5;
+    this.cloth.position.z = 0.27; // a borda de cima encosta na verga
     this.sailBase = this.cloth.geometry.attributes.position.array.slice();
     this.sailGroup.add(yard, this.cloth);
+    void clothTexture;
+    // amarras da vela na verga (anéis de corda ao longo da borda de cima)
+    for (let i = 0; i < 9; i++) {
+      const rb = new THREE.Mesh(new THREE.TorusGeometry(0.1, 0.018, 5, 10), ropeMat);
+      rb.rotation.y = Math.PI / 2; rb.position.set(-1.5 + i * 0.375, 5, 0.22); this.sailGroup.add(rb);
+    }
+    // vela ENROLADA: rolo de lona amarrado embaixo da verga (aparece quando a vela está baixada)
+    this.furl = new THREE.Group();
+    const roll = new THREE.Mesh(new THREE.CylinderGeometry(0.15, 0.15, 3.1, 12), new THREE.MeshStandardMaterial({ color: 0xe9dfc8, map: clothTexture(), roughness: 1 }));
+    roll.rotation.z = Math.PI / 2; this.furl.add(roll);
+    for (let i = 0; i < 5; i++) { const tie = new THREE.Mesh(new THREE.TorusGeometry(0.155, 0.02, 5, 12), ropeMat); tie.rotation.y = Math.PI / 2; tie.position.x = -1.2 + i * 0.6; this.furl.add(tie); }
+    this.furl.position.set(0, 4.82, 0.27);
+    this.sailGroup.add(this.furl);
+    // amantilhos: do topo do mastro até as pontas da verga
+    for (const x of [-1.65, 1.65]) {
+      const a = new THREE.Vector3(0, 5.6, 0.05), b = new THREE.Vector3(x, 5.02, 0.2), dir = b.clone().sub(a);
+      const lift = new THREE.Mesh(new THREE.CylinderGeometry(0.014, 0.014, dir.length(), 4), ropeMat);
+      lift.position.copy(a).add(b).multiplyScalar(0.5); lift.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), dir.normalize());
+      this.sailGroup.add(lift);
+    }
+    // escotas: dos cantos de baixo da vela até o convés (atualizadas a cada quadro)
+    this.sheets = [-1, 1].map((side) => {
+      const geo = new THREE.BufferGeometry(); geo.setAttribute('position', new THREE.BufferAttribute(new Float32Array(6), 3));
+      const line = new THREE.Line(geo, new THREE.LineBasicMaterial({ color: 0x8a744f }));
+      line.frustumCulled = false; this.group.add(line);
+      return { line, side, anchor: new THREE.Vector3(side * 2.3, DECK_BOTTOM + 0.45, MAST.z + 0.9) };
+    });
+    this._v1 = new THREE.Vector3();
     // Cordame fixo: estais do topo do mastro até os cantos da plataforma central.
     const top = new THREE.Vector3(MAST.x, 5.3, MAST.z);
     for (const [cx, cz] of [[-2.8, -1.8], [2.8, -1.8], [-2.8, 2.8], [2.8, 2.8]]) {
@@ -321,6 +349,9 @@ export class Boat {
     const s = Math.max(0.06, this.sailT);
     this.cloth.scale.y = s;
     this.cloth.position.y = 5 - 1.5 * s;
+    this.cloth.visible = this.sailT > 0.16;                 // baixada: só o rolo amarrado
+    this.furl.visible = this.sailT < 0.9;
+    this.furl.scale.set(1, 0.45 + 0.75 * (1 - this.sailT), 0.45 + 0.75 * (1 - this.sailT));
     this.sailGroup.rotation.y = this.sailAngle;
     const storm = clamp((sea.amp - 1) / 1.8, 0, 1);
     const gust = 1 + Math.sin(t * 0.17) * 0.07 + storm * (0.06 + Math.sin(t * 0.53) * 0.12);
@@ -329,16 +360,30 @@ export class Boat {
     for (let i = 0; i < cloth.length; i += 3) {
       const x = this.sailBase[i];
       const y = this.sailBase[i + 1];
-      const edge = 1 - Math.abs(x) / 1.6;
-      // barriga da vela (cheia de vento quando levantada) + tremulação nas bordas
-      const belly = (1 - (x / 1.6) ** 2) * (1 - (y / 1.5) ** 2 * 0.6) * this.sailT * (0.55 + storm * 0.25);
-      cloth[i + 2] = this.sailBase[i + 2] + Math.max(0, belly) +
-        Math.sin(t * (1.7 + storm * 0.9) + y * 1.25 + x * 0.55 + this.sailAngle) *
-        0.24 * edge * s * gust * (1.15 - this.sailT * 0.6) +
-        Math.sin(t * 9 + x * 4 + y * 3) * 0.025 * edge * (0.4 + storm);
+      // A borda de cima fica PRESA na verga (pin = 0 em cima, 1 embaixo). Antes o balanço era maior no
+      // meio da borda de cima: a vela se descolava da verga e sacudia solta.
+      const pin = (1.5 - y) / 3, side = Math.abs(x) / 1.6;
+      // barriga do vento: cheia no meio (horizontal) e na altura do meio pra baixo; zero na verga
+      const belly = (1 - (x / 1.6) ** 2) * Math.sin(Math.min(1, pin * 1.15) * Math.PI * 0.62) * this.sailT * (0.62 + storm * 0.3) * gust;
+      // tremulação: mais nas pontas de baixo e nas laterais; vela meio solta tremula mais
+      const flutter = Math.sin(t * (1.9 + storm * 1.1) + y * 1.4 + x * 0.7 + this.sailAngle) * 0.1 * (0.35 + 0.65 * side) * pin * (1.2 - this.sailT * 0.6) +
+        Math.sin(t * 9 + x * 4 + y * 3) * 0.018 * pin * (0.4 + storm);
+      cloth[i + 2] = this.sailBase[i + 2] + Math.max(0, belly) + flutter;
     }
     clothPositions.needsUpdate = true;
     this.cloth.geometry.computeVertexNormals();
+    // escotas: canto de baixo da vela → convés
+    if (this.sheets) {
+      const cols = 25, last = (clothPositions.count - cols);
+      this.sailGroup.updateMatrixWorld(true);
+      for (const sh of this.sheets) {
+        const vi = sh.side < 0 ? last : clothPositions.count - 1, v = this._v1;
+        v.fromBufferAttribute(clothPositions, vi); this.cloth.localToWorld(v); this.group.worldToLocal(v);
+        const a = sh.line.geometry.attributes.position;
+        a.setXYZ(0, v.x, v.y, v.z); a.setXYZ(1, sh.anchor.x, sh.anchor.y, sh.anchor.z); a.needsUpdate = true;
+        sh.line.visible = this.sailInstalled && this.cloth.visible;
+      }
+    }
     // Bandeira: aponta a favor do vento (oposto à proa) e ondula mais na ponta.
     {
       const fp = this.flag.geometry.attributes.position, fa = fp.array, fb = this.flagBase;

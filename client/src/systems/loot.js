@@ -210,6 +210,8 @@ export function generateCrateLoot(seed, id, difficulty, playerCount = 1) {
   if (random() < (wreck ? 0.15 : regionIndex >= 1 ? 0.08 : 0.03)) add('arma_banjo', 1);
   if (regionIndex >= 1 && random() < 0.05) add('arma_martelo', 1);
 
+  // COLETE BALÍSTICO: só na Zona Militar (região 2) e UM por ilha (sempre na 1ª caixa dela)
+  if (regionIndex === 2 && /^i-?\d+,-?\d+c0$/.test(id)) add('colete', 1);
   if (random() < 0.12 + regionIndex * 0.05) { // curativo extra: raro (antes saía demais)
     add(regionIndex >= 2 && random() < 0.25 ? 'kit' : 'bandagem', 1);
   }

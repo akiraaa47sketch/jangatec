@@ -5,7 +5,7 @@ import { sfx } from '../core/sfx.js';
 
 export const ITEM_NAMES = {
   metal: 'Metal', peixe: 'Peixe', bandagem: 'Bandagem', barra_proteina: 'Barra de proteína', energetico: 'Energético', chocolate: 'Chocolate',
-  kit: 'Kit médico', municao: 'Munição', cartucho: 'Cartuchos',
+  kit: 'Kit médico', municao: 'Munição', cartucho: 'Cartuchos', colete: 'Colete balístico',
   canhao: 'Canhão improvisado', canhao_ferro: 'Canhão de ferro', gancho: 'Torreta-arpão', bala_canhao: 'Balas de canhão',
 };
 // Comidas: buffs temporários (4 min). Comer de novo renova o tempo.
@@ -26,14 +26,18 @@ const USE = {
   peixe: (s) => { s.vida = clamp(s.vida + 20, 0, 100); sfx.pickup(); return 'Peixe: +20 de vida'; },
 };
 const FOODS = ['barra_proteina', 'energetico', 'chocolate'];
+// COLETE BALÍSTICO (Zona Militar, um por ilha): vestido, corta METADE do dano de TIROS (só projéteis —
+// explosões, canhão, golpes e mordidas passam normal). Não tem durabilidade: vestiu, fica.
+export const ARMOR = { absorb: 0.5, max: 100 };
 
 export class Survival {
   static BLEED = 45; // segundos caído até morrer sem ajuda
   constructor(G) {
     this.G = G;
     this.vida = 100;
-    this.inv = { metal: 0, bandagem: 0, kit: 0, municao: 0, cartucho: 0, canhao: 0, canhao_ferro: 0, gancho: 0, bala_canhao: 0, barra_proteina: 0, energetico: 0, chocolate: 0, peixe: 0 };
+    this.inv = { colete: 0, metal: 0, bandagem: 0, kit: 0, municao: 0, cartucho: 0, canhao: 0, canhao_ferro: 0, gancho: 0, bala_canhao: 0, barra_proteina: 0, energetico: 0, chocolate: 0, peixe: 0 };
     this.buffs = {}; // nome → segundos restantes
+    this.armor = 0;  // colete vestido: 0 = sem colete … ARMOR.max = novo
     this.deadTimer = 0;
   }
   add(loot) {
@@ -67,6 +71,7 @@ export class Survival {
       this.inv[k] = (this.inv[k] || 0) + loot[k];
       parts.push(`+${loot[k]} ${ITEM_NAMES[k] || k}`);
     }
+    if (loot.colete && this.armor <= 0) this.wearVest(); // achou colete sem estar vestido: veste na hora
     return parts.join('  ');
   }
   // Tira itens da mochila (para largar). Retorna quantos saíram.
@@ -75,7 +80,17 @@ export class Survival {
     if (k) this.inv[item] = have - k;
     return k;
   }
+  // veste um colete da mochila (troca o gasto por um novo)
+  wearVest() {
+    if (!this.inv.colete || this.G.player.dead) return false;
+    if (this.armor > 0) { this.G.hud.msg('Você já está de colete'); return false; }
+    this.inv.colete--; this.armor = ARMOR.max; sfx.pickup();
+    this.G.hud.msg('Colete balístico vestido: tiros tiram metade do dano');
+    if (this.G.player.setVest) this.G.player.setVest(true);
+    return true;
+  }
   use(item) {
+    if (item === 'colete') { this.wearVest(); return; }
     if (!USE[item] || !this.inv[item] || this.G.player.dead) return;
     if (this.G.player.downed) { this.G.hud.msg('Caído você não consegue se curar — espere um aliado'); return; }
     this.inv[item]--;
@@ -84,8 +99,12 @@ export class Survival {
     this.G.hud.msg(USE[item](this));
     this.G.hud.flash('heal');
   }
-  damage(n, source) {
+  damage(n, source, kind = null) {
     if (this.G.player.dead) return;
+    if (kind === 'bala' && this.armor > 0 && n > 0) { // colete segura parte do tiro
+      n -= n * ARMOR.absorb;
+      if (this.G.melee && Math.random() < 0.35) this.G.melee.say(this.G.player.body.pos, 'COLETE', '#c8d2a0');
+    }
     if (this.G.player.downed) { this.bleed -= n * 0.15; return; } // apanhar caído encurta o tempo
     this.vida -= n;
     if (n >= 3) sfx.hurt();

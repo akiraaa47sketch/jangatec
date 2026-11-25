@@ -14,15 +14,16 @@ import { clamp, clock, mulberry32 } from '../core/util.js';
 import { sea, eventHeight } from '../world/ocean.js';
 import { sfx, ambience } from '../core/sfx.js';
 import { SEA_KINDS, SEA_BALANCE } from './seaevents.js';
+import { EXTRA_KINDS, EXTRA_SEA } from './extraevents.js';
 import { setSeabedVortex } from '../world/seabed.js';
 import { SOS } from './sos.js';
 import { WORLD_LOOT_PARAMS } from './loot.js';
 
 // peso de cada evento no sorteio (1 = normal). Peixes-voadores: ~1/5 da chance dos outros.
-export const EVENT_WEIGHT = { peixes: 0.2 };
+export const EVENT_WEIGHT = { peixes: 0.2, aguasvivas: 0.8, acampamento: 0.9 };
 export const EVENT_BALANCE = {
-  first: [20, 40],           // s depois da partida até o primeiro evento (cai no 1º mar cheio)
-  interval: [60, 115],       // s entre o fim de um evento e o próximo (mar bem agitado)
+  first: [50, 90],           // s depois da partida até o primeiro evento (cai no 1º mar cheio)
+  interval: [130, 210],      // s entre o fim de um evento e o próximo (antes 60–115: frequente demais)
   // onda gigante: uma MURALHA de água (fora da escala real, de propósito) — 16–24 m de altura
   tsunami: { speed: [15, 20], startDist: 380, A: [16, 24], sigma: [22, 30], damage: 22, knock: 8.5 },
   // R = raio do redemoinho, depth = fundura do funil d'água, pull = puxão (m/s), swirl = giro (m/s)
@@ -115,7 +116,7 @@ export class Events {
     if (!e) return 0;
     if (e.kind === 'furacao') return 0.25 * smooth((t - e.t0) / 10) * (1 - smooth((t - e.t0 - e.dur + 8) / 8)); // redemoinho: céu só um pouco fechado
     const u = t - e.t0, inK = smooth(u / 10), outK = 1 - smooth((u - e.dur + 8) / 8);
-    const k = { tsunami: 0.7, kraken: 0.55, tubaroes: 0.15, peixes: 0, raios: 1, fantasma: 0.6, sos: 0 }[e.kind] ?? 1;
+    const k = EXTRA_KINDS.includes(e.kind) && this.G.extra ? this.G.extra.storminess(e.kind) : { tsunami: 0.7, kraken: 0.55, tubaroes: 0.15, peixes: 0, raios: 1, fantasma: 0.6, sos: 0 }[e.kind] ?? 1;
     return k * inK * outK;
   }
   // névoa verde do navio-fantasma (0..1)
@@ -139,19 +140,23 @@ export class Events {
     const tide = G.startup.tide.state; // só com o mar cheio e longe da próxima seca
     if (G.startup.waterLevel < 0.5 || (tide && (tide.phase.id === 'seco' || tide.nextIn < 35))) { this.timer = 10; return; }
     // quase nunca repete o mesmo tipo em seguida; às vezes o mar simplesmente fica quieto
-    if (Math.random() < 0.03) { this.timer = between([30, 60]); return; }
+    if (Math.random() < 0.1) { this.timer = between([45, 90]); return; }
     // chefes do mar (kraken, navio-fantasma) só do meio da rota em diante
     const prog = Math.min(1, Math.hypot(G.boat.x, G.boat.z) / (4 * WORLD_LOOT_PARAMS.diffStep));
     // SOS da plataforma de petróleo: só no fim da jornada, uma de cada vez (e no máximo 2 por partida)
     const sosOk = prog >= SOS.minProgress && !G.sos.rig && G.sos.done < 3;
-    const kinds = ['tsunami', 'furacao', 'tempestade', ...SEA_KINDS, 'fantasma', ...(sosOk ? ['sos', 'sos', 'sos'] : [])].filter((k) => !((k === 'kraken' || k === 'fantasma') && prog < 0.2)), others = kinds.filter((k) => k !== this.lastKind);
+    const campOk = G.extra && G.extra.campSpot(); // acampamento abandonado: só com ilha vazia à frente
+    const kinds = ['tsunami', 'furacao', 'tempestade', ...SEA_KINDS, 'fantasma', ...EXTRA_SEA.filter((k) => k !== 'acampamento' || campOk), ...(sosOk ? ['sos', 'sos', 'sos'] : [])].filter((k) => !((k === 'kraken' || k === 'fantasma') && prog < 0.2)), others = kinds.filter((k) => k !== this.lastKind);
     // sorteio com PESO: peixes-voadores bem raros; o resto igual (ver EVENT_WEIGHT)
     const pool = Math.random() < 0.88 && others.length ? others : kinds, w = (k) => EVENT_WEIGHT[k] ?? 1;
     let roll = Math.random() * pool.reduce((s, k) => s + w(k), 0), kind = pool[pool.length - 1];
     for (const k of pool) { roll -= w(k); if (roll <= 0) { kind = k; break; } }
-    this.begin(this.make(kind, t), true);
+    const ev = this.make(kind, t);
+    if (!ev) { this.timer = 10; return; }
+    this.begin(ev, true);
   }
   make(kind, t) {
+    if (EXTRA_KINDS.includes(kind)) return this.G.extra ? this.G.extra.make(kind, t) : null;
     if (kind === 'tsunami') return this._makeTsunami(t);
     if (kind === 'furacao') return this._makeHurricane(t);
     if (kind === 'tempestade') return this._makeStorm(t);
@@ -242,6 +247,7 @@ export class Events {
     const old = this.current;
     this.current = null;
     if (old && SEA_KINDS.includes(old.kind) && this.G.seaEvents) this.G.seaEvents.finish(old);
+    if (old && EXTRA_KINDS.includes(old.kind) && this.G.extra) this.G.extra.finish(old);
 
     sea.surge.A = 0;
     sea.vortex.k = 0;
@@ -266,6 +272,7 @@ export class Events {
       else if (e.kind === 'tsunami') this._updateTsunami(e, dt, t);
       else if (e.kind === 'tempestade') this._updateStorm(e, dt, t);
       else if (e.kind === 'furacao') this._updateHurricane(e, dt, t);
+      else if (EXTRA_KINDS.includes(e.kind)) { if (G.extra) G.extra.update(e, dt, t); }
       else if (SEA_KINDS.includes(e.kind)) {
         G.seaEvents.update(e, dt, t);
         if (e.kind === 'raios' && e.n) this._updateStorm(e, dt, t); // ondas gigantes até a tempestade acabar
@@ -275,7 +282,8 @@ export class Events {
         if (G.net.online) G.net.send({ t: 'event', e });
       }
     }
-    if (!e || e.kind !== 'furacao') G.player.drift = null;
+    if (!e || (e.kind !== 'furacao' && e.kind !== 'areia')) G.player.drift = null;
+    if (this._isHost() && G.extra) G.extra.scheduleDry(dt, t); // eventos da seca (galeão, desembarque, areia)
     setSeabedVortex(sea.vortex);
     if (e && e.kind === 'tempestade' && Math.random() < dt * 0.6 * this.stormBoost(t)) {
       this.flash = 1; G.hud.flash('lightning'); this.shake = Math.max(this.shake, 0.15);

@@ -5,6 +5,50 @@
 // Nos textos, **assim** vira negrito.
 export const PATCH_NOTES = [
   {
+    id: '0.32', versao: 'v0.32', data: '25/11/2026', titulo: 'Vela nova, caixas e itens no chão',
+    secoes: [
+      { icone: '⛵', nome: 'Vela', itens: ['**Corrigida**: a borda de cima fica presa na verga (antes ela se descolava e sacudia solta, pior com a vela baixada).', '**Mais detalhada**: painéis costurados, faixa vermelha com emblema, linha de rizo, reforços e corda de borda; barriga de vento de verdade.', 'Baixada, ela fica **enrolada e amarrada** embaixo da verga. Escotas ligam os cantos ao convés e amantilhos seguram a verga.'] },
+      { icone: '📦', nome: 'Caixas', itens: ['**Janela nova**: cartões com ícone, cor de raridade, estrelas e quantidade; animação ao abrir e ao pegar.', '**Pegar tudo** com um botão ou com [E].', 'A caixa **estoura ao abrir**: poeira, brilho dourado e um tranco; a janela aparece depois que a tampa abre.'] },
+      { icone: '🎒', nome: 'Itens largados', itens: ['Aparecem com o **modelo do item** (a arma, a bandagem, o kit, o colete, o peixe, o canhão...) deitados no chão, no lugar do saquinho com anel amarelo.', 'Um brilho branco pisca de vez em quando para dar para achar.'] },
+      { icone: '✨', nome: 'Correção', itens: ['Com o reflexo em **tempo real** a tela podia ficar **preta** quando havia itens no chão (o reflexo lia a própria imagem). Agora só a jangada usa o reflexo em tempo real; os outros metais refletem o céu.'] },
+    ],
+  },
+  {
+    id: '0.31', versao: 'v0.31', data: '25/11/2026', titulo: 'Colete balístico',
+    destaques: [
+      { tag: 'Item novo', titulo: 'Colete balístico', texto: 'Só na **Zona Militar**, **um por ilha** (numa das caixas). Vestido, corta **metade do dano de tiros** — só projéteis: explosões, canhão, morteiro e golpes passam normal. **Não se gasta**: vestiu, fica.' },
+    ],
+    secoes: [
+      { icone: '🦺', nome: 'Colete', itens: ['Aparece **vestido no personagem** (os aliados também veem) e o indicador ⛨ Colete fica ao lado da vida.', 'Pegou um sem estar vestido: **veste sozinho**. Um extra vai para a mochila — dá para largar para um aliado.'] },
+    ],
+  },
+  {
+    id: '0.30', versao: 'v0.30', data: '25/11/2026', titulo: 'Inimigos armados balanceados',
+    secoes: [
+      { icone: '🔫', nome: 'Inimigos armados', itens: ['**Não atiram mais através de paredes**: a linha de visão é conferida em cada tiro (os piratas no convés atiravam através das paredes da jangada). O tiro do atirador de elite também para na parede.', '**Erram bem mais**: a pontaria começa ruim e melhora enquanto eles te veem (~1,6 s); perde mais com a distância e quando você anda ou corre. Tiro errado passa longe.', '**Dano por zona**: na **Zona Pirata** os tiros tiram 55–70% do dano normal; **Zona Militar 78%**; Zona 51 100%.', 'Pistoleiro pirata: 13 → **9** de dano (≈5 na Zona Pirata). Soldado e agente com pontaria menor.'] },
+    ],
+  },
+  {
+    id: '0.29', versao: 'v0.29', data: '25/11/2026', titulo: 'Seis eventos novos',
+    destaques: [
+      { tag: 'Evento', titulo: 'Águas-vivas bioluminescentes', texto: 'O céu escurece e dezenas de **águas-vivas brilhando** cercam a jangada, com o mar cintilando em volta. Lindo — mas quem cair na água leva queimadura.' },
+      { tag: 'Seca', titulo: 'Galeão antigo', texto: 'Às vezes a seca revela um **galeão enorme enterrado na areia**. Entre pelo rombo do casco, passe pelas **armadilhas** e pelos **piratas-fantasma** e pegue o tesouro antes de a água voltar.' },
+      { tag: 'Seca', titulo: 'Desembarque militar', texto: 'Da Zona Militar em diante, um **helicóptero** deixa **soldados de rapel** no fundo do mar para cercar a jangada encalhada.' },
+    ],
+    secoes: [
+      { icone: '🌫', nome: 'Neblina', itens: ['Visão de ~20 m e **pedras escondidas** no caminho: bater numa estraga uma peça e quase para a jangada. Desvie com a vela.', 'Um **saco com loot raro** boia no meio da neblina.'] },
+      { icone: '🏕', nome: 'Acampamento abandonado', itens: ['Numa ilha vazia à frente: barraca, fogueira apagada e **loot no chão**…', '…cercado de **armadilhas** (placas de espinhos e de dardo) e com um **baú-mímico** que acorda e morde.'] },
+      { icone: '🏜', nome: 'Tempestade de areia', itens: ['Na seca: vento forte que **empurra**, areia no ar e visão curta.', 'O vento **desenterra sacos de loot** pela seca.'] },
+      { icone: '🎲', nome: 'Frequência', itens: ['Na seca sai **no máximo um** evento (galeão 32%, areia 28%, desembarque 30% só da Zona Militar em diante).', 'Os eventos do mar entram no sorteio normal (águas-vivas um pouco mais raras; acampamento só com ilha vazia à frente).'] },
+    ],
+  },
+  {
+    id: '0.28', versao: 'v0.28', data: '25/11/2026', titulo: 'Mar mais calmo entre eventos',
+    secoes: [
+      { icone: '🌊', nome: 'Eventos do mar', itens: ['**Mais tempo entre eventos**: 2 min 10 s a 3 min 30 s depois do fim do anterior (antes 1 a 2 min).', 'O primeiro evento vem **50–90 s** depois da partida (antes 20–40 s).', 'Às vezes (10%) o mar fica quieto por mais um tempo.'] },
+    ],
+  },
+  {
     id: '0.27', versao: 'v0.27', data: '25/11/2026', titulo: 'Mar gigante',
     destaques: [
       { tag: 'Eventos', titulo: 'Onda gigante de verdade', texto: 'A onda gigante virou uma **muralha de água de 16 a 24 m** (de propósito, fora da escala real), com espuma só na crista. A jangada sobe a parede inclinando bem mais.' },

@@ -47,6 +47,7 @@ import { Inventory } from './ui/inventory.js';
 import { clock } from './core/util.js';
 import { Intro } from './systems/intro.js';
 import { Reflections } from './core/reflections.js';
+import { ExtraEvents } from './systems/extraevents.js';
 import { ZoneTitle } from './ui/zonetitle.js';
 
 const $ = (id) => document.getElementById(id);
@@ -115,6 +116,7 @@ G.seaEvents = new SeaEvents(G); // kraken, tubarões, peixes voadores e raios
 G.sos = new Sos(G); // plataforma de petróleo do SOS (fim da jornada)
 G.endgame = new Endgame(G); // coordenadas do abrigo, navegação 360° e os Twins
 G.inventory = new Inventory(G); // tela de inventário (Tab)
+G.extra = new ExtraEvents(G); // neblina, águas-vivas, acampamento, galeão, desembarque, tempestade de areia
 G.zoneTitle = new ZoneTitle(G); // nome da zona ao entrar numa zona nova
 const atmo = new Atmosphere(renderer, scene, { sun, hemisphere }); // céu, IBL e sombras
 const ocean = new Ocean(scene, atmo);
@@ -190,6 +192,7 @@ function start(seed, welcome, opts = {}) {
   G.drops.clear();
   for (const e of [...G.enemies.list]) G.enemies.remove(e); // inimigos do mundo do menu não entram na partida
   G.seaEvents.end();
+  if (G.extra) G.extra.end();
   if (welcome) {
     for (const d of welcome.drops || []) G.drops.spawn(d);
     G.world.pendingProps = welcome.props || [];

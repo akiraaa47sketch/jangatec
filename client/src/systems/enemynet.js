@@ -166,7 +166,7 @@ export class EnemyNet {
         const att = E.byId(m.eid) || { body: { pos: new THREE.Vector3(+m.ex || 0, G.player.body.pos.y, +m.ez || 0) }, def: { nome: src }, yaw: 0, m: {} };
         if (m.k === 'kick') G.melee.incomingKick(att, dmg);
         else if (m.k === 'melee') G.melee.incoming(dmg, src, att, !!m.h);
-        else G.survival.damage(dmg, src);
+        else G.survival.damage(dmg, src, m.k === 'shot' ? 'bala' : null);
         break;
       }
       case 'chit': { // dano numa criatura do mar (todos aplicam)

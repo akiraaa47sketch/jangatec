@@ -118,6 +118,12 @@ export class Interact {
     this.lootOpen = true;
     G.input.setCursorMode(true);
     G.world.animateCrateOpen(crate.id);
+    if (!crate.opened || !crate._fx) { // primeira abertura: a tampa estoura com poeira e brilho dourado
+      crate._fx = true;
+      const p = { x: crate.x, y: crate.y + 0.6, z: crate.z };
+      if (G.vfx) { G.vfx.dust({ x: crate.x, y: crate.y + 0.1, z: crate.z }, 10, 0xcbb894, 2.2); G.vfx.sparks(p, 22, 0xffd36e, 3.5, 0.7); G.vfx.ring({ x: crate.x, y: crate.y, z: crate.z }, { color: 0xffd36e, from: 0.3, to: 2.2, life: 0.45 }); }
+      if (G.events) G.events.shake = Math.max(G.events.shake, 0.12);
+    }
 
     if (G.net.online) {
       G.hud.openLoot(crate.id === 'i0,1c0' ? 'Cache inicial' : 'Caixa de suprimentos', {}, null, () => this.closeCrate(), true);
@@ -127,7 +133,9 @@ export class Interact {
 
     const state = G.world.openCrate(crate.id, 1);
     if (!state) { this.closeCrate(); return; }
-    this.setCrateState(crate.id, state.loot);
+    // a janela aparece depois que a tampa abre (antecipação)
+    G.hud.openLoot(crate.id === 'i0,1c0' ? 'Cache inicial' : 'Caixa de suprimentos', {}, null, () => this.closeCrate(), true);
+    setTimeout(() => { if (this.openCrateId === crate.id) this.setCrateState(crate.id, state.loot); }, 380);
   }
 
   setCrateState(id, loot) {

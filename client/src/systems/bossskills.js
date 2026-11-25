@@ -458,8 +458,10 @@ export class BossSkills {
           const from = f.o.clone().setY(f.o.y + 1.5), to = f.tg.clone().setY(f.tg.y + 1.1);
           G.combat.tracer(from, to, 0xffb060); sfx.gun(f.o, 'sniper');
           const me = this._me();
-          if (me && Math.hypot(pp.x - f.tg.x, pp.z - f.tg.z) < S.radius && Math.abs(pp.y - f.tg.y) < 2 && !(G.melee && G.melee.iframes > 0)) {
-            G.survival.damage(S.dmg, 'Atirador de elite'); sfx.hit(pp, true);
+          // a bala para na parede: escondido atrás de algo, você não é atingido
+          const blocked = me && G.colliders.segmentBlocked(from.x, from.y, from.z, pp.x, pp.y + 1.1, pp.z);
+          if (me && !blocked && Math.hypot(pp.x - f.tg.x, pp.z - f.tg.z) < S.radius && Math.abs(pp.y - f.tg.y) < 2 && !(G.melee && G.melee.iframes > 0)) {
+            G.survival.damage(S.dmg, 'Atirador de elite', 'bala'); sfx.hit(pp, true);
           }
           done = true;
         }

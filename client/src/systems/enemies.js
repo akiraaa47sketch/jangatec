@@ -24,13 +24,13 @@ export const ENEMY_TYPES = {
   esquivo:  { nome: 'Esquivo', hp: 70, speed: 3.8, dmg: 9, range: 1.8, cd: 0.9, cor: 0x3a7a5a, scale: 0.95, dodge: { cd: 3.5, chance: 0.8 } }, // desvia (com recarga)
   // --- piratas (balsas e abordagem) ---
   duelista: { nome: 'Pirata duelista', hp: 90, speed: 4.6, dmg: 12, range: 1.9, cd: 1.0, cor: 0x7a1e2a, scale: 1.05, dodge: { cd: 3, chance: 0.75 } },
-  pistoleiro: { nome: 'Pirata pistoleiro', hp: 70, speed: 3.6, dmg: 13, range: 16, cd: 3.2, cor: 0x3b2a1d, scale: 1, ranged: true, acc: 0.55, keep: 6 }, // tiro único, recarga lenta
+  pistoleiro: { nome: 'Pirata pistoleiro', hp: 70, speed: 3.6, dmg: 9, range: 16, cd: 3.4, cor: 0x3b2a1d, scale: 1, ranged: true, acc: 0.55, keep: 6 }, // tiro único, recarga lenta
   bombardeiro: { nome: 'Pirata bombardeiro', hp: 65, speed: 3.4, dmg: 0, range: 16, cd: 99, cor: 0x2a2a2a, scale: 1, ranged: true, burst: 0, skill: 'bomb', keep: 7 },
   // --- soldados (bases militares e bunkers) ---
   escopeteiro: { nome: 'Escopeteiro', hp: 105, speed: 3.2, dmg: 4, range: 11, cd: 2.4, cor: 0x4b5530, scale: 1.05, ranged: true, pellets: 6, acc: 0.45, close: true },
   elite: { nome: 'Atirador de elite', hp: 70, speed: 2.6, dmg: 0, range: 45, cd: 99, cor: 0x3f4a2a, scale: 1, ranged: true, burst: 0, skill: 'snipe' }, // mira laser antes do tiro
   morteiro: { nome: 'Morteiro', hp: 55, speed: 0, dmg: 0, range: 80, cd: 6.5, cor: 0x4a4a3a, scale: 1, ranged: true, mortar: true },
-  soldado:  { nome: 'Soldado', hp: 115, speed: 3.0, dmg: 8, range: 28, cd: 1.7, cor: 0x4b5530, scale: 1.05, ranged: true, burst: 3, acc: 0.72 },
+  soldado:  { nome: 'Soldado', hp: 115, speed: 3.0, dmg: 7, range: 28, cd: 1.9, cor: 0x4b5530, scale: 1.05, ranged: true, burst: 3, acc: 0.6 },
   pirata:   { nome: 'Pirata', hp: 95, speed: 5.4, dmg: 13, range: 1.8, cd: 1.2, cor: 0x553b2d, scale: 1.05, raftSpeed: 7.2 },
   // chefes da seca (ver bosses.js): ring = distância em que rodeia o jogador, hitR = raio do corpo
   // (o alcance da sua arma conta a partir da borda), armor = dano que passa pelo casco fechado
@@ -38,7 +38,7 @@ export const ENEMY_TYPES = {
   // chefe das bases militares: gira a minigun (aviso), solta uma rajada longa e superaquece
   metralhador: { nome: 'Metralhador', hp: 700, speed: 1.7, dmg: 5, range: 30, cd: 4.2, cor: 0x3a4226, scale: 1.35, ranged: true, boss: 'minigun', burst: 34, burstGap: 0.07, acc: 0.4, spinUp: 1.2, hitR: 0.4 },
   // --- Zona 51 (fim de jogo): agentes de terno, cientistas com gás, mutantes e ciborgues ---
-  agente:   { nome: 'Agente', hp: 125, speed: 3.5, dmg: 9, range: 26, cd: 1.5, cor: 0x1a1a1e, scale: 1.02, ranged: true, burst: 2, acc: 0.74, keep: 7, dodge: { cd: 4, chance: 0.5 } },
+  agente:   { nome: 'Agente', hp: 125, speed: 3.5, dmg: 9, range: 26, cd: 1.6, cor: 0x1a1a1e, scale: 1.02, ranged: true, burst: 2, acc: 0.64, keep: 7, dodge: { cd: 4, chance: 0.5 } },
   cientista: { nome: 'Cientista louco', hp: 85, speed: 3.0, dmg: 0, range: 15, cd: 99, cor: 0xe8e4d6, scale: 1, ranged: true, burst: 0, skill: 'bomb', keep: 8 },
   mutante:  { nome: 'Mutante', hp: 150, speed: 4.6, dmg: 14, range: 1.9, cd: 0.9, cor: 0x5aff6a, scale: 1.1 },
   ciborgue: { nome: 'Ciborgue', hp: 280, speed: 2.3, dmg: 24, range: 2.4, cd: 1.6, cor: 0x7a8088, scale: 1.3, hitR: 0.35 },
@@ -81,6 +81,16 @@ export const COMBAT_DIRECTOR = {
 // Escala por jogador na sessão (1 a 6): +12% de vida por aliado nos inimigos, +20% nos chefes,
 // e +1 pirata nas invasões a cada 2 aliados. Dano e velocidade não mudam.
 export const PARTY = { hp: 0.12, bossHp: 0.2, extraPirateEvery: 2 };
+// Inimigos ARMADOS: dano por zona (Zona Pirata bem mais leve), pontaria que "esquenta" (os primeiros
+// tiros depois de te ver saem tortos) e erro maior com a distância e com você se mexendo.
+export const RANGED = {
+  dmgByDiff: [0.55, 0.7, 0.78, 1, 1],  // dificuldade 0–4 (0–1 = Zona Pirata, 2 = Zona Militar)
+  aimTime: 1.6,                         // s vendo você até a pontaria chegar no máximo
+  aimStart: 0.45,                       // pontaria no primeiro tiro (fração da pontaria total)
+  distLoss: 0.02, pelletLoss: 0.035,    // pontaria perdida por metro
+  moveLoss: [0.1, 0.22],                // andando / correndo
+  maxHit: 0.7, minHit: 0.05,
+};
 export const PIRATE_BALANCE = {
   firstWave: [75, 115],    // primeira invasão
   interval: [95, 160],     // entre invasões (conta só depois que a anterior acabou)
@@ -153,7 +163,7 @@ export class Enemies {
   }
   // Dano de inimigo num jogador: o local leva aqui; o aliado recebe pela rede (e se defende lá).
   hurt(T, dmg, src, e, extra = {}) {
-    if (T.local) { this.G.survival.damage(dmg, src); return; }
+    if (T.local) { this.G.survival.damage(dmg, src, extra.k === 'shot' ? 'bala' : null); return; } // tiro: o colete segura parte
     this.G.net.send({ t: 'pdmg', to: T.id, dmg: Math.round(dmg * 10) / 10, src, eid: e.id, ex: Math.round(e.body.pos.x * 10) / 10, ez: Math.round(e.body.pos.z * 10) / 10, ...extra });
   }
 
@@ -349,7 +359,7 @@ export class Enemies {
       if (this.G.melee) { this.G.melee.tokens.delete(e); this.G.melee.setTell(e, null); this.G.melee.updateStars(e, 0, false); }
       this.G.world.collected.add(e.id);
       const r = Math.random();
-      const loot = r < 0.4 ? { municao: 6 } : r < 0.52 ? { bandagem: 1 } : r < 0.64 ? { cartucho: 4 } : null; // curativo só às vezes
+      let loot = r < 0.4 ? { municao: 6 } : r < 0.52 ? { bandagem: 1 } : r < 0.64 ? { cartucho: 4 } : null; // curativo só às vezes
       // piratas (e às vezes saqueadores) largam o sabre
       const dropChance = e.type === 'pirata' || e.type === 'fantasma' ? 0.45 : e.type === 'melee' ? 0.12 : 0;
       const sabre = dropChance && Math.random() < dropChance;
@@ -666,20 +676,27 @@ export class Enemies {
     e.burstLeft--; e.burstT = e.def.burstGap || 0.13;
     if (e.def.spinUp && e.burstLeft === 0) { e.heat = 1; e.cd = e.def.cd * (0.9 + Math.random() * 0.3); } // superaqueceu: janela para atacar
     if (e.los === false || T.dead) return;
-    const moving = Math.hypot(T.vel.x, T.vel.z) > 3 ? 0.12 : 0; // correndo é mais difícil de acertar
+    // confere a linha de visão NA HORA do tiro (antes valia a de até 0,2 s atrás — e os piratas no
+    // convés "sempre enxergavam": atiravam através das paredes da jangada)
+    if (!this.hasLos(e)) { e.aim = 0; return; }
+    const spd = Math.hypot(T.vel.x, T.vel.z), R = RANGED;
+    const moving = spd > 4.5 ? R.moveLoss[1] : spd > 1.2 ? R.moveLoss[0] : 0; // andando/correndo é mais difícil de acertar
+    const aimK = R.aimStart + (1 - R.aimStart) * Math.min(1, (e.aim || 0) / R.aimTime);
+    const diff = Math.min(4, Math.max(0, this.G.world.difficulty(p.x, p.z) | 0)), dmgMul = R.dmgByDiff[diff];
     const from = new THREE.Vector3(p.x, p.y + 1.3, p.z), n = e.def.pellets || 1;
     const snd = e.type === 'soldado' || e.type === 'metralhador' ? 'rifle' : e.def.pellets ? 'shotgun' : e.type === 'pistoleiro' ? 'revolver' : 'pistol';
     let hits = 0;
     for (let k = 0; k < n; k++) {
-      const hit = Math.random() < (e.def.acc || 0.6) - dist * (e.def.pellets ? 0.035 : 0.012) - moving;
-      const miss = hit ? 0 : 0.8 + Math.random() * 1.2, ma = Math.random() * 6.28;
+      const chance = clamp((e.def.acc || 0.55) * aimK - dist * (e.def.pellets ? R.pelletLoss : R.distLoss) - moving, R.minHit, R.maxHit);
+      const hit = Math.random() < chance;
+      const miss = hit ? 0 : 1.2 + Math.random() * 2.2, ma = Math.random() * 6.28; // erro bem visível (passa longe)
       const to = new THREE.Vector3(pp.x + Math.cos(ma) * miss, pp.y + 1.2 + (hit ? 0 : 0.4), pp.z + Math.sin(ma) * miss);
       G.combat.tracer(from, to, 0xffb060);
       if (k === 0) G.enemyNet.shotFx(from, to, snd);
       if (hit) hits++;
     }
     sfx.gun(p, snd);
-    if (hits) this.hurt(T, e.def.dmg * hits, e.def.nome, e, { k: 'shot' });
+    if (hits) this.hurt(T, Math.max(1, Math.round(e.def.dmg * dmgMul)) * hits, e.def.nome, e, { k: 'shot' });
     e.swing = 0.25;
   }
 
@@ -940,7 +957,7 @@ export class Enemies {
     const stopAt = e.def.ranged ? Math.min(3.4, Math.max(2.2, boat.set.radius * 0.8)) : e.engaged === false ? Math.min(3.6, Math.max(2.4, boat.set.radius * 0.9)) : e.def.range * 0.7;
     if (e.def.ranged && e.def.burst !== 0 && !T.dead && !T.downed) { // pistoleiro a bordo: atira de onde está
       if (e.cd <= 0 && distance < e.def.range) { e.cd = e.def.cd * (0.85 + Math.random() * 0.4); e.burstLeft = e.def.burst ?? 1; e.burstT = 0.35; }
-      e.los = true; this._burst(e, T, distance, dt);
+      e.los = this.hasLos(e); e.aim = e.los ? (e.aim || 0) + dt : 0; this._burst(e, T, distance, dt);
     }
     const preX = e.local.x, preZ = e.local.z; // onde ele estava antes de andar neste quadro
     if (!T.dead && !T.downed && distance > stopAt && !(mres && mres.hold)) {
@@ -1149,6 +1166,7 @@ export class Enemies {
     const sameLevel = e.post || !T.pos || Math.abs(T.pos.y - e.body.pos.y) < 4.5;
     const alive = !T.dead && !T.downed && sameLevel; // caído (ou fora do andar): inimigos perdem o interesse
     e.los = dist < SIGHT + 10 && sameLevel ? this.hasLos(e) : false;
+    if (!e.los) e.aim = 0; // perdeu você de vista: a pontaria recomeça
     switch (e.state) {
       case 'idle': case 'patrol': case 'search': {
         // só percebe quem ENXERGA: dentro do cone à frente e sem parede no meio (ou muito perto)
@@ -1258,6 +1276,7 @@ export class Enemies {
         if (G.melee) G.melee.setTell(e, e.spinning > 0 ? { heavy: true } : null, 1 - Math.max(0, e.spinning) / e.def.spinUp);
         if (Math.random() < dt * 14) sfx.click(p, 0.6 + (1 - e.spinning / e.def.spinUp));
       }
+      if (e.los) e.aim = (e.aim || 0) + dt; // mirando: a pontaria vai melhorando
       this._burst(e, T, dist, dt);
       // Movimento + colisão (o mesmo resolvedor do jogador). Não saem da ilha.
       const prevY = p.y;
