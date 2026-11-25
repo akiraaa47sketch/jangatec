@@ -251,6 +251,7 @@ export class Startup {
     this.sun.intensity = 1.7 - storm * 0.95;
     this.hemisphere.intensity = 1.15 - storm * 0.55;
     if (G.sunVisual) G.sunVisual.setStorm(storm);
+    if (G.extra) G.extra.applyWeather(t); // neblina, areia e o céu escuro das águas-vivas
     const swell = this.departed && this.waterLevel > 0.5 ? swellAt(t) : 0;
     if (swell > 0.35 && !this.swellOn) G.hud.msg('Ondas grandes chegando — segure-se!');
     this.swellOn = swell > 0.35 ? true : swell < 0.1 ? false : this.swellOn;

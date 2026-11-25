@@ -356,7 +356,7 @@ function handle(ws, m) {
       // Eventos do mar sorteados pelo host (onda, furacão, tempestade, kraken, tubarões, peixes, raios,
       // navio-fantasma): valida e repassa a todos.
       const e = m.e;
-      if (room.hostId !== ws.id || !e || !['tsunami', 'furacao', 'tempestade', 'kraken', 'tubaroes', 'peixes', 'raios', 'fantasma', 'sos'].includes(e.kind) ||
+      if (room.hostId !== ws.id || !e || !['tsunami', 'furacao', 'tempestade', 'kraken', 'tubaroes', 'peixes', 'raios', 'fantasma', 'sos', 'neblina', 'aguasvivas', 'acampamento', 'galeao', 'desembarque', 'areia'].includes(e.kind) ||
           typeof e.id !== 'string' || e.id.length > 40) break;
       const keys = ['t0', 'dur', 'ox', 'oz', 'dx', 'dz', 'speed', 'A', 'sigma', 'cx', 'cz', 'fx', 'fz', 'lat', 'latV', 'ahead', 'R', 'depth', 'spin', 'seed', 'n', 'gap', 'x', 'z', 'yaw']; // x/z/yaw: posição da plataforma do SOS
       const clean = { id: e.id, kind: e.kind, end: !!e.end };

@@ -5,6 +5,20 @@
 // Nos textos, **assim** vira negrito.
 export const PATCH_NOTES = [
   {
+    id: '0.29', versao: 'v0.29', data: '25/11/2026', titulo: 'Seis eventos novos',
+    destaques: [
+      { tag: 'Evento', titulo: 'Águas-vivas bioluminescentes', texto: 'O céu escurece e dezenas de **águas-vivas brilhando** cercam a jangada, com o mar cintilando em volta. Lindo — mas quem cair na água leva queimadura.' },
+      { tag: 'Seca', titulo: 'Galeão antigo', texto: 'Às vezes a seca revela um **galeão enorme enterrado na areia**. Entre pelo rombo do casco, passe pelas **armadilhas** e pelos **piratas-fantasma** e pegue o tesouro antes de a água voltar.' },
+      { tag: 'Seca', titulo: 'Desembarque militar', texto: 'Da Zona Militar em diante, um **helicóptero** deixa **soldados de rapel** no fundo do mar para cercar a jangada encalhada.' },
+    ],
+    secoes: [
+      { icone: '🌫', nome: 'Neblina', itens: ['Visão de ~20 m e **pedras escondidas** no caminho: bater numa estraga uma peça e quase para a jangada. Desvie com a vela.', 'Um **saco com loot raro** boia no meio da neblina.'] },
+      { icone: '🏕', nome: 'Acampamento abandonado', itens: ['Numa ilha vazia à frente: barraca, fogueira apagada e **loot no chão**…', '…cercado de **armadilhas** (placas de espinhos e de dardo) e com um **baú-mímico** que acorda e morde.'] },
+      { icone: '🏜', nome: 'Tempestade de areia', itens: ['Na seca: vento forte que **empurra**, areia no ar e visão curta.', 'O vento **desenterra sacos de loot** pela seca.'] },
+      { icone: '🎲', nome: 'Frequência', itens: ['Na seca sai **no máximo um** evento (galeão 32%, areia 28%, desembarque 30% só da Zona Militar em diante).', 'Os eventos do mar entram no sorteio normal (águas-vivas um pouco mais raras; acampamento só com ilha vazia à frente).'] },
+    ],
+  },
+  {
     id: '0.28', versao: 'v0.28', data: '25/11/2026', titulo: 'Mar mais calmo entre eventos',
     secoes: [
       { icone: '🌊', nome: 'Eventos do mar', itens: ['**Mais tempo entre eventos**: 2 min 10 s a 3 min 30 s depois do fim do anterior (antes 1 a 2 min).', 'O primeiro evento vem **50–90 s** depois da partida (antes 20–40 s).', 'Às vezes (10%) o mar fica quieto por mais um tempo.'] },
