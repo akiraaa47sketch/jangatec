@@ -5,6 +5,12 @@
 // Nos textos, **assim** vira negrito.
 export const PATCH_NOTES = [
   {
+    id: '0.25', versao: 'v0.25', data: '25/11/2026', titulo: 'Cutscene revisada',
+    secoes: [
+      { icone: '🚁', nome: 'Cutscene de abertura', itens: ['**Mais calma** (~35 s): cada fala fica na tela tempo suficiente para ler e a queda dura mais.', 'Falas **revisadas** em português.', 'Corrigido o **congelamento no fim**: a luz da explosão da queda obrigava o jogo a recompilar os gráficos quando a cutscene acabava.', 'Se o mouse soltar durante a cutscene, aparece o aviso **"Clique na tela para controlar a câmera"**.'] },
+    ],
+  },
+  {
     id: '0.24', versao: 'v0.24', data: '24/11/2026', titulo: 'A queda do helicóptero',
     destaques: [
       { tag: 'Cutscene', titulo: 'Abertura: o voo 47', texto: 'Toda partida começa num **helicóptero de resgate com todos os jogadores da sala**. Um raio acerta o rotor, ele cai em espiral e vocês despencam na ilha. Você **acorda em 1ª pessoa** ao lado dos destroços. Espaço ou clique pula.' },

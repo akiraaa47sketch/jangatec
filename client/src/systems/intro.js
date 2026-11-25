@@ -1,4 +1,4 @@
-// Cutscene de abertura (roda no próprio motor, ~21 s, dá para pular):
+// Cutscene de abertura (roda no próprio motor, ~35 s, dá para pular):
 //   A  helicóptero de resgate voando na tempestade, com TODOS os jogadores da sala sentados na cabine
 //   B  dentro da cabine: turbulência, relâmpagos lá fora
 //   C  um raio acerta o rotor: clarão, faíscas, fumaça, o motor morre
@@ -16,8 +16,10 @@ import { makeHumanoid } from '../player/model.js';
 import { sfx, heliRotor, earRing, heliCrash } from '../core/sfx.js';
 
 // roteiro (segundos)
-const T = { B: 4.5, strike: 7.2, C2: 8.8, eject: 8.9, crash: 12.0, wake: 13.8, sit: 16.3, look: 17.6, stand: 18.8, hold: 20.0, end: 21.2 };
-const SPEED = 30, STRIKE_DIST = 100, ALT = 50;
+// Ritmo pensado para dar tempo de ler cada fala (~2,5–3 s cada) e acompanhar a queda.
+const T = { B: 7, strike: 12.5, C2: 15, eject: 15.2, crash: 19, wake: 22, sit: 26.5, look: 28.5, stand: 30.8, hold: 32.6, end: 35 };
+const WAKE_K = 1.4; // a sequência de abrir os olhos dura 40% a mais
+const SPEED = 25, STRIKE_DIST = 100, ALT = 50;
 const smooth = (x) => { x = clamp(x, 0, 1); return x * x * (3 - 2 * x); };
 const seg = (t, a, b) => smooth((t - a) / (b - a));
 const wrapPi = (a) => Math.atan2(Math.sin(a), Math.cos(a));
@@ -57,7 +59,7 @@ export class Intro {
 
     // o jogador e os aliados reais (já na ilha) ficam escondidos até o despertar
     G.player.mesh.visible = false;
-    this.flashes = [5.3, 6.35, T.strike];
+    this.flashes = [8.2, 10.4, T.strike];
 
     this._makeOverlay();
     this._onKey = (e) => { if (['Space', 'Enter', 'Escape'].includes(e.code)) { e.preventDefault(); this.skip(); } };
@@ -102,8 +104,8 @@ export class Intro {
     }
   }
   _names() {
-    const n = [...this.riders.values()].map((r) => r.name);
-    if (n.length === 1) return 'Você';
+    const n = [...this.riders.values()].map((r) => (r.id === 'local' ? 'você' : r.name));
+    if (n.length === 1) return 'só você';
     return n.slice(0, -1).join(', ') + ' e ' + n[n.length - 1];
   }
   // joga todo mundo para fora: cada um cai no lugar em que vai acordar
@@ -122,8 +124,8 @@ export class Intro {
         else { const ang = i * 1.9 + 0.7; target = new THREE.Vector3(isl.x + Math.cos(ang) * isl.R * 0.5, isl.set.y + 0.6, isl.z + Math.sin(ang) * isl.R * 0.5); }
       }
       const dur = T.crash - T.eject + 0.25 + i * 0.12;
-      const vy = (target.y - _v.y + 4.9 * dur * dur) / dur;
-      r.falling = { p0: _v.clone(), target, dur, vy, t: 0, spin: new THREE.Vector3((Math.random() - 0.5) * 6, (Math.random() - 0.5) * 4, (Math.random() - 0.5) * 6) };
+      const g = 2 * Math.max(1, _v.y - target.y) / (dur * dur); // cai do repouso e chega ao chão junto com o impacto
+      r.falling = { p0: _v.clone(), target, dur, g, t: 0, spin: new THREE.Vector3((Math.random() - 0.5) * 6, (Math.random() - 0.5) * 4, (Math.random() - 0.5) * 6) };
       i++;
     }
   }
@@ -190,11 +192,11 @@ export class Intro {
       const p = this.S.clone().addScaledVector(this.D, STRIKE_DIST * f);
       p.y = this.W.y + (ALT - this.W.y) * (1 - Math.pow(k, 2.1));
       h.position.copy(p);
-      const ts = t - T.strike, spin = 0.5 * 1.5 * ts * ts;
+      const ts = t - T.strike, spin = 0.5 * 0.65 * ts * ts;
       h.rotation.set(0.08 + 0.35 * k, this.a + spin, Math.sin(ts * 3) * 0.25 + 0.3 * k, 'YXZ');
     }
     // rotor: a todo vapor até o raio, depois morre devagar
-    this.rotorRate = t < T.strike ? 28 : lerp(28, 5, smooth((t - T.strike) / 2.5));
+    this.rotorRate = t < T.strike ? 28 : lerp(28, 5, smooth((t - T.strike) / 3.5));
     this.rotorSpin += this.rotorRate * this.dt;
     u.rotor.rotation.y = this.rotorSpin;
     u.tailRotor.rotation.x = this.rotorSpin * (t < T.strike ? 2.2 : 0.6);
@@ -257,10 +259,10 @@ export class Intro {
     const sit = seg(t, T.sit, T.look), stand = seg(t, T.stand, T.hold);
     const eye = 0.26 + (0.85 - 0.26) * sit + (1.38 - 0.85) * stand;
     // deitado olhando o céu → vira a cabeça para os destroços → senta olhando → levanta e procura a jangada
-    let pitch = lerp(1.25, 0.85, seg(t, T.wake + 1.7, T.sit));
+    let pitch = lerp(1.25, 0.85, seg(t, T.wake + 2.4, T.sit));
     pitch = lerp(pitch, -0.05, sit);
     pitch = lerp(pitch, 0.02, stand);
-    let yaw = lerpAng(upYaw, wreckYaw + 0.35, seg(t, T.wake + 1.7, T.sit));
+    let yaw = lerpAng(upYaw, wreckYaw + 0.35, seg(t, T.wake + 2.4, T.sit));
     yaw = lerpAng(yaw, wreckYaw, sit);
     yaw = lerpAng(yaw, boatYaw, seg(t, T.stand + 0.3, T.hold + 0.4));
     const roll = lerp(0.35, 0, sit) + Math.sin(t * 1.3) * 0.03 * (1 - stand);
@@ -296,18 +298,18 @@ export class Intro {
   _subtitles(t) {
     const multi = this.riders.size > 1;
     const lines = [
-      [0.8, 4.2, `Voo de resgate 47 — a bordo: ${this._names()}`],
-      [4.7, 6.2, 'Piloto: Segurem-se! A tempestade está piorando!'],
-      [6.3, 7.15, 'Piloto: Vou tentar passar por cima dela...'],
-      [7.5, 9.4, 'Piloto: MAYDAY! MAYDAY! Perdemos o rotor!'],
-      [9.5, 11.6, 'Piloto: Vamos cair! Pulem!'],
-      [16.6, 17.9, 'Ugh... onde eu estou?'],
-      [18.0, 19.4, multi ? 'O helicóptero... cadê os outros?' : 'O helicóptero... caiu.'],
-      [19.6, T.end - 0.3, 'Uma jangada! Preciso sair desta ilha.'],
+      [1.2, 6.4, `Voo de resgate 47 — passageiros: ${this._names()}.`],
+      [7.4, 9.9, 'Piloto: Segurem-se! A tempestade está piorando.'],
+      [10.1, 12.4, 'Piloto: Vou tentar passar por cima das nuvens…'],
+      [12.8, 15.4, 'Piloto: Mayday, mayday! Fomos atingidos por um raio!'],
+      [15.6, 18.6, 'Piloto: Não consigo segurar! Pulem, agora!'],
+      [26.7, 28.4, 'Ai… minha cabeça… Onde eu estou?'],
+      [28.6, 30.7, multi ? 'O helicóptero caiu… Cadê os outros?' : 'O helicóptero caiu…'],
+      [31.0, T.end - 0.6, 'Uma jangada! Talvez eu consiga sair desta ilha.'],
     ];
     const line = lines.find(([a, b]) => t >= a && t < b);
     this._sub(line ? line[2] : '');
-    const title = t > 0.3 && t < 3.6 ? 'Jangatec' : t > T.crash + 0.4 && t < T.wake - 0.2 ? '...' : '';
+    const title = t > 0.4 && t < 5.2 ? 'Jangatec' : t > T.crash + 0.4 && t < T.wake - 0.2 ? '...' : '';
     if (this.ui.title.textContent !== title) this.ui.title.textContent = title;
     this.ui.title.classList.toggle('on', !!title);
   }
@@ -320,7 +322,7 @@ export class Intro {
     // pálpebras: 1 = fechadas
     let lid = 0;
     if (t >= T.wake) {
-      const w = t - T.wake;
+      const w = (t - T.wake) / WAKE_K;
       lid = w < 0.4 ? 1 : w < 1.6 ? 1 - 0.55 * smooth((w - 0.4) / 1.2) : w < 1.9 ? 0.45 + 0.55 * smooth((w - 1.6) / 0.3)
         : w < 2.9 ? 1 - smooth((w - 1.9) / 1.0) * 0.9 : w < 3.15 ? 0.1 + 0.9 * smooth((w - 2.9) / 0.15) : 1 - smooth((w - 3.15) / 0.5);
       if (t > T.look + 0.6 && t < T.look + 0.85) lid = Math.max(lid, Math.sin((t - T.look - 0.6) / 0.25 * Math.PI)); // piscada
@@ -338,7 +340,7 @@ export class Intro {
     let fade = 0;
     if (t >= T.crash && t < T.wake) fade = t < T.crash + 0.08 ? 0 : 1;
     if (t >= T.wake) fade = 0;
-    if (t > T.end - 0.35) fade = seg(t, T.end - 0.35, T.end);
+    if (t > T.end - 0.6) fade = seg(t, T.end - 0.6, T.end);
     if (t < 0.6) fade = 1 - seg(t, 0, 0.6);
     ui.fade.style.opacity = fade.toFixed(3);
     this._subtitles(t);
@@ -357,7 +359,10 @@ export class Intro {
     // os aliados de verdade (já na ilha) só aparecem no despertar
     const showReal = ct >= T.wake;
     for (const r of G.net.remotes.values()) if (r.mesh.visible !== showReal) r.mesh.visible = showReal;
-    G.player.mesh.visible = false;
+    // tela preta: desenha de verdade (escondido pelo preto) o personagem, a sombra dele e os braços
+    // da 1ª pessoa por alguns quadros — assim nada é preparado pela primeira vez quando o jogo volta
+    const warm = ct >= T.crash + 1.2 && ct < T.crash + 2.2;
+    G.player.mesh.visible = warm;
 
     if (ct < T.crash) {
       this._heliPose(ct);
@@ -398,7 +403,7 @@ export class Intro {
       if (r.falling) {
         const f = r.falling; f.t += dt;
         const k = Math.min(1, f.t / f.dur);
-        r.obj.position.set(lerp(f.p0.x, f.target.x, k), f.p0.y + f.vy * Math.min(f.t, f.dur) - 4.9 * Math.min(f.t, f.dur) ** 2, lerp(f.p0.z, f.target.z, k));
+        r.obj.position.set(lerp(f.p0.x, f.target.x, k), f.p0.y - 0.5 * f.g * Math.min(f.t, f.dur) ** 2, lerp(f.p0.z, f.target.z, k));
         r.obj.rotation.x += f.spin.x * dt; r.obj.rotation.y += f.spin.y * dt; r.obj.rotation.z += f.spin.z * dt;
         r.obj.visible = k < 1 && ct < T.crash;
         if (r.pill) { r.pill.userData.vy = -10; animatePill(r.pill, 0, dt, 'jump'); }
@@ -406,10 +411,29 @@ export class Intro {
     }
     if (this.pilot.pill) animatePill(this.pilot.pill, 0, dt, 'row', 0.25);
 
-    if (!this.zoneShown && ct >= T.wake + 4.2 && G.zoneTitle) { this.zoneShown = true; const z = G.zoneTitle.zoneAt(); G.zoneTitle.show(z.name, z.sub); }
+    if (!this.zoneShown && ct >= 28.5 && G.zoneTitle) { this.zoneShown = true; const z = G.zoneTitle.zoneAt(); G.zoneTitle.show(z.name, z.sub); }
+    if (!this.prewarmed && ct >= T.crash + 1.2) { this.prewarmed = true; this._prewarm(dt, t); }
+    if (ct > T.end - 0.45 && !this.hudShown) { this.hudShown = true; G.hud.show(); } // monta o HUD atrás do preto
+    if (warm && G.viewmodel) { try { G.viewmodel.update(dt, t); G.viewmodel.render(G.renderer); } catch (e) { /* ok */ } }
     if (ct < T.crash) this._camera(ct);
     else this._wakeCamera(ct);
     this._overlay(ct, dt);
+  }
+
+  // Na tela preta (o jogador não vê nada), compila na placa de vídeo tudo que só aparece quando a
+  // cutscene acaba: o próprio personagem, os braços e a arma da 1ª pessoa. Sem isso o jogo travava
+  // por um instante bem no fim, quando eles eram desenhados pela primeira vez.
+  _prewarm(dt, t) {
+    const G = this.G, r = G.renderer, pm = G.player.mesh;
+    try {
+      pm.visible = true;
+      if (G.viewmodel) {
+        G.viewmodel.update(dt, t);
+        r.compile(G.viewmodel.scene, G.viewmodel.camera);
+      }
+      r.compile(G.scene, G.camera);
+    } catch (e) { /* sem pré-aquecimento: só um possível engasgo no fim */ }
+    pm.visible = false;
   }
 
   _crash() {
@@ -417,7 +441,10 @@ export class Intro {
     this.crashed = true;
     heliRotor(0);
     heliCrash();
-    this.boom = new Explosions(G.scene); // própria (a da batalha naval só anima durante a batalha)
+    // usa a explosão do jogo (a luz dela já está na cena). Uma luz NOVA mudaria o número de luzes e
+    // obrigaria a placa de vídeo a recompilar os materiais do mundo inteiro quando fosse removida —
+    // era isso que fazia a cutscene congelar no fim. Ela só anima na batalha, então a cutscene anima.
+    this.boom = G.naval && G.naval.boom ? G.naval.boom : new Explosions(G.scene);
     this.boom.spawn(this.W.clone().add(new THREE.Vector3(0, 1, 0)), 2.6);
     this.ui.flash.style.background = '#ffb35a'; this.flashK = 1;
     this.heli.visible = false;
@@ -428,8 +455,8 @@ export class Intro {
 
   skip() {
     if (!this.active || this.t < 0.6) return;
-    if (this.t >= T.end - 0.4) return;
-    this.t = T.end - 0.35; // fecha com o mesmo fade do fim
+    if (this.t >= T.end - 0.65) return;
+    this.t = T.end - 0.6; // fecha com o mesmo fade do fim
     if (!this.crashed) { this.crashed = true; heliRotor(0); this.heli.visible = false; if (this.island.wreck) this.island.wreck.group.visible = true; }
     for (const r of this.riders.values()) r.obj.visible = false;
     this._wakeCamera(T.end);
@@ -472,7 +499,7 @@ export class Intro {
     this._disposeObj(this.sparks.pts);
     for (const p of this.trail.list) this._disposeObj(p.s);
     if (this.bolt) this._disposeObj(this.bolt.g);
-    if (this.boom) { this.boom.update(10); G.scene.remove(this.boom.light); }
+    if (this.boom) this.boom.update(10); // termina a explosão (a luz continua na cena, apagada)
     // o preto some devagar já com o jogo rodando
     const ui = this.ui;
     ui.el.classList.add('out');
@@ -484,5 +511,7 @@ export class Intro {
       G.zoneTitle.sync();
     }
     if (this.onDone) this.onDone();
+    // o mouse pode ter sido solto durante a cutscene (Esc, troca de janela): avisa em vez de parecer travado
+    if (!G.touch && !G.input.locked && !G.input.freeLook) G.hud.msg('Clique na tela para controlar a câmera');
   }
 }
