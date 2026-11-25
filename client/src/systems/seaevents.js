@@ -143,15 +143,76 @@ function makeShark() {
   g.add(body); g.userData = { body, tail };
   return g;
 }
+// Peixe-voador: corpo afinando até a cauda (dorso azul-escuro, barriga prateada), olhão,
+// "asas" (nadadeiras peitorais enormes) translúcidas com raios, nadadeiras pélvicas e cauda
+// bifurcada com o lobo de baixo maior — como o peixe de verdade. Geometrias/materiais compartilhados.
+let FISH = null;
+function fishParts() {
+  if (FISH) return FISH;
+  // corpo: esfera esticada e afinada para trás, com cor por vértice (dorso → barriga)
+  const body = new THREE.SphereGeometry(0.1, 20, 14);
+  const pos = body.attributes.position, col = [], back = new THREE.Color(0x1d4f86), mid = new THREE.Color(0x4aa6d8), belly = new THREE.Color(0xe6eef2);
+  for (let i = 0; i < pos.count; i++) {
+    let x = pos.getX(i), y = pos.getY(i), z = pos.getZ(i) * 2.9;      // comprimento
+    const u = (z / 0.29 + 1) / 2;                                    // 0 = cauda, 1 = focinho
+    const taper = 0.35 + 0.65 * Math.sin(Math.min(1, u * 1.25) * Math.PI / 2); // afina para a cauda
+    x *= taper * 0.85; y *= taper;
+    if (u > 0.85) y -= (u - 0.85) * 0.06;                            // focinho levemente para baixo
+    pos.setXYZ(i, x, y, z);
+    const k = THREE.MathUtils.clamp((y / (0.1 * taper) + 1) / 2, 0, 1); // 0 = barriga, 1 = dorso
+    const c = k > 0.55 ? mid.clone().lerp(back, (k - 0.55) / 0.45) : belly.clone().lerp(mid, k / 0.55);
+    col.push(c.r, c.g, c.b);
+  }
+  body.setAttribute('color', new THREE.Float32BufferAttribute(col, 3));
+  body.computeVertexNormals();
+  // textura das nadadeiras: membrana azulada com raios
+  const cv = document.createElement('canvas'); cv.width = 128; cv.height = 64;
+  const g = cv.getContext('2d');
+  const grad = g.createLinearGradient(0, 0, 128, 0); grad.addColorStop(0, 'rgba(120,190,235,0.85)'); grad.addColorStop(1, 'rgba(200,235,255,0.55)');
+  g.fillStyle = grad; g.fillRect(0, 0, 128, 64);
+  g.strokeStyle = 'rgba(30,70,120,0.75)'; g.lineWidth = 2;
+  for (let i = 0; i < 10; i++) { g.beginPath(); g.moveTo(0, 32); g.lineTo(128, 4 + i * 6.2); g.stroke(); }
+  const finTex = new THREE.CanvasTexture(cv);
+  const finMat = new THREE.MeshStandardMaterial({ map: finTex, transparent: true, side: THREE.DoubleSide, roughness: 0.4, metalness: 0.1, depthWrite: false });
+  const shapeGeo = (pts) => { const sh = new THREE.Shape(); sh.moveTo(pts[0][0], pts[0][1]); for (const [a, b] of pts.slice(1)) sh.lineTo(a, b); return fitUV(new THREE.ShapeGeometry(sh)); };
+  const fitUV = (geo) => { // UV pela caixa (a textura cobre a nadadeira inteira)
+    geo.computeBoundingBox(); const bb = geo.boundingBox, p = geo.attributes.position, uv = [];
+    for (let i = 0; i < p.count; i++) uv.push((p.getX(i) - bb.min.x) / (bb.max.x - bb.min.x || 1), (p.getY(i) - bb.min.y) / (bb.max.y - bb.min.y || 1));
+    geo.setAttribute('uv', new THREE.Float32BufferAttribute(uv, 2)); return geo;
+  };
+  // asa (peitoral): presa na raiz (x=0), longa e com a ponta arredondada para trás
+  const wing = shapeGeo([[0, 0.03], [0.12, 0.07], [0.3, 0.06], [0.44, 0.0], [0.46, -0.06], [0.38, -0.12], [0.2, -0.13], [0.05, -0.07], [0, -0.03]]);
+  const pelvic = shapeGeo([[0, 0.01], [0.1, 0.02], [0.16, -0.03], [0.08, -0.06], [0, -0.02]]);
+  // cauda bifurcada (x = para trás), lobo de baixo maior
+  const tail = shapeGeo([[0, 0.02], [0.14, 0.1], [0.18, 0.11], [0.1, 0.0], [0.24, -0.15], [0.2, -0.16], [0, -0.02]]);
+  const dorsal = shapeGeo([[0, 0], [0.04, 0.06], [0.14, 0.05], [0.16, 0]]);
+  FISH = {
+    body, wing, pelvic, tail, dorsal, finMat,
+    bodyMat: new THREE.MeshStandardMaterial({ vertexColors: true, metalness: 0.55, roughness: 0.28 }),
+    eyeW: new THREE.SphereGeometry(0.026, 10, 8), eyeB: new THREE.SphereGeometry(0.016, 8, 6),
+    whiteMat: new THREE.MeshStandardMaterial({ color: 0xf4f1e6, roughness: 0.3 }), blackMat: new THREE.MeshBasicMaterial({ color: 0x050608 }),
+  };
+  return FISH;
+}
 function makeFish() {
-  const g = new THREE.Group();
-  const blue = new THREE.MeshStandardMaterial({ color: 0x3f8fc9, metalness: 0.4, roughness: 0.35 });
-  const b = new THREE.Mesh(new THREE.SphereGeometry(0.12, 10, 6), blue); b.scale.set(0.7, 0.8, 2.4); g.add(b);
-  const wingM = new THREE.MeshStandardMaterial({ color: 0xbfe6ff, transparent: true, opacity: 0.75, side: THREE.DoubleSide });
+  const F = fishParts(), g = new THREE.Group();
+  const body = new THREE.Mesh(F.body, F.bodyMat); g.add(body);
+  for (const s of [-1, 1]) { // olhos
+    const w = new THREE.Mesh(F.eyeW, F.whiteMat); w.position.set(s * 0.052, 0.022, 0.2); g.add(w);
+    const b = new THREE.Mesh(F.eyeB, F.blackMat); b.position.set(s * 0.068, 0.024, 0.208); g.add(b);
+  }
   const wings = [];
-  for (const s of [-1, 1]) { const w = new THREE.Mesh(new THREE.PlaneGeometry(0.42, 0.22), wingM); w.position.set(s * 0.22, 0.02, 0.05); w.rotation.x = -Math.PI / 2; g.add(w); wings.push(w); }
-  const tail = new THREE.Mesh(new THREE.PlaneGeometry(0.16, 0.2), wingM); tail.position.z = -0.32; tail.rotation.y = Math.PI / 2; g.add(tail);
-  g.userData = { wings };
+  for (const s of [-1, 1]) { // asas: pivô na lateral, abertas para fora e um pouco para trás
+    const piv = new THREE.Group(); piv.position.set(s * 0.06, 0.015, 0.1);
+    const m = new THREE.Mesh(F.wing, F.finMat); m.rotation.set(-Math.PI / 2, 0, 0); m.scale.x = s; piv.add(m);
+    piv.rotation.y = -s * 0.35; g.add(piv); wings.push(piv);
+    const pv = new THREE.Mesh(F.pelvic, F.finMat); pv.rotation.set(-Math.PI / 2, 0, 0); pv.scale.x = s; // pélvicas
+    pv.position.set(s * 0.03, -0.035, -0.1); pv.rotation.y = -s * 0.5; g.add(pv);
+  }
+  const tail = new THREE.Mesh(F.tail, F.finMat); tail.rotation.y = Math.PI / 2; tail.position.z = -0.27; g.add(tail);
+  const dorsal = new THREE.Mesh(F.dorsal, F.finMat); dorsal.rotation.y = Math.PI / 2; dorsal.position.set(0, 0.055, -0.08); g.add(dorsal);
+  g.scale.setScalar(1.15);
+  g.userData = { wings, tail };
   return g;
 }
 
@@ -496,7 +557,8 @@ export class SeaEvents {
     const base = sea.level + 0.2, y = base + Math.sin(u * Math.PI) * (G.boat.set.y - sea.level + f.peak);
     f.mesh.position.set(x, y, z);
     f.mesh.rotation.set(-Math.cos(u * Math.PI) * 0.5, Math.atan2(f.fx, f.fz), 0);
-    for (const w of f.mesh.userData.wings) w.rotation.z = Math.sin(e.u * 40 + f.lane * 9) * 0.25;
+    f.mesh.userData.wings.forEach((w, i) => { w.rotation.z = (i ? 1 : -1) * (0.12 + Math.sin(e.u * 40 + f.lane * 9) * 0.18); }); // planando, asas tremendo
+    f.mesh.userData.tail.rotation.x = Math.sin(e.u * 30 + f.lane * 5) * 0.35 * (1 - Math.sin(u * Math.PI)); // bate a cauda ao sair e ao voltar para a água
     f.body.pos.set(x, y - 1, z);
     // pancada em quem estiver no caminho
     if (!f.hitP && !pl.dead && Math.hypot(pp.x - x, pp.z - z) < 0.6 && Math.abs(pp.y + 1.1 - y) < 0.7) {
@@ -614,28 +676,62 @@ export class SeaEvents {
       }
     }
   }
+  // Raio: tronco em zigue-zague com 3 camadas (núcleo branco, brilho azul, halo largo), 3–5 galhos,
+  // clarão na nuvem lá em cima e no ponto de impacto, e 2–3 "re-descargas" (pisca como raio de verdade).
   _bolt(x, y, z) {
-    const G = this.G, pts = [], top = y + 70;
-    let px = x + (Math.random() - 0.5) * 12, pz = z + (Math.random() - 0.5) * 12;
-    for (let i = 0; i <= 14; i++) {
-      const u = i / 14, h = top + (y - top) * u;
-      if (i === 14) { px = x; pz = z; } else if (i) { px += (x - px) * 0.25 + (Math.random() - 0.5) * 3; pz += (z - pz) * 0.25 + (Math.random() - 0.5) * 3; }
-      pts.push(new THREE.Vector3(px, h, pz));
+    const G = this.G, top = y + 75, meshes = [];
+    const zig = (from, to, n, jit) => { // caminho em zigue-zague de from até to
+      const pts = [from.clone()];
+      for (let i = 1; i < n; i++) {
+        const u = i / n, p = from.clone().lerp(to, u);
+        p.x += (Math.random() - 0.5) * jit * (1 - u * 0.6); p.z += (Math.random() - 0.5) * jit * (1 - u * 0.6); p.y += (Math.random() - 0.5) * jit * 0.25;
+        pts.push(p);
+      }
+      pts.push(to.clone());
+      return new THREE.CatmullRomCurve3(pts, false, 'catmullrom', 0.02);
+    };
+    const tube = (curve, r, color, op, add = true) => {
+      const m = new THREE.Mesh(new THREE.TubeGeometry(curve, Math.max(20, curve.points.length * 6), r, 6),
+        new THREE.MeshBasicMaterial({ color, transparent: true, opacity: op, blending: add ? THREE.AdditiveBlending : THREE.NormalBlending, depthWrite: false, fog: false }));
+      m.userData.base = op; m.userData.noShadow = true; m.frustumCulled = false; G.scene.add(m); meshes.push(m); return m;
+    };
+    const start = new THREE.Vector3(x + (Math.random() - 0.5) * 16, top, z + (Math.random() - 0.5) * 16), end = new THREE.Vector3(x, y, z);
+    const main = zig(start, end, 26, 7);
+    tube(main, 0.2, 0xffffff, 1, false);   // núcleo
+    tube(main, 0.7, 0xa8ccff, 0.65);       // brilho
+    tube(main, 2.2, 0x5f8dff, 0.22);       // halo
+    for (let k = 0, n = 3 + ((Math.random() * 3) | 0); k < n; k++) { // galhos
+      const u = 0.15 + Math.random() * 0.55, from = main.getPoint(u);
+      const a = Math.random() * 6.28, len = 8 + Math.random() * 16;
+      const to = from.clone().add(new THREE.Vector3(Math.cos(a) * len * 0.7, -len, Math.sin(a) * len * 0.7));
+      const br = zig(from, to, 10, 4);
+      tube(br, 0.09, 0xffffff, 0.9, false); tube(br, 0.4, 0xa8ccff, 0.45);
     }
-    const path = new THREE.CatmullRomCurve3(pts, false, 'catmullrom', 0.05);
-    const core = new THREE.Mesh(new THREE.TubeGeometry(path, 60, 0.12, 5), new THREE.MeshBasicMaterial({ color: 0xffffff, transparent: true, fog: false }));
-    const glow = new THREE.Mesh(new THREE.TubeGeometry(path, 60, 0.6, 6), new THREE.MeshBasicMaterial({ color: 0x9cc4ff, transparent: true, opacity: 0.35, blending: THREE.AdditiveBlending, depthWrite: false, fog: false }));
-    G.scene.add(core, glow);
-    this.light.position.set(x, y + 4, z); this.light.intensity = 60;
-    this.bolts.push({ meshes: [core, glow], t: 0.35 });
+    // clarão na nuvem e no impacto
+    const glow = (pos, r, color, op) => { const m = new THREE.Mesh(new THREE.SphereGeometry(r, 16, 12), new THREE.MeshBasicMaterial({ color, transparent: true, opacity: op, blending: THREE.AdditiveBlending, depthWrite: false, fog: false })); m.position.copy(pos); m.userData.base = op; m.userData.grow = true; m.userData.noShadow = true; G.scene.add(m); meshes.push(m); return m; };
+    glow(start, 14, 0x9fbfff, 0.35);
+    glow(end.clone().setY(y + 0.6), 2.2, 0xdfeaff, 0.85);
+    if (G.vfx) { G.vfx.ring(end, { color: 0x9fd0ff, from: 0.5, to: 7, life: 0.5 }); G.vfx.sparks({ x, y: y + 0.4, z }, 26, 0xcfe4ff, 9, 0.5); }
+    this.light.position.set(x, y + 6, z); this.light.intensity = 420;
+    // 2–3 re-descargas: tempos dos clarões dentro da vida do raio
+    const pulses = [0, 0.09 + Math.random() * 0.05, Math.random() < 0.6 ? 0.22 + Math.random() * 0.08 : -1];
+    this.bolts.push({ meshes, t: 0.55, life: 0.55, pulses });
   }
   _updateBolts(dt) {
     for (let i = this.bolts.length - 1; i >= 0; i--) {
       const b = this.bolts[i]; b.t -= dt;
-      const k = Math.max(0, b.t / 0.35), flick = k * (0.6 + 0.4 * Math.sin(b.t * 90));
-      b.meshes[0].material.opacity = flick; b.meshes[1].material.opacity = 0.35 * flick;
+      const age = b.life - b.t;
+      // brilho = soma de pulsos curtos (re-descargas) + resto decaindo
+      let k = 0;
+      for (const p0 of b.pulses) if (p0 >= 0 && age >= p0) k = Math.max(k, Math.exp(-(age - p0) * 22));
+      k = Math.max(k, 0.25 * Math.max(0, b.t / b.life)) * (0.85 + 0.15 * Math.sin(age * 120));
+      for (const m of b.meshes) {
+        m.material.opacity = m.userData.base * k;
+        if (m.userData.grow) m.scale.setScalar(1 + age * 3);
+      }
+      if (b.pulses.some((p0) => p0 > 0 && Math.abs(age - p0) < dt)) { this.light.intensity = 300; if (this.G.events) this.G.events.flash = 1; }
       if (b.t <= 0) { for (const m of b.meshes) { this.G.scene.remove(m); m.geometry.dispose(); m.material.dispose(); } this.bolts.splice(i, 1); }
     }
-    this.light.intensity = Math.max(0, this.light.intensity - dt * 220);
+    this.light.intensity = Math.max(0, this.light.intensity - dt * 900);
   }
 }

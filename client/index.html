@@ -108,6 +108,10 @@
   <label class="check"><input id="gBloom" type="checkbox"> Brilho (bloom)</label>
   <label class="check"><input id="gGrade" type="checkbox"> Gradação de cor + vinheta</label>
   <label class="check"><input id="gFps" type="checkbox"> Mostrar FPS <kbd>F3</kbd></label>
+  <h3 class="gfx-sec">Reflexos</h3>
+  <label>Reflexos <select id="gReflect"></select></label>
+  <label class="check"><input id="gWetRaft" type="checkbox"> Jangada molhada na chuva (poças, madeira brilhando; seca no sol)</label>
+  <p class="gfx-tip">Metais (armas, canhões, peças de ferro) e a jangada molhada refletem o ambiente. "Só o céu" é leve; "Tempo real" fotografa a cena em volta da jangada (mar, ilhas, navios, raios) e pesa um pouco mais.</p>
   <h3 class="gfx-sec">Imersão <small>(opcional — não muda a predefinição)</small></h3>
   <label class="slider">Tremor da câmera <input id="gShake" type="range" min="0" max="100" step="10"><small id="gShakeVal"></small></label>
   <label>Profundidade de campo <select id="gDof"></select></label>
@@ -180,7 +184,7 @@
     <b>🌀 No redemoinho</b> o vento empurra quem está a bordo para FORA: ande contra ele (na direção do redemoinho) para se firmar, ou você escorrega e cai — e na água o redemoinho te puxa.<br>
     <b>🏝 Mar cheio / Mar seco:</b> depois da partida o mar alterna entre cheio e totalmente seco — fique de olho na água baixando. Seco, o fundo do mar vira chão: ande à vontade, junte destroços — os de metal afundam e só aparecem aí — e saqueie naufrágios com baús. A jangada fica encalhada até a água voltar; quem estiver longe precisa nadar de volta!<br>
     <b>Habilidades dos chefes:</b> Escafandrista — jato d'água que cega por 4 s (saia do lugar quando ele mirar a mangueira; bloquear de frente reduz) e pisão com onda de choque (pule!). Metralhador — granada quando você se esconde. Kraken — tinta quando a cabeça incha (vire de costas).<br>
-    <b>Torreta-arpão:</b> vem do loot como peça — carregue e solde na jangada. Dispara um arpão que crava em inimigos, tubarões e navios e fisga caixotes.<br>
+    <b>Torreta-arpão:</b> fica jogada no <b>fundo do mar</b> — ache na seca (anel dourado no chão) e pegue com [E]; ela aparece como peça: carregue e solde na jangada. Dispara um arpão que crava em inimigos, tubarões e navios e fisga caixotes.<br>
     <b>Bases militares:</b> o <b>Metralhador</b> guarda o pátio com uma minigun — quando os canos começam a girar (<b>!!</b>), procure cobertura; depois da rajada ela superaquece e ele fica exposto. Derrotado, larga a <b>Minigun</b> com 140 balas (sem recarga; ela gira antes de atirar e é pesada).<br>
     <b>Grupo:</b> até 6 jogadores; cada aliado deixa os inimigos um pouco mais resistentes (e as invasões com mais piratas).<br>
     <b>Nadar cansa:</b> na água a estamina desce e não volta; sem fôlego você começa a se afogar e perde vida aos poucos — volte para a jangada!<br>
@@ -192,7 +196,7 @@
     Inimigos não enxergam nem atiram através de paredes: use cabanas e paliçadas como cobertura.</p>
     <h3>Ferramentas</h3>
     <p><b>🔨 Martelo</b> (vem na caixa inicial): martele uma peça da jangada para consertá-la — não gasta material. Também serve de arma.<br>
-    <b>⚓ Torreta-gancho</b> (achada em naufrágios e destroços): instale no convés com [E] como o canhão e sente nela. O mouse mira (a linha pontilhada mostra o arco), o clique dispara o gancho e clica de novo para recolher. Fisga <b>caixotes de loot boiando</b>, <b>aliados</b> (resgate quem está nadando ou caído) e <b>inimigos</b> (puxa e deixa tonto).<br>
+    <b>⚓ Torreta-gancho</b> (achada no fundo do mar, na seca): instale no convés com [E] como o canhão e sente nela. O mouse mira (a linha pontilhada mostra o arco), o clique dispara o gancho e clica de novo para recolher. Fisga <b>caixotes de loot boiando</b>, <b>aliados</b> (resgate quem está nadando ou caído) e <b>inimigos</b> (puxa e deixa tonto).<br>
     <b>🪕 Banjo</b>: clique com ele na mão para tocar/parar uma música (Oh! Susanna, Drunken Sailor, Camptown Races). [B] ou botão direito abre o painel para tocar nota por nota (fileira A–Ç e Q–P; Shift = sustenido). Enquanto você toca, os <b>aliados por perto recuperam vida</b> devagar (e você um pouco).<br>
     As armas não quebram.</p>
     <h3>Estruturas no meio do mar</h3>
@@ -201,7 +205,7 @@
     <h3>Inimigos</h3>
     <p><b>Sobreviventes</b> (ilhas): porrete, <b>lanceiro</b> (alcance longo), <b>esquivo</b> (desvia quando você mira nele, com recarga), atirador e pesado. <b>Soldados</b> (bunkers e bases militares): rifle, <b>escopeteiro</b> (chumbo de perto) e <b>atirador de elite</b> (um laser vermelho avisa o tiro — saia da mira). <b>Piratas</b> (mar): sabre, <b>duelista</b> (desvia), <b>pistoleiro</b> e <b>bombardeiro</b> (joga bombas com pavio). Quanto mais longe na rota, mais perigosos. Com o mar seco os piratas descem das balsas e vêm <b>a pé</b> pelo fundo.</p>
     <h3>Batalha naval</h3>
-    <p>Bem longe na rota dá para achar um <b>canhão improvisado</b> (um galão d'água com cano de ferro) em caixas e naufrágios. A bordo, olhe para um ponto livre do convés e aperte [E] para instalar; [E] no canhão para sentar nele.<br>
+    <p>Os <b>canhões</b> ficam jogados no <b>fundo do mar</b>, meio enterrados: quando o mar secar, procure o <b>anel dourado</b> no chão e pegue com [E]. O <b>canhão improvisado</b> (galão d'água com cano de ferro) aparece em qualquer lugar; o <b>canhão de ferro</b>, do meio da rota em diante. A bordo, olhe para um ponto livre do convés e aperte [E] para instalar; [E] no canhão para sentar nele.<br>
     No canhão: o <b>mouse</b> (ou WASD) gira e levanta o cano, a linha pontilhada mostra a trajetória e o <b>círculo</b> marca onde a bala cai (fica vermelho quando vai acertar um navio; o arco é a recarga). <b>Clique</b> dispara, [E] sai.<br>
     As balas do canhão são <b>infinitas</b>, mas a recarga é longa (~7 s).<br>
     Depois que você tem um canhão instalado, <b>navios piratas grandes</b> aparecem de vez em quando, emparelham ao lado e disparam bordadas. Cada acerto danifica, incendeia e inclina o navio — alguns acertos e ele <b>afunda</b>, soltando <b>caixotes de loot que boiam</b> (pegue com [E] ou puxe com o gancho).<br>

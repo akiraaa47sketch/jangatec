@@ -4,7 +4,7 @@
 import * as THREE from '../three.js';
 import { mulberry32, hash2, rot } from '../core/util.js';
 import { CFG } from '../config.js';
-import { LOOT_CONFIG, generateCrateLoot, wreckFor, seabedCratesFor, seaSiteFor, chunkHasIsland, WORLD_LOOT_PARAMS } from '../systems/loot.js';
+import { LOOT_CONFIG, generateCrateLoot, wreckFor, seabedCratesFor, seabedFindsFor, seaSiteFor, chunkHasIsland, WORLD_LOOT_PARAMS } from '../systems/loot.js';
 import { seabedHeight, makeSeabedChunk, makeFarSeabed, patchVortexDip } from './seabed.js';
 import { bakeStatic } from '../core/bake.js';
 import { buildCamp } from './camp.js';
@@ -133,7 +133,7 @@ export class World {
     this.G = G; this.seed = seed;
     this.chunks = new Map();
     this.collected = new Set(); // ids de detritos coletados / caixotes abertos / inimigos mortos
-    this.debris = []; this.islands = []; this.crates = []; this.wrecks = [];
+    this.debris = []; this.islands = []; this.crates = []; this.wrecks = []; this.finds = [];
     this.farSeabed = makeFarSeabed(); G.scene.add(this.farSeabed);
     this.crateStates = new Map();
     // Objetos físicos e posições de peças colocadas, inclusive em chunks já descarregados.
@@ -148,6 +148,7 @@ export class World {
     // Baús dos naufrágios só abrem fora d'água.
     for (const w of this.wrecks) for (const c of w.crates) c.submerged = level > c.y + 0.3;
     for (const c of this.crates) if (c.sea) c.submerged = level > c.y + 0.3;
+    for (const f of this.finds) { f.submerged = level > f.y + 0.3; f.ring.visible = !f.submerged; }
     for (const island of this.islands) {
       // O patamar continua visível um tempo debaixo d'água (a água rasa é translúcida). Antes ele
       // sumia no instante em que a água passava do topo: o chão inteiro da ilha desaparecia de uma
@@ -276,6 +277,7 @@ export class World {
     const site = seaSiteFor(this.seed, cx, cz);
     if (site) ch.site = this.makeSeaSite(ch, site);
     ch.seaCrates = this.makeSeaCrates(cx, cz);
+    ch.finds = this.makeSeabedFinds(cx, cz);
     for (let i = 0; i < n; i++) {
       // Sempre consome o RNG na mesma ordem para manter o determinismo.
       const x = ox + (r() - 0.5) * S, z = oz + (r() - 0.5) * S;
@@ -892,6 +894,7 @@ export class World {
       ch.seabed.children[0].material.dispose();
     }
     for (const c of ch.seaCrates || []) { G.scene.remove(c.mesh); const i = this.crates.indexOf(c); if (i >= 0) this.crates.splice(i, 1); }
+    for (const f of ch.finds || []) { G.scene.remove(f.mesh); const i = this.finds.indexOf(f); if (i >= 0) this.finds.splice(i, 1); }
     if (ch.wreck) {
       const w = ch.wreck;
       G.physics.removeStaticSet(w.set); G.colliders.removeSet(w.set); G.scene.remove(w.group);
@@ -922,8 +925,43 @@ export class World {
   }
 
   // Marca como coletado (loot legado — ainda funciona para caixotes).
+  // Canhões e torreta-arpão jogados no fundo do mar (pega com E na seca). Meio enterrados e tortos,
+  // com um anel dourado no chão para dar para achar de longe.
+  makeSeabedFinds(cx, cz) {
+    const G = this.G, out = [];
+    seabedFindsFor(this.seed, cx, cz).forEach((f, n) => {
+      const id = `f${cx},${cz}k${n}`;
+      if (this.collected.has(id)) return;
+      const gy = this.seabedHeight(f.x, f.z);
+      const g = new THREE.Group();
+      const model = makePieceMesh(f.kind);
+      model.position.y = f.kind === 'gancho' ? 0.35 : 0.2; model.rotation.set(f.tilt, 0, f.tilt * 0.6 + (f.kind === 'gancho' ? 0.5 : 0.25));
+      g.add(model);
+      const sand = new THREE.Mesh(new THREE.CircleGeometry(1.1, 18), new THREE.MeshStandardMaterial({ color: 0x8f8160, roughness: 1, transparent: true, opacity: 0.7, depthWrite: false }));
+      sand.rotation.x = -Math.PI / 2; sand.position.y = 0.03; g.add(sand); // areia revirada em volta
+      const ring = new THREE.Mesh(new THREE.RingGeometry(1.35, 1.5, 36), new THREE.MeshBasicMaterial({ color: 0xf3cf7e, transparent: true, opacity: 0.55, depthWrite: false, side: THREE.DoubleSide }));
+      ring.rotation.x = -Math.PI / 2; ring.position.y = 0.05; ring.userData.noShadow = true; g.add(ring);
+      g.position.set(f.x, gy, f.z); g.rotation.y = f.yaw;
+      g.traverse((o) => { if (o.isMesh && o !== ring && o !== sand) { o.castShadow = true; o.receiveShadow = true; } });
+      G.scene.add(g);
+      const item = { id, kind: f.kind, mesh: g, ring, x: f.x, z: f.z, y: gy, submerged: !G.startup || G.startup.waterLevel > gy + 0.3 };
+      out.push(item); this.finds.push(item);
+    });
+    return out;
+  }
+  // pegar um canhão/arpão do fundo: vai para o inventário e some para todos
+  takeFind(f) {
+    const G = this.G;
+    if (!this.finds.includes(f)) return;
+    const nome = { canhao: 'Canhão improvisado', canhao_ferro: 'Canhão de ferro', gancho: 'Torreta-arpão' }[f.kind];
+    G.hud.msg(`Você achou um ${nome} na areia!  ${G.survival.add({ [f.kind]: 1 })}`);
+    this.markCollected(f.id);
+    if (G.net.online) G.net.send({ t: 'collect', id: f.id });
+  }
+
   markCollected(id) {
     this.collected.add(id);
+    { const k = this.finds.findIndex((f) => f.id === id); if (k >= 0) { const f = this.finds[k]; this.G.scene.remove(f.mesh); this.finds.splice(k, 1); } }
     // Detritos físicos NÃO são removidos ao "coletar" — devem ser carregados manualmente.
     // Apenas caixotes são removidos ao abrir.
     let i = this.crates.findIndex((c) => c.id === id);

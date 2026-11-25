@@ -12,13 +12,14 @@ export class GfxMenu {
     opts('gPreset', GFX_LABELS.preset); opts('gUpscaler', GFX_LABELS.upscaler); opts('gShadows', GFX_LABELS.shadows);
     opts('gDof', GFX_LABELS.dof); opts('gFsr', GFX_LABELS.fsr);
     $('gFsr').onchange = (e) => { if (e.target.value !== 'custom') gfx.setFsrMode(e.target.value); this.sync(); };
-    opts('gMsaa', GFX_LABELS.msaa); opts('gView', GFX_LABELS.view); opts('gWater', GFX_LABELS.water); opts('gPixel', GFX_LABELS.pixelCap);
+    opts('gMsaa', GFX_LABELS.msaa); opts('gReflect', GFX_LABELS.reflect); opts('gView', GFX_LABELS.view); opts('gWater', GFX_LABELS.water); opts('gPixel', GFX_LABELS.pixelCap);
     const num = (v) => (Number.isNaN(Number(v)) ? v : Number(v));
     $('gPreset').onchange = (e) => { if (e.target.value in GFX_PRESETS) gfx.setPreset(e.target.value); this.sync(); };
     const bind = (id, key, conv = num) => { $(id).onchange = (e) => { gfx.set(key, conv(e.target.type === 'checkbox' ? e.target.checked : e.target.value)); this.sync(); }; };
     bind('gUpscaler', 'upscaler', String); bind('gShadows', 'shadows', String); bind('gMsaa', 'msaa'); bind('gView', 'view');
     bind('gWater', 'water', String); bind('gPixel', 'pixelCap'); bind('gBloom', 'bloom', Boolean); bind('gGrade', 'grade', Boolean);
     bind('gFps', 'showFps', Boolean);
+    bind('gReflect', 'reflect', String); bind('gWetRaft', 'wetRaft', Boolean);
     bind('gDof', 'dof', String); bind('gMotion', 'motion', Boolean); bind('gBob', 'bob', Boolean);
     bind('gWet', 'wet', Boolean); bind('gLowHp', 'lowHp', Boolean); bind('gGrain', 'grain', Boolean);
     $('gShake').oninput = (e) => { gfx.set('shake', Number(e.target.value) / 100); this.sync(); };
@@ -47,6 +48,7 @@ export class GfxMenu {
     const s = this.G.gfx.settings, g = this.G.gfx;
     $('gPreset').value = s.preset; $('gUpscaler').value = s.upscaler; $('gShadows').value = s.shadows;
     $('gMsaa').value = String(s.msaa); $('gView').value = String(s.view); $('gWater').value = s.water; $('gPixel').value = String(s.pixelCap);
+    $('gReflect').value = s.reflect; $('gWetRaft').checked = s.wetRaft !== false;
     $('gBloom').checked = s.bloom; $('gGrade').checked = s.grade; $('gFps').checked = s.showFps;
     $('gDof').value = s.dof; $('gMotion').checked = s.motion; $('gBob').checked = s.bob;
     $('gWet').checked = s.wet; $('gLowHp').checked = s.lowHp; $('gGrain').checked = s.grain;

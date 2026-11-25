@@ -5,6 +5,21 @@
 // Nos textos, **assim** vira negrito.
 export const PATCH_NOTES = [
   {
+    id: '0.27', versao: 'v0.27', data: '25/11/2026', titulo: 'Mar gigante',
+    destaques: [
+      { tag: 'Eventos', titulo: 'Onda gigante de verdade', texto: 'A onda gigante virou uma **muralha de água de 16 a 24 m** (de propósito, fora da escala real), com espuma só na crista. A jangada sobe a parede inclinando bem mais.' },
+      { tag: 'Eventos', titulo: 'Redemoinho colossal', texto: 'O redemoinho ficou **2 a 3× maior** (140–190 m de raio) e **muito mais fundo** (funil de 25–35 m), puxando mais forte. Perto das ilhas a água volta ao nível normal, então nenhuma ilha fica pendurada no buraco.' },
+      { tag: 'Seca', titulo: 'Canhões e arpões no fundo do mar', texto: 'Canhões e a torreta-arpão **não saem mais de caixas**: ficam **jogados no chão da seca**, meio enterrados, com um **anel dourado** em volta. Pegue com [E].' },
+    ],
+    secoes: [
+      { icone: '✨', nome: 'Reflexos', itens: ['Nova seção **Reflexos** nos Gráficos: Desligados, Só o céu, **Tempo real** (a cena em volta da jangada aparece refletida) e Tempo real ultra.', '**Metais refletem** de verdade: armas, canhões e peças de ferro.', '**Jangada molhada**: na chuva a madeira escurece, fica lisa e brilhante e surgem **poças** no convés refletindo o céu; no sol ela **seca aos poucos** (~45 s). Dá para desligar.'] },
+      { icone: '🌧', nome: 'Chuva', itens: ['**Chuva nova**: gotas em **riscos** compridos, caindo rápido e inclinadas pelo vento (antes eram pontinhos que pareciam neve).', '**Respingos** onde a chuva bate na água e no convés; quanto mais forte a tempestade, mais grossa a chuva.'] },
+      { icone: '🐟', nome: 'Peixes-voadores', itens: ['Bem mais **raros** (~1/5 da chance dos outros eventos).', '**Modelo novo**: dorso azul e barriga prateada, olhos grandes, "asas" com raios, nadadeiras e cauda bifurcada.'] },
+      { icone: '⚡', nome: 'Raios', itens: ['Raios **muito mais visíveis**: tronco grosso com brilho, **galhos**, clarão na nuvem e no impacto, faíscas e 2–3 piscadas como raio de verdade.', 'Nas tempestades e no redemoinho os relâmpagos agora mostram o **raio caindo no mar** ao longe.'] },
+      { icone: '💣', nome: 'Canhões e arpão', itens: ['Canhão improvisado em qualquer lugar do fundo; **canhão de ferro** do meio da rota em diante; **torreta-arpão** a partir da 2ª região (rara antes).'] },
+    ],
+  },
+  {
     id: '0.26', versao: 'v0.26', data: '25/11/2026', titulo: 'Piratas nadadores e combate vivo',
     destaques: [
       { tag: 'Piratas', titulo: 'Piratas nadam', texto: 'Um golpe forte, um chute ou um pesado podem **jogar o pirata no mar**. Ele **nada de volta e escala a borda**. Se a jangada for embora rápido, ele fica para trás e afunda.' },

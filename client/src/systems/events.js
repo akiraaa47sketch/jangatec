@@ -18,14 +18,18 @@ import { setSeabedVortex } from '../world/seabed.js';
 import { SOS } from './sos.js';
 import { WORLD_LOOT_PARAMS } from './loot.js';
 
+// peso de cada evento no sorteio (1 = normal). Peixes-voadores: ~1/5 da chance dos outros.
+export const EVENT_WEIGHT = { peixes: 0.2 };
 export const EVENT_BALANCE = {
   first: [20, 40],           // s depois da partida até o primeiro evento (cai no 1º mar cheio)
   interval: [60, 115],       // s entre o fim de um evento e o próximo (mar bem agitado)
-  tsunami: { speed: [13, 18], startDist: 235, A: [3.6, 5.6], sigma: [9, 13], damage: 22, knock: 8.5 },
+  // onda gigante: uma MURALHA de água (fora da escala real, de propósito) — 16–24 m de altura
+  tsunami: { speed: [15, 20], startDist: 380, A: [16, 24], sigma: [22, 30], damage: 22, knock: 8.5 },
   // R = raio do redemoinho, depth = fundura do funil d'água, pull = puxão (m/s), swirl = giro (m/s)
   // tempestade de ONDAS GIGANTESCAS: maiores que a onda gigante (tsunami), com chuva forte e raios
   tempestade: { dur: [80, 110], waves: [5, 8], A: [7, 11], speed: [14, 18], sigma: [12, 17], start: 150, knock: 6 },
-  furacao: { push: 2.6, dur: [55, 75], pull: 1.55, swirl: 2.2, R: [60, 85], depth: [7, 11], ahead: 40, damage: 30 },
+  // redemoinho GIGANTE e muito fundo (funil de 25–35 m), 2–3× maior que antes e puxando mais
+  furacao: { push: 2.6, dur: [65, 85], pull: 2.3, swirl: 3.0, R: [140, 190], depth: [25, 35], ahead: 70, damage: 30 },
 };
 const between = ([a, b]) => a + Math.random() * (b - a);
 const smooth = (x) => { x = clamp(x, 0, 1); return x * x * (3 - 2 * x); };
@@ -103,7 +107,7 @@ export class Events {
   get tiltMax() {
     const e = this.current;
     if (!e) return 0.18; // mar normal: a jangada balança mais (dá uma chacoalhada)
-    return e.kind === 'tsunami' ? 0.34 : e.kind === 'tempestade' ? 0.45 : e.kind === 'kraken' ? 0.24 : 0.18;
+    return e.kind === 'tsunami' ? 0.55 : e.kind === 'tempestade' ? 0.45 : e.kind === 'kraken' ? 0.24 : e.kind === 'furacao' ? 0.3 : 0.18;
   }
   // Quanto o evento escurece o céu / engrossa o mar (0..1).
   stormBoost(t) {
@@ -141,7 +145,10 @@ export class Events {
     // SOS da plataforma de petróleo: só no fim da jornada, uma de cada vez (e no máximo 2 por partida)
     const sosOk = prog >= SOS.minProgress && !G.sos.rig && G.sos.done < 3;
     const kinds = ['tsunami', 'furacao', 'tempestade', ...SEA_KINDS, 'fantasma', ...(sosOk ? ['sos', 'sos', 'sos'] : [])].filter((k) => !((k === 'kraken' || k === 'fantasma') && prog < 0.2)), others = kinds.filter((k) => k !== this.lastKind);
-    const kind = Math.random() < 0.88 ? others[(Math.random() * others.length) | 0] : kinds[(Math.random() * kinds.length) | 0];
+    // sorteio com PESO: peixes-voadores bem raros; o resto igual (ver EVENT_WEIGHT)
+    const pool = Math.random() < 0.88 && others.length ? others : kinds, w = (k) => EVENT_WEIGHT[k] ?? 1;
+    let roll = Math.random() * pool.reduce((s, k) => s + w(k), 0), kind = pool[pool.length - 1];
+    for (const k of pool) { roll -= w(k); if (roll <= 0) { kind = k; break; } }
     this.begin(this.make(kind, t), true);
   }
   make(kind, t) {
@@ -273,6 +280,7 @@ export class Events {
     if (e && e.kind === 'tempestade' && Math.random() < dt * 0.6 * this.stormBoost(t)) {
       this.flash = 1; G.hud.flash('lightning'); this.shake = Math.max(this.shake, 0.15);
       sfx.thunder(0.2 + Math.random() * 1.2, Math.random());
+      this._farBolt(); // raio visível caindo no mar ao longe
     }
     // relâmpagos durante o furacão
     if (this.flash > 0) this.flash = Math.max(0, this.flash - dt * 3);
@@ -280,8 +288,16 @@ export class Events {
       this.flash = 1;
       G.hud.flash('lightning');
       sfx.thunder(0.3 + Math.random() * 1.5, Math.random() * 0.7);
+      this._farBolt();
     }
     G.startup.hemisphere.intensity += this.flash * 2.2;
+  }
+
+  // raio caindo no mar a 60–150 m do jogador (só visual: o raio que machuca é o da tempestade de raios)
+  _farBolt() {
+    const G = this.G; if (!G.seaEvents || !G.seaEvents._bolt) return;
+    const p = G.player.body.pos, a = Math.random() * Math.PI * 2, d = 60 + Math.random() * 90;
+    G.seaEvents._bolt(p.x + Math.cos(a) * d, sea.level, p.z + Math.sin(a) * d);
   }
 
   applyShake(camera, dt) {
@@ -501,6 +517,7 @@ export class Events {
     if (!V.spray.visible) { V.funnel.visible = false; return; }
     V.funnel.visible = false; // sem tornado/nuvem: só o redemoinho na água (espuma e destroços girando)
     V.funnel.position.set(cx, sea.level - sea.vortex.depth * 1.5, cz);
+    V.funnel.scale.set(R / 75, 1.3, R / 75); // funil e nuvem acompanham o tamanho do redemoinho
     // o funil se inclina e serpenteia um pouco
     V.funnel.rotation.z = Math.sin(t * 0.21) * 0.07;
     V.funnel.rotation.x = Math.cos(t * 0.17) * 0.06;
