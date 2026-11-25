@@ -21,8 +21,8 @@ import { WORLD_LOOT_PARAMS } from './loot.js';
 // peso de cada evento no sorteio (1 = normal). Peixes-voadores: ~1/5 da chance dos outros.
 export const EVENT_WEIGHT = { peixes: 0.2 };
 export const EVENT_BALANCE = {
-  first: [20, 40],           // s depois da partida até o primeiro evento (cai no 1º mar cheio)
-  interval: [60, 115],       // s entre o fim de um evento e o próximo (mar bem agitado)
+  first: [50, 90],           // s depois da partida até o primeiro evento (cai no 1º mar cheio)
+  interval: [130, 210],      // s entre o fim de um evento e o próximo (antes 60–115: frequente demais)
   // onda gigante: uma MURALHA de água (fora da escala real, de propósito) — 16–24 m de altura
   tsunami: { speed: [15, 20], startDist: 380, A: [16, 24], sigma: [22, 30], damage: 22, knock: 8.5 },
   // R = raio do redemoinho, depth = fundura do funil d'água, pull = puxão (m/s), swirl = giro (m/s)
@@ -139,7 +139,7 @@ export class Events {
     const tide = G.startup.tide.state; // só com o mar cheio e longe da próxima seca
     if (G.startup.waterLevel < 0.5 || (tide && (tide.phase.id === 'seco' || tide.nextIn < 35))) { this.timer = 10; return; }
     // quase nunca repete o mesmo tipo em seguida; às vezes o mar simplesmente fica quieto
-    if (Math.random() < 0.03) { this.timer = between([30, 60]); return; }
+    if (Math.random() < 0.1) { this.timer = between([45, 90]); return; }
     // chefes do mar (kraken, navio-fantasma) só do meio da rota em diante
     const prog = Math.min(1, Math.hypot(G.boat.x, G.boat.z) / (4 * WORLD_LOOT_PARAMS.diffStep));
     // SOS da plataforma de petróleo: só no fim da jornada, uma de cada vez (e no máximo 2 por partida)

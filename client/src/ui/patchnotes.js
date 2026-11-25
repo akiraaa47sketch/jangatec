@@ -5,6 +5,12 @@
 // Nos textos, **assim** vira negrito.
 export const PATCH_NOTES = [
   {
+    id: '0.28', versao: 'v0.28', data: '25/11/2026', titulo: 'Mar mais calmo entre eventos',
+    secoes: [
+      { icone: '🌊', nome: 'Eventos do mar', itens: ['**Mais tempo entre eventos**: 2 min 10 s a 3 min 30 s depois do fim do anterior (antes 1 a 2 min).', 'O primeiro evento vem **50–90 s** depois da partida (antes 20–40 s).', 'Às vezes (10%) o mar fica quieto por mais um tempo.'] },
+    ],
+  },
+  {
     id: '0.27', versao: 'v0.27', data: '25/11/2026', titulo: 'Mar gigante',
     destaques: [
       { tag: 'Eventos', titulo: 'Onda gigante de verdade', texto: 'A onda gigante virou uma **muralha de água de 16 a 24 m** (de propósito, fora da escala real), com espuma só na crista. A jangada sobe a parede inclinando bem mais.' },
