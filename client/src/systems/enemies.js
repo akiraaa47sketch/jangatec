@@ -332,15 +332,18 @@ export class Enemies {
       const p = e.body.pos; G.vfx.hit({ x: p.x, y: p.y + 1.1 * (e.def.scale || 1), z: p.z }, e.def.cor || 0xaa3333, n >= 25);
     }
     if (e.replica) { // inimigo de outro jogador (host): o acerto vai para ele decidir
-      e.hp -= n; e.hitT = 0.22;
+      e.hp -= n; e.hitT = 0.22; this.react(e, n, by);
       G.net.send({ t: 'ehit', id: e.id, n: Math.round(n) });
       return;
     }
     e.hp -= n;
     e.hitT = 0.22;
+    this.react(e, n, by);
     if (!e.pirate && !e.def.mortar && e.state !== 'chase' && e.state !== 'attack') this.alert(e); // levou tiro: ele e o grupo percebem
     if (e.hp <= 0) {
       e.state = 'dead'; e.timer = 5; e.deathT = 0;
+      e.downT = 0; e.reactT = 0;
+      { const pl = e.mesh.userData.pill; if (pl) { pl.rotation.x = 0; pl.position.y = 0; pl.scale.set(1, 1, 1); } }
       sfx.enemyDown(e.body.pos);
       if (G.vfx) { const p = e.body.pos; G.vfx.death({ x: p.x, y: p.y + 1.0 * (e.def.scale || 1), z: p.z }, e.def.cor || 0xaa3333); }
       if (this.G.melee) { this.G.melee.tokens.delete(e); this.G.melee.setTell(e, null); this.G.melee.updateStars(e, 0, false); }
@@ -537,15 +540,73 @@ export class Enemies {
     animateEnemy(e.mesh, 0, dt, 'row', (e.rowT % (Math.PI * 2)) / (Math.PI * 2));
   }
 
-  // Reação a dano: tranco para trás + brilho vermelho rápido.
+  // Reação a dano: guarda de onde veio o golpe e a força dele. Cada acerto sai um pouco diferente
+  // (torce para um lado e para o outro); golpes fortes jogam o corpo bem mais.
+  react(e, n, by = 'L') {
+    const G = this.G, p = e.body.pos;
+    let src = null;
+    if (by === 'L') src = G.player.body.pos;
+    else { const r = G.net && G.net.remotes.get(by); if (r && r.mesh) src = r.mesh.getWorldPosition(this._rv || (this._rv = new THREE.Vector3())); }
+    e.reactAng = src ? Math.atan2(src.x - p.x, src.z - p.z) : e.yaw + (Math.random() - 0.5) * 2;
+    e.reactStr = clamp(n / 28, 0.35, 1.5) * (e.def.boss ? 0.45 : 1);
+    e.reactDur = 0.3 + 0.14 * e.reactStr;
+    e.reactT = e.reactDur;
+    e.reactTwist = -(e.reactTwist || (Math.random() < 0.5 ? 1 : -1)); // alterna o lado a cada acerto
+  }
+  // Derrubado (golpe pesado / final do combo): cai de costas, fica no chão um instante e levanta.
+  knockDown(e, dur = 1.25) {
+    if (e.def.boss || e.state === 'dead' || e.creature) return false;
+    e.downT = dur; e.downDur = dur;
+    return true;
+  }
+
+  // Reação a dano: brilho vermelho + o corpo reage (tranco na direção do golpe, braços soltos,
+  // amassa e estica) e, se foi derrubado, cai e levanta.
   _animateHit(e, dt) {
-    if (e.hitT <= 0 && !e.hitGlow) return;
-    e.hitT = Math.max(0, e.hitT - dt);
-    const k = e.hitT / 0.22;
-    for (const m of e.mats) if (m.emissive) { if (m.userData.ghost && k <= 0) m.emissive.setHex(0x1a6a5a); else m.emissive.setRGB(0.9 * k, 0.1 * k, 0.05 * k); }
-    e.hitGlow = k > 0;
-    const parts = e.mesh.userData.parts;
-    if (parts) { parts.torso.rotation.x -= Math.sin(k * Math.PI) * 0.45; parts.head.rotation.x -= Math.sin(k * Math.PI) * 0.3; }
+    if (e.hitT > 0 || e.hitGlow) {
+      e.hitT = Math.max(0, e.hitT - dt);
+      const k = e.hitT / 0.22;
+      for (const m of e.mats) if (m.emissive) { if (m.userData.ghost && k <= 0) m.emissive.setHex(0x1a6a5a); else m.emissive.setRGB(0.9 * k, 0.1 * k, 0.05 * k); }
+      e.hitGlow = k > 0;
+    }
+    const pill = e.mesh.userData.pill;
+    if (pill && pill.userData.parts) { this._pillReact(e, pill, dt); return; }
+    const parts = e.mesh.userData.parts, k = e.hitT / 0.22;
+    if (parts && parts.torso) { parts.torso.rotation.x -= Math.sin(k * Math.PI) * 0.45; parts.head.rotation.x -= Math.sin(k * Math.PI) * 0.3; }
+  }
+  _pillReact(e, pill, dt) {
+    const P = pill.userData.parts;
+    let active = false;
+    if (e.reactT > 0) {
+      active = true;
+      e.reactT = Math.max(0, e.reactT - dt);
+      const u = 1 - e.reactT / e.reactDur, str = e.reactStr || 0.5;
+      // sobe rápido (~25% do tempo) e volta devagar, com um leve repique
+      const s = (u < 0.25 ? Math.sin(u / 0.25 * Math.PI / 2) : Math.cos((u - 0.25) / 0.75 * Math.PI / 2) ** 2) * str;
+      const rel = (e.reactAng ?? e.yaw) - e.yaw, fwd = Math.cos(rel), side = Math.sin(rel), tw = e.reactTwist || 1;
+      P.body.rotation.x -= fwd * 0.6 * s;            // golpe pela frente: joga o tronco para trás
+      P.body.rotation.z -= side * 0.5 * s;           // pelo lado: tomba para o outro lado
+      P.body.rotation.y += tw * 0.45 * s;            // torce (alterna o lado a cada acerto)
+      P.armL.rotation.z += (0.7 + 0.3 * tw) * s; P.armR.rotation.z -= (0.7 - 0.3 * tw) * s;
+      P.armL.rotation.x -= 0.55 * s; P.armR.rotation.x -= 0.45 * s;
+      P.legL.rotation.x += 0.25 * s * fwd; P.legR.rotation.x -= 0.2 * s * fwd; // tropeça
+      const sq = Math.sin(Math.min(1, u * 2.2) * Math.PI) * 0.11 * str;
+      pill.scale.set(1 + sq * 0.6, 1 - sq, 1 + sq * 0.6); // amassa com o impacto
+    }
+    if (e.downT > 0) {
+      active = true;
+      e.downT = Math.max(0, e.downT - dt);
+      const u = 1 - e.downT / e.downDur, sm = (x) => { x = Math.min(1, Math.max(0, x)); return x * x * (3 - 2 * x); };
+      const a = u < 0.26 ? sm(u / 0.26) : u < 0.62 ? 1 : 1 - sm((u - 0.62) / 0.38);
+      const bounce = u > 0.26 && u < 0.4 ? Math.sin((u - 0.26) / 0.14 * Math.PI) * 0.12 : 0;
+      pill.rotation.x = -1.4 * a + bounce;           // de costas no chão
+      pill.position.y = u < 0.26 ? Math.sin(u / 0.26 * Math.PI) * 0.25 : 0; // pulinho ao ser arremessado
+      P.armL.rotation.z += 1.1 * a; P.armR.rotation.z -= 1.1 * a;
+      P.legL.rotation.x -= 0.5 * a; P.legR.rotation.x -= 0.2 * a;
+      if (u >= 0.26 && !e.downThud) { e.downThud = true; sfx.kick(e.body.pos); if (this.G.vfx) this.G.vfx.dust(e.body.pos, 6, 0xcbb894, 2); }
+      if (e.downT <= 0) { pill.rotation.x = 0; pill.position.y = 0; e.downThud = false; }
+    }
+    if (!active && (pill.scale.y !== 1 || pill.rotation.x !== 0)) { pill.scale.set(1, 1, 1); pill.rotation.x = 0; pill.position.y = 0; }
   }
 
   // ---------- piratas no seco ----------
@@ -799,7 +860,7 @@ export class Enemies {
     const G = this.G, boat = G.boat, b = e.body, p = b.pos;
     if (e.state === 'dead') { this._animateDeath(e, dt); return; }
     const T = this.pickTarget(e), pp = T.pos; e.tgt = T;
-    e.netPose = e.state === 'approach' ? 'row' : e.state === 'grapple' ? 'leap' : 'walk'; e.netProg = 0; e.netSpd = 0;
+    e.netPose = e.state === 'approach' ? 'row' : e.state === 'grapple' ? 'leap' : e.state === 'swim' ? 'swim' : 'walk'; e.netProg = 0; e.netSpd = 0;
     e.cd -= dt;
     if (e.skillHold > 0) e.skillHold -= dt; else e.skillPose = null;
     if (e.state === 'onShip') { // no navio esperando a vez de pular
@@ -862,12 +923,18 @@ export class Enemies {
       }
       return;
     }
+    if (e.state === 'swim') { this._updateSwim(e, dt); return; }
     if (e.state !== 'boarded') return;
 
     const [playerX, playerZ] = boat.toLocal(pp.x, pp.z);
     const dx = playerX - e.local.x, dz = playerZ - e.local.z, distance = Math.hypot(dx, dz);
     let moved = 0;
     const mres = G.melee && !e.def.ranged ? G.melee.enemyTick(e, dt, Math.hypot(pp.x - p.x, pp.z - p.z)) : null; // aviso/golpe/guarda
+    if (e.knock && !mres) { // atiradores não passam pelo corpo a corpo: o empurrão é aplicado aqui
+      p.x += e.knock.x * dt; p.z += e.knock.z * dt;
+      const kk = Math.exp(-7 * dt); e.knock.x *= kk; e.knock.z *= kk;
+      if (Math.abs(e.knock.x) + Math.abs(e.knock.z) < 0.05) e.knock = null;
+    }
     if (e.knock) [e.local.x, e.local.z] = boat.toLocal(p.x, p.z);
     // no convés também revezam: quem não está engajado espera mais afastado
     const stopAt = e.def.ranged ? Math.min(3.4, Math.max(2.2, boat.set.radius * 0.8)) : e.engaged === false ? Math.min(3.6, Math.max(2.4, boat.set.radius * 0.9)) : e.def.range * 0.7;
@@ -893,15 +960,14 @@ export class Enemies {
         if (d > 0.001 && d < 1.2) { e.local.x += ox / d * (1.2 - d) * 3 * dt; e.local.z += oz / d * (1.2 - d) * 3 * dt; }
       }
     }
-    // Barreira invisível (só para piratas): com água embaixo, não saem do convés — antes caíam com
-    // o empurrão e "teleportavam" para uma balsa nova. Com o mar seco podem cair e voltar a pé.
-    if (!this.isDry(boat.x, boat.z)) {
-      if (this._deckUnder(e.local.x, e.local.z, e.local.y)) e.safeLocal = { x: e.local.x, z: e.local.z };
-      else {
-        if (e.safeLocal) { e.local.x = e.safeLocal.x; e.local.z = e.safeLocal.z; }
-        else { e.local.x *= 0.9; e.local.z *= 0.9; }
-        e.knock = null;
-      }
+    // Borda do convés: andando sozinhos, os piratas não saem da jangada. Fora do piso, voltam para o
+    // ponto de convés MAIS PERTO (antes voltavam para uma posição antiga guardada — com a jangada
+    // balançando na onda isso virava um "teleporte" de até 4 m para o meio dela). Um empurrão
+    // (golpe, chute) pode jogá-los no mar: aí eles nadam de volta e escalam a borda.
+    if (!this.isDry(boat.x, boat.z) && !e.knock && !this._deckUnder(e.local.x, e.local.z, e.local.y)) {
+      const [wx, wz] = boat.toWorld(e.local.x, e.local.z);
+      const L = this._findPirateLanding({ x: wx, z: wz }, boat);
+      if (L && L.distance < 2.5) { e.local.x = L.x; e.local.z = L.z; }
     }
     const [x, z] = boat.toWorld(e.local.x, e.local.z);
     const previousY = p.y;
@@ -913,14 +979,7 @@ export class Enemies {
     e.local.y = p.y - boat.set.y;
     if (p.y < boat.set.y - 0.5) {
       if (this.isDry(p.x, p.z)) { this.toLand(e, p.x, p.z, true); return; } // caiu no fundo seco: anda a pé
-      e.state = 'approach';
-      p.y = G.startup.waterLevel + 0.55;
-      b.vel.set(0, 0, 0);
-      b.grounded = false;
-      b.groundSet = null;
-      e.raft = this._makePirateRaft();
-      G.scene.add(e.raft);
-      this._rideRaft(e, 0);
+      this._startSwim(e);
       return;
     }
     const pdx = pp.x - p.x, pdz = pp.z - p.z, playerDistance = Math.hypot(pdx, pdz);
@@ -932,6 +991,39 @@ export class Enemies {
     e.netPose = mres ? mres.pose : 'walk'; e.netProg = mres ? mres.progress || 0 : 0; e.netSpd = dt > 0 ? moved / dt : 0;
     this._animateHit(e, dt);
     if (e.swing > 0) e.swing = Math.max(0, e.swing - dt);
+  }
+
+  // ---------- piratas nadando ----------
+  // Caiu (ou foi jogado) no mar: nada até a jangada e escala a borda. Se a jangada for embora
+  // rápido demais, ele fica para trás e afunda.
+  _startSwim(e) {
+    const G = this.G, p = e.body.pos, b = e.body;
+    e.state = 'swim'; e.local = null; e.knock = null; e.swimT = 0;
+    b.vel.set(0, 0, 0); b.grounded = false; b.groundSet = null;
+    p.y = waveHeight(p.x, p.z, clock()) - 0.95 * (e.def.scale || 1);
+    e.mesh.rotation.set(0, e.yaw, 0);
+    sfx.splash(p, true);
+    if (G.vfx) G.vfx.dust({ x: p.x, y: p.y + 0.9, z: p.z }, 6, 0xdff4ff, 3);
+  }
+  _updateSwim(e, dt) {
+    const G = this.G, boat = G.boat, p = e.body.pos;
+    e.swimT = (e.swimT || 0) + dt;
+    if (this.isDry(p.x, p.z)) { this.toLand(e, p.x, p.z); return; }
+    const dx = boat.x - p.x, dz = boat.z - p.z, cd = Math.hypot(dx, dz) || 1;
+    if (cd > 70 || e.swimT > 90) { this.killSilently(e, `${e.def.nome} ficou para trás e afundou.`); return; }
+    const landing = this._findPirateLanding(p, boat);
+    if (landing && landing.distance < 1.4 && e.swimT > 0.6) { this._startPirateGrapple(e, landing, true); return; } // escala a borda
+    e.yaw = lerpAngle(e.yaw, Math.atan2(dx, dz), Math.min(1, 5 * dt));
+    const sp = Math.max(2.3, e.def.speed * 0.72);
+    if (e.knock) { p.x += e.knock.x * dt; p.z += e.knock.z * dt; const k = Math.exp(-5 * dt); e.knock.x *= k; e.knock.z *= k; if (Math.abs(e.knock.x) + Math.abs(e.knock.z) < 0.05) e.knock = null; }
+    else { p.x += Math.sin(e.yaw) * sp * dt; p.z += Math.cos(e.yaw) * sp * dt; }
+    p.y = waveHeight(p.x, p.z, clock()) - 0.95 * (e.def.scale || 1) + Math.sin(e.swimT * 5) * 0.04;
+    e.mesh.position.copy(p);
+    e.mesh.rotation.set(0, e.yaw, 0);
+    animateEnemy(e.mesh, sp, dt, 'swim', 0);
+    e.netPose = 'swim'; e.netProg = 0; e.netSpd = sp;
+    if (G.vfx && Math.random() < dt * 6) G.vfx.dust({ x: p.x + Math.sin(e.yaw) * 0.6, y: p.y + 0.95, z: p.z + Math.cos(e.yaw) * 0.6 }, 1, 0xe8f6ff, 1.5); // marola das braçadas
+    this._animateHit(e, dt);
   }
 
   // Tem piso da jangada embaixo deste ponto (coordenadas locais do barco; ly = altura dos pés)?

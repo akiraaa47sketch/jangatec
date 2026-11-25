@@ -13,6 +13,8 @@ export const BUFFS = {
   forca:   { nome: 'Força', icon: '💪', food: 'barra_proteina', dur: 240, desc: '+25% de dano' },
   energia: { nome: 'Energia', icon: '⚡', food: 'energetico', dur: 240, desc: 'gasta metade da estamina' },
   regen:   { nome: 'Regeneração', icon: '🍫', food: 'chocolate', dur: 240, desc: 'recupera vida aos poucos' },
+  // efeito ruim (habilidade do escafandrista): lento e queimando
+  agua_viva: { nome: 'Queimadura de água-viva', icon: '🪼', dur: 4, desc: 'lento e perdendo 4 de vida por segundo', debuff: true },
 };
 const eat = (s, buff, msg) => { s.buffs[buff] = BUFFS[buff].dur; sfx.pickup(); return msg; };
 const USE = {
@@ -117,6 +119,10 @@ export class Survival {
   update(dt) {
     const pl = this.G.player;
     for (const k in this.buffs) { this.buffs[k] -= dt; if (this.buffs[k] <= 0) { delete this.buffs[k]; this.G.hud.msg(`${BUFFS[k].nome} acabou`); } }
+    if (this.buffs.agua_viva > 0 && !pl.dead && !pl.downed) { // 4 de vida por segundo (em pulsos de 0,5 s)
+      this.stingAcc = (this.stingAcc || 0) + dt;
+      if (this.stingAcc >= 0.5) { this.stingAcc -= 0.5; this.damage(2, 'Água-viva'); }
+    } else this.stingAcc = 0;
     if (this.buffs.regen > 0 && !pl.dead && !pl.downed && this.vida < 100) this.vida = Math.min(100, this.vida + 0.4 * dt); // ~96 de vida em 4 min
     if (pl.downed) {
       this.bleed -= dt;

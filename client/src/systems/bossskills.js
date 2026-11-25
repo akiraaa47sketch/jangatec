@@ -3,6 +3,8 @@
 //   Escafandrista  • Jato d'água: mira a mangueira (borbulha), solta um jato que voa até onde você
 //                    ESTAVA — saia do lugar. Acertou: tela azul e cego por 4 s (bloqueando de frente: 1,5 s).
 //                  • Pisão de chumbo: bate as botas e uma onda de choque corre pelo chão — PULE por cima.
+//                  • Águas-vivas: arremessa 3 águas-vivas (5 furioso) onde você está; elas ficam no chão
+//                    ~7 s. Encostou: fica lento e perde 4 de vida por segundo por 4 s.
 //   Metralhador    • Granada: se você se esconde atrás da cobertura, ele joga uma granada (anel vermelho
 //                    no chão, explode em 1,6 s).
 //   Chefes da plataforma Leviatã (evento SOS), um por andar:
@@ -21,6 +23,7 @@ import { sfx } from '../core/sfx.js';
 
 export const SKILLS = {
   jet: { cd: [11, 15], range: [4, 15], wind: 0.9, speed: 24, radius: 1.2, blind: 4, blindBlocked: 1.5 },
+  jelly: { cd: [9, 13], range: [3, 16], wind: 0.6, fly: 0.85, n: 3, radius: 1.2, life: 7, sting: 4 },
   stomp: { cd: [9, 12], range: 7, wind: 0.7, speed: 9, maxR: 10, width: 0.7, dmg: 14 },
   grenade: { cd: [7, 10], hiddenFor: 1.5, fuse: 1.6, radius: 3.6, dmg: 28 },
   // inimigos comuns: bombardeiro (bomba de pólvora) e atirador de elite (mira laser, saia da linha)
@@ -37,12 +40,31 @@ export const SKILLS = {
   blink: { cd: [9, 13], range: [5, 25], wind: 0.55, radius: 2.1, dmg: 18 },
 };
 const BOSS_SKILLS = { solda: ['flame', 'slag'], gas: ['cloud', 'vent'], broca: ['quake', 'charge'], raio: ['zap', 'blink'] };
-const POSE = { flame: 'aim', slag: 'throw', cloud: 'throw', vent: 'heavyWindup', charge: 'heavyWindup', quake: 'heavyWindup', zap: 'aim', blink: 'aim', stomp: 'heavyWindup', bomb: 'throw' };
+const POSE = { jelly: 'throw', flame: 'aim', slag: 'throw', cloud: 'throw', vent: 'heavyWindup', charge: 'heavyWindup', quake: 'heavyWindup', zap: 'aim', blink: 'aim', stomp: 'heavyWindup', bomb: 'throw' };
 // pseudo-aleatório determinístico (a mesma semente gera os mesmos pontos em todos os clientes)
 const rngOf = (seed) => { let a = seed >>> 0; return () => { a = (a + 0x6d2b79f5) | 0; let t = Math.imul(a ^ (a >>> 15), 1 | a); t ^= t + Math.imul(t ^ (t >>> 7), 61 | t); return ((t ^ (t >>> 14)) >>> 0) / 4294967296; }; };
 const between = ([a, b]) => a + Math.random() * (b - a);
 const r1 = (x) => Math.round(x * 10) / 10;
 const V = (a) => new THREE.Vector3(a[0], a[1], a[2]);
+
+// Água-viva: sino translúcido rosa que brilha + tentáculos.
+function makeJellyfish() {
+  const g = new THREE.Group(), tentacles = [];
+  const bell = new THREE.Mesh(new THREE.SphereGeometry(0.42, 18, 12, 0, Math.PI * 2, 0, Math.PI * 0.55),
+    new THREE.MeshStandardMaterial({ color: 0xff8ad8, emissive: 0xd23aa8, emissiveIntensity: 0.6, transparent: true, opacity: 0.72, roughness: 0.2, side: THREE.DoubleSide, depthWrite: false }));
+  bell.scale.y = 0.8; bell.position.y = 0.32; g.add(bell);
+  const inner = new THREE.Mesh(new THREE.SphereGeometry(0.2, 12, 8), new THREE.MeshBasicMaterial({ color: 0xffd0f2, transparent: true, opacity: 0.8 }));
+  inner.position.y = 0.42; g.add(inner);
+  const tm = new THREE.MeshBasicMaterial({ color: 0xffa8e6, transparent: true, opacity: 0.7 });
+  for (let i = 0; i < 7; i++) {
+    const a = i / 7 * Math.PI * 2, piv = new THREE.Group();
+    piv.position.set(Math.cos(a) * 0.28, 0.34, Math.sin(a) * 0.28); piv.rotation.y = -a; piv.userData.k = i;
+    const t = new THREE.Mesh(new THREE.CylinderGeometry(0.018, 0.008, 0.55, 4), tm); t.position.y = -0.27; piv.add(t);
+    g.add(piv); tentacles.push(piv);
+  }
+  g.userData.tentacles = tentacles;
+  return g;
+}
 
 export class BossSkills {
   constructor(G) {
@@ -58,7 +80,7 @@ export class BossSkills {
     for (const e of E.list) {
       if (!(e.def.boss || e.def.skill) || e.replica || e.state === 'dead' || e.creature) continue;
       const T = e.tgt; if (!T || T.dead || T.downed || !T.pos) continue;
-      const sk = e.sk || (e.sk = { jet: between([4, 7]), stomp: between([3, 6]), grenade: 3, bomb: between([2, 4]), snipe: between([2, 4]), hidden: 0,
+      const sk = e.sk || (e.sk = { jet: between([4, 7]), jelly: between([3, 6]), stomp: between([3, 6]), grenade: 3, bomb: between([2, 4]), snipe: between([2, 4]), hidden: 0,
         flame: between([2, 4]), slag: between([4, 7]), cloud: between([2, 4]), vent: between([5, 8]), charge: between([3, 5]), quake: between([4, 7]), zap: between([2, 4]), blink: between([5, 8]) });
       for (const k in sk) if (typeof sk[k] === 'number' && k !== 'hidden') sk[k] -= dt;
       if (e.skillHold > 0 || (e.m && ['windup', 'strike', 'stagger'].includes(e.m.state))) continue;
@@ -86,8 +108,12 @@ export class BossSkills {
         continue;
       }
       if (kind === 'mini') {
+        const J = SKILLS.jet, JL = SKILLS.jelly;
+        const canJet = sk.jet <= 0 && d > J.range[0] && d < J.range[1] && e.los !== false;
+        const canJelly = sk.jelly <= 0 && d > JL.range[0] && d < JL.range[1];
         if (sk.stomp <= 0 && d < SKILLS.stomp.range) { sk.stomp = between(SKILLS.stomp.cd); this.cast('stomp', e, T); }
-        else if (sk.jet <= 0 && d > SKILLS.jet.range[0] && d < SKILLS.jet.range[1] && e.los !== false) { sk.jet = between(SKILLS.jet.cd); this.cast('jet', e, T); }
+        else if (canJelly && (!canJet || Math.random() < 0.5)) { sk.jelly = between(JL.cd) * (e.enraged ? 0.7 : 1); sk.jet = Math.max(sk.jet, 2.5); this.cast('jelly', e, T); }
+        else if (canJet) { sk.jet = between(J.cd); sk.jelly = Math.max(sk.jelly, 2.5); this.cast('jet', e, T); }
       } else if (kind === 'minigun') {
         sk.hidden = e.los === false ? sk.hidden + dt : 0; // escondido atrás da cobertura?
         if (sk.grenade <= 0 && sk.hidden > SKILLS.grenade.hiddenFor && d < 24) { sk.grenade = between(SKILLS.grenade.cd); this.cast('grenade', e, T); }
@@ -106,7 +132,7 @@ export class BossSkills {
   cast(s, e, T) {
     const G = this.G, p = e.body.pos;
     // mira preditiva: onde você VAI estar quando o ataque chegar (limitado a 6 m de antecipação)
-    const LEAD = { jet: 1.3, slag: 1.1, cloud: 0.9, zap: 0.8, charge: 0.45, bomb: 0.9, grenade: 0.9, vent: 0.9, snipe: 0.5 }[s] || 0;
+    const LEAD = { jelly: 0.8, jet: 1.3, slag: 1.1, cloud: 0.9, zap: 0.8, charge: 0.45, bomb: 0.9, grenade: 0.9, vent: 0.9, snipe: 0.5 }[s] || 0;
     const v = T.vel || { x: 0, z: 0 }, lx = Math.max(-6, Math.min(6, (v.x || 0) * LEAD)), lz = Math.max(-6, Math.min(6, (v.z || 0) * LEAD));
     const m = { t: 'fx', k: 'skill', s, id: e.id, o: [r1(p.x), r1(p.y), r1(p.z)], tg: [r1(T.pos.x + lx), r1(T.pos.y), r1(T.pos.z + lz)], seed: Math.floor(Math.random() * 1e6), en: e.enraged ? 1 : 0 };
     const S = SKILLS[s];
@@ -123,6 +149,13 @@ export class BossSkills {
     const fx = { ...m, o, tg, t: 0, objs: [] };
     const add = (obj) => { G.scene.add(obj); fx.objs.push(obj); return obj; };
     if (m.s === 'jet') { fx.stream = add(new THREE.Group()); for (let i = 0; i < 14; i++) fx.stream.add(new THREE.Mesh(new THREE.SphereGeometry(0.16 + Math.random() * 0.1, 8, 6), new THREE.MeshBasicMaterial({ color: 0xbfe8ff, transparent: true, opacity: 0.85 }))); fx.stream.visible = false; sfx.splash(o, false); }
+    if (m.s === 'jelly') {
+      const n = S.n + (m.en ? 2 : 0), rnd = rngOf(m.seed || 1);
+      fx.pts = Array.from({ length: n }, (_, k) => { const a = rnd() * 6.28, d = k === 0 ? 0 : 2 + rnd() * 2.2; const q = new THREE.Vector3(tg.x + Math.cos(a) * d, 0, tg.z + Math.sin(a) * d); q.y = this._ground(q.x, q.z, tg.y) + 0.05; return q; });
+      fx.marks = fx.pts.map((q) => { const mk = add(new THREE.Mesh(new THREE.RingGeometry(S.radius * 0.85, S.radius, 28).rotateX(-Math.PI / 2), new THREE.MeshBasicMaterial({ color: 0xff7ad9, transparent: true, opacity: 0.6, side: THREE.DoubleSide, depthWrite: false }))); mk.position.copy(q); return mk; });
+      fx.jellies = fx.pts.map(() => { const j = add(makeJellyfish()); j.position.copy(o).setY(o.y + 2); return j; });
+      fx.stung = 0;
+    }
     if (m.s === 'stomp') { fx.ring = add(new THREE.Mesh(new THREE.RingGeometry(0.85, 1, 48).rotateX(-Math.PI / 2), new THREE.MeshBasicMaterial({ color: 0xe8d2a0, transparent: true, opacity: 0.9, side: THREE.DoubleSide, depthWrite: false }))); fx.ring.visible = false; }
     if (m.s === 'snipe') { // laser vermelho até onde você estava
       const geo = new THREE.BufferGeometry().setFromPoints([o.clone().setY(o.y + 1.5), tg.clone().setY(tg.y + 1.1)]);
@@ -356,19 +389,56 @@ export class BossSkills {
           f.stream.visible = true;
           const dir = f.tg.clone().sub(f.o).normalize(), o = f.o.clone().setY(f.o.y + 1.9);
           f.stream.children.forEach((b, k) => { const d = Math.max(0, Math.min(len, head - k * 0.35)); b.position.copy(o).addScaledVector(dir, d); b.position.y += Math.sin(d / len * Math.PI) * 0.3 - d * 0.04; b.visible = head - k * 0.35 > 0; });
-          if (!f.checked && head >= len - 2) {
-            f.checked = true; sfx.splash(f.tg, true);
-            const me = this._me();
-            if (me && Math.hypot(pp.x - f.tg.x, pp.z - f.tg.z) < S.radius && Math.abs(pp.y - f.tg.y) < 2.2 && !(G.melee && G.melee.iframes > 0)) {
+          // Acerta em QUALQUER ponto do caminho do jato (antes só valia o ponto final, para onde ele
+          // mirou prevendo seu movimento: o jato passava por você, molhava a tela e não cegava).
+          const me = this._me(), hd = Math.min(len, head), prevHd = Math.min(len, Math.max(0, head - S.speed * dt - 0.4));
+          const dl = Math.hypot(dir.x, dir.z) || 1, ux = dir.x / dl, uz = dir.z / dl, tx = pp.x - o.x, tz = pp.z - o.z, along = tx * ux + tz * uz;
+          const across = Math.hypot(tx - ux * along, tz - uz * along), jetY = o.y + Math.sin(Math.max(0, along) / len * Math.PI) * 0.3 - Math.max(0, along) * 0.04;
+          const onPath = me && !f.hitMe && along >= prevHd - 0.6 && along <= hd + 0.4 && across < S.radius && jetY > pp.y + 0.2 && jetY < pp.y + 2.4;
+          if (!f.checked && head >= len - 2) { f.checked = true; sfx.splash(f.tg, true); }
+          if (onPath) {
+            f.hitMe = true; sfx.splash(pp, true);
+            if (!(G.melee && G.melee.iframes > 0)) {
               const [fx, fz] = pl.forward(), ax = f.o.x - pp.x, az = f.o.z - pp.z, l = Math.hypot(ax, az) || 1;
               const blocked = G.melee && G.melee.blocking && (ax * fx + az * fz) / l > 0.3;
               this.blind(blocked ? S.blindBlocked : S.blind, 'agua');
               G.hud.msg(blocked ? 'Você segurou o jato com a arma — quase não molhou a vista' : 'Jato d\'água na cara! Você está cego');
               if (G.gfx) G.gfx.wetLens(1);
+              pl.body.vel.x += dir.x * 3; pl.body.vel.z += dir.z * 3; // o jato empurra
             }
           }
           if (fly > len / S.speed + 0.6) done = true;
         } else if (Math.random() < dt * 20) sfx.click(f.o, 0.4); // borbulhando
+      } else if (f.s === 'jelly') {
+        const u = Math.min(1, Math.max(0, (f.t - S.wind) / S.fly));
+        f.jellies.forEach((j, k) => {
+          const q = f.pts[k];
+          if (u < 1) {
+            j.position.lerpVectors(f.o.clone().setY(f.o.y + 2), q, u); j.position.y += Math.sin(u * Math.PI) * 3.2;
+            j.rotation.x = u * 6; j.rotation.z = u * 4 * (k % 2 ? 1 : -1);
+          } else { // no chão: pulsa (encolhe e estica) e balança os tentáculos
+            const ph = f.t * 3 + k;
+            j.position.copy(q); j.rotation.set(0, ph * 0.3, 0);
+            j.scale.set(1 + Math.sin(ph) * 0.12, 1 - Math.sin(ph) * 0.15, 1 + Math.sin(ph) * 0.12);
+            for (const tc of j.userData.tentacles) tc.rotation.z = Math.sin(ph * 1.7 + tc.userData.k) * 0.5;
+          }
+        });
+        for (const mk of f.marks) mk.material.opacity = u < 1 ? 0.35 + 0.4 * Math.abs(Math.sin(f.t * 12)) : 0;
+        if (u >= 1) {
+          if (!f.landed) { f.landed = true; for (const q of f.pts) sfx.splash(q, false); if (G.vfx) for (const q of f.pts) G.vfx.ring(q, { color: 0xff7ad9, from: 0.2, to: S.radius * 1.3, life: 0.35 }); }
+          const left = S.wind + S.fly + S.life - f.t;
+          if (left < 1.2) for (const j of f.jellies) { const s2 = Math.max(0.01, left / 1.2); j.scale.multiplyScalar(s2); }
+          const me = this._me();
+          if (me && f.pts.some((q) => this._inside(q, S.radius, pp, 1.6))) {
+            const sv = G.survival, was = sv.buffs.agua_viva > 0;
+            sv.buffs.agua_viva = S.sting; // encostou de novo: renova os 4 s
+            if (!was) {
+              G.hud.flash('hurt'); sfx.hurt && sfx.hurt();
+              if (f.stung++ === 0) G.hud.msg('Água-viva! Você está lento e queimando — saia de perto delas.');
+            }
+          }
+          if (left <= 0) done = true;
+        }
       } else if (f.s === 'stomp') {
         const go = f.t - S.wind;
         if (go > 0) {

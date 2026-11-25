@@ -5,6 +5,18 @@
 // Nos textos, **assim** vira negrito.
 export const PATCH_NOTES = [
   {
+    id: '0.26', versao: 'v0.26', data: '25/11/2026', titulo: 'Piratas nadadores e combate vivo',
+    destaques: [
+      { tag: 'Piratas', titulo: 'Piratas nadam', texto: 'Um golpe forte, um chute ou um pesado podem **jogar o pirata no mar**. Ele **nada de volta e escala a borda**. Se a jangada for embora rápido, ele fica para trás e afunda.' },
+      { tag: 'Chefe da seca', titulo: 'Águas-vivas do escafandrista', texto: 'Nova habilidade: ele **arremessa águas-vivas** onde você está (5 quando furioso). Elas ficam no chão ~7 s; encostar deixa você **lento e perdendo 4 de vida por segundo** por 4 s.' },
+    ],
+    secoes: [
+      { icone: '🏴‍☠️', nome: 'Piratas', itens: ['Corrigido o pirata que **teleportava para o meio da jangada** quando uma onda passava: agora ele só volta para o ponto de convés mais perto.', 'Piratas **nadam** quando caem no mar e sobem de volta pela borda.', 'Piratas atiradores também são **empurrados** pelos golpes.'] },
+      { icone: '🤿', nome: 'Escafandrista', itens: ['O **jato que cega** agora funciona: acerta em qualquer ponto do caminho (antes só valia o ponto final da mira) e te empurra.', 'Nova habilidade **Águas-vivas** (lentidão + 4 de vida/s por 4 s), com ícone 🪼 na tela.'] },
+      { icone: '⚔', nome: 'Combate', itens: ['Inimigos **reagem a cada golpe**: o corpo é jogado para o lado de onde veio o golpe, torce, os braços soltam e ele amassa com o impacto.', 'Golpe **pesado** ou **final do combo** que entra limpo **derruba**: cai de costas, quica e levanta.', 'Golpes fortes jogam o corpo bem mais que os fracos; chefes reagem menos.'] },
+    ],
+  },
+  {
     id: '0.25', versao: 'v0.25', data: '25/11/2026', titulo: 'Cutscene revisada',
     secoes: [
       { icone: '🚁', nome: 'Cutscene de abertura', itens: ['**Mais calma** (~35 s): cada fala fica na tela tempo suficiente para ler e a queda dura mais.', 'Falas **revisadas** em português.', 'Corrigido o **congelamento no fim**: a luz da explosão da queda obrigava o jogo a recompilar os gráficos quando a cutscene acabava.', 'Se o mouse soltar durante a cutscene, aparece o aviso **"Clique na tela para controlar a câmera"**.'] },

@@ -157,7 +157,7 @@ export class Hud {
     // buffs ativos com o tempo que falta
     const bf = G.survival.buffs, buffHtml = Object.keys(bf).map((k) => {
       const t = Math.ceil(bf[k]), b = BUFFS[k];
-      return `<span class="buff${t <= 20 ? ' low' : ''}" title="${b.nome}: ${b.desc}"><i>${b.icon}</i>${Math.floor(t / 60)}:${String(t % 60).padStart(2, '0')}</span>`;
+      return `<span class="buff${b.debuff ? ' debuff' : t <= 20 ? ' low' : ''}" title="${b.nome}: ${b.desc}"><i>${b.icon}</i>${Math.floor(t / 60)}:${String(t % 60).padStart(2, '0')}</span>`;
     }).join('');
     if (buffHtml !== this._buffs) { $('buffs').innerHTML = buffHtml; this._buffs = buffHtml; }
     // Arma equipada: só texto, sem painel

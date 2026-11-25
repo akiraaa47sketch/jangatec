@@ -697,3 +697,7 @@ body.bossfight #msgs { top: 96px; } body.touch.bossfight #msgs { top: 84px; }
 #zoneTitle .zt-sub:empty { display: none; }
 @keyframes zoneIn { 0% { opacity: 0; transform: translateY(10px); } 18% { opacity: 1; transform: none; } 74% { opacity: 1; } 100% { opacity: 0; transform: translateY(-4px); } }
 @keyframes zoneLine { 0% { transform: scaleX(0); } 25% { transform: scaleX(1); } 100% { transform: scaleX(1); } }
+
+/* efeito ruim (água-viva do escafandrista) */
+#buffs .buff.debuff { background: rgba(120, 20, 80, 0.75); border-color: rgba(255, 122, 217, 0.8); color: #ffd0f2; animation: debuffPulse 0.6s ease-in-out infinite alternate; }
+@keyframes debuffPulse { from { box-shadow: 0 0 0 rgba(255, 122, 217, 0); } to { box-shadow: 0 0 10px rgba(255, 122, 217, 0.7); } }
