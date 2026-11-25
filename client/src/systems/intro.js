@@ -51,6 +51,9 @@ export class Intro {
     // passageiros: você + todos os jogadores da sala (os que chegarem nos primeiros segundos também entram)
     this.riders = new Map();
     this._addRider('local', this._lookLocal(), 'Você');
+    // quem estava no lobby já embarca desde o primeiro quadro (mesmo id da rede)
+    for (const p of G.net.lobbyPlayers || []) this._addRider(p.id, typeof p.ap === 'string' ? p.ap : '', String(p.name || 'Náufrago').slice(0, 16));
+    G.net.lobbyPlayers = null;
     this._syncRiders();
     // piloto
     this.pilot = this._figure('p', randomPill());

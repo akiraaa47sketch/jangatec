@@ -300,6 +300,14 @@ body.touch #banjoPanel { bottom: 8px; padding: 8px; } body.touch #banjoPanel .ti
 .modal-card { width: min(360px, 92vw); padding: 22px; border-radius: 6px; background: #0b1d29; border: 1px solid rgba(255, 255, 255, 0.1); box-shadow: 0 24px 60px rgba(0, 0, 0, 0.6); }
 .modal-card h3 { margin: 0; font: 400 28px var(--display); color: var(--ink); }
 .modal-card input { width: 100%; margin: 8px 0 4px; padding: 10px 12px; border-radius: 4px; background: rgba(0, 0, 0, 0.35); border: 1px solid rgba(255, 255, 255, 0.15); color: var(--ink); font: inherit; }
+.lobby-card { width: min(420px, 92vw); }
+.lobby-sub { margin: 4px 0 12px; color: var(--ink-dim); font-size: 13px; }
+.lobby-list { list-style: none; margin: 0 0 12px; padding: 0; display: grid; gap: 6px; max-height: 260px; overflow-y: auto; }
+.lobby-list li { display: flex; align-items: center; gap: 10px; padding: 9px 12px; border-radius: 4px; background: rgba(0, 0, 0, 0.25); font: 700 14px var(--ui); animation: menuIn 0.2s; }
+.lobby-list li.empty { background: transparent; border: 1px dashed rgba(255, 255, 255, 0.12); color: var(--ink-dim); font-weight: 400; }
+.lobby-list .you { color: var(--ink-dim); font-weight: 400; font-size: 12px; }
+.lobby-list .cap { margin-left: auto; padding: 1px 6px; border-radius: 3px; font: 800 10px var(--ui); letter-spacing: 0.1em; text-transform: uppercase; color: #1a1206; background: var(--brass); }
+#lobbyStart[hidden] { display: none; }
 .modal-card .err { min-height: 1.2em; margin: 2px 0 8px; color: #ff8a7a; font-size: 12.5px; }
 
 /* personagem: prévia grande à esquerda, categorias e opções à direita */

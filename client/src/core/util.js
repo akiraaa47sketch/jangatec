@@ -34,4 +34,5 @@ export function hash2(seed, x, y) {
 // fora de sincronia com o mar.
 let clockOffsetMs = 0;
 export function setClockOffset(ms) { clockOffsetMs = Number.isFinite(ms) ? ms : 0; }
+export const serverNow = () => Date.now() + clockOffsetMs; // hora do servidor em ms
 export const clock = () => ((Date.now() + clockOffsetMs) / 1000) % 100000;
