@@ -46,6 +46,7 @@ import { Endgame } from './systems/endgame.js';
 import { Inventory } from './ui/inventory.js';
 import { clock } from './core/util.js';
 import { Intro } from './systems/intro.js';
+import { Reflections } from './core/reflections.js';
 import { ZoneTitle } from './ui/zonetitle.js';
 
 const $ = (id) => document.getElementById(id);
@@ -125,6 +126,7 @@ G.viewmodel.scene.environmentIntensity = scene.environmentIntensity;
 window.G = G; // útil para depurar no console
 G.gfx = new Graphics(G, { renderer, scene, camera, sun, mobile: MOBILE }); // pipeline + opções gráficas
 G.gfxMenu = new GfxMenu(G);
+G.reflections = new Reflections(G); // reflexos (metais, jangada molhada na chuva) — menu Gráficos
 G.keysMenu = new KeysMenu(G);
 if (MOBILE) G.touch = new TouchControls(G);
 
@@ -344,6 +346,7 @@ function frame() {
   G.zoneTitle.update(dt);
   if (G.touch && !cut) G.touch.update();
   sunVisual.update(camera, t);
+  G.reflections.update(dt); // jangada molhada/secando + câmera de reflexo
   G.gfx.render(dt);
   G.gfxMenu.update();
   if (!cut) G.viewmodel.render(renderer); // 2º passe: braços e arma por cima do mundo

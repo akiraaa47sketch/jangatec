@@ -15,10 +15,10 @@ import { FullScreenQuad } from 'three/addons/postprocessing/Pass.js';
 
 export const GFX_PRESETS = {
   // escala = modo do FSR: baixo → Desempenho, médio → Equilibrado, alto → Qualidade, ultra → nativo
-  baixo: { scale: 0.5, upscaler: 'fsr', sharpness: 0.5, shadows: 'off', msaa: 0, bloom: false, view: 1, water: 'baixa', grade: false, pixelCap: 1 },
-  medio: { scale: 0.59, upscaler: 'fsr', sharpness: 0.4, shadows: 'baixa', msaa: 0, bloom: false, view: 2, water: 'media', grade: true, pixelCap: 1 },
-  alto: { scale: 0.67, upscaler: 'fsr', sharpness: 0.3, shadows: 'alta', msaa: 4, bloom: true, view: 2, water: 'alta', grade: true, pixelCap: 1.5 },
-  ultra: { scale: 1, upscaler: 'fsr', sharpness: 0.25, shadows: 'ultra', msaa: 8, bloom: true, view: 3, water: 'ultra', grade: true, pixelCap: 2 },
+  baixo: { scale: 0.5, upscaler: 'fsr', sharpness: 0.5, shadows: 'off', msaa: 0, bloom: false, view: 1, water: 'baixa', grade: false, pixelCap: 1, reflect: 'off' },
+  medio: { scale: 0.59, upscaler: 'fsr', sharpness: 0.4, shadows: 'baixa', msaa: 0, bloom: false, view: 2, water: 'media', grade: true, pixelCap: 1, reflect: 'ceu' },
+  alto: { scale: 0.67, upscaler: 'fsr', sharpness: 0.3, shadows: 'alta', msaa: 4, bloom: true, view: 2, water: 'alta', grade: true, pixelCap: 1.5, reflect: 'alta' },
+  ultra: { scale: 1, upscaler: 'fsr', sharpness: 0.25, shadows: 'ultra', msaa: 8, bloom: true, view: 3, water: 'ultra', grade: true, pixelCap: 2, reflect: 'ultra' },
 };
 // Modos do FSR (como no FSR 2/3 da AMD): fração da resolução em que a cena é desenhada.
 export const FSR_MODES = { nativo: 1, qualidade: 0.67, equilibrado: 0.59, desempenho: 0.5, ultra: 0.33 };
@@ -32,9 +32,10 @@ export const GFX_LABELS = {
   view: { 1: 'Curta', 2: 'Média', 3: 'Longa' },
   water: { baixa: 'Baixa', media: 'Média', alta: 'Alta', ultra: 'Ultra' },
   pixelCap: { 1: '1x', 1.5: '1,5x', 2: '2x (retina)' },
+  reflect: { off: 'Desligados', ceu: 'Só o céu (leve)', alta: 'Tempo real (cena em volta)', ultra: 'Tempo real ultra (nítido, rápido)' },
 };
-export const IMMERSION_DEFAULTS = (mobile) => ({ shake: 1, bob: true, dof: mobile ? 'off' : 'suave', motion: !mobile, grain: false, lowHp: true, wet: true });
-export const IMMERSION_KEYS = ['shake', 'bob', 'dof', 'motion', 'grain', 'lowHp', 'wet'];
+export const IMMERSION_DEFAULTS = (mobile) => ({ shake: 1, bob: true, dof: mobile ? 'off' : 'suave', motion: !mobile, grain: false, lowHp: true, wet: true, wetRaft: true });
+export const IMMERSION_KEYS = ['shake', 'bob', 'dof', 'motion', 'grain', 'lowHp', 'wet', 'wetRaft'];
 GFX_LABELS.dof = { off: 'Desligada', suave: 'Suave', forte: 'Forte (cinema)' };
 const SHADOW = { off: null, baixa: [1024, 52, false], media: [2048, 52, false], alta: [2048, 60, true], ultra: [4096, 85, true] };
 const KEY = 'mare-alta-graficos';
@@ -271,6 +272,8 @@ export class Graphics {
       water: pick('water', (v) => v in GFX_LABELS.water),
       grade: pick('grade', (v) => typeof v === 'boolean'),
       pixelCap: pick('pixelCap', (v) => [1, 1.5, 2].includes(v)),
+      reflect: pick('reflect', (v) => v in GFX_LABELS.reflect),
+      wetRaft: pick('wetRaft', (v) => typeof v === 'boolean'),
       showFps: pick('showFps', (v) => typeof v === 'boolean'),
       shake: pick('shake', (v) => Number.isFinite(v) && v >= 0 && v <= 1),
       bob: pick('bob', (v) => typeof v === 'boolean'),

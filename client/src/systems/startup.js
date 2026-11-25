@@ -275,7 +275,8 @@ export class Startup {
     }
 
     // chuva: começa com a tempestade passando da metade e engrossa até o máximo
-    this.rain.update(dt, clamp((storm - 0.35) * 1.6, 0, 1), storm);
+    this.rainK = clamp((storm - 0.35) * 1.6, 0, 1); this.stormK = storm; // a jangada molha/seca com isto (core/reflections.js)
+    this.rain.update(dt, this.rainK, storm);
   }
 
   spawnPosition() {
