@@ -84,7 +84,7 @@ export const PARTY = { hp: 0.12, bossHp: 0.2, extraPirateEvery: 2 };
 // Inimigos ARMADOS: dano por zona (Zona Pirata bem mais leve), pontaria que "esquenta" (os primeiros
 // tiros depois de te ver saem tortos) e erro maior com a distância e com você se mexendo.
 export const RANGED = {
-  dmgByDiff: [0.55, 0.7, 0.9, 1, 1],   // dificuldade 0–4 (0–1 = Zona Pirata)
+  dmgByDiff: [0.55, 0.7, 0.78, 1, 1],  // dificuldade 0–4 (0–1 = Zona Pirata, 2 = Zona Militar)
   aimTime: 1.6,                         // s vendo você até a pontaria chegar no máximo
   aimStart: 0.45,                       // pontaria no primeiro tiro (fração da pontaria total)
   distLoss: 0.02, pelletLoss: 0.035,    // pontaria perdida por metro
