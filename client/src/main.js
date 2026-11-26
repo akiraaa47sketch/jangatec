@@ -231,7 +231,7 @@ function start(seed, welcome, opts = {}) {
   const play = () => {
     G.input.enabled = true;
     G.hud.show();
-    G.hud.msg(`${G.combat.weapon.nome} ${'★'.repeat(G.combat.weapon.stars)} equipada · complete a jangada e procure as caixas`);
+    G.hud.msg(`${G.combat.weapon.nome} ${'★'.repeat(G.combat.rarOf(G.combat.weaponId))} equipada · complete a jangada e procure as caixas`);
   };
   // Cutscene de abertura (helicóptero → raio → queda → acordar na ilha) só no começo da partida.
   if (opts.intro && G.startup.phase === 'build' && starterIsland) {

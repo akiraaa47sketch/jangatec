@@ -1,6 +1,6 @@
 // Vida e inventário simples (contadores por item).
 import { clamp } from '../core/util.js';
-import { WEAPONS } from './combat.js';
+import { WEAPONS, parseWeaponKey, rollRarity, MAX_RAR } from './combat.js';
 import { sfx } from '../core/sfx.js';
 
 export const ITEM_NAMES = {
@@ -47,19 +47,20 @@ export class Survival {
     for (const k in loot) {
       if (k === 'madeira' || k === 'pano') continue; // não existem mais (saves/caixotes antigos)
       if (k.startsWith('arma_')) {
-        const id = k.slice(5), c = this.G.combat;
-        const result = c.unlockWeapon(id);
+        const pk = parseWeaponKey(k), id = pk.id, c = this.G.combat;
         const wd = WEAPONS.find((entry) => entry.id === id);
+        // sem estrelas na chave (recompensas, inimigos): sorteia pela zona; minigun é sempre 4★
+        const rar = wd && wd.noReload ? MAX_RAR : pk.rar || rollRarity(this.G.world.difficulty(this.G.player.body.pos.x, this.G.player.body.pos.z));
+        const result = c.unlockWeapon(id, rar);
         if (wd && wd.noReload) { // minigun: a quantidade é o número de balas que ainda tem
           const n = Math.max(1, Math.min(wd.mag, Math.floor(loot[k]) || wd.mag));
           c.mags[id] = result === 'owned' ? Math.min(wd.mag, (c.mags[id] || 0) + n) : n;
           parts.push(`${wd.nome} (${c.mags[id]} balas)`);
           continue;
         }
-        if (result === true) {
-          const weapon = WEAPONS.find((entry) => entry.id === id);
-          parts.push(weapon ? `${weapon.nome} ${'★'.repeat(weapon.stars)} adquirido` : 'Arma adquirida');
-        }
+        if (result === true) parts.push(wd ? `${wd.nome} ${'★'.repeat(rar)} adquirido` : 'Arma adquirida');
+        else if (result === 'upgrade') parts.push(`${wd.nome} melhorou para ${'★'.repeat(rar)}!`);
+        else if (wd && !wd.noReload) parts.push(`${wd.nome} ${'★'.repeat(rar)} (você já tem uma ${'★'.repeat(c.rarOf(id))})`);
         continue;
       }
       if (k === 'gancho' || k === 'canhao' || k === 'canhao_ferro') { // torreta e canhões não vão para a mochila: aparecem na sua frente para carregar e soldar

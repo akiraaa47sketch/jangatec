@@ -5,6 +5,18 @@
 // Nos textos, **assim** vira negrito.
 export const PATCH_NOTES = [
   {
+    id: '0.37', versao: 'v0.37', data: '26/11/2026', titulo: 'Raridade de armas e mãos arrumadas',
+    destaques: [
+      { tag: 'Armas', titulo: 'Raridade 1★ a 4★', texto: 'Cada arma achada vem com **1 a 4 estrelas**: mais estrelas = **mais dano** (até +32%) e **mais precisão**. Zonas mais longe dão armas mais estreladas. Achou a mesma arma com mais estrelas? A sua **melhora**.' },
+      { tag: 'Animação', titulo: 'Engatilhar a pistola', texto: 'Na recarga da pistola em 1ª pessoa a mão esquerda **puxa o ferrolho para trás** e solta — ele bate para a frente.' },
+    ],
+    secoes: [
+      { icone: '★', nome: 'Raridade', itens: ['1★ comum · 2★ +10% · 3★ +20% · 4★ +32% de dano; a mira também abre menos.', 'As estrelas aparecem na caixa, na barra, no inventário e na arma largada no chão (ela guarda as estrelas).'] },
+      { icone: '🖐', nome: '1ª pessoa', itens: ['Rifle e escopeta: punho mais fino — os dedos **não atravessam mais** a coronha.', 'Pistola: o carregador não fica mais saindo pelo punho.'] },
+      { icone: '🧍', nome: '3ª pessoa', itens: ['O pulso gira de verdade: pistola em **baixo-pronto** apontando para a frente (antes apontava para o chão) e rifle atravessado no corpo (antes apontava para trás).', 'A **mão esquerda segura a arma** (rifle, escopeta e pistola na mira).', '**Recarga nova**: a arma sobe na frente do peito, o carregador cai, a mão vai ao cinto e volta; a pistola é engatilhada, o tambor do revólver abre, a escopeta bombeia.'] },
+    ],
+  },
+  {
     id: '0.36', versao: 'v0.36', data: '26/11/2026', titulo: 'Caixas balanceadas',
     destaques: [
       { tag: 'Loot', titulo: 'Caixas consistentes', texto: 'Toda caixa agora tem uma **base garantida** (munição + comida); o resto (curativo, cartuchos, arma) cresce **aos poucos** de zona em zona. Acabou a caixa com 3 balas do lado de uma com arma, e o salto enorme da zona militar para a seguinte.' },

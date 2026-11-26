@@ -35,7 +35,7 @@ function smallSack() {
 
 function modelFor(key) {
   if (key.startsWith('arma_')) {
-    const spec = buildWeapon(key.slice(5));
+    const spec = buildWeapon(key.slice(5).replace(/_r[1-4]$/, ''));
     if (!spec) return null;
     if (spec.flashMesh) spec.flashMesh.visible = false;
     const g = new THREE.Group(), w = spec.group;

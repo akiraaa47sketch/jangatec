@@ -3,14 +3,14 @@
 // Qualquer jogador pega com [E]. No multiplayer o servidor guarda os sacos e garante que só um pega.
 import * as THREE from '../three.js';
 import { ITEM_NAMES } from './survival.js';
-import { WEAPONS } from './combat.js';
+import { WEAPONS, parseWeaponKey } from './combat.js';
 import { waveHeight } from '../world/ocean.js';
 import { clock } from '../core/util.js';
 import { sfx } from '../core/sfx.js';
 import { makeItemModel } from '../world/itemmodels.js';
 
 export const lootLabel = (loot) => Object.entries(loot).map(([k, n]) => {
-  if (k.startsWith('arma_')) { const w = WEAPONS.find((e) => e.id === k.slice(5)); return w ? w.nome : 'Arma'; }
+  if (k.startsWith('arma_')) { const pk = parseWeaponKey(k), w = WEAPONS.find((e) => e.id === pk.id); return w ? w.nome + (pk.rar ? ' ' + '★'.repeat(pk.rar) : '') : 'Arma'; }
   return `${n > 1 ? n + ' ' : ''}${ITEM_NAMES[k] || k}`;
 }).join(', ');
 

@@ -95,6 +95,13 @@ export const LOOT_CONFIG = {
   },
 };
 const FOODS = ['barra_proteina', 'energetico', 'chocolate'];
+// RARIDADE da arma achada (1★…4★; mais estrelas = mais forte, ver combat.js): chance por zona
+const RAR_BY_ZONE = [[0.6, 0.3, 0.1, 0], [0.42, 0.36, 0.18, 0.04], [0.24, 0.38, 0.28, 0.1], [0.1, 0.32, 0.38, 0.2], [0.04, 0.22, 0.4, 0.34]];
+export function rollRarity(zone, random = Math.random) {
+  const t = RAR_BY_ZONE[Math.max(0, Math.min(4, Math.floor(zone) || 0))], x = random();
+  let acc = 0; for (let i = 0; i < 4; i++) { acc += t[i]; if (x < acc) return i + 1; }
+  return 1;
+}
 // munição que já vem com a arma achada
 const WEAPON_AMMO = { revolver: ['municao', 5, 8], pistola: ['municao', 6, 10], escopeta: ['cartucho', 4, 6], rifle: ['municao', 8, 12], rifle_precisao: ['municao', 4, 7] };
 
@@ -129,10 +136,10 @@ function starterLoot(random, index, players) {
   const out = {}, add = (k, n) => { out[k] = (out[k] || 0) + n; };
   switch (index) {
     case 0: // cache inicial: pistola OU revólver (sorteado); com 4+ jogadores vêm os dois
-      if (p >= 4) { add('arma_pistola', 1); add('arma_revolver', 1); add('municao', 20); }
-      else { add(random() < 0.5 ? 'arma_pistola' : 'arma_revolver', 1); add('municao', 12); }
+      if (p >= 4) { add('arma_pistola_r1', 1); add('arma_revolver_r1', 1); add('municao', 20); }
+      else { add(random() < 0.5 ? 'arma_pistola_r1' : 'arma_revolver_r1', 1); add('municao', 12); }
       break;
-    case 1: add('arma_martelo', 1); add('bandagem', 1 + p); break;                    // conserta a jangada
+    case 1: add('arma_martelo_r1', 1); add('bandagem', 1 + p); break;                    // conserta a jangada
     case 2: add('municao', 6); add('barra_proteina', p); add('energetico', 1); break;
     case 3: add('bandagem', 1); add('chocolate', p); add(food(), 1); add('municao', 4); break;
     default: add('energetico', 1); add(food(), 1); add('municao', 4);
@@ -175,7 +182,7 @@ export function generateCrateLoot(seed, id, difficulty, playerCount = 1) {
     // ZONA PIRATA (zonas 0–1): metade das armas é arma de fogo simples (pistola ou revólver)
     const simpleGun = regionIndex <= 1 && random() < 0.5;
     const weapon = simpleGun ? (random() < 0.5 ? 'pistola' : 'revolver') : pool[Math.floor(random() * pool.length)];
-    add(`arma_${weapon}`, 1);
+    add(`arma_${weapon}_r${rollRarity(regionIndex, random)}`, 1);
     const wa = WEAPON_AMMO[weapon]; if (wa) add(wa[0], between(wa[1], wa[2]));
   }
   // 5) ferramentas e equipamento

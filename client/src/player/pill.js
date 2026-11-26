@@ -1,7 +1,7 @@
 // Personagem "Pílula": modelo procedural personalizável (cápsula, rostos, luvas, calçados e
 // chapéus) + animação própria. Altura do modelo ≈ 3,24 unidades; o jogo escala para ~1,75 m.
 import * as THREE from '../three.js';
-import { attachRealHands, animateRealHands } from './pillhands.js';
+import { attachRealHands, animateRealHands, poseWeaponHands } from './pillhands.js';
 import { PILL_OUTFITS, PILL_BACKS, makeOutfit, makeBack, OUTFIT_DEPTH } from './clothes.js';
 export { PILL_OUTFITS, PILL_BACKS };
 
@@ -659,8 +659,9 @@ export function animatePill(pill, speed, dt, pose = 'walk', progress = 0) {
   p.body.position.y = _snap[15] + (p.body.position.y - _snap[15]) * k;
   p.body.position.z = _snap[16] + (p.body.position.z - _snap[16]) * k;
   animateFace(pill.userData, dt);
-  pill.userData.pose = pose;
+  pill.userData.pose = pose; pill.userData.poseP = progress;
   animateRealHands(pill, dt);
+  poseWeaponHands(pill, dt);
   if (p.clothesAnim) for (const f of p.clothesAnim) f(dt, speed, pill.userData.phase || 0);
 }
 

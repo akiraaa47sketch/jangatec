@@ -397,6 +397,7 @@ export class Player {
       pd.accel = (pd.accel || 0) + ((dt > 0 ? (sp - (this._prevSp ?? sp)) / dt : 0) - (pd.accel || 0)) * Math.min(1, 5 * dt); this._prevSp = sp;
       pd.armed = !w ? 'none' : w.tool && w.tool !== 'martelo' ? 'tool' : w.melee ? 'melee' : GUN_TYPE[w.id] || 'pistol';
       pd.gunType = GUN_TYPE[w && w.id] || 'pistol';
+      pd.weaponSpec = this.weaponSpec; // pegadas/peças do modelo da arma (pulso, mão de apoio, recarga)
       pd.reloadKind = w && w.id === 'escopeta' ? 'shotgun' : w && w.id === 'revolver' ? 'revolver' : 'mag';
       pd.useItem = this.useAnim ? this.useAnim.item : null;
       pd.hurt = this.hurtT; pd.hurtSide = this.hurtSide || 1; pd.squash = this.squash; pd.strum = this.strumK;

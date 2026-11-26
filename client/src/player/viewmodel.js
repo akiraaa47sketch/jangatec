@@ -290,7 +290,7 @@ export class ViewModel {
     if (this.spec) {
       this.weaponRoot.add(this.spec.group);
       const p = this.spec.parts || {};
-      if (p.mag) { p.mag.visible = true; p.mag.position.set(0, 0, 0); p.mag.rotation.set(0, 0, 0); }
+      if (p.mag) { p.mag.visible = !this.spec.magHidden; p.mag.position.set(0, 0, 0); p.mag.rotation.set(0, 0, 0); }
       if (p.pump) p.pump.position.z = 0;
       if (p.slide) p.slide.position.z = 0;
     }
@@ -315,7 +315,7 @@ export class ViewModel {
   // grip.p é um ponto NO EIXO do cabo; a origem da mão (punho) fica deslocada pela geometria
   // dos dedos: palma ~3 cm acima do eixo e punho ~7 cm atrás do ponto de curvatura.
   gripHand(grip, extra, hand = 0) {
-    const q = eulerQ(grip.r, grip.order || 'XYZ');
+    const q = grip.q ? grip.q.clone() : eulerQ(grip.r, grip.order || 'XYZ');
     const wq = this.weaponRoot.quaternion;
     // cada modelo de mão tem o seu ponto de pegada (a mão 3D mede o buraco do punho fechado)
     const h = this.hands[hand], ho = h && h.gripOff ? (hand === 1 ? [-h.gripOff[0], h.gripOff[1], h.gripOff[2]] : h.gripOff) : null;
@@ -642,6 +642,12 @@ export class ViewModel {
   }
 
   // ---------- recarga ----------
+  // Linha do tempo da recarga com carregador (fração 0..1). A pistola termina ENGATILHANDO: a mão
+  // esquerda passa por cima do ferrolho, puxa para trás e solta (ele bate para a frente).
+  magTimeline(spec) {
+    if (spec.slideGrab) return { grab: [0.1, 0.22], drop: [0.22, 0.36], belt: [0.26, 0.4], below: [0.4, 0.5], ins: [0.5, 0.62], reach: [0.64, 0.72], pull: [0.72, 0.8], release: [0.8, 0.83], back: [0.84, 0.96], held: [0.38, 0.6] };
+    return { grab: [0.14, 0.3], drop: [0.3, 0.46], belt: [0.34, 0.5], below: [0.5, 0.62], ins: [0.62, 0.76], back: [0.8, 0.92], held: [0.5, 0.77] };
+  }
   // Deslocamento da arma durante a recarga (relativo à empunhadura).
   reloadPose(spec, p) {
     const roll = smooth(ramp(p, 0, 0.16)) - smooth(ramp(p, 0.86, 1));
@@ -650,8 +656,15 @@ export class ViewModel {
       off[0] = -0.07 * roll; off[1] = 0.03 * roll; off[2] = 0.03 * roll;
       off[3] = 0.28 * roll; off[4] = 0.25 * roll; off[5] = -0.55 * roll;
       // empurrão ao encaixar
-      const ins = Math.sin(Math.PI * ramp(p, 0.66, 0.76));
+      const T = this.magTimeline(spec);
+      const ins = Math.sin(Math.PI * ramp(p, T.ins[0] + 0.04, T.ins[1]));
       off[1] += -0.012 * ins; off[3] += -0.05 * ins;
+      if (T.pull) { // engatilhar: a arma vem um pouco para perto e o ferrolho batendo dá um tranco para cima
+        const rk = smooth(ramp(p, T.reach[0], T.reach[1])) - smooth(ramp(p, T.back[0], T.back[1]));
+        off[2] += 0.02 * rk; off[5] -= 0.15 * rk;
+        const slam = Math.sin(Math.PI * ramp(p, T.release[0], T.release[1] + 0.05));
+        off[3] -= 0.07 * slam; off[1] += 0.006 * slam;
+      }
     } else if (spec.reload === 'revolver') {
       off[0] = -0.07 * roll; off[1] = 0.03 * roll; off[2] = 0.03 * roll;
       off[3] = 0.28 * roll; off[4] = 0.25 * roll; off[5] = -0.75 * roll;
@@ -676,18 +689,37 @@ export class ViewModel {
     const gripPose = { p: grip.p, q: grip.q, c: [spec.gripL.c, spec.gripL.c, spec.gripL.c, spec.gripL.c] };
 
     if (spec.reload === 'mag') {
+      const T = this.magTimeline(spec);
       const well = mk(rest(V(0, -0.04, 0.03)), qOpen, grab);
       const below = mk(rest(V(0, -0.16, 0.03)), qOpen, grab);
       const up = mk(rest(V(0, -0.015, 0.03)), qOpen, grab);
       const beltPose = mk(belt, qOpen, open);
-      if (p < 0.14) return gripPose;
-      if (p < 0.3) return mixH(gripPose, well, smooth(ramp(p, 0.14, 0.3)));
-      if (p < 0.34) return well;
-      if (p < 0.5) return mixH(well, beltPose, smooth(ramp(p, 0.34, 0.5)));
-      if (p < 0.62) return mixH(beltPose, below, smooth(ramp(p, 0.5, 0.62)));
-      if (p < 0.76) return mixH(below, up, smooth(ramp(p, 0.62, 0.76)));
-      if (p < 0.8) return up;
-      return mixH(up, gripPose, smooth(ramp(p, 0.8, 0.92)));
+      const seg = (a, b, r) => mixH(a, b, smooth(ramp(p, r[0], r[1])));
+      if (p < T.grab[0]) return gripPose;
+      if (p < T.grab[1]) return seg(gripPose, well, T.grab);
+      if (p < T.belt[0]) return well;
+      if (p < T.belt[1]) return seg(well, beltPose, T.belt);
+      if (p < T.below[1]) return seg(beltPose, below, T.below);
+      if (p < T.ins[1]) return seg(below, up, T.ins);
+      if (T.pull) { // ENGATILHAR: por cima do ferrolho → puxa para trás → solta → volta para a empunhadura
+        // mão por cima do ferrolho: a pegada de apoio de arma longa (buraco do punho ao longo do cano),
+        // virada de cabeça para baixo — palma em cima do ferrolho, dedos fechando dos lados
+        const sg = spec.slideGrab, qOver = new THREE.Quaternion().setFromAxisAngle(V(0, 0, 1), Math.PI).multiply(eulerQ([0, -1.5708, 3.1416]));
+        const at = (d, c) => { const h = this.gripHand({ p: sg, q: qOver }, d, 1); return { p: h.p, q: h.q, c }; };
+        const shut = [0.82, 0.88, 0.88, 0.85];
+        const over = at(V(0, 0.05, 0.01), open);
+        const grabS = at(V(0, 0, 0), shut);
+        const pulled = at(V(0, 0, 0.045), shut);
+        const letGo = at(V(-0.01, 0.05, 0.06), open);
+        if (p < T.reach[0]) return up;
+        if (p < T.reach[1]) { const u = smooth(ramp(p, T.reach[0], T.reach[1])); return u < 0.6 ? mixH(up, over, u / 0.6) : mixH(over, grabS, (u - 0.6) / 0.4); }
+        if (p < T.pull[1]) return seg(grabS, pulled, T.pull);
+        if (p < T.release[1]) return seg(pulled, letGo, T.release);
+        if (p < T.back[0]) return letGo;
+        return seg(letGo, gripPose, T.back);
+      }
+      if (p < T.back[0]) return up;
+      return seg(up, gripPose, T.back);
     }
     if (spec.reload === 'revolver') {
       const drum = mk(rest(V(0, -0.075, 0.0)), qOpen, grab);
@@ -715,13 +747,17 @@ export class ViewModel {
   }
   applyReloadParts(spec, parts, p, weight) {
     if (spec.reload === 'mag' && parts.mag) {
-      // carregador: cai (0.3–0.42), some, reaparece entrando (0.62–0.78)
-      const drop = smooth(ramp(p, 0.3, 0.46));
-      const ins = smooth(ramp(p, 0.62, 0.77));
+      // carregador: cai, some, reaparece entrando
+      const T = this.magTimeline(spec);
+      const drop = smooth(ramp(p, T.drop[0], T.drop[1]));
+      const ins = smooth(ramp(p, T.ins[0], T.ins[1] + 0.01));
       const m = parts.mag;
-      if (p < 0.62) { m.visible = p < 0.46 && weight > 0.01; m.position.set(0.0, -0.32 * drop, 0.05 * drop); m.rotation.set(0.9 * drop, 0, 0.5 * drop); }
-      else { m.visible = true; m.position.set(0, -0.14 * (1 - ins), 0); m.rotation.set(0, 0, 0); }
-      if (parts.slide && spec.id === 'pistola') {
+      if (p < T.ins[0]) { m.visible = p < T.drop[1] && weight > 0.01; m.position.set(0.0, -0.32 * drop, 0.05 * drop); m.rotation.set(0.9 * drop, 0, 0.5 * drop); }
+      else { m.visible = !(spec.magHidden && p > T.ins[1] + 0.02); m.position.set(0, -0.14 * (1 - ins), 0); m.rotation.set(0, 0, 0); }
+      if (parts.slide && T.pull) { // ferrolho acompanha a mão para trás e bate para a frente ao soltar
+        const back = p < T.pull[0] ? 0 : p < T.pull[1] ? smooth(ramp(p, T.pull[0], T.pull[1])) : 1 - ramp(p, T.release[0], T.release[0] + 0.012);
+        parts.slide.position.z = Math.max(parts.slide.position.z, back * 0.045 * weight);
+      } else if (parts.slide && spec.id === 'pistola') {
         const sl = Math.sin(Math.PI * ramp(p, 0.8, 0.92));
         parts.slide.position.z = Math.max(parts.slide.position.z, sl * 0.04);
       }
@@ -749,7 +785,7 @@ export class ViewModel {
     }
     if (!spec || reloadP < 0 || wt.reload < 0.1) return;
     const p = reloadP;
-    if (spec.reload === 'mag' && p > 0.5 && p < 0.77) this.heldMag.visible = true;
+    if (spec.reload === 'mag') { const T = this.magTimeline(spec); if (p > T.held[0] && p < T.held[1]) this.heldMag.visible = true; }
     else if (spec.reload === 'revolver' && p > 0.64 && p < 0.84) this.heldLoader.visible = true;
     else if (spec.reload === 'shotgun' && p > 0.1 && p < 0.82) {
       const u = ((p - 0.1) / 0.72) * 3, f = u - Math.floor(u);

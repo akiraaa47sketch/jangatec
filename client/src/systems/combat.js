@@ -24,6 +24,19 @@ export const WEAPONS = [
   { id: 'rifle_precisao', nome: 'Rifle de precisão', stars: 5, dmg: 70, mag: 5, rate: 0.9, spread: 0.001, range: 240, reload: 2.6, recoil: 0.07, pellets: 1, ammo: 'municao', durability: 240, color: 0x292f33, scale: [0.75, 0.8, 2] },
 ];
 
+// RARIDADE de cada arma achada: 1★ comum … 4★ épica. Mesma arma, mais estrelas = um pouco mais forte
+// (dano) e mais precisa. A raridade vem na chave do item: arma_pistola_r3. Sem sufixo = sorteada pela zona.
+export const MAX_RAR = 4;
+export const RAR_DMG = [1, 1, 1.1, 1.2, 1.32];
+export const RAR_SPREAD = [1, 1, 0.93, 0.86, 0.78];
+export const RAR_NAME = ['', 'Comum', 'Incomum', 'Rara', 'Épica'];
+export const starsTxt = (r) => '★'.repeat(r) + '☆'.repeat(Math.max(0, MAX_RAR - r));
+export function parseWeaponKey(k) {
+  const m = /^arma_(.+?)(?:_r([1-4]))?$/.exec(k);
+  return m ? { id: m[1], rar: m[2] ? Number(m[2]) : 0 } : null;
+}
+export { rollRarity } from './loot.js'; // chance de cada raridade por zona (fica no loot.js: o servidor também usa)
+
 // recuo por arma: [sobe (rad), lado (rad)]
 const RECOIL = { minigun: [0.012, 0.012], pistola: [0.075, 0.024], revolver: [0.08, 0.02], escopeta: [0.12, 0.035], rifle: [0.03, 0.016], rifle_precisao: [0.15, 0.025] };
 const GUN_SOUND = { minigun: 'rifle', pistola: 'pistol', revolver: 'revolver', escopeta: 'shotgun', rifle: 'rifle', rifle_precisao: 'sniper' };
@@ -38,6 +51,7 @@ export class Combat {
     this.hotbar = [null, null, null, null, null, null];
     this.owned = new Set();
     this.durability = {};
+    this.rarity = {}; // id da arma -> 1..4 estrelas
     this.cooldown = 0;
     this.reloading = 0;
     this.aiming = false;
@@ -52,12 +66,14 @@ export class Combat {
   }
 
   get weapon() { return WEAPONS.find((w) => w.id === this.weaponId) || null; }
+  rarOf(id) { return this.rarity[id] || 1; }
+  dmgOf(w) { return w.dmg * RAR_DMG[this.rarOf(w.id)]; }
 
   startWithRandomImprovisedWeapon() {
     this.weaponId = null;
     this.hotbar.fill(null);
     this.owned.clear();
-    this.durability = {};
+    this.durability = {}; this.rarity = {};
     for (const id of Object.keys(this.mags)) this.mags[id] = 0;
     const id = STARTER_WEAPONS[Math.floor(Math.random() * STARTER_WEAPONS.length)];
     this.unlockWeapon(id);
@@ -65,10 +81,16 @@ export class Combat {
     return id;
   }
 
-  unlockWeapon(id) {
+  // rar = estrelas da arma achada. Já tem essa arma? Fica com a de mais estrelas ('upgrade').
+  unlockWeapon(id, rar = 1) {
     const weapon = WEAPONS.find((w) => w.id === id);
     if (!weapon) return false;
-    if (this.owned.has(id)) return 'owned';
+    rar = Math.max(1, Math.min(MAX_RAR, rar | 0 || 1));
+    if (this.owned.has(id)) {
+      if (rar > this.rarOf(id)) { this.rarity[id] = rar; return 'upgrade'; }
+      return 'owned';
+    }
+    this.rarity[id] = rar;
     this.owned.add(id);
     const slot = this.hotbar.indexOf(null);
     if (slot >= 0) this.hotbar[slot] = id;
@@ -111,7 +133,7 @@ export class Combat {
     if (!this.owned.has(id)) return false;
     const w = WEAPONS.find((e) => e.id === id), inv = this.G.survival.inv;
     if (w && w.ammo && this.mags[id]) { inv[w.ammo] = (inv[w.ammo] || 0) + this.mags[id]; this.mags[id] = 0; }
-    this.owned.delete(id);
+    this.owned.delete(id); delete this.rarity[id];
     const i = this.hotbar.indexOf(id);
     if (i >= 0) this.hotbar[i] = null;
     if (this.weaponId === id) {
@@ -180,7 +202,7 @@ export class Combat {
     for (const e of G.enemies.list) {
       const dx = e.body.pos.x - _m.x, dz = e.body.pos.z - _m.z, d = Math.hypot(dx, dz);
       if (d - (e.def.hitR || 0) < w.range && (d < 0.8 || (dx * fx + dz * fz) / d > 0.2) && Math.abs(e.body.pos.y - (_m.y - 1.3)) < 2) {
-        G.enemies.damage(e, w.dmg);
+        G.enemies.damage(e, Math.round(this.dmgOf(w)));
         hits++;
       }
     }
@@ -219,7 +241,7 @@ export class Combat {
     // 1ª pessoa: o rastro sai da boca da arma na tela; 3ª pessoa: da boca do cano do modelo
     let origin = vm ? vm.muzzleWorld(_mw) : _m;
     if (!vm && G.player.flashMesh) origin = G.player.flashMesh.getWorldPosition(_mw);
-    const spread = w.spread * (this.aiming ? 0.4 : 1);
+    const spread = w.spread * RAR_SPREAD[this.rarOf(w.id)] * (this.aiming ? 0.4 : 1);
     cam.getWorldPosition(_o);
     const targets = G.enemies.hitMeshes.concat(G.solids), ends = [];
     for (let i = 0; i < w.pellets; i++) {
@@ -231,7 +253,7 @@ export class Combat {
       this.ray.far = w.range + G.player.camDist;
       const hit = this.ray.intersectObjects(targets, false)[0];
       const end = hit ? hit.point.clone() : _o.clone().addScaledVector(_dir, w.range);
-      if (hit && hit.object.userData.enemy) G.enemies.damage(hit.object.userData.enemy, Math.round(w.dmg * G.survival.dmgMul));
+      if (hit && hit.object.userData.enemy) G.enemies.damage(hit.object.userData.enemy, Math.round(this.dmgOf(w) * G.survival.dmgMul));
       this.tracer(origin.clone(), end); ends.push(end);
     }
     if (G.enemyNet) G.enemyNet.playerShot(origin, ends, w.id, GUN_SOUND[w.id] || 'pistol'); // os aliados veem e ouvem o tiro

@@ -12,6 +12,7 @@ import { SHIP } from '../world/navalmodels.js';
 import { SIEGE } from './siege.js';
 const SIEGE_MORTAR = () => SIEGE.mortar;
 import { ZONES, zoneOf } from './zones.js';
+import { rollRarity } from './loot.js';
 import { sfx } from '../core/sfx.js';
 
 export const ENEMY_TYPES = {
@@ -365,7 +366,7 @@ export class Enemies {
       const sabre = dropChance && Math.random() < dropChance;
       if (by === 'L' || !G.net.online) { // o loot vai para quem matou
         this.G.hud.msg(`${e.def.nome} derrotado` + (loot ? '  ' + this.G.survival.add(loot) : ''));
-        if (sabre && !this.G.combat.owned.has('sabre') && this.G.combat.unlockWeapon('sabre') === true) this.G.hud.msg('Você pegou um Sabre pirata ★★★!');
+        if (sabre && !this.G.combat.owned.has('sabre') && this.G.combat.unlockWeapon('sabre', rollRarity(e.isl ? e.isl.diff || 0 : 0) + 1) === true) this.G.hud.msg(`Você pegou um Sabre pirata ${'★'.repeat(this.G.combat.rarOf('sabre'))}!`);
       } else this.G.hud.msg(`${e.def.nome} derrotado`);
       if (e.def.boss && G.drops) { // chefe: saco de loot no chão para quem pegar primeiro
         G.drops.dropAt(e.body.pos, bossLoot(e.def.boss));
