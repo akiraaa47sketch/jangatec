@@ -23,7 +23,7 @@ import { WORLD_LOOT_PARAMS } from './loot.js';
 export const EVENT_WEIGHT = { peixes: 0.2, aguasvivas: 0.8, acampamento: 0.9 };
 export const EVENT_BALANCE = {
   first: [50, 90],           // s depois da partida até o primeiro evento (cai no 1º mar cheio)
-  interval: [130, 210],      // s entre o fim de um evento e o próximo (antes 60–115: frequente demais)
+  interval: [100, 165],      // s entre o fim de um evento e o próximo (antes 130–210)
   // onda gigante: uma MURALHA de água (fora da escala real, de propósito) — 16–24 m de altura
   tsunami: { speed: [15, 20], startDist: 380, A: [16, 24], sigma: [22, 30], damage: 22, knock: 8.5 },
   // R = raio do redemoinho, depth = fundura do funil d'água, pull = puxão (m/s), swirl = giro (m/s)

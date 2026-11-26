@@ -252,10 +252,8 @@ export class Startup {
     this.hemisphere.intensity = 1.15 - storm * 0.55;
     if (G.sunVisual) G.sunVisual.setStorm(storm);
     if (G.extra) G.extra.applyWeather(t); // neblina, areia e o céu escuro das águas-vivas
-    const swell = this.departed && this.waterLevel > 0.5 ? swellAt(t) : 0;
-    if (swell > 0.35 && !this.swellOn) G.hud.msg('Ondas grandes chegando — segure-se!');
-    this.swellOn = swell > 0.35 ? true : swell < 0.1 ? false : this.swellOn;
-    sea.amp = 1 + storm * 0.7 + swell + (this.departed ? 0.3 : 0); // depois da partida o mar nunca fica liso
+    // (o marulho de "ondas grandes" saiu: só avisava e quase não mudava o mar)
+    sea.amp = 1 + storm * 0.7 + (this.departed ? 0.3 : 0); // depois da partida o mar nunca fica liso
     if (G.boat.sailInstalled) G.boat.sailGroup.rotation.z = Math.sin(t * 6) * storm * 0.045;
 
     // chuva e nuvens em volta de quem está olhando (na cutscene a câmera está longe do jogador)

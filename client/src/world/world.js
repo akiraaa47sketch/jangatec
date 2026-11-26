@@ -109,6 +109,9 @@ export const DEBRIS = [
   // flutuadores: ajudam a jangada a boiar (embaixo do convés)
   { nome: 'Barril', w: 2, real: true, pieceType: 'bloco', size: [1.3, 1.3, 1.3], make: () => { const g = new THREE.Group(); const m = new THREE.Mesh(new THREE.CylinderGeometry(0.55, 0.55, 1.3, 14), plankMat(0x7a4f2a)); m.rotation.z = Math.PI / 2; g.add(m); for (const x of [-0.45, 0.45]) { const hoop = new THREE.Mesh(new THREE.TorusGeometry(0.555, 0.03, 4, 18), M(0x4b4f55, { metalness: 0.7 })); hoop.rotation.y = Math.PI / 2; hoop.position.x = x; g.add(hoop); } return g; } },
   { nome: 'Boia', w: 1, real: true, pieceType: 'bloco', size: [1.1, 1.1, 1.1], make: () => { const g = new THREE.Group(); const b = new THREE.Mesh(new THREE.SphereGeometry(0.55, 16, 12), M(0xf07a1e, { roughness: 0.6 })); g.add(b); const band = new THREE.Mesh(new THREE.TorusGeometry(0.55, 0.045, 6, 20), M(0xf3efe6)); band.rotation.x = Math.PI / 2; g.add(band); return g; } },
+  // pranchões longos: 6 × 2 m e 5 × 3 m (bons para alongar a jangada ou fazer pontes)
+  { nome: 'Prancha de madeira 6×2', w: 4, real: true, pieceType: 'piso', size: [2, 0.15, 6], make: (r) => plankFloor(2, 6, r) },
+  { nome: 'Madeira 5×3', w: 3, real: true, pieceType: 'piso', size: [3, 0.15, 5], make: (r) => plankFloor(3, 5, r) },
   { nome: 'Palete', w: 2, real: true, pieceType: 'piso', size: [1.6, 0.2, 1.3], make: (r) => { const g = new THREE.Group(), m = plankMat(WOOD[(r() * 4) | 0]); for (let i = -2; i <= 2; i++) { const s = box(1.6, 0.04, 0.2, m); s.position.set(0, 0.08, i * 0.27); g.add(s); } for (const x of [-0.7, 0, 0.7]) { const run = box(0.14, 0.13, 1.3, plankMat(WOOD[3])); run.position.set(x, -0.03, 0); g.add(run); } return g; } },
 ];
 // Paredes bem maiores (largura × 1,45, altura × 1,35); vigas, guarda-corpo e escada +8%.

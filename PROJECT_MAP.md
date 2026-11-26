@@ -28,7 +28,7 @@ Regra: **leituras de input (`mouse.dx`, `hit()`) só valem até `endFrame`** —
 | Câmera 1ª/3ª pessoa, mira, FOV | `player/player.js` → `updateFirstPersonCamera` / `updateCamera` |
 | Movimento, pulo, parkour (mantle) | `player/player.js` → `update`, `tryMantle` |
 | Modelo 3ª pessoa / animações Mixamo | `player/castaway.js`, `player/model.js` (placeholder + remotos) |
-| Construção física (pegar/girar/soldar) | `build/build.js` (+ `world/physics.js` p/ corpos e juntas) |
+| Construção física (pegar/girar/soldar) | `build/build.js` (+ `build/weldgraph.js` solda em grafo/fatias, `world/physics.js` p/ corpos e juntas) |
 | Peças do barco | `boat/pieces.js` (catálogo) e `boat/boat.js` |
 | Inimigos / piratas | `systems/enemies.js` → `ENEMY_TYPES`, FSM em `think`, piratas `updatePirate*` |
 | Mundo procedural / ilhas / caixas | `world/world.js` (`makeChunk`, `makeIsland`) |
@@ -57,7 +57,7 @@ Convenção das armas: origem na empunhadura, cano em **-Z**, +Y cima, +X direit
 - `camPitch` positivo = olhar para BAIXO. Frente da câmera = `(-sin yaw, -sin pitch, -cos yaw)`.
 - Quem está a bordo é filho de `boat.group`; posições a bordo trafegam na rede em coordenadas locais do barco.
 - Geração por chunk consome o RNG sempre na mesma ordem (determinismo por seed).
-- Arquivos com **CRLF**: `systems/combat.js`, `player/castaway.js`, `build/build.js`, `systems/loot.js` — ao editar por script, preserve.
+- Arquivos com **CRLF**: `systems/combat.js`, `player/castaway.js`, `systems/loot.js` — ao editar por script, preserve.
 - Abrir `index.html` por `file://` não funciona (ES modules): use o servidor do Vite.
 
 ## 6b. Gráficos (convenções)

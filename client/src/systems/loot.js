@@ -36,7 +36,7 @@ export function seabedCratesFor(seed, cx, cz) {
 // CANHÕES E ARPÕES NO FUNDO DO MAR: ficam jogados no chão da seca (meio enterrados) e se pegam com E
 // quando o mar baixa. Canhão improvisado em qualquer lugar; canhão de ferro do meio da rota em diante
 // (região 2+); torreta-arpão a partir da região 1. Por chunk de 90 m (fora de ilhas e da largada).
-export const SEABED_FINDS = { canhao: 0.1, canhao_ferro: 0.06, gancho: 0.06 };
+export const SEABED_FINDS = { canhao: 0.14, canhao_ferro: 0.06, gancho: 0.06 };
 export function seabedFindsFor(seed, cx, cz) {
   if (Math.abs(cx) + Math.abs(cz) <= 1 || chunkHasIsland(seed, cx, cz)) return [];
   const r = mulberry32(hash2(seed ^ 0x5be0cd19, cx, cz)), S = WORLD_LOOT_PARAMS.chunkSize, out = [];

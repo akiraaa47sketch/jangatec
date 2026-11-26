@@ -192,3 +192,48 @@ export function orientedBox(x, y, z, hx, hy, hz, yaw = 0, rotX = 0, rotZ = 0, ty
   const proj = (e) => axes.reduce((acc, v, i) => acc + Math.abs(v[0] * e[0] + v[1] * e[1] + v[2] * e[2]) * half[i], 0);
   return { type: 'box', x, y, z, hx: proj(ex), hy: proj([0, 1, 0]), hz: proj(ez), yaw: a };
 }
+
+// Peça INCLINADA vira várias fatias horizontais (cada uma = caixa justa daquele trecho), em vez de
+// uma caixa única que engloba tudo (antes uma parede tombada ou tábua em rampa ganhava uma caixa
+// enorme e invisível). Sem inclinação devolve a caixa simples de orientedBox.
+export function orientedBoxes(x, y, z, hx, hy, hz, yaw = 0, rotX = 0, rotZ = 0, type = 'box') {
+  const single = orientedBox(x, y, z, hx, hy, hz, yaw, rotX, rotZ, type);
+  if (single.type !== 'box' || !(rotX || rotZ) || type === 'ramp' || type === 'cyl') return [single];
+  const tilt = (a) => { const m = Math.abs(a) % Math.PI; return Math.min(m, Math.PI - m); };
+  if (tilt(rotX) < 0.02 && tilt(rotZ) < 0.02) return [single];
+  const cy = Math.cos(yaw), sy = Math.sin(yaw), cx = Math.cos(rotX), sx = Math.sin(rotX), cz = Math.cos(rotZ), sz = Math.sin(rotZ);
+  const R = [
+    [cy * cz + sy * sx * sz, -cy * sz + sy * sx * cz, sy * cx],
+    [cx * sz, cx * cz, -sx],
+    [-sy * cz + cy * sx * sz, sy * sz + cy * sx * cz, cy * cx],
+  ];
+  const half = [hx, hy, hz], corners = [];
+  for (let i = 0; i < 8; i++) {
+    const s = [i & 1 ? 1 : -1, i & 2 ? 1 : -1, i & 4 ? 1 : -1];
+    corners.push([0, 1, 2].map((r) => [x, y, z][r] + R[r][0] * s[0] * half[0] + R[r][1] * s[1] * half[1] + R[r][2] * s[2] * half[2]));
+  }
+  const edges = [];
+  for (let i = 0; i < 8; i++) for (const b of [1, 2, 4]) if (!(i & b)) edges.push([corners[i], corners[i | b]]);
+  let y0 = Infinity, y1 = -Infinity;
+  for (const c of corners) { y0 = Math.min(y0, c[1]); y1 = Math.max(y1, c[1]); }
+  const a = single.yaw, ex = [Math.cos(a), -Math.sin(a)], ez = [Math.sin(a), Math.cos(a)];
+  const n = clamp(Math.ceil((y1 - y0) / 0.28), 1, 10), dh = (y1 - y0) / n, out = [];
+  for (let k = 0; k < n; k++) {
+    const lo = y0 + dh * k, hi = lo + dh, pts = [];
+    for (const c of corners) if (c[1] >= lo - 1e-6 && c[1] <= hi + 1e-6) pts.push(c);
+    for (const [p, q] of edges) for (const h of [lo, hi]) {
+      if ((p[1] - h) * (q[1] - h) > 0 || Math.abs(q[1] - p[1]) < 1e-9) continue;
+      const t = (h - p[1]) / (q[1] - p[1]); pts.push([p[0] + (q[0] - p[0]) * t, h, p[2] + (q[2] - p[2]) * t]);
+    }
+    if (pts.length < 2) continue;
+    let u0 = Infinity, u1 = -Infinity, v0 = Infinity, v1 = -Infinity;
+    for (const p of pts) {
+      const u = p[0] * ex[0] + p[2] * ex[1], v = p[0] * ez[0] + p[2] * ez[1];
+      u0 = Math.min(u0, u); u1 = Math.max(u1, u); v0 = Math.min(v0, v); v1 = Math.max(v1, v);
+    }
+    const uc = (u0 + u1) / 2, vc = (v0 + v1) / 2;
+    out.push({ type: 'box', x: ex[0] * uc + ez[0] * vc, y: (lo + hi) / 2, z: ex[1] * uc + ez[1] * vc,
+      hx: Math.max(0.03, (u1 - u0) / 2), hy: dh / 2, hz: Math.max(0.03, (v1 - v0) / 2), yaw: a });
+  }
+  return out.length ? out : [single];
+}

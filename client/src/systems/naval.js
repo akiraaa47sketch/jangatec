@@ -381,9 +381,11 @@ export class Naval {
     if (Math.hypot(lx, lz) > boat.set.radius + 1 || ly < -1.4 || ly > 6.5) return null;
     let best = null;
     for (const piece of boat.pieces.values()) {
-      const c = piece.col; if (!c) continue;
-      const [px, pz] = rot(lx - c.x, lz - c.z, -(c.yaw || 0));
-      if (Math.abs(px) < c.hx + 0.22 && Math.abs(ly - c.y) < c.hy + 0.22 && Math.abs(pz) < c.hz + 0.22) { best = piece; break; }
+      for (const c of piece.cols || (piece.col ? [piece.col] : [])) {
+        const [px, pz] = rot(lx - c.x, lz - c.z, -(c.yaw || 0));
+        if (Math.abs(px) < c.hx + 0.22 && Math.abs(ly - c.y) < c.hy + 0.22 && Math.abs(pz) < c.hz + 0.22) { best = piece; break; }
+      }
+      if (best) break;
     }
     // barris flutuadores / casco: conta como acerto na peça mais próxima
     if (!best && ly < 0.2 && Math.hypot(lx, lz) < boat.set.radius * 0.9) {
@@ -453,9 +455,11 @@ export class Naval {
       const obj = piece.physObj;
       G.build.tryRemoveWelded(id); // vira destroço solto (avisando a sala)
       if (obj.body) { obj.body.velocity.set((Math.random() - 0.5) * 4, 4, (Math.random() - 0.5) * 4); obj.body.angularVelocity.set(Math.random() * 3, Math.random() * 3, Math.random() * 3); }
+      G.build.splitOrphans(); // o que ficou sem ligação com a jangada se solta junto (fatia inteira)
     } else {
       G.boat.removePiece(id);
       G.net.send({ t: 'remove', id });
+      G.build.splitOrphans();
     }
     this.G.hud.msg('Uma peça da jangada foi destruída!');
     this.boom.spawn(wp, 0.7);

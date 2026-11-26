@@ -206,7 +206,7 @@ export class Melee {
     this.combo = heavy ? 0 : (step + 1) % 3; this.comboT = MELEE.light.window;
     // golpes rápidos; o combo alterna corte direita/revés e fecha com um final variado
     // golpe com um leve atraso (peso da arma): o leve leva ~0,3 s e o impacto vem perto da metade
-    const dur = heavy ? clamp(w.rate * 1.05, 0.42, 0.6) : clamp(w.rate * (finisher ? 0.82 : 0.68), 0.27, 0.44);
+    const dur = heavy ? clamp(w.rate * 1.15, 0.5, 0.68) : clamp(w.rate * (finisher ? 0.82 : 0.68), 0.27, 0.44);
     const pick = (l) => l[(Math.random() * l.length) | 0];
     let pose = heavy ? 'heavyStrike' : finisher ? pick(['thrust', 'uppercut', 'spin']) : step === 0 ? 'slashR' : 'slashL';
     if (w.tool === 'martelo') pose = heavy ? 'slam' : 'hammer'; // martelo: marteladas de cima para baixo

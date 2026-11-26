@@ -219,7 +219,7 @@ export class Hud {
     crosshair.style.display = G.naval && G.naval.manning ? 'none' : '';
     const carryText = !build.active ? '' : build.rotating
       ? `${build.held.def.nome} · arraste anel · botão direito: câmera · [${keyOf('gizmo')}] voltar · [${keyOf('weld')}] solda · Esc cancela`
-      : `${build.held.def.nome} · roda gira · [${keyOf('straighten')}] endireita · [${keyOf('resetPos')}] reposiciona · [${keyOf('place')}] solta · [${keyOf('gizmo')}] gizmo · [${keyOf('weld')}] solda · [${keyOf('assist')}] encaixe · Esc cancela`;
+      : `${build.held.def.nome} · roda aproxima/afasta · Shift+roda/[${keyOf('turn')}] gira · [${keyOf('tilt')}] inclina · [${keyOf('straighten')}] endireita · [${keyOf('resetPos')}] reposiciona · [${keyOf('place')}] solta · [${keyOf('gizmo')}] gizmo · [${keyOf('weld')}] solda · [${keyOf('assist')}] encaixe · Esc cancela`;
 
     const it = G.interact.current;
     const pickupText = build.pickupTarget
