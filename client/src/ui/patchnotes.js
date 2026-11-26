@@ -5,6 +5,12 @@
 // Nos textos, **assim** vira negrito.
 export const PATCH_NOTES = [
   {
+    id: '0.34', versao: 'v0.34', data: '26/11/2026', titulo: 'Menos engasgos',
+    secoes: [
+      { icone: '⚙', nome: 'Desempenho', itens: ['**Reflexo em tempo real**: desenha um lado do cubo por quadro (antes a cena inteira 6× de uma vez a cada 0,8 s — um engasgo periódico).', '**Ilhas novas** carregam mais leve: altura do fundo do mar **~9× mais rápida**, texturas e corpo dos inimigos reaproveitados, caixas iguais com a mesma geometria.', 'Materiais de cada trecho novo são **compilados em segundo plano** antes de aparecer (o trecho carrega longe, na neblina).', 'Sem a checagem de erro de shader, que travava o quadro esperando cada compilação.', '**Vazamento de memória**: ilhas e naufrágios que saíam do alcance não liberavam a memória de vídeo — numa viagem longa ela ia enchendo.', 'Sombras de objetos novos não forçam mais recompilar materiais compartilhados.'] },
+    ],
+  },
+  {
     id: '0.33', versao: 'v0.33', data: '26/11/2026', titulo: 'Build refeita, solda em grafo e agachar',
     destaques: [
       { tag: 'Construção', titulo: 'Solda peça com peça', texto: 'Cada peça fica soldada **nas peças que ela toca**. Se uma peça quebrar e **partir a jangada**, o pedaço que ficou sem ligação **se solta inteiro**: a fatia continua soldada e boia separada.' },

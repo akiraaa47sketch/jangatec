@@ -26,7 +26,20 @@ const WOOD = [0x9b7242, 0x86623a, 0xb08a55, 0x6f5231];
 export const ISLAND_AVOID = { fullLevel: 0.9, depth: 1.25, soft: 10, push: 3.2, slide: 0.9 };
 const SAND = { 7.5: 0x9a8d68, 6: 0xab9c72, 4.5: 0xbcab7c, 3: 0xcdb986, 2.2: 0xb3a275, 1.5: 0xd8c48e, 1.1: 0xcdb986, 0.5: 0xe0cc96, 0.4: 0xd8c48e, 0: 0xdcc891 };
 // UVs em escala de mundo: texturas mantêm o mesmo tamanho em qualquer caixa.
-const box = (w, h, l, mat) => new THREE.Mesh(scaleBoxUVs(new THREE.BoxGeometry(w, h, l), w, h, l), mat);
+// Caixas do mesmo tamanho reaproveitam a geometria (as ilhas repetem muitas paredes/tábuas iguais).
+const _boxGeo = new Map();
+const box = (w, h, l, mat) => {
+  const k = `${w.toFixed(3)},${h.toFixed(3)},${l.toFixed(3)}`;
+  let g = _boxGeo.get(k);
+  if (!g) { g = scaleBoxUVs(new THREE.BoxGeometry(w, h, l), w, h, l); _boxGeo.set(k, g); }
+  const m = new THREE.Mesh(g, mat); m.userData.sharedGeo = true; return m;
+};
+// Libera da memória de vídeo as geometrias de algo que saiu do alcance (ilha, naufrágio, estrutura).
+// Antes só tirava da cena: numa viagem longa a memória de vídeo ia enchendo.
+function disposeGeometries(root) {
+  if (!root) return;
+  root.traverse((o) => { if ((o.isMesh || o.isLine || o.isPoints) && o.geometry && !o.userData.sharedGeo) o.geometry.dispose(); });
+}
 let SHARED = null; // materiais texturizados compartilhados pelas ilhas
 function shared() {
   if (SHARED) return SHARED;
@@ -178,6 +191,21 @@ export class World {
   }
   difficulty(x, z) { return Math.min(4, Math.floor(Math.hypot(x, z) / WORLD_LOOT_PARAMS.diffStep)); }
 
+  // Compila os materiais do que acabou de ser criado em segundo plano e só mostra quando estiver
+  // pronto (os trechos carregam longe, na neblina). Antes os shaders novos eram compilados no primeiro
+  // desenho, travando o quadro.
+  _compileHidden(objs) {
+    const G = this.G, r = G.renderer;
+    if (!r || !r.compileAsync) return;
+    for (const o of objs) {
+      if (!o || !o.visible) continue;
+      o.visible = false;
+      let shown = false; const show = () => { if (!shown) { shown = true; o.visible = true; } };
+      try { r.compileAsync(o, G.camera, G.scene).then(show, show); } catch { show(); }
+      setTimeout(show, 1500); // garantia: nunca fica escondido
+    }
+  }
+
   ensureStarterIsland() {
     const key = '0,1';
     if (!this.chunks.has(key)) this.chunks.set(key, this.makeChunk(0, 1));
@@ -229,7 +257,11 @@ export class World {
       const d = i * i + j * j;
       if (d < bd) { bd = d; best = [key, ccx + i, ccz + j]; }
     }
-    if (best) this.chunks.set(best[0], this.makeChunk(best[1], best[2]));
+    if (best) {
+      const ch = this.makeChunk(best[1], best[2]);
+      this.chunks.set(best[0], ch);
+      this._compileHidden([ch.seabed, ch.island && ch.island.group, ch.wreck && ch.wreck.group, ch.site && ch.site.group]);
+    }
     this.farSeabed.position.set(pp.x, this.farSeabed.position.y, pp.z);
     this.farSeabed.visible = (G.startup ? G.startup.waterLevel : 1) < -3; // só faz falta com o mar seco
     for (const [key, ch] of this.chunks) {
@@ -900,7 +932,7 @@ export class World {
     for (const f of ch.finds || []) { G.scene.remove(f.mesh); const i = this.finds.indexOf(f); if (i >= 0) this.finds.splice(i, 1); }
     if (ch.wreck) {
       const w = ch.wreck;
-      G.physics.removeStaticSet(w.set); G.colliders.removeSet(w.set); G.scene.remove(w.group);
+      G.physics.removeStaticSet(w.set); G.colliders.removeSet(w.set); G.scene.remove(w.group); disposeGeometries(w.group);
       for (const c of w.crates) { const i = this.crates.indexOf(c); if (i >= 0) this.crates.splice(i, 1); }
       this.wrecks.splice(this.wrecks.indexOf(w), 1);
     }
@@ -918,6 +950,7 @@ export class World {
     const G = this.G;
     G.physics.removeStaticSet(isl.set);
     G.scene.remove(isl.group);
+    disposeGeometries(isl.group);
     G.colliders.removeSet(isl.set);
     for (const m of isl.solids) { const i = G.solids.indexOf(m); if (i >= 0) G.solids.splice(i, 1); }
     for (const c of isl.crates) { const i = this.crates.indexOf(c); if (i >= 0) this.crates.splice(i, 1); }

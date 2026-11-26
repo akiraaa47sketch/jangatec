@@ -38,17 +38,32 @@ export class Reflections {
     this.probe = { rt, cam, size: cfg.size };
     this.probeT = 0;
   }
+  // Desenha UM lado do cubo por quadro (6 quadros por foto completa). Antes os 6 lados saíam de uma
+  // vez: a cena inteira desenhada 6× no mesmo quadro, a cada ~0,8 s — um engasgo periódico.
   _renderProbe() {
-    const G = this.G, r = G.renderer, p = this.probe, boat = G.boat;
-    p.cam.position.set(boat.x, boat.set.y + 1.6, boat.z);
+    const G = this.G, r = G.renderer, p = this.probe, boat = G.boat, cam = p.cam;
+    if (!(p.face >= 0 && p.face < 6)) { // começo de uma foto nova
+      p.face = 0;
+      cam.position.set(boat.x, boat.set.y + 1.6, boat.z);
+      cam.updateMatrixWorld();
+      if (cam.coordinateSystem !== r.coordinateSystem) { cam.coordinateSystem = r.coordinateSystem; cam.updateCoordinateSystem(); }
+    }
     // a jangada e o jogador não aparecem no próprio reflexo
     const hide = [boat.group, G.player.mesh], was = hide.map((o) => o.visible);
     hide.forEach((o) => { o.visible = false; });
     const shadowUp = r.shadowMap.needsUpdate; r.shadowMap.needsUpdate = false;
-    p.cam.update(r, G.scene);
+    const prevRT = r.getRenderTarget(), prevFace = r.getActiveCubeFace(), prevMip = r.getActiveMipmapLevel(), xr = r.xr.enabled;
+    r.xr.enabled = false;
+    const tex = p.rt.texture, last = p.face === 5;
+    tex.mipmapsAutoUpdate = last; // os níveis de mipmap só no último lado (todos definidos)
+    r.setRenderTarget(p.rt, p.face, 0);
+    r.render(G.scene, cam.children[p.face]);
+    r.setRenderTarget(prevRT, prevFace, prevMip);
+    r.xr.enabled = xr;
     r.shadowMap.needsUpdate = shadowUp;
     hide.forEach((o, i) => { o.visible = was[i]; });
-    p.rt.texture.needsPMREMUpdate = true; // o three refaz os níveis de rugosidade a partir do cubo
+    p.face++;
+    if (last) tex.needsPMREMUpdate = true; // foto completa: o three refaz os níveis de rugosidade
   }
   envFor() { // mapa de ambiente para a jangada e os metais
     const mode = this.settings.reflect;
@@ -155,8 +170,12 @@ export class Reflections {
     // câmera de reflexo conforme a qualidade
     if (s.reflect !== this.mode) { this.mode = s.reflect; this._ensureProbe(s.reflect); this._scanT = 0; }
     if (this.probe) {
-      this.probeT -= dt;
-      if (this.probeT <= 0) { this.probeT = PROBE[this.mode].every; this._renderProbe(); }
+      const p = this.probe;
+      if (p.face >= 0 && p.face < 6) this._renderProbe(); // continua a foto em andamento (1 lado por quadro)
+      else {
+        this.probeT -= dt;
+        if (this.probeT <= 0) { this.probeT = PROBE[this.mode].every; p.face = -1; this._renderProbe(); }
+      }
     }
     const env = this.envFor();
     // de vez em quando procura peças novas na jangada e materiais metálicos novos no mundo

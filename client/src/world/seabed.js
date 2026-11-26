@@ -37,9 +37,11 @@ export const SEABED = { base: -4.6, min: -6.4, islandEdge: -1.9, starterEdge: -2
 
 // Ilha do chunk (mesma ordem de RNG de World.makeChunk/makeIsland).
 const islandCache = new Map();
+let lastSeed = null, lastStarter;
 function chunkIsland(seed, cx, cz) {
+  if (cx === 0 && cz === 1 && seed === lastSeed) return lastStarter; // caminho rápido (é sempre esta)
   const key = `${seed}:${cx},${cz}`;
-  if (islandCache.has(key)) return islandCache.get(key);
+  if (islandCache.has(key)) { const v = islandCache.get(key); if (cx === 0 && cz === 1) { lastSeed = seed; lastStarter = v; } return v; }
   let isl = null;
   if (cx !== 0 || cz !== 0) {
     const r = mulberry32(hash2(seed, cx, cz)), roll = r(), starter = cx === 0 && cz === 1;
@@ -66,13 +68,17 @@ export function seabedHeight(seed, x, z) {
     0.12 * Math.cos(x * 0.47 + z * 0.39);
   // valas longas e rasas
   h -= 0.7 * Math.max(0, Math.sin(x * 0.011 + z * 0.019 + ph) - 0.75) * 4;
+  // Só a ilha inicial (chunk 0,1) ainda levanta o fundo (as outras têm o próprio morro: World.seabedHeight).
+  // Antes esta função montava 9 chaves de texto e consultava o cache para cada ponto — e ela roda o
+  // tempo todo (terreno, colisão do chão, jangada, itens). Agora só olha a ilha inicial quando está perto.
   const cx = Math.round(x / S), cz = Math.round(z / S);
-  for (let i = -1; i <= 1; i++) for (let j = -1; j <= 1; j++) {
-    const isl = chunkIsland(seed, cx + i, cz + j);
-    if (!isl) continue;
-    const d = Math.hypot(x - isl.x, z - isl.z) - isl.R;
-    const k = smooth(1 - d / SEABED.slope);
-    if (k > 0) h = h + (isl.edge - h) * k;
+  if (cx >= -1 && cx <= 1 && cz >= 0 && cz <= 2) {
+    const isl = chunkIsland(seed, 0, 1);
+    if (isl) {
+      const d = Math.hypot(x - isl.x, z - isl.z) - isl.R;
+      const k = smooth(1 - d / SEABED.slope);
+      if (k > 0) h = h + (isl.edge - h) * k;
+    }
   }
   return Math.max(SEABED.min, h);
 }
