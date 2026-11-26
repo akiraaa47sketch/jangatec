@@ -533,7 +533,7 @@ SPECS.pistola = () => {
   };
 };
 
-SPECS.escopeta = () => {
+const proceduralEscopeta = () => {
   const g = new THREE.Group();
   add(g, box(0.048, 0.08, 0.22, MAT.black, 0, 0.012, -0.03));                  // caixa da culatra
   add(g, box(0.052, 0.012, 0.1, MAT.iron, 0, 0.056, -0.04));
@@ -563,6 +563,29 @@ SPECS.escopeta = () => {
     gripR: { p: [0, -0.075, 0.07], r: [0, 0, -1.55], c: 0.9, idx: 0.3, th: [-0.35, -0.2, 0.2] },
     gripL: { p: [0, -0.005, -0.3], r: [0, -1.5708, 3.1416], c: 0.8, th: [0.3, -0.3, 0.2] },
     magPoint: [0.0, -0.045, -0.06],
+    parts: { pump },
+  };
+};
+
+// Escopeta com o modelo 3D importado (Tripo, texturas PBR). A bomba de madeira é uma malha separada
+// que desliza no tubo ao bombear (parts.pump). Procedural enquanto o GLB não carrega.
+SPECS.escopeta = () => {
+  const m = gunModel('escopeta');
+  if (!m) return proceduralEscopeta();
+  const g = new THREE.Group(), pump = new THREE.Group();
+  g.add(m.group);
+  const node = m.parts.bomba;
+  if (node) { node.parent.add(pump); pump.add(node); }
+  const rdY = redDot(g, 0.064, -0.09);
+  const muzzle = new THREE.Vector3(0, 0.04, -0.65);
+  return {
+    group: g, type: 'long', reload: 'shotgun', muzzle, sightY: rdY, adsDist: 0.2, adsFov: 62, flash: 1.6,
+    eject: new THREE.Vector3(0.028, 0.045, -0.06),
+    hold: { p: [0.15, -0.12, -0.46], r: [0.03, 0.09, 0] },
+    // coronha reta: a mão fecha em volta do pescoço inclinado (gira para acompanhar a inclinação)
+    gripR: { p: [0, -0.014, 0.06], r: [-0.75, 0, -1.55], c: 0.9, idx: 0.3, th: [-0.35, -0.2, 0.2] },
+    gripL: { p: [0, 0.016, -0.31], r: [0, -1.5708, 3.1416], c: 0.85, th: [0.3, -0.3, 0.2] },
+    magPoint: [0.0, -0.01, -0.12],
     parts: { pump },
   };
 };

@@ -12,6 +12,7 @@ export const PATCH_NOTES = [
     ],
     secoes: [
       { icone: '★', nome: 'Raridade', itens: ['1★ comum · 2★ +10% · 3★ +20% · 4★ +32% de dano; a mira também abre menos.', 'As estrelas aparecem na caixa, na barra, no inventário e na arma largada no chão (ela guarda as estrelas).'] },
+      { icone: '🔫', nome: 'Escopeta nova', itens: ['**Modelo 3D novo da escopeta** (bomba de madeira, coronha entalhada, cano duplo): a bomba desliza de verdade ao bombear.', 'Pegada certa na coronha reta e mão de apoio em volta da bomba; na recarga a mão volta para a bomba antes de bombear.'] },
       { icone: '🖐', nome: '1ª pessoa', itens: ['Rifle e escopeta: punho mais fino — os dedos **não atravessam mais** a coronha.', 'Pistola: o carregador não fica mais saindo pelo punho.'] },
       { icone: '🧍', nome: '3ª pessoa', itens: ['O pulso gira de verdade: pistola em **baixo-pronto** apontando para a frente (antes apontava para o chão) e rifle atravessado no corpo (antes apontava para trás).', 'A **mão esquerda segura a arma** (rifle, escopeta e pistola na mira).', '**Recarga nova**: a arma sobe na frente do peito, o carregador cai, a mão vai ao cinto e volta; a pistola é engatilhada, o tambor do revólver abre, a escopeta bombeia.'] },
     ],

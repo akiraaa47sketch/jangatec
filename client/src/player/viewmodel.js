@@ -732,18 +732,20 @@ export class ViewModel {
       if (p < 0.86) return drum;
       return mixH(drum, gripPose, smooth(ramp(p, 0.86, 0.96)));
     }
-    // shotgun: 3 ciclos belt -> porta -> belt, depois bombeia
+    // shotgun: 3 ciclos belt -> porta -> belt, volta para a bomba e bombeia COM a mão nela
     const port = mk(this.weaponPoint(spec.magPoint, V(0, -0.02, 0.0)), qOpen, grab);
     const beltPose = mk(belt, qOpen, open);
+    const pz = spec.parts && spec.parts.pump ? spec.parts.pump.position.z : 0;
+    const onPump = this.gripHand(spec.gripL, V(0, 0, pz), 1), pumpPose = { p: onPump.p, q: onPump.q, c: gripPose.c };
     if (p < 0.1) return mixH(gripPose, beltPose, smooth(ramp(p, 0.0, 0.1)));
-    if (p < 0.82) {
-      const u = ((p - 0.1) / 0.72) * 3;
+    if (p < 0.74) {
+      const u = ((p - 0.1) / 0.64) * 3;
       const f = u - Math.floor(u);
       if (f < 0.4) return mixH(beltPose, port, smooth(ramp(f, 0, 0.4)));
       if (f < 0.6) return port;
       return mixH(port, beltPose, smooth(ramp(f, 0.6, 1)));
     }
-    return mixH(beltPose, gripPose, smooth(ramp(p, 0.82, 0.96)));
+    return mixH(beltPose, pumpPose, smooth(ramp(p, 0.74, 0.85)));
   }
   applyReloadParts(spec, parts, p, weight) {
     if (spec.reload === 'mag' && parts.mag) {
@@ -772,7 +774,7 @@ export class ViewModel {
       parts.drum.rotation.z = open * Math.PI * 2 * 1.5 + (p > 0.3 && p < 0.5 ? (p - 0.3) * 40 : 0);
       parts.drum.position.x = -0.045 * open;
     } else if (spec.reload === 'shotgun' && parts.pump) {
-      const sl = ramp(p, 0.84, 0.98);
+      const sl = ramp(p, 0.86, 0.98); // a mão já está na bomba (chega em 0,85)
       const back = smooth(ramp(sl, 0, 0.45)) - smooth(ramp(sl, 0.5, 1));
       parts.pump.position.z = back * 0.1;
     }
@@ -787,8 +789,8 @@ export class ViewModel {
     const p = reloadP;
     if (spec.reload === 'mag') { const T = this.magTimeline(spec); if (p > T.held[0] && p < T.held[1]) this.heldMag.visible = true; }
     else if (spec.reload === 'revolver' && p > 0.64 && p < 0.84) this.heldLoader.visible = true;
-    else if (spec.reload === 'shotgun' && p > 0.1 && p < 0.82) {
-      const u = ((p - 0.1) / 0.72) * 3, f = u - Math.floor(u);
+    else if (spec.reload === 'shotgun' && p > 0.1 && p < 0.74) {
+      const u = ((p - 0.1) / 0.64) * 3, f = u - Math.floor(u);
       this.heldShell.visible = f > 0.12 && f < 0.5;
     }
   }
