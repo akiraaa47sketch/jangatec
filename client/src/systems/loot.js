@@ -78,8 +78,8 @@ export const LOOT_CONFIG = {
     // ammo: [mín, máx] de munição; shellK: chance de vir cartucho no lugar de parte da munição
     // heal: chance de curativo; kitK: chance do curativo ser kit; extras: sorteios extras da tabela
     // weapon: chance de arma; rarity: estrelas da arma (1★…5★)
-    { ammo: [5, 8], shellK: 0, heal: 0.4, kitK: 0, extras: 0, foodN: 1, weapon: 0.16, rarity: [0.7, 0.3, 0, 0, 0] },
-    { ammo: [6, 9], shellK: 0.3, heal: 0.42, kitK: 0, extras: 1, foodN: 1, weapon: 0.24, rarity: [0.42, 0.45, 0.13, 0, 0] },
+    { ammo: [5, 8], shellK: 0, heal: 0.4, kitK: 0, extras: 0, foodN: 1, weapon: 0.22, rarity: [0.7, 0.3, 0, 0, 0] },
+    { ammo: [6, 9], shellK: 0.3, heal: 0.42, kitK: 0, extras: 1, foodN: 1, weapon: 0.28, rarity: [0.42, 0.45, 0.13, 0, 0] },
     { ammo: [7, 11], shellK: 0.35, heal: 0.45, kitK: 0.3, extras: 1, foodN: 1, weapon: 0.34, rarity: [0.18, 0.42, 0.32, 0.075, 0.005] },
     { ammo: [8, 12], shellK: 0.4, heal: 0.5, kitK: 0.35, extras: 1, foodN: 2, weapon: 0.44, rarity: [0.06, 0.26, 0.42, 0.23, 0.03] },
     { ammo: [9, 14], shellK: 0.4, heal: 0.55, kitK: 0.4, extras: 2, foodN: 2, weapon: 0.54, rarity: [0.01, 0.1, 0.31, 0.43, 0.15] },
@@ -128,11 +128,14 @@ function starterLoot(random, index, players) {
   const p = Math.max(1, players), food = () => FOODS[Math.floor(random() * 3)];
   const out = {}, add = (k, n) => { out[k] = (out[k] || 0) + n; };
   switch (index) {
-    case 0: add('arma_pistola', 1); add('municao', 12); break;                       // cache inicial
+    case 0: // cache inicial: pistola OU revólver (sorteado); com 4+ jogadores vêm os dois
+      if (p >= 4) { add('arma_pistola', 1); add('arma_revolver', 1); add('municao', 20); }
+      else { add(random() < 0.5 ? 'arma_pistola' : 'arma_revolver', 1); add('municao', 12); }
+      break;
     case 1: add('arma_martelo', 1); add('bandagem', 1 + p); break;                    // conserta a jangada
     case 2: add('municao', 6); add('barra_proteina', p); add('energetico', 1); break;
     case 3: add('bandagem', 1); add('chocolate', p); add(food(), 1); add('municao', 4); break;
-    default: { const m = LOOT_CONFIG.weaponsByStar[1]; add(`arma_${m[Math.floor(random() * m.length)]}`, 1); add('energetico', 1); add('municao', 4); }
+    default: add('energetico', 1); add(food(), 1); add('municao', 4);
   }
   return out;
 }
@@ -168,7 +171,10 @@ export function generateCrateLoot(seed, id, difficulty, playerCount = 1) {
     const roll = random();
     let cumulative = 0, stars = 1;
     for (let i = 0; i < R.rarity.length; i++) { cumulative += R.rarity[i]; if (roll < cumulative) { stars = i + 1; break; } }
-    const pool = LOOT_CONFIG.weaponsByStar[stars], weapon = pool[Math.floor(random() * pool.length)];
+    const pool = LOOT_CONFIG.weaponsByStar[stars];
+    // ZONA PIRATA (zonas 0–1): metade das armas é arma de fogo simples (pistola ou revólver)
+    const simpleGun = regionIndex <= 1 && random() < 0.5;
+    const weapon = simpleGun ? (random() < 0.5 ? 'pistola' : 'revolver') : pool[Math.floor(random() * pool.length)];
     add(`arma_${weapon}`, 1);
     const wa = WEAPON_AMMO[weapon]; if (wa) add(wa[0], between(wa[1], wa[2]));
   }

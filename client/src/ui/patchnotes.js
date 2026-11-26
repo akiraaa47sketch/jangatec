@@ -8,10 +8,10 @@ export const PATCH_NOTES = [
     id: '0.36', versao: 'v0.36', data: '26/11/2026', titulo: 'Caixas balanceadas',
     destaques: [
       { tag: 'Loot', titulo: 'Caixas consistentes', texto: 'Toda caixa agora tem uma **base garantida** (munição + comida); o resto (curativo, cartuchos, arma) cresce **aos poucos** de zona em zona. Acabou a caixa com 3 balas do lado de uma com arma, e o salto enorme da zona militar para a seguinte.' },
-      { tag: 'Ilha inicial', titulo: '5 caixas espalhadas', texto: 'A ilha inicial tem **5 caixas em volta da ilha** e o kit de começo vem **dividido entre elas**: pistola, martelo e curativos, comida, e uma arma branca.' },
+      { tag: 'Ilha inicial', titulo: '5 caixas espalhadas', texto: 'A ilha inicial tem **5 caixas em volta da ilha** e o kit de começo vem **dividido entre elas**: uma arma de fogo (**pistola ou revólver**, sorteado), martelo e curativos, e comida. Com **4 jogadores ou mais** vêm **pistola E revólver**.' },
     ],
     secoes: [
-      { icone: '📦', nome: 'Loot', itens: ['Chance de arma sobe suave: **16% → 24% → 34% → 44% → 54%** (naufrágio +8%).', 'Arma achada já vem com munição própria (cartuchos para escopeta).', 'Zonas avançadas dão mais comida e sorteios extras; kit médico a partir da zona militar.', 'Caixotes da seca: sempre munição + comida.'] },
+      { icone: '📦', nome: 'Loot', itens: ['Chance de arma sobe suave: **22% → 28% → 34% → 44% → 54%** (naufrágio +8%).', '**Ilhas piratas**: metade das armas achadas é **pistola ou revólver** — arma de fogo simples aparece bem mais (de ~3% para ~13% das caixas na primeira zona).', 'Arma achada já vem com munição própria (cartuchos para escopeta).', 'Zonas avançadas dão mais comida e sorteios extras; kit médico a partir da zona militar.', 'Caixotes da seca: sempre munição + comida.'] },
     ],
   },
   {
