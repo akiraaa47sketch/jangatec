@@ -169,7 +169,7 @@ export class Player {
     }
 
     if (this.dead) { this.syncMesh(0, dt); return; }
-    if ((G.interact && G.interact.lootOpen) || (G.gfxMenu && G.gfxMenu.open) || (G.keysMenu && G.keysMenu.open) || (G.tools && G.tools.menuOpen)) {
+    if ((G.interact && G.interact.lootOpen) || (G.gfxMenu && G.gfxMenu.open) || (G.keysMenu && G.keysMenu.open) || (G.admin && G.admin.open) || (G.tools && G.tools.menuOpen)) {
       b.vel.x = b.vel.z = 0;
       this.syncMesh(0, dt);
       return;
@@ -373,7 +373,7 @@ export class Player {
       if (gun && this.aimHold > 0 && pose === 'walk') pose = 'aim';
       const c = G.combat, tools = G.tools, idle = pose === 'walk' || pose === 'aim';
       // recarga, item, gancho, banjo: ações que tomam conta dos braços quando o corpo está livre
-      if (idle && gun && c.reloading > 0) { pose = 'reload'; progress = 1 - c.reloading / w.reload; }
+      if (idle && gun && c.reloading > 0) { pose = 'reload'; progress = c.reloadFrac(); }
       else if (idle && this.useAnim) { pose = 'use'; progress = this.useAnim.t / this.useAnim.dur; }
       else if (idle && this.throwT >= 0) { pose = 'throw'; progress = this.throwT / 0.5; }
       else if (pose === 'walk' && w && w.tool === 'banjo' && tools && tools.playT > 0) pose = 'strum';
@@ -397,6 +397,8 @@ export class Player {
       pd.accel = (pd.accel || 0) + ((dt > 0 ? (sp - (this._prevSp ?? sp)) / dt : 0) - (pd.accel || 0)) * Math.min(1, 5 * dt); this._prevSp = sp;
       pd.armed = !w ? 'none' : w.tool && w.tool !== 'martelo' ? 'tool' : w.melee ? 'melee' : GUN_TYPE[w.id] || 'pistol';
       pd.gunType = GUN_TYPE[w && w.id] || 'pistol';
+      pd.shellPlan = c.reloading > 0 ? c.reloadPlan : null; // escopeta: quantos cartuchos e em que fase
+      pd.weaponSpec = this.weaponSpec; // pegadas/peças do modelo da arma (pulso, mão de apoio, recarga)
       pd.reloadKind = w && w.id === 'escopeta' ? 'shotgun' : w && w.id === 'revolver' ? 'revolver' : 'mag';
       pd.useItem = this.useAnim ? this.useAnim.item : null;
       pd.hurt = this.hurtT; pd.hurtSide = this.hurtSide || 1; pd.squash = this.squash; pd.strum = this.strumK;

@@ -30,6 +30,7 @@ import { Melee } from './systems/melee.js';
 import { Voice } from './net/voice.js';
 import { MainMenu } from './ui/mainmenu.js';
 import { preloadGun, preloadHand, buildRealHand } from './player/gunmodels.js';
+import { AdminPanel } from './ui/admin.js';
 import { upgradeWaitingPills } from './player/pillhands.js';
 import { Naval } from './systems/naval.js';
 import { Tools } from './systems/tools.js';
@@ -133,6 +134,7 @@ G.gfx = new Graphics(G, { renderer, scene, camera, sun, mobile: MOBILE }); // pi
 G.gfxMenu = new GfxMenu(G);
 G.reflections = new Reflections(G); // reflexos (metais, jangada molhada na chuva) — menu Gráficos
 G.keysMenu = new KeysMenu(G);
+G.admin = new AdminPanel(G); // L + Z: painel de testes (só no solo)
 if (MOBILE) G.touch = new TouchControls(G);
 
 canvas.addEventListener('mousedown', (e) => {
@@ -231,7 +233,7 @@ function start(seed, welcome, opts = {}) {
   const play = () => {
     G.input.enabled = true;
     G.hud.show();
-    G.hud.msg(`${G.combat.weapon.nome} ${'★'.repeat(G.combat.weapon.stars)} equipada · complete a jangada e procure as caixas`);
+    G.hud.msg(`${G.combat.weapon.nome} ${'★'.repeat(G.combat.rarOf(G.combat.weaponId))} equipada · complete a jangada e procure as caixas`);
   };
   // Cutscene de abertura (helicóptero → raio → queda → acordar na ilha) só no começo da partida.
   if (opts.intro && G.startup.phase === 'build' && starterIsland) {
@@ -246,7 +248,7 @@ const startBenchmark = () => { start(4242); G.bench = new Benchmark(G); };
 preloadHand('./models/mao.glb').then((ok) => { if (ok) G.viewmodel.upgradeHands(buildRealHand); });
 preloadHand('./models/mao_3p.glb', '3p').then((ok) => { if (ok) upgradeWaitingPills(); }); // mãos das pílulas (3ª pessoa)
 // modelo 3D da pistola: carrega em segundo plano e troca o procedural quando ficar pronto
-for (const [id, url] of [['pistola', './models/pistola.glb'], ['revolver', './models/revolver.glb'], ['sniper', './models/sniper.glb'], ['martelo', './models/martelo.glb']]) {
+for (const [id, url] of [['pistola', './models/pistola.glb'], ['revolver', './models/revolver.glb'], ['sniper', './models/sniper.glb'], ['martelo', './models/martelo.glb'], ['escopeta', './models/escopeta.glb']]) {
   preloadGun(id, url).then((ok) => {
     const wid = id === 'sniper' ? 'rifle_precisao' : id;
     if (ok) G.viewmodel.specs.delete(wid);
@@ -271,7 +273,7 @@ function hotkeys() {
     G.player.faceCam = !G.player.faceCam;
     G.hud.msg(G.player.faceCam ? 'Corpo travado na direção da câmera' : 'Corpo livre (vira para onde anda)');
   }
-  if (G.build.active || G.interact.lootOpen || G.gfxMenu.open || G.keysMenu.open || G.naval.manning || G.tools.menuOpen) return;
+  if (G.build.active || G.interact.lootOpen || G.gfxMenu.open || G.keysMenu.open || G.admin.open || G.naval.manning || G.tools.menuOpen) return;
   for (let i = 0; i < 6; i++) if (inp.act('slot' + (i + 1))) G.combat.select(i);
   if (inp.mouse.wheel) G.combat.cycle(Math.sign(inp.mouse.wheel));
   if (inp.act('bandage')) G.survival.use('bandagem');

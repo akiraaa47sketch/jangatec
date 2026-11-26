@@ -498,6 +498,7 @@ const proceduralPistola = () => {
     gripR: { p: [0, -0.065, 0.065], r: [0, 0, -1.55], c: 0.9, idx: 0.3, th: [-0.35, -0.2, 0.2] },
     gripL: { p: [0, -0.108, 0.065], r: [0, 0, 1.55], c: 0.85, th: [-0.2, 0.0, 0.2] },
     magPoint: [0, -0.1, -0.045],
+    slideGrab: [0, 0.04, 0.075],
     parts: { slide, mag },
   };
 };
@@ -515,9 +516,9 @@ SPECS.pistola = () => {
   if (node) { node.parent.add(slide); slide.add(node); }
   const rdY = redDot(slide, 0.056, 0.012);
   trigger(g, 0.02, -0.035);
-  const mag = new THREE.Group(); // carregador escondido dentro do punho (aparece na recarga)
-  add(mag, box(0.026, 0.1, 0.045, MAT.iron, 0, -0.06, 0.06));
-  add(mag, box(0.03, 0.012, 0.05, MAT.black, 0, -0.112, 0.06));
+  const mag = new THREE.Group(); // carregador: só aparece na recarga (parado, ficava saindo pelo punho)
+  add(mag, box(0.022, 0.1, 0.04, MAT.iron, 0, -0.06, 0.05));
+  add(mag, box(0.026, 0.012, 0.044, MAT.black, 0, -0.112, 0.05));
   g.add(mag);
   const muzzle = new THREE.Vector3(0, 0.03, -0.25);
   return {
@@ -526,12 +527,13 @@ SPECS.pistola = () => {
     hold: { p: [0.15, -0.1, -0.44], r: [0.08, 0.05, 0] },
     gripR: { p: [0, -0.06, 0.075], r: [0, 0, -1.55], c: 0.9, idx: 0.3, th: [-0.35, -0.2, 0.2] },
     gripL: { p: [0, -0.1, 0.075], r: [0, 0, 1.55], c: 0.85, th: [-0.2, 0.0, 0.2] },
-    magPoint: [0, -0.1, 0.06],
+    magPoint: [0, -0.1, 0.05], magHidden: true,
+    slideGrab: [0, 0.035, 0.1], // onde a mão esquerda pega o ferrolho para engatilhar
     parts: { slide, mag },
   };
 };
 
-SPECS.escopeta = () => {
+const proceduralEscopeta = () => {
   const g = new THREE.Group();
   add(g, box(0.048, 0.08, 0.22, MAT.black, 0, 0.012, -0.03));                  // caixa da culatra
   add(g, box(0.052, 0.012, 0.1, MAT.iron, 0, 0.056, -0.04));
@@ -544,8 +546,9 @@ SPECS.escopeta = () => {
   add(pump, box(0.058, 0.05, 0.2, MAT.wood, 0, 0.0, -0.3));
   for (let i = 0; i < 6; i++) add(pump, box(0.06, 0.054, 0.006, MAT.woodDark, 0, 0.0, -0.22 - i * 0.03));
   g.add(pump);
-  add(g, profile([[0.0, 0.05], [-0.1, 0.05], [-0.22, 0.042], [-0.26, -0.06], [-0.2, -0.06], [-0.14, -0.03],
-    [-0.1, -0.12], [-0.045, -0.12], [-0.03, -0.03], [0.02, -0.03]], 0.05, MAT.wood));
+  // coronha e punho separados: o punho é fino para os dedos fecharem em volta sem atravessar
+  add(g, profile([[0.0, 0.05], [-0.1, 0.05], [-0.22, 0.042], [-0.26, -0.06], [-0.2, -0.06], [-0.14, -0.03], [0.02, -0.03]], 0.05, MAT.wood));
+  add(g, profile([[-0.03, -0.02], [-0.13, -0.02], [-0.1, -0.12], [-0.05, -0.12]], 0.026, MAT.wood));
   for (let i = 0; i < 4; i++) { // cartuchos presos na coronha
     const sh = cylY(0.0095, 0.045, MAT.red2, 0.03, -0.015, 0.1 + i * 0.024); add(g, sh);
     add(g, cylY(0.0098, 0.012, MAT.brass, 0.03, -0.042, 0.1 + i * 0.024));
@@ -560,6 +563,29 @@ SPECS.escopeta = () => {
     gripR: { p: [0, -0.075, 0.07], r: [0, 0, -1.55], c: 0.9, idx: 0.3, th: [-0.35, -0.2, 0.2] },
     gripL: { p: [0, -0.005, -0.3], r: [0, -1.5708, 3.1416], c: 0.8, th: [0.3, -0.3, 0.2] },
     magPoint: [0.0, -0.045, -0.06],
+    parts: { pump },
+  };
+};
+
+// Escopeta com o modelo 3D importado (Tripo, texturas PBR). A bomba de madeira é uma malha separada
+// que desliza no tubo ao bombear (parts.pump). Procedural enquanto o GLB não carrega.
+SPECS.escopeta = () => {
+  const m = gunModel('escopeta');
+  if (!m) return proceduralEscopeta();
+  const g = new THREE.Group(), pump = new THREE.Group();
+  g.add(m.group);
+  const node = m.parts.bomba;
+  if (node) { node.parent.add(pump); pump.add(node); }
+  const rdY = redDot(g, 0.064, -0.09);
+  const muzzle = new THREE.Vector3(0, 0.04, -0.65);
+  return {
+    group: g, type: 'long', reload: 'shotgun', muzzle, sightY: rdY, adsDist: 0.2, adsFov: 62, flash: 1.6,
+    eject: new THREE.Vector3(0.028, 0.045, -0.06),
+    hold: { p: [0.15, -0.12, -0.46], r: [0.03, 0.09, 0] },
+    // coronha reta: a mão fecha em volta do pescoço inclinado (gira para acompanhar a inclinação)
+    gripR: { p: [0, -0.014, 0.06], r: [-0.75, 0, -1.55], c: 0.9, idx: 0.3, th: [-0.35, -0.2, 0.2] },
+    gripL: { p: [0, 0.016, -0.31], r: [0, -1.5708, 3.1416], c: 0.85, th: [0.3, -0.3, 0.2] },
+    magPoint: [0.0, -0.01, -0.12],
     parts: { pump },
   };
 };
@@ -579,7 +605,7 @@ SPECS.rifle = () => {
   add(g, box(0.008, 0.03, 0.008, MAT.black, 0, 0.066, -0.82));                  // massa
   add(g, box(0.02, 0.016, 0.014, MAT.black, 0, 0.082, 0.07));                   // alça
   add(g, profile([[0.0, 0.05], [-0.1, 0.05], [-0.22, 0.04], [-0.25, -0.05], [-0.2, -0.055], [-0.14, -0.03], [-0.08, -0.04]], 0.045, MAT.woodDark));
-  add(g, profile([[-0.03, -0.01], [-0.085, -0.01], [-0.115, -0.125], [-0.06, -0.125]], 0.034, MAT.woodDark)); // punho
+  add(g, profile([[-0.03, -0.01], [-0.085, -0.01], [-0.115, -0.125], [-0.06, -0.125]], 0.024, MAT.woodDark)); // punho (fino: a mão fecha em volta)
   const mag = new THREE.Group();
   const mb = box(0.034, 0.15, 0.06, MAT.iron, 0, -0.1, 0);
   mb.rotation.x = 0.18;

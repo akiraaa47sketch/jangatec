@@ -12,7 +12,7 @@ export const WEAPONS = [
   { id: 'sabre', nome: 'Sabre pirata', stars: 3, melee: true, dmg: 34, range: 2.5, rate: 0.4, durability: 150, color: 0xb58d4a, scale: [0.5, 0.5, 1.5] },
   { id: 'revolver', nome: 'Revólver', stars: 2, dmg: 26, mag: 6, rate: 0.38, spread: 0.028, range: 60, reload: 1.55, recoil: 0.026, pellets: 1, ammo: 'municao', durability: 90, color: 0x514b45, scale: [0.8, 0.75, 0.95] },
   { id: 'pistola', nome: 'Pistola', stars: 3, dmg: 30, mag: 12, rate: 0.24, spread: 0.009, range: 100, reload: 1.5, recoil: 0.02, pellets: 1, ammo: 'municao', durability: 140, color: 0x33383c, scale: [0.9, 0.85, 0.9], automatic: true },
-  { id: 'escopeta', nome: 'Escopeta', stars: 4, dmg: 12, mag: 5, rate: 0.8, spread: 0.07, range: 32, reload: 1.9, recoil: 0.04, pellets: 8, ammo: 'cartucho', durability: 110, color: 0x4c3525, scale: [1, 1, 1.7] },
+  { id: 'escopeta', nome: 'Escopeta', stars: 4, dmg: 12, mag: 5, rate: 0.8, spread: 0.07, range: 32, reload: 1.9, perShell: true, recoil: 0.04, pellets: 8, ammo: 'cartucho', durability: 110, color: 0x4c3525, scale: [1, 1, 1.7] },
   { id: 'rifle', nome: 'Rifle', stars: 4, dmg: 38, mag: 20, rate: 0.12, spread: 0.006, range: 140, reload: 2, recoil: 0.018, pellets: 1, ammo: 'municao', durability: 190, color: 0x454239, scale: [0.8, 0.8, 1.8], automatic: true },
   // ferramentas: martelo conserta peças da jangada (e ainda bate), banjo toca e cura aliados,
   // gancho puxa caixotes boiando e jogadores
@@ -24,9 +24,24 @@ export const WEAPONS = [
   { id: 'rifle_precisao', nome: 'Rifle de precisão', stars: 5, dmg: 70, mag: 5, rate: 0.9, spread: 0.001, range: 240, reload: 2.6, recoil: 0.07, pellets: 1, ammo: 'municao', durability: 240, color: 0x292f33, scale: [0.75, 0.8, 2] },
 ];
 
+// RARIDADE de cada arma achada: 1★ comum … 4★ épica. Mesma arma, mais estrelas = um pouco mais forte
+// (dano) e mais precisa. A raridade vem na chave do item: arma_pistola_r3. Sem sufixo = sorteada pela zona.
+export const MAX_RAR = 4;
+export const RAR_DMG = [1, 1, 1.1, 1.2, 1.32];
+export const RAR_SPREAD = [1, 1, 0.93, 0.86, 0.78];
+export const RAR_NAME = ['', 'Comum', 'Incomum', 'Rara', 'Épica'];
+export const starsTxt = (r) => '★'.repeat(r) + '☆'.repeat(Math.max(0, MAX_RAR - r));
+export function parseWeaponKey(k) {
+  const m = /^arma_(.+?)(?:_r([1-4]))?$/.exec(k);
+  return m ? { id: m[1], rar: m[2] ? Number(m[2]) : 0 } : null;
+}
+export { rollRarity } from './loot.js'; // chance de cada raridade por zona (fica no loot.js: o servidor também usa)
+
 // recuo por arma: [sobe (rad), lado (rad)]
 const RECOIL = { minigun: [0.012, 0.012], pistola: [0.075, 0.024], revolver: [0.08, 0.02], escopeta: [0.12, 0.035], rifle: [0.03, 0.016], rifle_precisao: [0.15, 0.025] };
 const GUN_SOUND = { minigun: 'rifle', pistola: 'pistol', revolver: 'revolver', escopeta: 'shotgun', rifle: 'rifle', rifle_precisao: 'sniper' };
+// recarga cartucho a cartucho (escopeta): levantar, cada cartucho, fechar (bomba só se estava vazia)
+export const SHELL = { intro: 0.3, per: 0.42, end: 0.25, pump: 0.5 };
 const STARTER_WEAPONS = ['tabua_prego', 'cano', 'faca_manteiga', 'bastao'];
 const _o = new THREE.Vector3(), _dir = new THREE.Vector3(), _m = new THREE.Vector3(), _mw = new THREE.Vector3();
 const stars = (count) => '★'.repeat(count);
@@ -38,8 +53,9 @@ export class Combat {
     this.hotbar = [null, null, null, null, null, null];
     this.owned = new Set();
     this.durability = {};
+    this.rarity = {}; // id da arma -> 1..4 estrelas
     this.cooldown = 0;
-    this.reloading = 0;
+    this.reloading = 0; this.reloadPlan = null;
     this.aiming = false;
     this.swing = 0;
     this.swingDuration = 0.34;
@@ -51,13 +67,21 @@ export class Combat {
     this.pendingStrike = null; // golpe corpo a corpo em 1ª pessoa: o dano cai quando a animação acerta
   }
 
+  // fração da recarga em andamento (0..1) — animações em 1ª e 3ª pessoa
+  reloadFrac() {
+    const w = this.weapon; if (!w || this.reloading <= 0) return 0;
+    if (this.reloadPlan) return Math.min(1, this.reloadPlan.t / this.reloadPlan.total);
+    return Math.max(0, Math.min(1, 1 - this.reloading / w.reload));
+  }
   get weapon() { return WEAPONS.find((w) => w.id === this.weaponId) || null; }
+  rarOf(id) { return this.rarity[id] || 1; }
+  dmgOf(w) { return w.dmg * RAR_DMG[this.rarOf(w.id)]; }
 
   startWithRandomImprovisedWeapon() {
     this.weaponId = null;
     this.hotbar.fill(null);
     this.owned.clear();
-    this.durability = {};
+    this.durability = {}; this.rarity = {};
     for (const id of Object.keys(this.mags)) this.mags[id] = 0;
     const id = STARTER_WEAPONS[Math.floor(Math.random() * STARTER_WEAPONS.length)];
     this.unlockWeapon(id);
@@ -65,10 +89,16 @@ export class Combat {
     return id;
   }
 
-  unlockWeapon(id) {
+  // rar = estrelas da arma achada. Já tem essa arma? Fica com a de mais estrelas ('upgrade').
+  unlockWeapon(id, rar = 1) {
     const weapon = WEAPONS.find((w) => w.id === id);
     if (!weapon) return false;
-    if (this.owned.has(id)) return 'owned';
+    rar = Math.max(1, Math.min(MAX_RAR, rar | 0 || 1));
+    if (this.owned.has(id)) {
+      if (rar > this.rarOf(id)) { this.rarity[id] = rar; return 'upgrade'; }
+      return 'owned';
+    }
+    this.rarity[id] = rar;
     this.owned.add(id);
     const slot = this.hotbar.indexOf(null);
     if (slot >= 0) this.hotbar[slot] = id;
@@ -82,7 +112,7 @@ export class Combat {
     if (!weapon) return false;
     this.weaponId = id;
     this.cooldown = 0;
-    this.reloading = 0;
+    this.reloading = 0; this.reloadPlan = null;
     // 3ª pessoa: o mesmo modelo detalhado usado na 1ª pessoa
     const mesh = this.G.player.weaponMesh, chest = this.G.player.chestMount;
     for (const old of mesh.children.slice()) mesh.remove(old);
@@ -98,7 +128,7 @@ export class Combat {
 
   // Sem arma na mão (largou a última)
   unequip() {
-    this.weaponId = null; this.cooldown = 0; this.reloading = 0;
+    this.weaponId = null; this.cooldown = 0; this.reloading = 0; this.reloadPlan = null;
     const pl = this.G.player, mesh = pl.weaponMesh, chest = pl.chestMount;
     if (mesh) for (const old of mesh.children.slice()) mesh.remove(old);
     if (chest) for (const old of chest.children.slice()) chest.remove(old);
@@ -111,7 +141,7 @@ export class Combat {
     if (!this.owned.has(id)) return false;
     const w = WEAPONS.find((e) => e.id === id), inv = this.G.survival.inv;
     if (w && w.ammo && this.mags[id]) { inv[w.ammo] = (inv[w.ammo] || 0) + this.mags[id]; this.mags[id] = 0; }
-    this.owned.delete(id);
+    this.owned.delete(id); delete this.rarity[id];
     const i = this.hotbar.indexOf(id);
     if (i >= 0) this.hotbar[i] = null;
     if (this.weaponId === id) {
@@ -155,8 +185,16 @@ export class Combat {
     const w = this.weapon, inv = this.G.survival.inv;
     if (!w || !w.ammo || w.noReload || this.reloading > 0 || this.mags[w.id] >= w.mag) return;
     if (!inv[w.ammo]) { this.G.hud.msg('Sem munição'); return; }
-    this.reloading = w.reload;
     const pp = this.G.player.body.pos;
+    if (w.perShell) { // ESCOPETA: um cartucho por vez — o tempo depende de quantos faltam
+      const mag = this.mags[w.id], n = Math.min(w.mag - mag, inv[w.ammo]), empty = mag === 0;
+      const plan = { n, intro: SHELL.intro, per: SHELL.per, outro: empty ? SHELL.pump : SHELL.end, pump: empty, t: 0, done: 0 };
+      plan.total = plan.intro + n * plan.per + plan.outro;
+      this.reloadPlan = plan; this.reloading = plan.total; this.reloadSample = null;
+      return;
+    }
+    this.reloadPlan = null;
+    this.reloading = w.reload;
     this.reloadSample = sfx.reload(pp, w.id); // pistola: som gravado da recarga inteira
     if (this.reloadSample) return;
     if (w.id === 'escopeta' || w.id === 'revolver') sfx.shell(pp); else sfx.click(pp, 0.85); // tira o carregador / abre
@@ -180,7 +218,7 @@ export class Combat {
     for (const e of G.enemies.list) {
       const dx = e.body.pos.x - _m.x, dz = e.body.pos.z - _m.z, d = Math.hypot(dx, dz);
       if (d - (e.def.hitR || 0) < w.range && (d < 0.8 || (dx * fx + dz * fz) / d > 0.2) && Math.abs(e.body.pos.y - (_m.y - 1.3)) < 2) {
-        G.enemies.damage(e, w.dmg);
+        G.enemies.damage(e, Math.round(this.dmgOf(w)));
         hits++;
       }
     }
@@ -219,7 +257,7 @@ export class Combat {
     // 1ª pessoa: o rastro sai da boca da arma na tela; 3ª pessoa: da boca do cano do modelo
     let origin = vm ? vm.muzzleWorld(_mw) : _m;
     if (!vm && G.player.flashMesh) origin = G.player.flashMesh.getWorldPosition(_mw);
-    const spread = w.spread * (this.aiming ? 0.4 : 1);
+    const spread = w.spread * RAR_SPREAD[this.rarOf(w.id)] * (this.aiming ? 0.4 : 1);
     cam.getWorldPosition(_o);
     const targets = G.enemies.hitMeshes.concat(G.solids), ends = [];
     for (let i = 0; i < w.pellets; i++) {
@@ -231,7 +269,7 @@ export class Combat {
       this.ray.far = w.range + G.player.camDist;
       const hit = this.ray.intersectObjects(targets, false)[0];
       const end = hit ? hit.point.clone() : _o.clone().addScaledVector(_dir, w.range);
-      if (hit && hit.object.userData.enemy) G.enemies.damage(hit.object.userData.enemy, Math.round(w.dmg * G.survival.dmgMul));
+      if (hit && hit.object.userData.enemy) G.enemies.damage(hit.object.userData.enemy, Math.round(this.dmgOf(w) * G.survival.dmgMul));
       this.tracer(origin.clone(), end); ends.push(end);
     }
     if (G.enemyNet) G.enemyNet.playerShot(origin, ends, w.id, GUN_SOUND[w.id] || 'pistol'); // os aliados veem e ouvem o tiro
@@ -252,11 +290,25 @@ export class Combat {
 
   update(dt) {
     const G = this.G, inp = G.input, w = this.weapon;
-    const building = G.build.active || !!(G.naval && G.naval.manning) || !!(G.tools && G.tools.menuOpen), looting = G.interact.lootOpen;
+    const building = G.build.active || !!(G.naval && G.naval.manning) || !!(G.tools && G.tools.menuOpen) || !!(G.admin && G.admin.open), looting = G.interact.lootOpen;
     this.cooldown -= dt;
     this.bloom = Math.max(0, (this.bloom || 0) - dt * 2.5);
     this.aiming = !!w && !building && !looting && !!w.ammo && !w.noReload && inp.mouse.right && !G.player.dead && !G.player.downed && !G.player.swimming;
-    if (this.reloading > 0 && w) {
+    if (this.reloading > 0 && w && this.reloadPlan) {
+      const pl = this.reloadPlan, inv = G.survival.inv;
+      pl.t += dt; this.reloading = pl.total - pl.t;
+      // cada cartucho entra no carregador quando a mão o empurra na janela (metade do ciclo)
+      const due = Math.max(0, Math.min(pl.n, Math.floor((pl.t - pl.intro) / pl.per - 0.5) + 1));
+      while (pl.done < due && inv[w.ammo] > 0 && this.mags[w.id] < w.mag) {
+        this.mags[w.id]++; inv[w.ammo]--; pl.done++;
+        sfx.shell(G.player.body.pos);
+      }
+      // atirar no meio da recarga: termina o cartucho que está na mão e para por aí
+      if (inp.mouse.leftPressed && this.mags[w.id] > 0 && pl.n > pl.done + 1 && pl.t > pl.intro) {
+        pl.n = pl.done + 1; pl.total = pl.intro + pl.n * pl.per + pl.outro; this.reloading = pl.total - pl.t;
+      }
+      if (this.reloading <= 0) { this.reloading = 0; this.reloadPlan = null; if (pl.pump) sfx.shell(G.player.body.pos); }
+    } else if (this.reloading > 0 && w) {
       this.reloading -= dt;
       if (this.reloading <= 0) {
         const inv = G.survival.inv, count = Math.min(w.mag - this.mags[w.id], inv[w.ammo]);

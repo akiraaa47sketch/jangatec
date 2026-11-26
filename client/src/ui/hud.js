@@ -1,6 +1,6 @@
 // HUD em DOM, enxuto: vitais, arma, hotbar, objetivo curto, avisos e prompts.
 import { ITEM_NAMES, BUFFS } from '../systems/survival.js';
-import { WEAPONS } from '../systems/combat.js';
+import { WEAPONS, parseWeaponKey, starsTxt } from '../systems/combat.js';
 import { keyOf, binds } from '../core/keybinds.js';
 
 // ícones e cores da janela das caixas (raridade das armas pelas estrelas)
@@ -118,10 +118,11 @@ export class Hud {
     // armas primeiro, depois pelo nome
     items.sort((a, b) => (b[0].startsWith('arma_') - a[0].startsWith('arma_')) || a[0].localeCompare(b[0]));
     items.forEach(([id, amount], i) => {
-      const weapon = id.startsWith('arma_') && WEAPONS.find((entry) => entry.id === id.slice(5));
+      const pk = id.startsWith('arma_') && parseWeaponKey(id), weapon = pk && WEAPONS.find((entry) => entry.id === pk.id);
+      const wr = weapon ? pk.rar || 0 : 0; // 0 = estrelas sorteadas ao pegar
       const name = weapon ? weapon.nome : ITEM_NAMES[id] || id;
-      const color = weapon ? RARITY[Math.min(5, weapon.stars)] : id === 'colete' || id.startsWith('canhao') || id === 'gancho' ? RARITY[3] : id === 'kit' ? RARITY[2] : RARITY[1];
-      const sub = weapon ? `<span class="stars">${'★'.repeat(weapon.stars)}${'☆'.repeat(Math.max(0, 5 - weapon.stars))}</span>` : `<span>${id === 'colete' ? 'equipamento' : ['bandagem', 'kit'].includes(id) ? 'cura' : ['barra_proteina', 'energetico', 'chocolate', 'peixe'].includes(id) ? 'comida' : ['municao', 'cartucho', 'bala_canhao'].includes(id) ? 'munição' : 'item'}</span>`;
+      const color = weapon ? RARITY[wr || 1] : id === 'colete' || id.startsWith('canhao') || id === 'gancho' ? RARITY[3] : id === 'kit' ? RARITY[2] : RARITY[1];
+      const sub = weapon ? (wr ? `<span class="stars">${starsTxt(wr)}</span>` : '<span>arma</span>') : `<span>${id === 'colete' ? 'equipamento' : ['bandagem', 'kit'].includes(id) ? 'cura' : ['barra_proteina', 'energetico', 'chocolate', 'peixe'].includes(id) ? 'comida' : ['municao', 'cartucho', 'bala_canhao'].includes(id) ? 'munição' : 'item'}</span>`;
       const card = document.createElement('button');
       card.type = 'button'; card.className = 'loot-card';
       card.style.setProperty('--rar', color);
@@ -187,8 +188,8 @@ export class Hud {
     if (buffHtml !== this._buffs) { $('buffs').innerHTML = buffHtml; this._buffs = buffHtml; }
     // Arma equipada: só texto, sem painel
     const weaponHtml = w
-      ? `<div class="wname" style="--rar:${RARITY[w.stars]}">${w.nome}</div>` +
-        (w.noReload ? `<div class="ammo">${c.mags[w.id]}<small> sem recarga</small></div>` : w.ammo ? `<div class="ammo">${c.reloading > 0 ? '<small>recarregando…</small>' : `${c.mags[w.id]}<small> / ${inv[w.ammo]}</small>`}</div>` : '')
+      ? `<div class="wname" style="--rar:${RARITY[c.rarOf(w.id)]}">${w.nome} <small>${'★'.repeat(c.rarOf(w.id))}</small></div>` +
+        (w.noReload ? `<div class="ammo">${c.mags[w.id]}<small> sem recarga</small></div>` : w.ammo ? `<div class="ammo">${c.reloading > 0 && !c.reloadPlan ? '<small>recarregando…</small>' : `${c.mags[w.id]}<small> / ${inv[w.ammo]}</small>`}</div>` : '')
       : '<div class="wname">Mãos vazias</div>';
     if (weaponHtml !== this._weapon) { $('weapon').innerHTML = weaponHtml; this._weapon = weaponHtml; }
     // Barra de inventário: armas (slots) | consumíveis — cada um mostra a tecla configurada
@@ -200,7 +201,7 @@ export class Hud {
       const k = keyOf('slot' + (i + 1));
       const ammo = weapon && (weapon.ammo || weapon.noReload) ? `<em>${c.mags[id]}</em>` : '';
       hot += `<button type="button" data-slot="${i}" class="slot wpn${id === c.weaponId ? ' active' : ''}${weapon ? '' : ' empty'}"` +
-        `${weapon ? ` title="${weapon.nome} ${'★'.repeat(weapon.stars)}" style="--rar:${RARITY[weapon.stars]}"` : ''}>` +
+        `${weapon ? ` title="${weapon.nome} ${'★'.repeat(c.rarOf(id))}" style="--rar:${RARITY[c.rarOf(id)]}"` : ''}>` +
         `<kbd>${k}</kbd><span class="nm">${weapon ? short(weapon.nome) : ''}</span>${ammo}</button>`;
     }
     hot += '<i class="sep"></i>';
