@@ -134,7 +134,18 @@ function holderFor(h, target) {
 const OVER_SLIDE = new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 0, 1), Math.PI).multiply(eQ([0, -1.5708, 3.1416]));
 
 // Linha do tempo da mão esquerda na recarga (u 0..1) → { at: 'grip'|'well'|'belt'|'below'|'slide'|'pulled'|'drum'|'port', k }
-function reloadKeys(kind, slide) {
+function reloadKeys(kind, slide, plan) {
+  if (kind === 'shotgun' && plan) { // um ciclo cinto → janela por cartucho que falta; bomba só se estava vazia
+    const T = plan.total, k = [[0, 'grip'], [plan.intro / T, 'belt']];
+    for (let i = 0; i < plan.n; i++) {
+      const t0 = plan.intro + i * plan.per;
+      k.push([(t0 + 0.42 * plan.per) / T, 'port'], [(t0 + 0.6 * plan.per) / T, 'port'], [(t0 + plan.per) / T, i === plan.n - 1 ? 'grip' : 'belt']);
+    }
+    const o = plan.intro + plan.n * plan.per;
+    if (plan.pump) k.push([(o + 0.5 * plan.outro) / T, 'pumpBack'], [(o + 0.95 * plan.outro) / T, 'grip']);
+    else k.push([1, 'grip']);
+    return k;
+  }
   if (kind === 'revolver') return [[0, 'grip'], [0.12, 'drum'], [0.45, 'drum'], [0.56, 'belt'], [0.7, 'drum'], [0.84, 'drum'], [0.95, 'grip']];
   if (kind === 'shotgun') return [[0, 'grip'], [0.1, 'belt'], [0.2, 'port'], [0.28, 'belt'], [0.38, 'port'], [0.46, 'belt'], [0.56, 'port'], [0.66, 'grip'], [0.74, 'pumpBack'], [0.8, 'grip']];
   if (slide) return [[0, 'grip'], [0.12, 'well'], [0.2, 'well'], [0.34, 'belt'], [0.44, 'below'], [0.56, 'well'], [0.62, 'well'], [0.68, 'slide'], [0.74, 'slide'], [0.8, 'pulled'], [0.84, 'letgo'], [0.95, 'grip']];
@@ -147,7 +158,7 @@ function sampleKeys(keys, u) {
   const last = keys[keys.length - 1][1]; return { a: last, b: last, k: 0 };
 }
 // Peças do modelo na recarga (3ª pessoa): carregador cai e volta, ferrolho/tambor/bomba.
-function reloadParts(spec, u, on) {
+function reloadParts(spec, u, on, plan) {
   const p = spec.parts || {}, kind = spec.reload;
   if (p.mag) {
     if (!on) { p.mag.visible = !spec.magHidden; p.mag.position.set(0, 0, 0); p.mag.rotation.set(0, 0, 0); }
@@ -159,7 +170,14 @@ function reloadParts(spec, u, on) {
   }
   if (p.slide) p.slide.position.z = on && spec.slideGrab ? (u < 0.74 ? 0 : u < 0.8 ? smooth(ramp(u, 0.74, 0.8)) : 1 - ramp(u, 0.8, 0.815)) * 0.045 : 0;
   if (p.drum) { const o = on && kind === 'revolver' ? smooth(ramp(u, 0.1, 0.2)) - smooth(ramp(u, 0.84, 0.92)) : 0; p.drum.position.x = -0.045 * o; p.drum.rotation.z = o * Math.PI * 3; }
-  if (p.pump) { const b = on && kind === 'shotgun' ? Math.sin(Math.PI * ramp(u, 0.66, 0.8)) : 0; p.pump.position.z = b * 0.1; }
+  if (p.pump) {
+    let b = 0;
+    if (on && kind === 'shotgun') {
+      if (plan) { const o = (plan.intro + plan.n * plan.per) / plan.total; b = plan.pump ? Math.sin(Math.PI * ramp(u, o + 0.1 * plan.outro / plan.total, 1)) : 0; }
+      else b = Math.sin(Math.PI * ramp(u, 0.66, 0.8));
+    }
+    p.pump.position.z = b * 0.1;
+  }
 }
 
 export function poseWeaponHands(pill, dt) {
@@ -173,7 +191,7 @@ export function poseWeaponHands(pill, dt) {
   ud.leftCurl = null;
   const pose = ud.pose, gun = spec && spec.type !== 'melee' && spec.muzzle && (ud.armed === 'pistol' || ud.armed === 'long');
   const active = gun && (pose === 'walk' || pose === 'aim' || pose === 'reload');
-  if (spec && spec.parts) reloadParts(spec, ud.poseP || 0, active && pose === 'reload');
+  if (spec && spec.parts) reloadParts(spec, ud.poseP || 0, active && pose === 'reload', ud.shellPlan);
   if (!active) { ud.gunW = 0; return; }
   const long = ud.armed === 'long', u = pose === 'reload' ? Math.min(1, ud.poseP || 0) : 0;
   ud.gunW = Math.min(1, (ud.gunW || 0) + dt * 8);
@@ -224,7 +242,7 @@ export function poseWeaponHands(pill, dt) {
   };
   let target;
   if (pose === 'reload') {
-    const s = sampleKeys(reloadKeys(spec.reload, !!spec.slideGrab), u), A = at(s.a), B = at(s.b);
+    const s = sampleKeys(reloadKeys(spec.reload, !!spec.slideGrab, ud.shellPlan), u), A = at(s.a), B = at(s.b);
     const pa = new THREE.Vector3(), qa = new THREE.Quaternion(), pb = new THREE.Vector3(), qb2 = new THREE.Quaternion(), sc = new THREE.Vector3();
     A.decompose(pa, qa, sc); B.decompose(pb, qb2, sc);
     target = new THREE.Matrix4().compose(pa.lerp(pb, s.k), qa.slerp(qb2, s.k), sc);

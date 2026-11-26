@@ -189,7 +189,7 @@ export class Hud {
     // Arma equipada: só texto, sem painel
     const weaponHtml = w
       ? `<div class="wname" style="--rar:${RARITY[c.rarOf(w.id)]}">${w.nome} <small>${'★'.repeat(c.rarOf(w.id))}</small></div>` +
-        (w.noReload ? `<div class="ammo">${c.mags[w.id]}<small> sem recarga</small></div>` : w.ammo ? `<div class="ammo">${c.reloading > 0 ? '<small>recarregando…</small>' : `${c.mags[w.id]}<small> / ${inv[w.ammo]}</small>`}</div>` : '')
+        (w.noReload ? `<div class="ammo">${c.mags[w.id]}<small> sem recarga</small></div>` : w.ammo ? `<div class="ammo">${c.reloading > 0 && !c.reloadPlan ? '<small>recarregando…</small>' : `${c.mags[w.id]}<small> / ${inv[w.ammo]}</small>`}</div>` : '')
       : '<div class="wname">Mãos vazias</div>';
     if (weaponHtml !== this._weapon) { $('weapon').innerHTML = weaponHtml; this._weapon = weaponHtml; }
     // Barra de inventário: armas (slots) | consumíveis — cada um mostra a tecla configurada

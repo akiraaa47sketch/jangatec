@@ -10,6 +10,7 @@ import * as THREE from '../three.js';
 import { cam as camSet } from '../core/camsettings.js';
 import { clamp, lerp } from '../core/util.js';
 import { CFG } from '../config.js';
+import { SHELL } from '../systems/combat.js';
 import {
   MAT, buildHand, buildArm, buildWeapon, buildBandage, buildMedkit, buildShell, buildCartridgeCase, setGloveColor,
 } from './viewmodel-parts.js';
@@ -114,6 +115,14 @@ function sampleKeys(keys, p) {
   return keys[keys.length - 1][1];
 }
 
+// fase da recarga cartucho a cartucho: 'in' (levanta), 'shell' (i-ésimo cartucho), 'out' (fecha/bombeia)
+function shellPhase(pl) {
+  const t = pl.t;
+  if (t < pl.intro) return { k: 'in', f: t / pl.intro, pump: pl.pump };
+  const s = (t - pl.intro) / pl.per;
+  if (s < pl.n) return { k: 'shell', i: Math.floor(s), f: s - Math.floor(s), last: Math.floor(s) === pl.n - 1, pump: pl.pump };
+  return { k: 'out', f: Math.min(1, (t - pl.intro - pl.n * pl.per) / pl.outro), pump: pl.pump };
+}
 const BELT = V(-0.13, -0.52, -0.2);            // "cinto": fora da tela, embaixo à esquerda
 const SHOULDER = { R: V(0.2, -0.27, 0.2), L: V(-0.2, -0.27, 0.2) };
 const POLE = { R: V(0.75, -0.8, 0.35), L: V(-0.75, -0.8, 0.35) };
@@ -385,7 +394,11 @@ export class ViewModel {
     // ---- recarga ----
     let reloadP = -1;
     if (this.debug.reloadP != null) reloadP = this.debug.reloadP;
-    else if (w && w.reload && cb.reloading > 0 && shownIsCurrent) reloadP = clamp(1 - cb.reloading / w.reload, 0, 1);
+    else if (w && w.reload && cb.reloading > 0 && shownIsCurrent) reloadP = cb.reloadFrac();
+    // escopeta: fase da recarga cartucho a cartucho (para o debug, um plano de 3 cartuchos com bomba)
+    let plan = cb.reloading > 0 && shownIsCurrent ? cb.reloadPlan : null;
+    if (this.debug.reloadP != null && spec && spec.reload === 'shotgun') { plan = { n: 3, intro: SHELL.intro, per: SHELL.per, outro: SHELL.pump, pump: true }; plan.total = plan.intro + 3 * plan.per + plan.outro; plan.t = this.debug.reloadP * plan.total; }
+    this.shot = plan ? shellPhase(plan) : null;
     wt.reload = approach(wt.reload, reloadP >= 0 ? 1 : 0, dt * 8);
 
     // ---- mira ----
@@ -737,15 +750,16 @@ export class ViewModel {
     const beltPose = mk(belt, qOpen, open);
     const pz = spec.parts && spec.parts.pump ? spec.parts.pump.position.z : 0;
     const onPump = this.gripHand(spec.gripL, V(0, 0, pz), 1), pumpPose = { p: onPump.p, q: onPump.q, c: gripPose.c };
-    if (p < 0.1) return mixH(gripPose, beltPose, smooth(ramp(p, 0.0, 0.1)));
-    if (p < 0.74) {
-      const u = ((p - 0.1) / 0.64) * 3;
-      const f = u - Math.floor(u);
-      if (f < 0.4) return mixH(beltPose, port, smooth(ramp(f, 0, 0.4)));
-      if (f < 0.6) return port;
-      return mixH(port, beltPose, smooth(ramp(f, 0.6, 1)));
+    const st = this.shot;
+    if (!st) return mixH(beltPose, pumpPose, smooth(ramp(p, 0.74, 0.85)));
+    if (st.k === 'in') return mixH(gripPose, beltPose, smooth(st.f));
+    if (st.k === 'shell') { // pega o cartucho no cinto → empurra na janela → volta ao cinto (o último vai direto à bomba)
+      const f = st.f;
+      if (f < 0.42) return mixH(beltPose, port, smooth(ramp(f, 0, 0.42)));
+      if (f < 0.62) { const push = Math.sin(Math.PI * ramp(f, 0.42, 0.62)); return mixH(port, mk(this.weaponPoint(spec.magPoint, V(0, -0.005, -0.03)), qOpen, grab), push); }
+      return mixH(port, st.last ? pumpPose : beltPose, smooth(ramp(f, 0.62, 1)));
     }
-    return mixH(beltPose, pumpPose, smooth(ramp(p, 0.74, 0.85)));
+    return pumpPose; // fechando: mão na bomba (e bombeia junto se estava vazia)
   }
   applyReloadParts(spec, parts, p, weight) {
     if (spec.reload === 'mag' && parts.mag) {
@@ -774,7 +788,7 @@ export class ViewModel {
       parts.drum.rotation.z = open * Math.PI * 2 * 1.5 + (p > 0.3 && p < 0.5 ? (p - 0.3) * 40 : 0);
       parts.drum.position.x = -0.045 * open;
     } else if (spec.reload === 'shotgun' && parts.pump) {
-      const sl = ramp(p, 0.86, 0.98); // a mão já está na bomba (chega em 0,85)
+      const st = this.shot, sl = st ? (st.k === 'out' && st.pump ? ramp(st.f, 0.1, 0.95) : 0) : ramp(p, 0.86, 0.98);
       const back = smooth(ramp(sl, 0, 0.45)) - smooth(ramp(sl, 0.5, 1));
       parts.pump.position.z = back * 0.1;
     }
@@ -789,9 +803,8 @@ export class ViewModel {
     const p = reloadP;
     if (spec.reload === 'mag') { const T = this.magTimeline(spec); if (p > T.held[0] && p < T.held[1]) this.heldMag.visible = true; }
     else if (spec.reload === 'revolver' && p > 0.64 && p < 0.84) this.heldLoader.visible = true;
-    else if (spec.reload === 'shotgun' && p > 0.1 && p < 0.74) {
-      const u = ((p - 0.1) / 0.64) * 3, f = u - Math.floor(u);
-      this.heldShell.visible = f > 0.12 && f < 0.5;
+    else if (spec.reload === 'shotgun' && this.shot && this.shot.k === 'shell') {
+      this.heldShell.visible = this.shot.f > 0.04 && this.shot.f < 0.55; // cartucho na mão até entrar na janela
     }
   }
 
