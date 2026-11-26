@@ -5,6 +5,16 @@
 // Nos textos, **assim** vira negrito.
 export const PATCH_NOTES = [
   {
+    id: '0.36', versao: 'v0.36', data: '26/11/2026', titulo: 'Caixas balanceadas',
+    destaques: [
+      { tag: 'Loot', titulo: 'Caixas consistentes', texto: 'Toda caixa agora tem uma **base garantida** (munição + comida); o resto (curativo, cartuchos, arma) cresce **aos poucos** de zona em zona. Acabou a caixa com 3 balas do lado de uma com arma, e o salto enorme da zona militar para a seguinte.' },
+      { tag: 'Ilha inicial', titulo: '5 caixas espalhadas', texto: 'A ilha inicial tem **5 caixas em volta da ilha** e o kit de começo vem **dividido entre elas**: pistola, martelo e curativos, comida, e uma arma branca.' },
+    ],
+    secoes: [
+      { icone: '📦', nome: 'Loot', itens: ['Chance de arma sobe suave: **16% → 24% → 34% → 44% → 54%** (naufrágio +8%).', 'Arma achada já vem com munição própria (cartuchos para escopeta).', 'Zonas avançadas dão mais comida e sorteios extras; kit médico a partir da zona militar.', 'Caixotes da seca: sempre munição + comida.'] },
+    ],
+  },
+  {
     id: '0.35', versao: 'v0.35', data: '26/11/2026', titulo: 'Canhões soldáveis e encaixe na mira',
     destaques: [
       { tag: 'Construção', titulo: 'Mirou na bolinha, encaixou', texto: 'Carregando uma peça, **mire num ponto de encaixe** da jangada: a peça vai **direto para a posição certinha** (em cima ou do lado) e fica travada ali, pronta para **soldar**.' },

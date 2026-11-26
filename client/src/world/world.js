@@ -612,7 +612,8 @@ export class World {
     };
     // Ruínas de casas montadas com módulos de parede (algumas faltando).
     const starterCratePositions = starterIsland
-      ? [[-R * 0.78, 0], [R * 0.78, -R * 0.22], [0, R * 0.78]]
+      // 5 caixas espalhadas em volta (a cada ~60°), fora do helicóptero (-45°) e da plataforma (-90°)
+      ? [[180, 0.74], [0, 0.76], [120, 0.7], [60, 0.72], [-140, 0.7]].map(([a, d]) => [Math.cos(a * Math.PI / 180) * R * d, Math.sin(a * Math.PI / 180) * R * d])
       : [];
     // acampamento (cabana ou forte) perto do meio; ruínas ficam longe dele
     const campA = r() * 6.28, campD = r() * Math.max(0, R - campR - 1.4);
