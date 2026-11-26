@@ -203,7 +203,7 @@ export class Interact {
       } else this.reviveT = 0;
       return;
     }
-    if (c.remove && inp.act('unweld')) G.build.tryRemoveWelded(c.remove);
+    if (c.remove && inp.act('unweld')) { if (G.build.tryRemoveWelded(c.remove)) G.build.splitOrphans(); }
     else if (inp.act('interact') && c.run) { c.run(); if (G.viewmodel) G.viewmodel.onInteract(); }
     if (c.mast && !c.installSail) {
       const turn = (inp.held('sailLeft') ? 1 : 0) - (inp.held('sailRight') ? 1 : 0); // + = vira para a esquerda (+X)

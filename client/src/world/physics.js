@@ -27,6 +27,7 @@ export class Physics {
     this.records = new Map();
     this.raftPieces = new Map();
     this.staticSets = new Map();
+    this.links = []; // soldas ENTRE destroços (fatia que se soltou da jangada): { a, b, c }
 
     this.raftRoot = new CANNON.Body({
       mass: 0,
@@ -215,7 +216,27 @@ export class Physics {
     this.staticSets.delete(set);
   }
 
+  // Solda entre dois objetos soltos (uma fatia da jangada que se separou continua inteira).
+  linkObjects(objA, objB) {
+    const ra = this.records.get(objA.id), rb = this.records.get(objB.id);
+    if (!ra || !rb || ra === rb || ra.kind !== 'object' || rb.kind !== 'object') return false;
+    if (this.links.some((l) => (l.a === objA.id && l.b === objB.id) || (l.a === objB.id && l.b === objA.id))) return true;
+    const c = new CANNON.LockConstraint(ra.body, rb.body, { maxForce: 6e5 });
+    this.world.addConstraint(c);
+    this.links.push({ a: objA.id, b: objB.id, c });
+    return true;
+  }
+  unlinkObject(obj) {
+    if (!obj || !this.links.length) return;
+    this.links = this.links.filter((l) => {
+      if (l.a !== obj.id && l.b !== obj.id) return true;
+      this.world.removeConstraint(l.c); return false;
+    });
+  }
+  isLinked(obj) { return !!obj && this.links.some((l) => l.a === obj.id || l.b === obj.id); }
+
   suspendObject(obj) {
+    this.unlinkObject(obj);
     const record = this.records.get(obj.id);
     if (!record || record.kind !== 'object' || !record.active) return;
     this.world.removeBody(record.body);
@@ -249,6 +270,7 @@ export class Physics {
   }
 
   removeObject(obj) {
+    this.unlinkObject(obj);
     const record = this.records.get(obj.id);
     if (!record || record.kind !== 'object') return;
     if (record.active) this.world.removeBody(record.body);
@@ -287,6 +309,7 @@ export class Physics {
   }
 
   attachWeldedObject(obj, piece) {
+    this.unlinkObject(obj);
     let record = this.records.get(obj.id);
     if (!record) record = this.addFloatingObject(obj);
     if (record.constraint) this.world.removeConstraint(record.constraint);
@@ -417,9 +440,9 @@ export class Physics {
 
   _applyHold(record, dt) {
     const { body, holdTarget } = record;
-    const maxAcceleration = 160;
+    const maxAcceleration = 260;
     const linearSpeed = body.velocity.length();
-    const maxSpeed = 8;
+    const maxSpeed = 13;
     if (linearSpeed > maxSpeed) body.velocity.scale(maxSpeed / linearSpeed, body.velocity);
     let ax = (holdTarget.position.x - body.position.x) * 140 - body.velocity.x * 23.7;
     let ay = (holdTarget.position.y - body.position.y) * 140 - body.velocity.y * 23.7;
@@ -478,9 +501,8 @@ export class Physics {
   }
 
   _syncPlayerCollider(dt) {
-    const carrying = Array.from(this.records.values()).some((record) =>
-      record.kind === 'object' && record.active && record.holdTarget
-    );
+    const held = this.G.build && this.G.build.held, hr = held && this.records.get(held.id);
+    const carrying = !!(hr && hr.active && hr.holdTarget);
     if (!carrying || !this.G.player) {
       if (this.playerColliderActive) this.world.removeBody(this.playerCollider);
       this.playerColliderActive = false;

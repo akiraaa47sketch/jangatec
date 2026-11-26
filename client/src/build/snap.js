@@ -66,7 +66,7 @@ export class BuildSnap {
     if (!this.on) this.hide();
     return this.on;
   }
-  hide() { this.dots.count = 0; this.result = null; }
+  hide() { this.dots.count = 0; this.result = null; this.last = null; }
 
   // Caixas das peças da jangada (pela malha + medida física; a plataforma inicial pelo colisor)
   targets(near) {
@@ -106,7 +106,7 @@ export class BuildSnap {
   // Ajusta { position, quaternion } da peça carregada. Retorna true se grudou.
   apply(position, quaternion, size, offset) {
     this.result = null;
-    if (!this.on) { this.dots.count = 0; return false; }
+    if (!this.on) { this.dots.count = 0; this.last = null; return false; }
     const up = AXES[1];
     const center = () => position.clone().add(offset.clone().applyQuaternion(quaternion));
     const slotBoxes = this.slots();
@@ -138,15 +138,20 @@ export class BuildSnap {
       if (slotBoxes.includes(b)) { tTop.push(...facePoints(b, faceToward(b, up.clone().negate())).map((t) => ({ ...t, slot: true }))); continue; }
       tTop.push(...facePoints(b, faceToward(b, up))); tSide.push(...sidePoints(b, up));
     }
+    // histerese: o encaixe atual "segura" mais (raio maior e vantagem), então a peça não fica pulando
+    // entre dois pontos vizinhos enquanto a mira treme
+    const last = this.last, sticky = (t) => last && t.p.distanceToSquared(last) < 0.0025;
+    const score = (d, t) => d - (sticky(t) ? 0.2 : 0), radius = (t) => (sticky(t) ? SNAP_RADIUS * 1.5 : SNAP_RADIUS);
     let best = null;
     for (const h of hBottom) for (const t of tTop) {
       if (h.k !== t.k) continue;
-      const d = h.p.distanceTo(t.p); if (d < SNAP_RADIUS && (!best || d < best.d)) best = { d, h, t };
+      const d = h.p.distanceTo(t.p), sc = score(d, t); if (d < radius(t) && (!best || sc < best.s)) best = { d, s: sc, h, t };
     }
     for (const h of hSide) for (const t of tSide) {
       if (h.k !== t.k || h.n.dot(t.n) > -0.85) continue;
-      const d = h.p.distanceTo(t.p); if (d < SNAP_RADIUS && (!best || d < best.d - 0.02)) best = { d, h, t };
+      const d = h.p.distanceTo(t.p), sc = score(d, t) + 0.02; if (d < radius(t) && (!best || sc < best.s)) best = { d, s: sc, h, t };
     }
+    this.last = best ? best.t.p.clone() : null;
     if (best) {
       const delta = best.t.p.clone().sub(best.h.p);
       position.add(delta);

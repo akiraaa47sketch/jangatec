@@ -614,9 +614,11 @@ export function disposePill(pill) {
 //        | parry | roll | sidestep | crawl | kick | clash
 const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
 const smooth01 = (x) => { x = Math.max(0, Math.min(1, x)); return x * x * (3 - 2 * x); };
+const easeOut3 = (x) => { x = Math.max(0, Math.min(1, x)); return 1 - (1 - x) ** 3; }; // arranque rápido, freia no fim (golpes)
 // Partes animadas: a pose calcula o ALVO e animatePill mistura suavemente do quadro anterior para
 // ele (sem "estalos" ao trocar de pose). Ângulos misturados pelo caminho mais curto (giros de 360°).
 const BLEND_PARTS = ['body', 'armL', 'armR', 'legL', 'legR'];
+const CROUCH_SKIP = ['swim', 'crawl', 'climb', 'vault', 'roll', 'row', 'leap', 'jump', 'sidestep', 'dodge', 'kick', 'spin'];
 const _snap = new Float32Array(BLEND_PARTS.length * 3 + 2);
 const wrapPi = (a) => { a = (a + Math.PI) % (Math.PI * 2); return (a < 0 ? a + Math.PI * 2 : a) - Math.PI; };
 export function animatePill(pill, speed, dt, pose = 'walk', progress = 0) {
@@ -755,17 +757,22 @@ function poseTargets(pill, speed, dt, pose, progress) {
     p.armR.rotation.set(0.9 * k2 + tr, 0, -0.35 - 0.4 * k2); p.armL.rotation.set(-0.9 * k2, 0, 0.35);
     p.body.rotation.set(-0.1 * k2, 0.45 * k2, 0.04 * k2); p.body.position.y = BODY_Y - 0.1 * k2;
     p.legL.rotation.set(-0.45 * k2, 0, 0.1); p.legR.rotation.set(0.35 * k2, 0, -0.1);
-  } else if (pose === 'charge') { // carregando o pesado: arma por cima do ombro, tronco torcido, base larga
-    const k2 = smooth01(progress), full = progress >= 1 ? 1 : 0, tr = Math.sin(ph * 31) * (0.012 + 0.03 * full) * k2;
-    p.armR.rotation.set(-2.35 * k2 + tr, 0.25 * k2, -0.55 * k2); p.armL.rotation.set(-1.95 * k2 - tr, -0.55 * k2, 0.65 * k2);
-    p.body.rotation.set(-0.14 * k2, 0.65 * k2 + tr, 0.06 * k2); p.body.position.y = BODY_Y - 0.15 * k2;
-    p.legL.rotation.set(-0.55 * k2, 0, 0.18 * k2); p.legR.rotation.set(0.45 * k2, 0, -0.18 * k2);
-  } else if (pose === 'heavyStrike') { // solta a carga: corte diagonal de cima, avançando, e volta
-    const u = Math.min(1, progress), a = u < 0.42 ? smooth01(u / 0.42) : 1, back = u > 0.68 ? smooth01((u - 0.68) / 0.32) : 0, h = 1 - back;
-    const rx = -2.35 + 2.0 * a, ry = 0.25 - 0.75 * a, rz = -0.55 + 0.35 * a;
-    p.armR.rotation.set(rx * h, ry * h, rz * h); p.armL.rotation.set((-1.95 + 1.7 * a) * h, (-0.55 + 0.4 * a) * h, (0.65 - 0.2 * a) * h);
-    p.body.rotation.set((-0.14 + 0.6 * a) * h, (0.65 - 1.2 * a) * h, (0.06 - 0.12 * a) * h); p.body.position.y = BODY_Y - (0.15 + 0.08 * a) * h;
-    p.legL.rotation.set(-0.75 * a * h, 0, 0.18 * h); p.legR.rotation.set(0.55 * a * h, 0, -0.18 * h);
+  } else if (pose === 'charge') { // carregando o pesado: arma bem alta atrás do ombro, tronco torcido, base larga e baixa
+    const k2 = smooth01(progress), full = progress >= 1 ? 1 : 0, tr = Math.sin(ph * 31) * (0.012 + 0.035 * full) * k2;
+    const pulse = full ? Math.sin(ph * 5) * 0.04 : 0; // carga cheia: respira pesado, pronto para soltar
+    p.armR.rotation.set(-2.6 * k2 + tr, 0.45 * k2, -0.7 * k2); p.armL.rotation.set(-2.25 * k2 - tr, -0.35 * k2, 0.75 * k2);
+    p.body.rotation.set(-0.2 * k2 + pulse, 0.85 * k2 + tr, 0.1 * k2); p.body.position.y = BODY_Y - 0.2 * k2 + pulse * 0.5; p.body.position.z = -0.08 * k2;
+    p.legL.rotation.set(-0.6 * k2, 0, 0.22 * k2); p.legR.rotation.set(0.5 * k2, 0, -0.22 * k2);
+  } else if (pose === 'heavyStrike') { // PESADO: sobe por cima do ombro → desce na diagonal com tudo, avançando → segura o impacto → volta
+    const u = Math.min(1, progress);
+    const wind = smooth01(u / 0.2), smash = easeOut3((u - 0.2) / 0.24), hold = u < 0.66 ? 1 : 1 - smooth01((u - 0.66) / 0.34);
+    const lerp3 = (a, b, c) => (a + (b - a) * wind) * (1 - smash) + c * smash; // carga → topo → impacto
+    const hop = Math.sin(Math.min(1, u / 0.2) * Math.PI) * 0.06;            // pulinho para tomar impulso
+    p.armR.rotation.set(lerp3(-2.6, -2.95, 0.25) * hold, lerp3(0.45, 0.4, -0.75) * hold, lerp3(-0.7, -0.5, -0.1) * hold);
+    p.armL.rotation.set(lerp3(-2.25, -2.75, 0.05) * hold, lerp3(-0.35, -0.3, -0.35) * hold, lerp3(0.75, 0.55, 0.3) * hold);
+    p.body.rotation.set(lerp3(-0.2, -0.32, 0.6) * hold, lerp3(0.85, 0.7, -0.7) * hold, lerp3(0.1, 0.05, -0.14) * hold);
+    p.body.position.y = BODY_Y + (lerp3(-0.2, -0.05, -0.3) + hop) * hold; p.body.position.z = lerp3(-0.08, -0.05, 0.4) * hold;
+    p.legL.rotation.set(lerp3(-0.6, -0.4, -1.0) * hold, 0, 0.2 * hold); p.legR.rotation.set(lerp3(0.5, 0.35, 0.7) * hold, 0, -0.2 * hold);
   } else if (pose === 'heavyWindup') { // os dois braços para o alto
     const k2 = smooth01(progress);
     p.armR.rotation.set(-2.9 * k2, 0, -0.25 * k2); p.armL.rotation.set(-2.9 * k2, 0, 0.25 * k2);
@@ -791,26 +798,31 @@ function poseTargets(pill, speed, dt, pose, progress) {
     p.body.position.y = BODY_Y - 0.5 * k2; p.body.rotation.set(0.5 * k2, 0, 0);
     p.armR.rotation.set(-0.6 * k2, 0, -0.6 * k2); p.armL.rotation.set(-0.6 * k2, 0, 0.6 * k2);
     p.legL.rotation.set(-1.0 * k2, 0, 0); p.legR.rotation.set(0.6 * k2, 0, 0);
-  } else if (pose === 'slashR') { // corte horizontal da direita para a esquerda, com passo à frente
-    const a = smooth01(progress), sw = Math.sin(Math.min(1, progress) * Math.PI);
-    p.armR.rotation.set(-1.45, -1.3 + 2.4 * a, -0.4 + 0.3 * sw); p.armL.rotation.set(-0.6 + 0.3 * sw, 0, 0.5 + 0.3 * a);
-    p.body.rotation.set(0.1 + 0.1 * sw, 0.6 - 1.3 * a, -0.08 * sw); p.body.position.z = 0.12 * sw; p.body.position.y = BODY_Y - 0.08 * sw;
-    p.legL.rotation.set(-0.5 * sw - 0.1, 0, 0.05); p.legR.rotation.set(0.35, 0, -0.05);
-  } else if (pose === 'slashL') { // revés da esquerda para a direita
-    const a = smooth01(progress), sw = Math.sin(Math.min(1, progress) * Math.PI);
-    p.armR.rotation.set(-1.35, 1.1 - 2.3 * a, -0.2); p.armL.rotation.set(-0.4, 0, 0.45 + 0.3 * sw);
-    p.body.rotation.set(0.1 + 0.1 * sw, -0.65 + 1.3 * a, 0.08 * sw); p.body.position.z = 0.12 * sw; p.body.position.y = BODY_Y - 0.08 * sw;
-    p.legL.rotation.set(0.35, 0, 0.05); p.legR.rotation.set(-0.5 * sw - 0.1, 0, -0.05);
-  } else if (pose === 'thrust') { // estocada com avanço
-    const a = Math.sin(Math.min(1, progress) * Math.PI);
-    p.armR.rotation.set(-1.6, 0, -0.1); p.armL.rotation.set(0.5 * a, 0, 0.3);
-    p.body.position.z = 0.35 * a; p.body.rotation.set(0.35 * a, -0.25 * a, 0);
-    p.legL.rotation.set(-0.7 * a, 0, 0); p.legR.rotation.set(0.5 * a, 0, 0);
-  } else if (pose === 'uppercut') { // golpe de baixo para cima
-    const a = smooth01(progress);
-    p.armR.rotation.set(0.6 - 3.0 * a, 0, -0.25); p.armL.rotation.set(-0.5, 0, 0.4);
-    p.body.position.y = BODY_Y - 0.15 + 0.3 * a; p.body.rotation.set(0.3 - 0.5 * a, -0.2, 0);
-    p.legL.rotation.set(-0.3 * (1 - a), 0, 0); p.legR.rotation.set(0.3 * (1 - a), 0, 0);
+  } else if (pose === 'slashR' || pose === 'slashL') { // corte horizontal: prepara → corta rápido com passo → acompanha → volta
+    const u = Math.min(1, progress), d = pose === 'slashR' ? 1 : -1;            // slashR: direita→esquerda; slashL: revés
+    const ant = smooth01(u / 0.2), cut = easeOut3((u - 0.16) / 0.3), rec = smooth01((u - 0.62) / 0.38), on = 1 - rec;
+    const yaw = ((-1.45 * ant) * (1 - cut) + 1.35 * cut) * d;                  // braço: puxa para o lado e varre
+    const lunge = Math.sin(Math.min(1, Math.max(0, (u - 0.12) / 0.6)) * Math.PI);
+    p.armR.rotation.set((-0.6 - 0.85 * Math.max(ant, cut)) * on - 0.35 * rec, yaw * on + 0.1 * rec, (-0.35 + 0.35 * cut * d) * on - 0.2 * rec);
+    p.armL.rotation.set((-0.5 - 0.3 * lunge) * on - 0.3 * rec, 0, (0.45 + 0.45 * lunge) * on + 0.2 * rec);
+    p.body.rotation.set((0.08 + 0.16 * lunge) * on, ((0.7 * ant) * (1 - cut) - 0.8 * cut) * d * on, -0.1 * lunge * d * on);
+    p.body.position.z = 0.2 * lunge; p.body.position.y = BODY_Y - 0.1 * lunge;
+    const front = d > 0 ? p.legL : p.legR, rear = d > 0 ? p.legR : p.legL;
+    front.rotation.set(-0.65 * lunge - 0.05, 0, 0.06 * d); rear.rotation.set(0.45 * lunge, 0, -0.06 * d);
+  } else if (pose === 'thrust') { // estocada: recolhe o braço → dispara à frente com avanço → recolhe
+    const u = Math.min(1, progress), ant = smooth01(u / 0.22), hit = easeOut3((u - 0.2) / 0.22), rec = smooth01((u - 0.6) / 0.4), on = 1 - rec;
+    const ext = hit * on;
+    p.armR.rotation.set((-0.9 - 0.75 * ext) * on - 0.35 * rec, (0.35 * ant * (1 - hit)) * on, (-0.35 * ant * (1 - hit) - 0.05) * on);
+    p.armL.rotation.set((0.2 + 0.4 * ext) * on, 0, (0.35 + 0.2 * ext) * on);
+    p.body.position.z = -0.1 * ant * (1 - hit) + 0.45 * ext; p.body.position.y = BODY_Y - 0.12 * ext;
+    p.body.rotation.set((-0.08 * ant * (1 - hit) + 0.38 * ext), (0.35 * ant * (1 - hit) - 0.3 * ext), 0);
+    p.legL.rotation.set(-0.85 * ext, 0, 0.05); p.legR.rotation.set(0.6 * ext, 0, -0.05);
+  } else if (pose === 'uppercut') { // de baixo para cima: agacha e enrola → explode para cima → volta
+    const u = Math.min(1, progress), low = smooth01(u / 0.25), up = easeOut3((u - 0.22) / 0.26), rec = smooth01((u - 0.62) / 0.38), on = 1 - rec;
+    p.armR.rotation.set((0.55 * low * (1 - up) - 2.7 * up) * on - 0.35 * rec, 0.15 * on, -0.3 * on);
+    p.armL.rotation.set(-0.5 * on, 0, (0.4 + 0.3 * up) * on);
+    p.body.position.y = BODY_Y - 0.22 * low * (1 - up) + 0.12 * up * on; p.body.rotation.set((0.35 * low * (1 - up) - 0.3 * up) * on, (0.3 * low * (1 - up) - 0.25 * up) * on, 0);
+    p.legL.rotation.set(-0.45 * low * (1 - up) * on, 0, 0.08); p.legR.rotation.set(0.35 * low * (1 - up) * on, 0, -0.08);
   } else if (pose === 'spin') { // giro de 360° (golpe final)
     const a = smooth01(progress);
     p.armR.rotation.set(-1.5, 0, -1.2); p.armL.rotation.set(-1.5, 0, 1.2);
@@ -888,6 +900,15 @@ function poseTargets(pill, speed, dt, pose, progress) {
       p.armL.rotation.set(-0.55 + sc * 0.25, sc * 0.4, 0.95); p.armR.rotation.set(-0.55 - sc * 0.25, -sc * 0.4, -0.95);
       p.legL.rotation.set(Math.sin(ph * 1.6) * 0.6, 0, 0.1); p.legR.rotation.set(-Math.sin(ph * 1.6) * 0.6, 0, -0.1);
     }
+  }
+  // ---------- agachar (ud.crouch 0..1, mola com um leve "quique"; ud.crouchV = velocidade da mola) ----------
+  const cr = clamp(ud.crouch || 0, 0, 1.15);
+  if (cr > 0.005 && !CROUCH_SKIP.includes(pose)) {
+    const cw = Math.min(1, cr), mvk = Math.min(1, speed / 2.2), st = Math.sin(ph) * 0.28 * mvk;
+    const mix = (r, x, z) => { r.x += (x - r.x) * cw; r.z += (z - r.z) * cw; r.y *= 1 - cw; };
+    mix(p.legL.rotation, -1.0 + st, 0.12); mix(p.legR.rotation, 0.85 - st, -0.12); // um joelho à frente, o outro atrás
+    p.body.position.y -= 0.36 * cr; p.body.rotation.x += 0.2 * cw - (ud.crouchV || 0) * 0.04; // inclina para a frente (e balança ao descer/subir)
+    if (pose === 'walk') { p.armL.rotation.x = p.armL.rotation.x * (1 - 0.5 * cw) - 0.35 * cw; p.armR.rotation.x = p.armR.rotation.x * (1 - 0.5 * cw) - 0.35 * cw; }
   }
   // ---------- camadas por cima: tranco de dano e "amassada" ao aterrissar ----------
   const hurt = ud.hurt || 0;

@@ -37,6 +37,7 @@ export class Player {
     this.aimHold = 0;         // depois de um tiro "do quadril", segura a pose de mira um instante
     this.kick = 0;            // recuo visual dos braços em 3ª pessoa
     this.flashT = 0; this.throwT = -1;
+    this.crouching = false; this.crouchK = 0; this.crouchV = 0; // agachar ([Ctrl] segurado): mola 0 = em pé … 1 = agachado
     this.mesh = makeHumanoid(0xb49b7b, 0xb97251);
     this.proceduralRig = this.mesh.userData.parts.rig;
     this.pillVisual = null;
@@ -184,7 +185,8 @@ export class Player {
     let dx = fx * fwd + rx * side, dz = fz * fwd + rz * side;
     const len = Math.hypot(dx, dz), moving = len > 0;
     if (moving) { dx /= len; dz /= len; }
-    let speed = this.swimming ? CFG.swim : inp.held('sprint') && !this.G.build.active ? CFG.run : CFG.walk;
+    this._updateCrouch(dt);
+    let speed = this.swimming ? CFG.swim : this.crouching ? CFG.walk * 0.5 : inp.held('sprint') && !this.G.build.active ? CFG.run : CFG.walk;
     if (this.downed) speed = this.swimming ? CFG.swim * 0.6 : 0.9; // caído: só se arrasta
     if (aiming) speed = Math.min(speed, 3);
     speed *= this.speedMul || 1; // bloqueando/carregando golpe anda devagar
@@ -208,6 +210,7 @@ export class Player {
     else if (aiming || this.aimHold > 0 || (this.faceCam && !this.swimming)) this.yaw = lerpAngle(this.yaw, Math.atan2(fx, fz), Math.min(1, 16 * dt)); // [L] trava o corpo na câmera
     else if (moving) this.yaw = lerpAngle(this.yaw, Math.atan2(dx, dz), Math.min(1, 12 * dt));
 
+    if (inp.act('jump') && !this.downed && this.crouching && this._canStand()) { this.crouching = false; this.body.height = 1.7; } // pular levanta
     if (inp.act('jump') && !this.downed) {
       const dir = moving ? [dx, dz] : [Math.sin(this.yaw), Math.cos(this.yaw)];
       if (!this.tryMantle(dir[0], dir[1]) && b.grounded) { b.vel.y = CFG.jumpSpeed; b.grounded = false; }
@@ -262,6 +265,24 @@ export class Player {
       if (Math.hypot(p.x - c.x, p.z - c.z) > c.radius + 2.5) b.carrier = null;
     }
     this.syncMesh(Math.hypot(b.vel.x, b.vel.z), dt);
+  }
+
+  // Agachar: segura a tecla. Só levanta se houver espaço em cima (não atravessa teto/mesa).
+  _canStand() {
+    const p = this.body.pos;
+    return !this.G.colliders.segmentBlocked(p.x, p.y + 1.15, p.z, p.x, p.y + 1.72, p.z, 0.02);
+  }
+  _updateCrouch(dt) {
+    const G = this.G, b = this.body;
+    const can = !this.swimming && !this.downed && !this.mantle && !this.onLadder && !this.dead && !(G.melee && G.melee.dodge);
+    const want = can && G.input.held('crouch') && !(G.tools && G.tools.menuOpen);
+    if (want) this.crouching = true;
+    else if (this.crouching && (!can || this._canStand())) this.crouching = false;
+    b.height = this.crouching ? 1.15 : 1.7;
+    // mola levemente sub-amortecida: desce/sobe com um pequeno quique (é a animação de agachar/levantar)
+    const target = this.crouching ? 1 : 0, kS = 170, dS = 19;
+    this.crouchV += ((target - this.crouchK) * kS - this.crouchV * dS) * dt;
+    this.crouchK = clamp(this.crouchK + this.crouchV * dt, -0.08, 1.12);
   }
 
   // Procura uma superfície à frente para subir (vault baixo, borda alta ou sair da água).
@@ -380,6 +401,7 @@ export class Player {
       pd.useItem = this.useAnim ? this.useAnim.item : null;
       pd.hurt = this.hurtT; pd.hurtSide = this.hurtSide || 1; pd.squash = this.squash; pd.strum = this.strumK;
       pd.vaultSide = 1;
+      pd.crouch = Math.max(0, this.crouchK); pd.crouchV = this.crouchV;
       pd.talk = G.voice && G.voice.talking ? Math.min(1, G.voice.level * 30) : 0; // boca mexe com a voz
       this.anim = { pose: pose === 'climb' || pose === 'vault' ? pose : pose, progress, armed: pd.armed };
       if (this.flashMesh) {
@@ -397,6 +419,7 @@ export class Player {
     this.mesh.updateWorldMatrix(true, false);
     this.mesh.getWorldPosition(_v);
     this.eyeHeight += ((this.dead ? 0.35 : this.downed ? 0.5 : 1.38) - this.eyeHeight) * Math.min(1, 6 * dt);
+    _v.y -= 0.5 * Math.max(0, this.crouchK); // agachado: olhos mais baixos (segue a mola, com o mesmo quique)
     _v.y += this.eyeHeight + (vm ? vm.camOff.y : 0);
     this.camTarget.copy(_v);
     this.camDist = 0;
@@ -438,7 +461,7 @@ export class Player {
     if (this.firstPerson) { this.updateFirstPersonCamera(dt, t); return; }
     const G = this.G, cam = G.camera, aiming = G.combat.aiming;
     this.mesh.updateWorldMatrix(true, false);
-    this.mesh.getWorldPosition(_v); _v.y += this.downed ? 0.7 : 1.4;
+    this.mesh.getWorldPosition(_v); _v.y += this.downed ? 0.7 : 1.4 - 0.45 * Math.max(0, this.crouchK);
     this.camTarget.lerp(_v, 1 - Math.exp(-20 * dt));
     // zoom da 3ª pessoa: [I] aproxima, [O] afasta (mira sempre puxa para perto do ombro)
     const typing = G.tools && G.tools.menuOpen;
@@ -472,5 +495,6 @@ export class Player {
     b.carrier = spawn.groundSet; b.groundSet = spawn.groundSet; b.grounded = !!spawn.groundSet;
     this.camTarget.set(b.pos.x, b.pos.y + 1.6, b.pos.z);
     this.swimming = false; this.mantle = null; this.dead = false; this.downed = false; this.throwT = -1;
+    this.crouching = false; this.crouchK = this.crouchV = 0; b.height = 1.7;
   }
 }

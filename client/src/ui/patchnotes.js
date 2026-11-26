@@ -5,6 +5,19 @@
 // Nos textos, **assim** vira negrito.
 export const PATCH_NOTES = [
   {
+    id: '0.33', versao: 'v0.33', data: '26/11/2026', titulo: 'Build refeita, solda em grafo e agachar',
+    destaques: [
+      { tag: 'Construção', titulo: 'Solda peça com peça', texto: 'Cada peça fica soldada **nas peças que ela toca**. Se uma peça quebrar e **partir a jangada**, o pedaço que ficou sem ligação **se solta inteiro**: a fatia continua soldada e boia separada.' },
+      { tag: 'Movimento', titulo: 'Agachar', texto: 'Segure **[Ctrl]** para agachar, com animação de **abaixar e levantar**. Anda mais devagar e só levanta se tiver espaço em cima.' },
+    ],
+    secoes: [
+      { icone: '🔨', nome: 'Build', itens: ['**Roda do mouse aproxima e afasta** a peça carregada; Shift+roda ou **[E]** gira 15°, **[C]** inclina 15°.', 'O giro fica **preso à jangada** (a peça vira junto com ela) e o gizmo gira sempre nos eixos da jangada.', '**Hitbox certa em peça girada**: o contorno verde e a caixa de pegar seguem o giro da peça; peça soldada inclinada ganha colisão justa (antes virava uma caixa enorme e invisível).', '**Clicar pega**: o alcance é medido até a peça (antes era até o centro, e peças grandes não pegavam).', 'Mais leve: a mira não testa mais a malha inteira do mar nem todas as ilhas a cada quadro.', 'Build assistida: encaixe **não pula** entre pontos vizinhos e solda mesmo com a peça exatamente rente.'] },
+      { icone: '🪵', nome: 'Peças novas', itens: ['**Prancha de madeira 6×2** e **Madeira 5×3** boiando no mar.'] },
+      { icone: '⚔', nome: 'Combate em 3ª pessoa', itens: ['**Ataque pesado com animação própria**: arma bem alta atrás do ombro na carga, pulinho de impulso, pancada diagonal avançando e segura o impacto.', 'Cortes, estocada e gancho com **preparação, avanço e retorno** (antes eram só um vaivém).'] },
+      { icone: '🌊', nome: 'Mar', itens: ['Seca um pouco mais longa: **55 → 70 s**.', 'Eventos aleatórios **mais frequentes** (intervalo 100–165 s, antes 130–210).', 'Saiu o aviso de **"ondas grandes"** (e a ondulação que ele anunciava).', 'Canhão improvisado no fundo da seca **um pouco mais comum**.'] },
+    ],
+  },
+  {
     id: '0.32', versao: 'v0.32', data: '25/11/2026', titulo: 'Vela nova, caixas e itens no chão',
     secoes: [
       { icone: '⛵', nome: 'Vela', itens: ['**Corrigida**: a borda de cima fica presa na verga (antes ela se descolava e sacudia solta, pior com a vela baixada).', '**Mais detalhada**: painéis costurados, faixa vermelha com emblema, linha de rizo, reforços e corda de borda; barriga de vento de verdade.', 'Baixada, ela fica **enrolada e amarrada** embaixo da verga. Escotas ligam os cantos ao convés e amantilhos seguram a verga.'] },

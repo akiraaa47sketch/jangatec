@@ -63,7 +63,7 @@ function placementState(id, state) {
       !Array.isArray(state.p) || state.p.length !== 3 ||
       !Array.isArray(state.q) || state.q.length !== 4 ||
       !state.p.concat(state.q).every(Number.isFinite)) return null;
-  return { id, p: state.p, q: state.q, placed: true, water: !!state.water };
+  return { id, p: state.p, q: state.q, placed: state.placed !== false, water: !!state.water };
 }
 
 const ITEM_RE = /^(colete|metal|bandagem|kit|municao|cartucho|canhao|canhao_ferro|gancho|bala_canhao|barra_proteina|energetico|chocolate|peixe|arma_[a-z0-9_]+)$/;

@@ -45,12 +45,17 @@ uso troca as duas de lugar).
 | Tecla | Ação |
 |---|---|
 | W A S D / Shift | andar / correr |
+| Ctrl (segurar) | agachar (anda devagar; só levanta se houver espaço em cima) |
 | Espaço | pular, subir em bordas, sair da água |
 | Mouse ou setas | câmera |
 | E | abrir caixa / instalar vela; controlar vela depois da partida |
 | Z / C | soldar durante o build / girar vela perto do mastro |
 | Botão esquerdo | pegar a peça contornada de verde |
 | Q | soltar a peça carregada |
+| Roda do mouse (construindo) | aproximar / afastar a peça carregada |
+| Shift + roda · E (construindo) | girar a peça 15° no vertical (Shift+E ao contrário) |
+| C (construindo) | inclinar a peça 15° (Shift+C ao contrário) |
+| T (construindo) | endireitar (tira a inclinação, giro em múltiplos de 90°) |
 | Mouse + WASD | virar câmera, arrastar a peça e andar |
 | G (construindo) | teletransportar a peça para o ponto indicado pela mira |
 | B (construindo) | build assistida: pontos de encaixe e alinhamento automático |

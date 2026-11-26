@@ -232,7 +232,7 @@ export class Net {
       let x = b.pos.x, y = b.pos.y, z = b.pos.z, yaw = pl.yaw;
       if (pl.aboard) { [x, z] = boat.toLocal(x, z); y -= boat.set.y; yaw -= boat.yaw; }
       const r2 = (v) => Math.round(v * 100) / 100;
-      this.send({ t: 'state', s: { p: [r2(x), r2(y), r2(z)], yaw: r2(yaw), ab: pl.aboard ? 1 : 0, sw: pl.swimming ? 1 : 0, sp: r2(Math.hypot(b.vel.x, b.vel.z)), dead: pl.dead ? 1 : 0, dn: pl.downed ? 1 : 0, mu: G.tools && G.tools.playT > 0 ? 1 : 0, vc: G.voice && G.voice.on ? 1 : 0, po: pl.anim ? pl.anim.pose : 'walk', pp: pl.anim ? Math.round(pl.anim.progress * 100) / 100 : 0, ar: pl.anim ? pl.anim.armed : 'none', tk: G.voice && G.voice.talking ? 1 : 0, ap: this.localLook(), cv: G.survival && G.survival.armor > 0 ? 1 : 0, w: G.combat.weaponId || '', bm: G.combat.buildMode || G.build.active ? 1 : 0 } });
+      this.send({ t: 'state', s: { p: [r2(x), r2(y), r2(z)], yaw: r2(yaw), ab: pl.aboard ? 1 : 0, sw: pl.swimming ? 1 : 0, sp: r2(Math.hypot(b.vel.x, b.vel.z)), dead: pl.dead ? 1 : 0, dn: pl.downed ? 1 : 0, mu: G.tools && G.tools.playT > 0 ? 1 : 0, vc: G.voice && G.voice.on ? 1 : 0, po: pl.anim ? pl.anim.pose : 'walk', pp: pl.anim ? Math.round(pl.anim.progress * 100) / 100 : 0, ar: pl.anim ? pl.anim.armed : 'none', tk: G.voice && G.voice.talking ? 1 : 0, ap: this.localLook(), cv: G.survival && G.survival.armor > 0 ? 1 : 0, w: G.combat.weaponId || '', bm: G.combat.buildMode || G.build.active ? 1 : 0, cr: pl.crouchK > 0.05 ? Math.round(pl.crouchK * 100) / 100 : 0 } });
       if (this.isHost) this.send({ t: 'boat', b: { x: r2(boat.x), z: r2(boat.z), yaw: Math.round(boat.yaw * 1000) / 1000, speed: r2(boat.speed), up: boat.sailUp, angle: boat.sailAngle } });
     }
     // Interpola os aliados.
@@ -254,6 +254,7 @@ export class Net {
         const vp = G.voice && G.voice.peers.get(id);
         pd.talk = vp && vp.speaking > 0 ? Math.min(1, (vp.level || 0) * 30) : s.tk ? 0.6 : 0; // boca no ritmo da voz
         pd.armed = typeof s.ar === 'string' ? s.ar : 'none'; pd.gunType = pd.armed === 'long' ? 'long' : 'pistol';
+        { const c = +s.cr || 0, prev = pd.crouch || 0; pd.crouch = prev + (c - prev) * Math.min(1, dt * 12); pd.crouchV = 0; } // aliado agachado
         const remotePose = s.sw ? 'swim' : s.dn ? 'crawl' : typeof s.po === 'string' ? s.po : 'walk';
         animatePill(r.pill.children[0], s.sp, dt, remotePose, +s.pp || 0); // mesma animação que o jogador vê
         if (!!s.cv !== !!r.vest) { r.vest = !!s.cv; setPillVest(r.pill.children[0], r.vest); } // colete do aliado

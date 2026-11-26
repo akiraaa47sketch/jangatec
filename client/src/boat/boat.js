@@ -170,7 +170,7 @@ export class Boat {
     this.group.remove(piece.mesh);
     this.G.physics.removeRaftPiece(id);
     piece.mesh.traverse((o) => { if (o.isMesh) { const i = this.G.solids.indexOf(o); if (i >= 0) this.G.solids.splice(i, 1); o.geometry.dispose(); } });
-    this.set.items.splice(this.set.items.indexOf(piece.col), 1);
+    for (const c of piece.cols || [piece.col]) { const i = this.set.items.indexOf(c); if (i >= 0) this.set.items.splice(i, 1); }
     this.pieces.delete(id);
     this.recalcRadius();
     return piece;
