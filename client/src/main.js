@@ -30,6 +30,7 @@ import { Melee } from './systems/melee.js';
 import { Voice } from './net/voice.js';
 import { MainMenu } from './ui/mainmenu.js';
 import { preloadGun, preloadHand, buildRealHand } from './player/gunmodels.js';
+import { AdminPanel } from './ui/admin.js';
 import { upgradeWaitingPills } from './player/pillhands.js';
 import { Naval } from './systems/naval.js';
 import { Tools } from './systems/tools.js';
@@ -133,6 +134,7 @@ G.gfx = new Graphics(G, { renderer, scene, camera, sun, mobile: MOBILE }); // pi
 G.gfxMenu = new GfxMenu(G);
 G.reflections = new Reflections(G); // reflexos (metais, jangada molhada na chuva) — menu Gráficos
 G.keysMenu = new KeysMenu(G);
+G.admin = new AdminPanel(G); // L + Z: painel de testes (só no solo)
 if (MOBILE) G.touch = new TouchControls(G);
 
 canvas.addEventListener('mousedown', (e) => {
@@ -271,7 +273,7 @@ function hotkeys() {
     G.player.faceCam = !G.player.faceCam;
     G.hud.msg(G.player.faceCam ? 'Corpo travado na direção da câmera' : 'Corpo livre (vira para onde anda)');
   }
-  if (G.build.active || G.interact.lootOpen || G.gfxMenu.open || G.keysMenu.open || G.naval.manning || G.tools.menuOpen) return;
+  if (G.build.active || G.interact.lootOpen || G.gfxMenu.open || G.keysMenu.open || G.admin.open || G.naval.manning || G.tools.menuOpen) return;
   for (let i = 0; i < 6; i++) if (inp.act('slot' + (i + 1))) G.combat.select(i);
   if (inp.mouse.wheel) G.combat.cycle(Math.sign(inp.mouse.wheel));
   if (inp.act('bandage')) G.survival.use('bandagem');

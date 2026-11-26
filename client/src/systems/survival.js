@@ -101,6 +101,7 @@ export class Survival {
     this.G.hud.flash('heal');
   }
   damage(n, source, kind = null) {
+    if (this.G.admin && this.G.admin.god) return; // painel de admin: imortal
     if (this.G.player.dead) return;
     if (kind === 'bala' && this.armor > 0 && n > 0) { // colete segura parte do tiro
       n -= n * ARMOR.absorb;

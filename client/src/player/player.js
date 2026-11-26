@@ -169,7 +169,7 @@ export class Player {
     }
 
     if (this.dead) { this.syncMesh(0, dt); return; }
-    if ((G.interact && G.interact.lootOpen) || (G.gfxMenu && G.gfxMenu.open) || (G.keysMenu && G.keysMenu.open) || (G.tools && G.tools.menuOpen)) {
+    if ((G.interact && G.interact.lootOpen) || (G.gfxMenu && G.gfxMenu.open) || (G.keysMenu && G.keysMenu.open) || (G.admin && G.admin.open) || (G.tools && G.tools.menuOpen)) {
       b.vel.x = b.vel.z = 0;
       this.syncMesh(0, dt);
       return;
