@@ -62,10 +62,10 @@ export class Survival {
         }
         continue;
       }
-      if (k === 'gancho') { // torreta-arpão não vai para a mochila: aparece na sua frente para carregar e soldar
-        const pl = this.G.player, [fx, fz] = pl.forward(), p = pl.body.pos;
-        for (let i = 0; i < loot[k]; i++) this.G.world.spawnProp('torreta', p.x + fx * (1.6 + i), p.y + 0.8, p.z + fz * (1.6 + i));
-        parts.push('Torreta-arpão (carregue e solde na jangada)');
+      if (k === 'gancho' || k === 'canhao' || k === 'canhao_ferro') { // torreta e canhões não vão para a mochila: aparecem na sua frente para carregar e soldar
+        const pl = this.G.player, [fx, fz] = pl.forward(), p = pl.body.pos, prop = k === 'gancho' ? 'torreta' : k;
+        for (let i = 0; i < loot[k]; i++) this.G.world.spawnProp(prop, p.x + fx * (1.8 + i * 1.4), p.y + 0.8, p.z + fz * (1.8 + i * 1.4));
+        parts.push(`${ITEM_NAMES[k]} (carregue e solde na jangada)`);
         continue;
       }
       this.inv[k] = (this.inv[k] || 0) + loot[k];

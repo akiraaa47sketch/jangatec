@@ -1,6 +1,8 @@
 // Build assistida: pontos de encaixe ("bolinhas") nos centros, meios das bordas e cantos das peças
 // da jangada. A peça carregada gira para alinhar com a peça vizinha (múltiplos de 90°) e seus
 // próprios pontos grudam no ponto livre mais próximo — em cima (empilhar) ou do lado (encostar).
+// MIRAR NUMA BOLINHA: a peça se teleporta encaixada exatamente nela (em cima ou ao lado) e fica
+// travada ali, pronta para soldar — sem precisar arrastar até grudar.
 import * as THREE from '../three.js';
 
 const SNAP_RADIUS = 0.6;     // distância máxima para grudar
@@ -104,7 +106,7 @@ export class BuildSnap {
   }
 
   // Ajusta { position, quaternion } da peça carregada. Retorna true se grudou.
-  apply(position, quaternion, size, offset) {
+  apply(position, quaternion, size, offset, ray = null, maxDist = 6) {
     this.result = null;
     if (!this.on) { this.dots.count = 0; this.last = null; return false; }
     const up = AXES[1];
@@ -143,11 +145,31 @@ export class BuildSnap {
     const last = this.last, sticky = (t) => last && t.p.distanceToSquared(last) < 0.0025;
     const score = (d, t) => d - (sticky(t) ? 0.2 : 0), radius = (t) => (sticky(t) ? SNAP_RADIUS * 1.5 : SNAP_RADIUS);
     let best = null;
-    for (const h of hBottom) for (const t of tTop) {
+    // a) MIRA: a bolinha mais perto da linha da mira (com tolerância que cresce com a distância)
+    if (ray) {
+      let aim = null;
+      const consider = (t, side) => {
+        const v = t.p.clone().sub(ray.origin), along = v.dot(ray.direction);
+        if (along < 0.3 || along > maxDist) return;
+        const perp = v.addScaledVector(ray.direction, -along).length(), tol = 0.14 + along * 0.025;
+        if (perp > tol) return;
+        const sc = perp / along - (sticky(t) ? 0.02 : 0);
+        if (!aim || sc < aim.sc) aim = { t, side, sc };
+      };
+      for (const t of tTop) consider(t, false);
+      for (const t of tSide) if (t.k === 's') consider(t, true);
+      if (aim) {
+        const t = aim.t, cands = aim.side ? hSide.filter((h) => h.k === 's' && h.n.dot(t.n) < -0.85) : hBottom.filter((h) => h.k === t.k);
+        let hb = null, hd = Infinity;
+        for (const h of cands) { const d = h.p.distanceToSquared(t.p); if (d < hd) { hd = d; hb = h; } }
+        if (hb) best = { d: 0, s: -1, h: hb, t, aim: true };
+      }
+    }
+    if (!best) for (const h of hBottom) for (const t of tTop) {
       if (h.k !== t.k) continue;
       const d = h.p.distanceTo(t.p), sc = score(d, t); if (d < radius(t) && (!best || sc < best.s)) best = { d, s: sc, h, t };
     }
-    for (const h of hSide) for (const t of tSide) {
+    if (!best || !best.aim) for (const h of hSide) for (const t of tSide) {
       if (h.k !== t.k || h.n.dot(t.n) > -0.85) continue;
       const d = h.p.distanceTo(t.p), sc = score(d, t) + 0.02; if (d < radius(t) && (!best || sc < best.s)) best = { d, s: sc, h, t };
     }
@@ -157,7 +179,7 @@ export class BuildSnap {
       position.add(delta);
       for (const h of hBottom) h.p.add(delta);
       for (const h of hSide) h.p.add(delta);
-      this.result = { target: best.t.p.clone() };
+      this.result = { target: best.t.p.clone(), aim: !!best.aim };
     }
     // 3) bolinhas: pontos livres das peças (amarelos), da peça carregada (azuis) e o encaixe (verde)
     const dots = this.dots, col = new THREE.Color();
