@@ -244,7 +244,19 @@ function makeFaceLayer(id) {
 }
 
 // Plástico com arranhões/manchas na cor dada; com rosto quando face != null.
+// Sem rosto, a textura é sempre igual para a mesma cor: fica guardada e é compartilhada (desenhar
+// 1024 px de canvas por pílula travava o quadro quando uma ilha nova trazia vários inimigos).
+const _bodyTexCache = new Map();
 function bodyTexture(color, H, face, seed) {
+  if (!face) {
+    const k = `${color}|${H}|${seed}`;
+    let t = _bodyTexCache.get(k);
+    if (!t) { t = drawBodyTexture(color, H, null, seed); t.userData.shared = true; _bodyTexCache.set(k, t); }
+    return t;
+  }
+  return drawBodyTexture(color, H, face, seed);
+}
+function drawBodyTexture(color, H, face, seed) {
   const W = 1024, c = document.createElement('canvas'); c.width = W; c.height = H;
   const g = c.getContext('2d');
   g.fillStyle = hex(color); g.fillRect(0, 0, W, H);
@@ -265,7 +277,15 @@ function bodyTexture(color, H, face, seed) {
 }
 
 // Parte do perfil da cápsula entre os comprimentos de arco `from` e `to` (de baixo para cima).
+// Mesma forma = mesma geometria (compartilhada entre todas as pílulas).
+const _latheCache = new Map();
 function capsuleLathe(R, L, from, to) {
+  const k = `${R}|${L}|${from}|${to}`;
+  let g = _latheCache.get(k);
+  if (!g) { g = makeCapsuleLathe(R, L, from, to); g.userData.shared = true; _latheCache.set(k, g); }
+  return g;
+}
+function makeCapsuleLathe(R, L, from, to) {
   const pts = [], N = 64, arcCap = Math.PI / 2 * R;
   for (let i = 0; i <= N; i++) {
     const s = from + (to - from) * (i / N);
@@ -602,9 +622,9 @@ export function disposePill(pill) {
   const face = pill.userData.face && pill.userData.face.mesh;
   pill.traverse((m) => {
     if (!m.isMesh || m.userData.sharedGeo) return; // mão 3D: geometria compartilhada com as outras
-    m.geometry.dispose();
+    if (!m.geometry.userData.shared) m.geometry.dispose(); // corpo: geometria guardada e compartilhada
     if (m === face) { m.material.dispose(); return; } // quadros do rosto são compartilhados
-    if (m.material.map) m.material.map.dispose();
+    if (m.material.map && !m.material.map.userData.shared) m.material.map.dispose();
     m.material.dispose();
   });
 }

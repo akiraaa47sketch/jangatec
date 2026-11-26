@@ -57,6 +57,9 @@ const renderer = new THREE.WebGLRenderer({ canvas, antialias: true });
 const MOBILE = isTouchDevice();
 renderer.setPixelRatio(Math.min(devicePixelRatio, MOBILE ? 1.25 : 2)); // celular: menos pixels, mais FPS
 renderer.toneMapping = THREE.NeutralToneMapping; // realces suaves, cores preservadas
+// Sem checagem de erro de shader: ela obriga a esperar cada compilação terminar (engasgo). Os shaders do
+// jogo já são testados; em desenvolvimento dá para religar com ?shaderdebug na URL.
+renderer.debug.checkShaderErrors = /[?&]shaderdebug/.test(location.search);
 renderer.toneMappingExposure = 1.0;
 const scene = new THREE.Scene();
 const SKY = 0xbfe5ff;

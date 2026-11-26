@@ -135,7 +135,7 @@ export class Atmosphere {
     this.sun.target.updateMatrixWorld();
 
     this.shadowTimer -= dt;
-    if (this.shadowTimer <= 0) { this.shadowTimer = 0.25; this.markShadows(); }
+    if (this.shadowTimer <= 0) { this.shadowTimer = 0.5; this.markShadows(); } // procura objetos novos 2×/s
   }
 
   // Tudo que é malha opaca projeta e recebe sombra, exceto água/céu/transparentes/marcados.
@@ -146,7 +146,9 @@ export class Atmosphere {
       const mats = Array.isArray(o.material) ? o.material : [o.material];
       if (o.userData.noShadow || mats.some((m) => !m || m.isShaderMaterial || m.transparent || m.isMeshBasicMaterial)) return;
       o.castShadow = true; o.receiveShadow = true;
-      for (const m of mats) m.needsUpdate = true; // receiveShadow muda o programa do material
+      // receiveShadow muda o programa do material — mas só precisa avisar UMA vez por material (antes
+      // cada objeto novo forçava recompilar materiais compartilhados por centenas de objetos)
+      for (const m of mats) if (!m.userData._shReady) { m.userData._shReady = true; m.needsUpdate = true; }
     });
   }
 }
