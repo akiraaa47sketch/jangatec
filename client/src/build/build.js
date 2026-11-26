@@ -358,9 +358,13 @@ export class Build {
     if (!this.active || !this.held) return;
     const { position, quaternion, isWater } = this._computeTarget();
     // build assistida: alinha e gruda nos pontos das peças vizinhas (não mexe durante o gizmo)
-    const snapped = !this.rotationMode && this.snap.apply(position, quaternion, this._physicsSize(this.held), this._physicsOffset(this.held));
+    this._setRayFromCursor();
+    const ray = this.ray.ray.clone(), reach = this._camOffset() + BUILD_DISTANCE + 1;
+    const snapped = !this.rotationMode && this.snap.apply(position, quaternion, this._physicsSize(this.held), this._physicsOffset(this.held), ray, reach);
     if (this.rotationMode) this.snap.hide();
     this.candidate = { position: position.clone(), quaternion: quaternion.clone(), isWater, valid: true, snapped };
+    // mirou numa bolinha: a peça vai DIRETO para o encaixe e fica travada (sem mola, sem tremer)
+    if (snapped && this.snap.result && this.snap.result.aim) this.G.physics.placeObject(this.held, position, quaternion);
     this.G.physics.setHoldTarget(this.held, position, quaternion);
   }
 

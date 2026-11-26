@@ -251,7 +251,7 @@ function handle(ws, m) {
       break;
     }
     case 'prop': { // prop do loot (torreta-arpão) criado por um jogador: todos criam igual
-      if (typeof m.id !== 'string' || m.id.length > 64 || m.k !== 'torreta' || !Array.isArray(m.p) || m.p.length !== 3 || !m.p.every(Number.isFinite)) break;
+      if (typeof m.id !== 'string' || m.id.length > 64 || !['torreta', 'canhao', 'canhao_ferro'].includes(m.k) || !Array.isArray(m.p) || m.p.length !== 3 || !m.p.every(Number.isFinite)) break;
       if (room.props.length < 60) room.props.push({ id: m.id, k: m.k, p: m.p });
       broadcast(room, { t: 'prop', id: m.id, k: m.k, p: m.p }, ws);
       break;

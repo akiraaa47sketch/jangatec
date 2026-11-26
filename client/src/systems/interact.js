@@ -30,12 +30,6 @@ export class Interact {
       if (d < 2.4 && Math.abs(wp.y - p.y) < 2) consider(d - 1, { revive: id, name: r.s.n || 'aliado', label: `Reanimar ${r.s.n || 'aliado'} (segure)` });
     }
 
-    // Canhões e arpões jogados no fundo do mar (só na seca)
-    for (const f of G.world.finds || []) {
-      if (f.submerged) continue;
-      const dist = Math.hypot(f.x - p.x, f.z - p.z);
-      if (dist < 2.4 && Math.abs(p.y - f.y) < 2) consider(dist - 0.2, { label: f.kind === 'gancho' ? 'Pegar torreta-arpão' : f.kind === 'canhao_ferro' ? 'Pegar canhão de ferro' : 'Pegar canhão', run: () => G.world.takeFind(f) });
-    }
     // Caixas de loot
     for (const c of G.world.crates) {
       if (c.submerged) continue; // baú do banco de areia debaixo d'água

@@ -142,7 +142,13 @@ const DEBRIS_W = DEBRIS.reduce((s, d) => s + d.w, 0);
 // noBake: o modelo tem partes que se mexem (a torreta gira e levanta o lançador).
 export const PROPS = {
   torreta: { nome: 'Torreta-arpão', real: true, noBake: true, pieceType: 'gancho', size: [0.8, 1.1, 1.0], make: () => makeHookTurretMesh() },
+  // canhões também são props: nunca vão para a mochila — carregue até a jangada e solde
+  canhao: { nome: 'Canhão improvisado', real: true, noBake: true, pieceType: 'canhao', size: PIECES.canhao.size, make: () => makePieceMesh('canhao') },
+  canhao_ferro: { nome: 'Canhão de ferro', real: true, noBake: true, pieceType: 'canhao_ferro', size: PIECES.canhao_ferro.size, make: () => makePieceMesh('canhao_ferro') },
 };
+// achados do fundo do mar: o mesmo prop, mas já nasce deitado na areia (afunda)
+const FIND_PROPS = { canhao: { ...PROPS.canhao, sinks: true }, canhao_ferro: { ...PROPS.canhao_ferro, sinks: true }, gancho: { ...PROPS.torreta, sinks: true } };
+const FIND_PROP_KIND = { canhao: 'canhao', canhao_ferro: 'canhao_ferro', gancho: 'torreta' };
 
 export class World {
   constructor(G, seed) {
@@ -312,7 +318,7 @@ export class World {
     const site = seaSiteFor(this.seed, cx, cz);
     if (site) ch.site = this.makeSeaSite(ch, site);
     ch.seaCrates = this.makeSeaCrates(cx, cz);
-    ch.finds = this.makeSeabedFinds(cx, cz);
+    this._findChunk = ch; ch.finds = this.makeSeabedFinds(cx, cz); this._findChunk = null;
     for (let i = 0; i < n; i++) {
       // Sempre consome o RNG na mesma ordem para manter o determinismo.
       const x = ox + (r() - 0.5) * S, z = oz + (r() - 0.5) * S;
@@ -960,39 +966,19 @@ export class World {
     if (G.siege) G.siege.removeIsland(isl);
   }
 
-  // Marca como coletado (loot legado — ainda funciona para caixotes).
-  // Canhões e torreta-arpão jogados no fundo do mar (pega com E na seca). Meio enterrados e tortos,
-  // com um anel dourado no chão para dar para achar de longe.
+  // Canhões e torreta-arpão jogados no fundo do mar: props físicos de verdade, deitados na areia.
+  // Na seca, pegue com E, carregue até a jangada e solde (não vão para a mochila).
   makeSeabedFinds(cx, cz) {
-    const G = this.G, out = [];
     seabedFindsFor(this.seed, cx, cz).forEach((f, n) => {
-      const id = `f${cx},${cz}k${n}`;
-      if (this.collected.has(id)) return;
-      const gy = this.seabedHeight(f.x, f.z);
-      const g = new THREE.Group();
-      const model = makePieceMesh(f.kind);
-      model.position.y = f.kind === 'gancho' ? 0.35 : 0.2; model.rotation.set(f.tilt, 0, f.tilt * 0.6 + (f.kind === 'gancho' ? 0.5 : 0.25));
-      g.add(model);
-      const sand = new THREE.Mesh(new THREE.CircleGeometry(1.1, 18), new THREE.MeshStandardMaterial({ color: 0x8f8160, roughness: 1, transparent: true, opacity: 0.7, depthWrite: false }));
-      sand.rotation.x = -Math.PI / 2; sand.position.y = 0.03; g.add(sand); // areia revirada em volta
-      const ring = new THREE.Mesh(new THREE.RingGeometry(1.35, 1.5, 36), new THREE.MeshBasicMaterial({ color: 0xf3cf7e, transparent: true, opacity: 0.55, depthWrite: false, side: THREE.DoubleSide }));
-      ring.rotation.x = -Math.PI / 2; ring.position.y = 0.05; ring.userData.noShadow = true; g.add(ring);
-      g.position.set(f.x, gy, f.z); g.rotation.y = f.yaw;
-      g.traverse((o) => { if (o.isMesh && o !== ring && o !== sand) { o.castShadow = true; o.receiveShadow = true; } });
-      G.scene.add(g);
-      const item = { id, kind: f.kind, mesh: g, ring, x: f.x, z: f.z, y: gy, submerged: !G.startup || G.startup.waterLevel > gy + 0.3 };
-      out.push(item); this.finds.push(item);
+      const id = `f${cx},${cz}k${n}`, def = FIND_PROPS[f.kind];
+      if (!def) return;
+      const ch = this._findChunk;
+      const lr = mulberry32(hash2(this.seed, cx * 977 + n, cz * 31 + 5));
+      this.spawnDebris(ch, id, def, f.x, f.z, lr);
+      const obj = this.physObjects.find((o) => o.id === id);
+      if (obj) obj.prop = FIND_PROP_KIND[f.kind];
     });
-    return out;
-  }
-  // pegar um canhão/arpão do fundo: vai para o inventário e some para todos
-  takeFind(f) {
-    const G = this.G;
-    if (!this.finds.includes(f)) return;
-    const nome = { canhao: 'Canhão improvisado', canhao_ferro: 'Canhão de ferro', gancho: 'Torreta-arpão' }[f.kind];
-    G.hud.msg(`Você achou um ${nome} na areia!  ${G.survival.add({ [f.kind]: 1 })}`);
-    this.markCollected(f.id);
-    if (G.net.online) G.net.send({ t: 'collect', id: f.id });
+    return [];
   }
 
   markCollected(id) {

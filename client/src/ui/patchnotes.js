@@ -5,6 +5,16 @@
 // Nos textos, **assim** vira negrito.
 export const PATCH_NOTES = [
   {
+    id: '0.35', versao: 'v0.35', data: '26/11/2026', titulo: 'Canhões soldáveis e encaixe na mira',
+    destaques: [
+      { tag: 'Construção', titulo: 'Mirou na bolinha, encaixou', texto: 'Carregando uma peça, **mire num ponto de encaixe** da jangada: a peça vai **direto para a posição certinha** (em cima ou do lado) e fica travada ali, pronta para **soldar**.' },
+      { tag: 'Naval', titulo: 'Canhão é peça, não item', texto: 'Canhões (improvisado e de ferro) **não vão mais para a mochila**: ficam **deitados na areia do fundo do mar** (ou aparecem na sua frente quando vêm de recompensa). **Carregue até a jangada e solde**, como a torreta-arpão.' },
+    ],
+    secoes: [
+      { icone: '🎯', nome: 'Mira', itens: ['Retícula nova: **só um círculo simples**, sem ponto no meio, em 1ª e 3ª pessoa.'] },
+    ],
+  },
+  {
     id: '0.34', versao: 'v0.34', data: '26/11/2026', titulo: 'Menos engasgos',
     secoes: [
       { icone: '⚙', nome: 'Desempenho', itens: ['**Reflexo em tempo real**: desenha um lado do cubo por quadro (antes a cena inteira 6× de uma vez a cada 0,8 s — um engasgo periódico).', '**Ilhas novas** carregam mais leve: altura do fundo do mar **~9× mais rápida**, texturas e corpo dos inimigos reaproveitados, caixas iguais com a mesma geometria.', 'Materiais de cada trecho novo são **compilados em segundo plano** antes de aparecer (o trecho carrega longe, na neblina).', 'Sem a checagem de erro de shader, que travava o quadro esperando cada compilação.', '**Vazamento de memória**: ilhas e naufrágios que saíam do alcance não liberavam a memória de vídeo — numa viagem longa ela ia enchendo.', 'Sombras de objetos novos não forçam mais recompilar materiais compartilhados.'] },
