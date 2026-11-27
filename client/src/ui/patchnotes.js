@@ -5,6 +5,17 @@
 // Nos textos, **assim** vira negrito.
 export const PATCH_NOTES = [
   {
+    id: '0.39', versao: 'v0.39', data: '27/11/2026', titulo: 'Recargas arrumadas: pistola e escopeta',
+    destaques: [
+      { tag: 'Escopeta', titulo: 'Cartucho por cartucho, de verdade', texto: 'Na recarga o personagem **deita a escopeta de lado**, pega o cartucho no cinto e **encaixa na janela embaixo da culatra**, empurrando para dentro do tubo — dá para ver cada cartucho entrando. No fim a arma volta de pé e bombeia.' },
+      { tag: 'Pistola', titulo: 'Engatilhar sem braço torto', texto: 'A mão esquerda agora segura o ferrolho **por cima, vindo da esquerda** (palma em cima, dedos do outro lado) e a pistola inclina na direção dela. Antes a mão chegava pela direita, o antebraço cruzava a arma e o pulso dobrava ao contrário.' },
+    ],
+    secoes: [
+      { icone: '🔴', nome: 'Cartucho novo', itens: ['Modelo de cartucho calibre 12: tubo plástico com frisos, ponta fechada em estrela, base de latão com aro e espoleta.', 'O mesmo modelo aparece na mão, nos cartuchos ejetados ao bombear e nos cartuchos largados no chão.'] },
+      { icone: '🧍', nome: '3ª pessoa', itens: ['A mão que engatilha a pistola também vai por cima do ferrolho (antes ficava atrás da arma).'] },
+    ],
+  },
+  {
     id: '0.38', versao: 'v0.38', data: '27/11/2026', titulo: 'Desempenho: mais à frente, menos dos lados',
     destaques: [
       { tag: 'Desempenho', titulo: 'Inimigos leves de longe', texto: 'Cada inimigo era desenhado com **~90 pecinhas** — e os das ilhas em volta, quase invisíveis na neblina, custavam **~800 desenhos por quadro**. Agora, de longe, eles viram só a **cápsula do corpo** (mesma cor e silhueta) e somem além da neblina: menos desenhos por quadro. Somado ao corte das laterais, foram de **~710 para ~290 desenhos por quadro** no teste.' },

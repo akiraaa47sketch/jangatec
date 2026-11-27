@@ -131,7 +131,9 @@ function holderFor(h, target) {
   return new THREE.Matrix4().multiplyMatrices(target, _m1);
 }
 
-const OVER_SLIDE = new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 0, 1), Math.PI).multiply(eQ([0, -1.5708, 3.1416]));
+// mão esquerda por cima do ferrolho (eixos da mão 3D: pulso na origem, dedos -Z, palma -Y): palma em
+// cima, dedos para a direita da arma e pulso à esquerda — o braço vem do ombro esquerdo sem cruzar a arma
+const OVER_SLIDE = eQ([0, -1.4, 0.25]);
 
 // Linha do tempo da mão esquerda na recarga (u 0..1) → { at: 'grip'|'well'|'belt'|'below'|'slide'|'pulled'|'drum'|'port', k }
 function reloadKeys(kind, slide, plan) {
@@ -229,7 +231,7 @@ export function poseWeaponHands(pill, dt) {
     if (name === 'grip' || name === 'pumpBack') return gripWorld(gunObj, support, hL, name === 'pumpBack' ? _p2.set(0, 0, 0.1) : null);
     const open = { q: eQ([0.2, 0, 1.0]) };
     if (name === 'slide' || name === 'pulled' || name === 'letgo') {
-      const d = name === 'slide' ? null : name === 'pulled' ? _p2.set(0, 0, 0.045) : _p2.set(-0.01, 0.05, 0.06);
+      const d = name === 'slide' ? _p2.set(0, 0, -0.03) : name === 'pulled' ? _p2.set(0, 0, 0.015) : _p2.set(-0.01, 0.05, 0.03); // em cima do ferrolho (não atrás dele)
       return gripWorld(gunObj, { p: spec.slideGrab, q: OVER_SLIDE }, hL, d);
     }
     if (name === 'belt') { // no cinto: abaixo do ombro esquerdo, na altura do quadril, um pouco à frente

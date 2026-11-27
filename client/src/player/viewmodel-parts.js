@@ -861,10 +861,31 @@ export function buildMedkit() {
   g.add(box(0.05, 0.012, 0.05, MAT.iron, 0, 0.056, 0));
   return g;
 }
+// Cartucho de escopeta calibre 12 (~7 cm × 1,9 cm): tubo plástico com frisos, ponta fechada em
+// estrela (-Z, entra primeiro no tubo), base de latão com aro e espoleta (+Z). Materiais em cache.
+const SHELL_MATS = new Map();
+function shellMats(color) {
+  if (!SHELL_MATS.has(color)) {
+    const c = new THREE.Color(color);
+    SHELL_MATS.set(color, {
+      hull: std(color, 0.55, 0, { emissive: c.clone().multiplyScalar(0.06) }),
+      crimp: std(c.clone().multiplyScalar(0.62).getHex(), 0.7),
+      rib: std(c.clone().multiplyScalar(0.8).getHex(), 0.6),
+      head: std(0xc9a25a, 0.32, 0.85), primer: std(0x9a9da2, 0.3, 0.9),
+    });
+  }
+  return SHELL_MATS.get(color);
+}
 export function buildShell(color = 0xb03a2e) {
-  const g = new THREE.Group();
-  const body = cylZ(0.0095, 0.0095, 0.045, std(color, 0.7), 0, 0, 0, 8);
-  g.add(body, cylZ(0.0098, 0.0098, 0.014, MAT.brass, 0, 0, 0.026, 8));
+  const g = new THREE.Group(), m = shellMats(color), R = 0.0093;
+  g.add(cylZ(R, R, 0.05, m.hull, 0, 0, -0.008, 16));                       // tubo plástico
+  for (const z of [-0.026, -0.016, -0.006, 0.004]) g.add(cylZ(R + 0.0004, R + 0.0004, 0.0018, m.rib, 0, 0, z, 16)); // frisos
+  g.add(cylZ(R * 0.72, R, 0.005, m.crimp, 0, 0, -0.0355, 16));             // ponta dobrada
+  const star = new THREE.Mesh(new THREE.CircleGeometry(R * 0.72, 6), m.crimp); // fechamento em estrela (6 dobras)
+  star.rotation.y = Math.PI; star.position.z = -0.0381; g.add(star);
+  g.add(cylZ(R + 0.0003, R + 0.0003, 0.016, m.head, 0, 0, 0.025, 16));     // base de latão
+  g.add(cylZ(R + 0.0014, R + 0.0014, 0.0024, m.head, 0, 0, 0.0342, 16));   // aro
+  g.add(cylZ(0.0027, 0.0027, 0.0012, m.primer, 0, 0, 0.036, 12));          // espoleta
   return g;
 }
 export function buildCartridgeCase() {

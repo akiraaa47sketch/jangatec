@@ -123,7 +123,13 @@ function shellPhase(pl) {
   if (s < pl.n) return { k: 'shell', i: Math.floor(s), f: s - Math.floor(s), last: Math.floor(s) === pl.n - 1, pump: pl.pump };
   return { k: 'out', f: Math.min(1, (t - pl.intro - pl.n * pl.per) / pl.outro), pump: pl.pump };
 }
-const BELT = V(-0.13, -0.52, -0.2);            // "cinto": fora da tela, embaixo à esquerda
+const BELT = V(-0.13, -0.52, -0.2);
+// Escopeta: o cartucho fica deitado na palma, alinhado com os dedos (mão 3D: dedos -Z, palma -Y).
+const SHELL_IN_HAND = V(0.004, -0.03, -0.118); // na ponta dos dedos: metade do cartucho fica à mostra
+// Caminho do cartucho até o tubo, no espaço da ARMA (x direita, y topo, z para trás); a janela de
+// carregar fica embaixo da culatra. A mão vai por baixo, de palma para cima, e empurra para a frente.
+const SHELL_PATH = { below: [0, -0.115, -0.05], port: [0, -0.052, -0.095], inside: [0, -0.03, -0.15] };
+const Q_PORT = new THREE.Quaternion().setFromEuler(new THREE.Euler(0.22, 0, Math.PI)); // palma para cima, dedos para a frente            // "cinto": fora da tela, embaixo à esquerda
 const SHOULDER = { R: V(0.2, -0.27, 0.2), L: V(-0.2, -0.27, 0.2) };
 const POLE = { R: V(0.75, -0.8, 0.35), L: V(-0.75, -0.8, 0.35) };
 const REST_R = { p: V(0.23, -0.35, -0.36), r: [0.55, -0.15, -0.35], c: [0.55, 0.55, 0.55, 0.55], t: [0.2, -0.2, 0.3] };
@@ -157,8 +163,7 @@ export class ViewModel {
     // itens que aparecem na mão esquerda (carregador / cartucho / bandagem / kit / speedloader)
     this.heldMag = new THREE.Mesh(new THREE.BoxGeometry(0.028, 0.1, 0.05), MAT.iron);
     this.heldMag.position.set(0, -0.045, -0.04);
-    this.heldShell = buildShell(0xb03a2e); this.heldShell.position.set(0.0, -0.035, -0.05);
-    this.heldShell.rotation.set(0, 1.4, 0);
+    this.heldShell = buildShell(0xb03a2e); this.heldShell.position.copy(SHELL_IN_HAND); // na palma, ponta para os dedos
     this.heldBandage = buildBandage(); this.heldBandage.position.set(0, 0.04, -0.05);
     this.heldKit = buildMedkit(); this.heldKit.position.set(0, 0.07, -0.06);
     this.heldLoader = new THREE.Mesh(new THREE.CylinderGeometry(0.03, 0.03, 0.035, 6), MAT.brass);
@@ -674,7 +679,9 @@ export class ViewModel {
       off[1] += -0.012 * ins; off[3] += -0.05 * ins;
       if (T.pull) { // engatilhar: a arma vem um pouco para perto e o ferrolho batendo dá um tranco para cima
         const rk = smooth(ramp(p, T.reach[0], T.reach[1])) - smooth(ramp(p, T.back[0], T.back[1]));
-        off[2] += 0.02 * rk; off[5] -= 0.15 * rk;
+        // a pistola vira com o topo para a ESQUERDA (na direção da mão que engatilha) e vem para o meio;
+        // antes ficava inclinada para a direita e o braço esquerdo tinha que cruzar por cima dela
+        off[0] -= 0.05 * rk; off[1] -= 0.02 * rk; off[2] += 0.03 * rk; off[3] -= 0.2 * rk; off[4] -= 0.2 * rk; off[5] += 0.8 * rk;
         const slam = Math.sin(Math.PI * ramp(p, T.release[0], T.release[1] + 0.05));
         off[3] -= 0.07 * slam; off[1] += 0.006 * slam;
       }
@@ -684,8 +691,16 @@ export class ViewModel {
       const dump = smooth(ramp(p, 0.26, 0.4)) - smooth(ramp(p, 0.5, 0.58));
       off[3] += 0.55 * dump; off[5] += Math.sin(p * 60) * 0.06 * dump;
     } else if (spec.reload === 'shotgun') {
-      off[0] = -0.06 * roll; off[1] = 0.05 * roll; off[2] = 0.06 * roll;
-      off[3] = 0.38 * roll; off[4] = 0.3 * roll; off[5] = -0.6 * roll;
+      // deita a escopeta de lado (barriga para a esquerda): a janela de carregar fica de frente
+      // para a câmera e para a mão esquerda; volta a ficar de pé antes de bombear
+      const st = this.shot;
+      const lay = st ? (st.k === 'in' ? smooth(st.f) : st.k === 'shell' ? 1 : 1 - smooth(ramp(st.f, 0, 0.45))) : roll;
+      off[0] = -0.02 * lay; off[1] = -0.01 * lay; off[2] = -0.07 * lay;
+      off[3] = 0.0 * lay; off[4] = 0.62 * lay; off[5] = 0.55 * lay;
+      if (st && st.k === 'shell') { // empurrão do cartucho entrando (a arma cede um pouco)
+        const push = Math.sin(Math.PI * ramp(st.f, 0.5, 0.68));
+        off[2] -= 0.008 * push; off[3] -= 0.025 * push;
+      }
     }
     return { off };
   }
@@ -717,7 +732,10 @@ export class ViewModel {
       if (T.pull) { // ENGATILHAR: por cima do ferrolho → puxa para trás → solta → volta para a empunhadura
         // mão por cima do ferrolho: a pegada de apoio de arma longa (buraco do punho ao longo do cano),
         // virada de cabeça para baixo — palma em cima do ferrolho, dedos fechando dos lados
-        const sg = spec.slideGrab, qOver = new THREE.Quaternion().setFromAxisAngle(V(0, 0, 1), Math.PI).multiply(eulerQ([0, -1.5708, 3.1416]));
+        // Eixos da mão 3D: pulso na origem, dedos para -Z, palma para -Y. Girada -80° no eixo vertical da
+        // arma: palma em cima do ferrolho, dedos para a DIREITA e o pulso à esquerda — o antebraço vai
+        // direto para o ombro esquerdo (antes a mão chegava pela direita e o braço cruzava a arma).
+        const sg = spec.slideGrab, qOver = eulerQ([0, -1.4, 0.25]);
         const at = (d, c) => { const h = this.gripHand({ p: sg, q: qOver }, d, 1); return { p: h.p, q: h.q, c }; };
         const shut = [0.82, 0.88, 0.88, 0.85];
         const over = at(V(0, 0.05, 0.01), open);
@@ -745,19 +763,29 @@ export class ViewModel {
       if (p < 0.86) return drum;
       return mixH(drum, gripPose, smooth(ramp(p, 0.86, 0.96)));
     }
-    // shotgun: 3 ciclos belt -> porta -> belt, volta para a bomba e bombeia COM a mão nela
-    const port = mk(this.weaponPoint(spec.magPoint, V(0, -0.02, 0.0)), qOpen, grab);
+    // shotgun: por cartucho → cinto, por baixo da janela, encaixa e empurra para dentro do tubo, volta
+    // (o último vai direto à bomba). A mão segue o CARTUCHO: a posição da raiz sai do ponto em que o
+    // cartucho tem que estar (espaço da arma).
     const beltPose = mk(belt, qOpen, open);
     const pz = spec.parts && spec.parts.pump ? spec.parts.pump.position.z : 0;
     const onPump = this.gripHand(spec.gripL, V(0, 0, pz), 1), pumpPose = { p: onPump.p, q: onPump.q, c: gripPose.c };
+    const hq = this.weaponRoot.quaternion.clone().multiply(Q_PORT);
+    const holdShell = [0.22, 0.28, 0.4, 0.45]; // pinça leve: polegar e dedos seguram o cartucho pela base
+    const shellAt = (pt) => {
+      const target = this.weaponPoint(pt);
+      return { p: target.sub(SHELL_IN_HAND.clone().applyQuaternion(hq)), q: hq.clone(), c: holdShell };
+    };
+    const lerp3 = (a, b, u) => [a[0] + (b[0] - a[0]) * u, a[1] + (b[1] - a[1]) * u, a[2] + (b[2] - a[2]) * u];
     const st = this.shot;
     if (!st) return mixH(beltPose, pumpPose, smooth(ramp(p, 0.74, 0.85)));
     if (st.k === 'in') return mixH(gripPose, beltPose, smooth(st.f));
-    if (st.k === 'shell') { // pega o cartucho no cinto → empurra na janela → volta ao cinto (o último vai direto à bomba)
-      const f = st.f;
-      if (f < 0.42) return mixH(beltPose, port, smooth(ramp(f, 0, 0.42)));
-      if (f < 0.62) { const push = Math.sin(Math.PI * ramp(f, 0.42, 0.62)); return mixH(port, mk(this.weaponPoint(spec.magPoint, V(0, -0.005, -0.03)), qOpen, grab), push); }
-      return mixH(port, st.last ? pumpPose : beltPose, smooth(ramp(f, 0.62, 1)));
+    if (st.k === 'shell') {
+      const f = st.f, P = SHELL_PATH;
+      if (f < 0.34) return mixH(beltPose, shellAt(P.below), smooth(ramp(f, 0, 0.34)));            // pega no cinto e traz
+      if (f < 0.5) return shellAt(lerp3(P.below, P.port, smooth(ramp(f, 0.34, 0.5))));           // encosta na janela
+      if (f < 0.66) { const k = smooth(ramp(f, 0.5, 0.66)); const h = shellAt(lerp3(P.port, P.inside, k)); h.c = [0.3, 0.35, 0.4, 0.4]; return h; } // polegar empurra para dentro
+      const done = shellAt(P.inside); done.c = [0.3, 0.35, 0.4, 0.4];
+      return mixH(done, st.last ? pumpPose : beltPose, smooth(ramp(f, 0.66, 1)));
     }
     return pumpPose; // fechando: mão na bomba (e bombeia junto se estava vazia)
   }
@@ -788,7 +816,7 @@ export class ViewModel {
       parts.drum.rotation.z = open * Math.PI * 2 * 1.5 + (p > 0.3 && p < 0.5 ? (p - 0.3) * 40 : 0);
       parts.drum.position.x = -0.045 * open;
     } else if (spec.reload === 'shotgun' && parts.pump) {
-      const st = this.shot, sl = st ? (st.k === 'out' && st.pump ? ramp(st.f, 0.1, 0.95) : 0) : ramp(p, 0.86, 0.98);
+      const st = this.shot, sl = st ? (st.k === 'out' && st.pump ? ramp(st.f, 0.45, 0.98) : 0) : ramp(p, 0.86, 0.98);
       const back = smooth(ramp(sl, 0, 0.45)) - smooth(ramp(sl, 0.5, 1));
       parts.pump.position.z = back * 0.1;
     }
@@ -804,7 +832,7 @@ export class ViewModel {
     if (spec.reload === 'mag') { const T = this.magTimeline(spec); if (p > T.held[0] && p < T.held[1]) this.heldMag.visible = true; }
     else if (spec.reload === 'revolver' && p > 0.64 && p < 0.84) this.heldLoader.visible = true;
     else if (spec.reload === 'shotgun' && this.shot && this.shot.k === 'shell') {
-      this.heldShell.visible = this.shot.f > 0.04 && this.shot.f < 0.55; // cartucho na mão até entrar na janela
+      this.heldShell.visible = this.shot.f > 0.06 && this.shot.f < 0.62; // cartucho na mão até sumir dentro do tubo
     }
   }
 
