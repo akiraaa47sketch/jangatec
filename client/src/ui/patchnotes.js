@@ -5,6 +5,16 @@
 // Nos textos, **assim** vira negrito.
 export const PATCH_NOTES = [
   {
+    id: '0.38', versao: 'v0.38', data: '27/11/2026', titulo: 'Desempenho: inimigos de longe e resolução automática',
+    destaques: [
+      { tag: 'Desempenho', titulo: 'Inimigos leves de longe', texto: 'Cada inimigo era desenhado com **~90 pecinhas** — e os das ilhas em volta, quase invisíveis na neblina, custavam **~800 desenhos por quadro**. Agora, de longe, eles viram só a **cápsula do corpo** (mesma cor e silhueta) e somem além da neblina: **cerca de 40% menos desenhos** por quadro.' },
+      { tag: 'Gráficos', titulo: 'Resolução automática', texto: 'Se o FPS cair abaixo de 28, a escala de renderização **desce sozinha** (até 40% da tela) e volta aos poucos quando sobra folga. Dá para desligar em **Gráficos → Resolução automática**.' },
+    ],
+    secoes: [
+      { icone: '⚡', nome: 'Desempenho', itens: ['Com a luneta/mira o detalhe dos inimigos vai mais longe (o zoom conta).', 'Câmera de reflexo (Reflexos: alta): uma foto a cada 2,5 s, um lado a cada 3 quadros e alcance menor — com FPS baixo ela redesenhava o mundo em ~3 de cada 4 quadros.'] },
+    ],
+  },
+  {
     id: '0.37', versao: 'v0.37', data: '26/11/2026', titulo: 'Raridade de armas e mãos arrumadas',
     destaques: [
       { tag: 'Armas', titulo: 'Raridade 1★ a 4★', texto: 'Cada arma achada vem com **1 a 4 estrelas**: mais estrelas = **mais dano** (até +32%) e **mais precisão**. Zonas mais longe dão armas mais estreladas. Achou a mesma arma com mais estrelas? A sua **melhora**.' },

@@ -50,6 +50,7 @@ import { Intro } from './systems/intro.js';
 import { Reflections } from './core/reflections.js';
 import { ExtraEvents } from './systems/extraevents.js';
 import { ZoneTitle } from './ui/zonetitle.js';
+import { Lod } from './core/lod.js';
 
 const $ = (id) => document.getElementById(id);
 const canvas = $('c');
@@ -122,6 +123,7 @@ G.endgame = new Endgame(G); // coordenadas do abrigo, navegação 360° e os Twi
 G.inventory = new Inventory(G); // tela de inventário (Tab)
 G.extra = new ExtraEvents(G); // neblina, águas-vivas, acampamento, galeão, desembarque, tempestade de areia
 G.zoneTitle = new ZoneTitle(G); // nome da zona ao entrar numa zona nova
+G.lod = new Lod(G); // inimigos de longe viram só a cápsula; além da neblina, nada
 const atmo = new Atmosphere(renderer, scene, { sun, hemisphere }); // céu, IBL e sombras
 const ocean = new Ocean(scene, atmo);
 ocean.islandSource = () => G.world.islands.filter((i) => !i.seaSite); // estruturas do mar não têm água rasa
@@ -354,6 +356,7 @@ function frame() {
   G.zoneTitle.update(dt);
   if (G.touch && !cut) G.touch.update();
   sunVisual.update(camera, t);
+  G.lod.update(); // detalhe por distância (antes de qualquer desenho do quadro)
   G.reflections.update(dt); // jangada molhada/secando + câmera de reflexo
   G.gfx.render(dt);
   G.gfxMenu.update();

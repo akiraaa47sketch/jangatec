@@ -18,7 +18,7 @@ export class GfxMenu {
     const bind = (id, key, conv = num) => { $(id).onchange = (e) => { gfx.set(key, conv(e.target.type === 'checkbox' ? e.target.checked : e.target.value)); this.sync(); }; };
     bind('gUpscaler', 'upscaler', String); bind('gShadows', 'shadows', String); bind('gMsaa', 'msaa'); bind('gView', 'view');
     bind('gWater', 'water', String); bind('gPixel', 'pixelCap'); bind('gBloom', 'bloom', Boolean); bind('gGrade', 'grade', Boolean);
-    bind('gFps', 'showFps', Boolean);
+    bind('gFps', 'showFps', Boolean); bind('gAutoRes', 'autoRes', Boolean);
     bind('gReflect', 'reflect', String); bind('gWetRaft', 'wetRaft', Boolean);
     bind('gDof', 'dof', String); bind('gMotion', 'motion', Boolean); bind('gBob', 'bob', Boolean);
     bind('gWet', 'wet', Boolean); bind('gLowHp', 'lowHp', Boolean); bind('gGrain', 'grain', Boolean);
@@ -49,7 +49,7 @@ export class GfxMenu {
     $('gPreset').value = s.preset; $('gUpscaler').value = s.upscaler; $('gShadows').value = s.shadows;
     $('gMsaa').value = String(s.msaa); $('gView').value = String(s.view); $('gWater').value = s.water; $('gPixel').value = String(s.pixelCap);
     $('gReflect').value = s.reflect; $('gWetRaft').checked = s.wetRaft !== false;
-    $('gBloom').checked = s.bloom; $('gGrade').checked = s.grade; $('gFps').checked = s.showFps;
+    $('gBloom').checked = s.bloom; $('gGrade').checked = s.grade; $('gFps').checked = s.showFps; $('gAutoRes').checked = s.autoRes !== false;
     $('gDof').value = s.dof; $('gMotion').checked = s.motion; $('gBob').checked = s.bob;
     $('gWet').checked = s.wet; $('gLowHp').checked = s.lowHp; $('gGrain').checked = s.grain;
     $('gShake').value = Math.round(s.shake * 100); $('gShakeVal').textContent = s.shake > 0 ? `${Math.round(s.shake * 100)}%` : 'desligado';
@@ -67,7 +67,7 @@ export class GfxMenu {
     if (!s.showFps) return;
     const f = g.fps, cls = f.value >= 55 ? 'good' : f.value >= 30 ? 'ok' : 'bad';
     const text = `<b class="${cls}">${f.value}</b> FPS · ${f.ms.toFixed(1)} ms<br><span>${g.inSize.x}×${g.inSize.y} → ${g.outSize.x}×${g.outSize.y}` +
-      `${s.upscaler === 'fsr' && s.scale < 1 ? ' · FSR' : ''}</span>`;
+      `${s.upscaler === 'fsr' && g.scaleNow < 1 ? ' · FSR' : ''}${g.dyn < 0.999 ? ' · auto' : ''}</span>`;
     if (text !== this._t) { el.innerHTML = text; this._t = text; }
   }
 }
