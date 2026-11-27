@@ -8,7 +8,22 @@
 // A mira (raycast) não olha para "visible", então acertar de longe continua funcionando.
 import * as THREE from '../three.js';
 
-const DETAIL = 48; // metros (× distância de visão das opções gráficas)
+const DETAIL = 36; // metros (× distância de visão das opções gráficas)
+const NEAR = 55;    // perto disso tudo aparece, em qualquer direção (sombras, cobertura em volta)
+
+// Alcance de desenho conforme a direção: na frente da câmera vai até a neblina; nas laterais da tela
+// (e atrás, onde só importaria a sombra) cai para ~45% dela. O que some de lado aparece ao virar.
+// `r` = raio do objeto (uma ilha grande aparece pela borda); `cap` = alcance máximo dele.
+const _f = new THREE.Vector3();
+export function viewReach(G, x, z, r = 0, cap = Infinity) {
+  const cam = G.camera, fog = G.scene.fog, far = fog ? fog.far : 600;
+  const dx = x - cam.position.x, dz = z - cam.position.z, d = Math.hypot(dx, dz) - r;
+  if (d < NEAR) return true;
+  cam.getWorldDirection(_f);
+  const fl = Math.hypot(_f.x, _f.z) || 1, c = (dx * _f.x + dz * _f.z) / (fl * (d + r || 1)); // cosseno do ângulo
+  const k = Math.min(1, Math.max(0, (c - 0.55) / 0.35)); // ≥ ~25° do centro: frente; ≤ ~57°: lado
+  return d < Math.min(cap, far * (0.45 + 0.55 * k * k));
+}
 
 export class Lod {
   constructor(G) { this.G = G; this._p = new THREE.Vector3(); }
@@ -41,7 +56,7 @@ export class Lod {
       if (e.creature || !e.mesh) continue; // kraken/tubarões: o próprio evento cuida
       const l = e._lod && e._lod.root === e.mesh ? e._lod : this._prep(e);
       const d = cam.distanceTo(e.mesh.getWorldPosition(this._p)), sc = (e.def && e.def.scale) || 1;
-      const show = d < fogFar + 6 * sc;
+      const show = d < fogFar + 6 * sc && viewReach(G, this._p.x, this._p.z, 2 * sc);
       if (e.mesh.visible !== show) e.mesh.visible = show;
       this._setFar(l, l.ok && show && d > detail * Math.max(1, sc));
     }

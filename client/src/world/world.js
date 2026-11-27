@@ -7,6 +7,7 @@ import { CFG } from '../config.js';
 import { LOOT_CONFIG, generateCrateLoot, wreckFor, seabedCratesFor, seabedFindsFor, seaSiteFor, chunkHasIsland, WORLD_LOOT_PARAMS } from '../systems/loot.js';
 import { seabedHeight, makeSeabedChunk, makeFarSeabed, patchVortexDip } from './seabed.js';
 import { bakeStatic } from '../core/bake.js';
+import { viewReach } from '../core/lod.js';
 import { buildCamp } from './camp.js';
 import { buildScrapCamp } from './scrap.js';
 import { buildSeaTower, buildLeaningBuilding, buildJunkTower, buildScrapShack } from './seasites.js';
@@ -205,8 +206,8 @@ export class World {
     if (!r || !r.compileAsync) return;
     for (const o of objs) {
       if (!o || !o.visible) continue;
-      o.visible = false;
-      let shown = false; const show = () => { if (!shown) { shown = true; o.visible = true; } };
+      o.visible = false; o.userData.compiling = true;
+      let shown = false; const show = () => { if (!shown) { shown = true; o.visible = true; o.userData.compiling = false; } };
       try { r.compileAsync(o, G.camera, G.scene).then(show, show); } catch { show(); }
       setTimeout(show, 1500); // garantia: nunca fica escondido
     }
@@ -249,6 +250,11 @@ export class World {
     // Carrega em volta da jangada E do jogador (no fundo seco dá para se afastar a pé).
     const pp = G.player ? G.player.body.pos : G.boat;
     const centers = [[Math.round(G.boat.x / S), Math.round(G.boat.z / S)], [Math.round(pp.x / S), Math.round(pp.z / S)]];
+    // navegando: carrega também um trecho À FRENTE da jangada (o que vem pela proa aparece antes)
+    if (G.boat.speed > 0.4) {
+      const fx = Math.sin(G.boat.yaw), fz = Math.cos(G.boat.yaw), ahead = S * 1.6;
+      centers.push([Math.round((G.boat.x + fx * ahead) / S), Math.round((G.boat.z + fz * ahead) / S)]);
+    }
     // o host também carrega em volta dos aliados: é ele quem simula os inimigos das ilhas deles
     if (G.net && G.net.online && G.net.isHost) for (const r of G.net.remotes.values()) {
       if (!r.mesh || !r.mesh.parent) continue;
@@ -270,12 +276,44 @@ export class World {
     }
     this.farSeabed.position.set(pp.x, this.farSeabed.position.y, pp.z);
     this.farSeabed.visible = (G.startup ? G.startup.waterLevel : 1) < -3; // só faz falta com o mar seco
+    this._cullView();
     for (const [key, ch] of this.chunks) {
       const carryingDebris = ch.debris.some((obj) => obj.carriedBy);
       const far = centers.every(([ccx, ccz]) => Math.abs(ch.cx - ccx) > R + 1 || Math.abs(ch.cz - ccz) > R + 1);
       if (!carryingDebris && far) {
         this.dropChunk(ch);
         this.chunks.delete(key);
+      }
+    }
+  }
+
+  // Desenha menos nas laterais e mais à frente (core/lod.js → viewReach). Só mexe na visibilidade
+  // do grupo inteiro de cada coisa do chunk; peças soltas (destroços) escondem só as malhas filhas,
+  // porque o "visible" da raiz delas é usado pela construção (pegar/carregar).
+  _cullView() {
+    const G = this.G, S = CFG.chunk;
+    // fundo do mar: a água funda é quase opaca (6% de transparência), então de longe ele só aparece
+    // com o mar seco; destroços soltos são pequenos e somem antes da neblina
+    const dry = (G.startup ? G.startup.waterLevel : 0) < -3, bedCap = dry ? Infinity : 110 * (G.viewScale || 1);
+    const debrisCap = 120 * (G.viewScale || 1);
+    const set = (o, x, z, r, cap) => {
+      if (!o || o.userData.compiling) return;
+      const v = viewReach(G, x, z, r, cap);
+      if (o.visible !== v) o.visible = v;
+    };
+    for (const ch of this.chunks.values()) {
+      if (ch.seabed) set(ch.seabed, ch.cx * S, ch.cz * S, S * 0.71, bedCap);
+      if (ch.island) set(ch.island.group, ch.island.x, ch.island.z, (ch.island.R || 20) + 12);
+      if (ch.site) set(ch.site.group, ch.site.x, ch.site.z, 30);
+      if (ch.wreck) set(ch.wreck.group, ch.wreck.x, ch.wreck.z, 20);
+      for (const d of ch.debris) {
+        if (!d.mesh || d.mesh.isMesh) continue;
+        const v = d.placed || d.welded || d.carriedBy ? true : viewReach(G, d.mesh.position.x, d.mesh.position.z, 4, debrisCap); // na jangada/na mão: sempre
+        if (d._cullV === v) continue;
+        d._cullV = v;
+        if (!v) d._cullHid = d.mesh.children.filter((c) => c.visible); // lembra o que estava à mostra (contorno etc. fica como estava)
+        for (const c of d._cullHid || []) c.visible = v;
+        if (v) d._cullHid = null;
       }
     }
   }

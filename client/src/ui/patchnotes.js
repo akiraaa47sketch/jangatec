@@ -5,12 +5,13 @@
 // Nos textos, **assim** vira negrito.
 export const PATCH_NOTES = [
   {
-    id: '0.38', versao: 'v0.38', data: '27/11/2026', titulo: 'Desempenho: inimigos de longe e resolução automática',
+    id: '0.38', versao: 'v0.38', data: '27/11/2026', titulo: 'Desempenho: mais à frente, menos dos lados',
     destaques: [
-      { tag: 'Desempenho', titulo: 'Inimigos leves de longe', texto: 'Cada inimigo era desenhado com **~90 pecinhas** — e os das ilhas em volta, quase invisíveis na neblina, custavam **~800 desenhos por quadro**. Agora, de longe, eles viram só a **cápsula do corpo** (mesma cor e silhueta) e somem além da neblina: **cerca de 40% menos desenhos** por quadro.' },
+      { tag: 'Desempenho', titulo: 'Inimigos leves de longe', texto: 'Cada inimigo era desenhado com **~90 pecinhas** — e os das ilhas em volta, quase invisíveis na neblina, custavam **~800 desenhos por quadro**. Agora, de longe, eles viram só a **cápsula do corpo** (mesma cor e silhueta) e somem além da neblina: menos desenhos por quadro. Somado ao corte das laterais, foram de **~710 para ~290 desenhos por quadro** no teste.' },
       { tag: 'Gráficos', titulo: 'Resolução automática', texto: 'Se o FPS cair abaixo de 28, a escala de renderização **desce sozinha** (até 40% da tela) e volta aos poucos quando sobra folga. Dá para desligar em **Gráficos → Resolução automática**.' },
     ],
     secoes: [
+      { icone: '👁', nome: 'Mais à frente, menos dos lados', itens: ['O que está **na frente** da câmera aparece até a neblina; nas **laterais** da tela (e atrás) o alcance cai para ~45% — ao virar, aparece.', 'Navegando, o mapa carrega também **um trecho à frente da proa**.', 'Fundo do mar só é desenhado perto (a água funda quase não deixa ver), a não ser com o mar seco; destroços soltos somem depois de ~120 m.', 'Inimigos viram cápsula a partir de ~36 m (era 48 m).'] },
       { icone: '⚡', nome: 'Desempenho', itens: ['Com a luneta/mira o detalhe dos inimigos vai mais longe (o zoom conta).', 'Câmera de reflexo (Reflexos: alta): uma foto a cada 2,5 s, um lado a cada 3 quadros e alcance menor — com FPS baixo ela redesenhava o mundo em ~3 de cada 4 quadros.'] },
     ],
   },
