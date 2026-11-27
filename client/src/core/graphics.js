@@ -218,6 +218,7 @@ export class Graphics {
     if (GFX_PRESETS[this.settings.preset]) Object.assign(this.settings, GFX_PRESETS[this.settings.preset]);
     this.frameN = 0;
     this.fps = { frames: 0, acc: 0, value: 0, ms: 0 };
+    this.dyn = 1; this.dynLow = 0; this.dynHigh = 0; // resolução automática (multiplica a escala escolhida)
     this.fullRT = new THREE.WebGLRenderTarget(1, 1, { type: THREE.HalfFloatType, depthBuffer: false });
     this.easu = new FullScreenQuad(new THREE.ShaderMaterial({
       uniforms: { tInput: { value: null }, uInSize: { value: new THREE.Vector2() }, uExposure: { value: 1 }, uGrade: { value: 1 }, uBicubic: { value: 1 },
@@ -253,7 +254,7 @@ export class Graphics {
   wetLens(amount = 1) { if (this.settings.wet) this.wet = Math.max(this.wet, amount); }
 
   // ---------- configurações ----------
-  defaults() { return { preset: this.mobile ? 'medio' : 'alto', ...GFX_PRESETS[this.mobile ? 'medio' : 'alto'], showFps: false, ...IMMERSION_DEFAULTS(this.mobile) }; }
+  defaults() { return { preset: this.mobile ? 'medio' : 'alto', ...GFX_PRESETS[this.mobile ? 'medio' : 'alto'], showFps: false, autoRes: true, ...IMMERSION_DEFAULTS(this.mobile) }; }
   load() {
     let s = null;
     try { s = JSON.parse(localStorage.getItem(KEY) || 'null'); } catch { s = null; }
@@ -275,6 +276,7 @@ export class Graphics {
       reflect: pick('reflect', (v) => v in GFX_LABELS.reflect),
       wetRaft: pick('wetRaft', (v) => typeof v === 'boolean'),
       showFps: pick('showFps', (v) => typeof v === 'boolean'),
+      autoRes: pick('autoRes', (v) => typeof v === 'boolean'),
       shake: pick('shake', (v) => Number.isFinite(v) && v >= 0 && v <= 1),
       bob: pick('bob', (v) => typeof v === 'boolean'),
       dof: pick('dof', (v) => v in GFX_LABELS.dof),
@@ -294,7 +296,7 @@ export class Graphics {
   }
   set(key, value) {
     this.settings[key] = value;
-    if (key !== 'showFps' && !IMMERSION_KEYS.includes(key)) this.settings.preset = 'custom'; // imersão não mexe na predefinição
+    if (key !== 'showFps' && key !== 'autoRes' && !IMMERSION_KEYS.includes(key)) this.settings.preset = 'custom'; // imersão não mexe na predefinição
     this.apply(key); this.save();
   }
 
@@ -341,6 +343,7 @@ export class Graphics {
     // distância de visão (chunks carregados + neblina)
     G.viewScale = { 1: 0.7, 2: 1, 3: 1.35 }[s.view];
     G.loadRadius = s.view;
+    if (changed === undefined || changed === 'scale' || changed === 'autoRes') { this.dyn = 1; this.dynLow = this.dynHigh = 0; }
     if (G.ocean && (changed === undefined || changed === 'water')) G.ocean.setQuality(s.water);
     this.resize();
   }
@@ -349,7 +352,7 @@ export class Graphics {
 
   resize() {
     const r = this.renderer, size = r.getDrawingBufferSize(new THREE.Vector2());
-    const s = this.settings, w = Math.max(1, Math.round(size.x * s.scale)), h = Math.max(1, Math.round(size.y * s.scale));
+    const s = this.settings, sc = this.scaleNow, w = Math.max(1, Math.round(size.x * sc)), h = Math.max(1, Math.round(size.y * sc));
     this.inSize = new THREE.Vector2(w, h); this.outSize = size.clone();
     this.composer.setSize(w, h);
     this.bloom.setSize(Math.max(1, w >> 1), Math.max(1, h >> 1));
@@ -359,7 +362,7 @@ export class Graphics {
     this.easu.material.uniforms.uAspect.value = size.x / Math.max(1, size.y);
     const eu = this.easu.material.uniforms, ru = this.rcas.material.uniforms;
     eu.uInSize.value.copy(this.inSize);
-    eu.uBicubic.value = s.upscaler === 'fsr' && s.scale < 0.999 ? 1 : 0;
+    eu.uBicubic.value = s.upscaler === 'fsr' && sc < 0.999 ? 1 : 0;
     eu.uGrade.value = s.grade ? 1 : 0;
     ru.uSize.value.copy(size);
     ru.uSharp.value = s.sharpness;
@@ -424,6 +427,23 @@ export class Graphics {
   tick() {
     const f = this.fps, now = performance.now(), dt = f.last ? (now - f.last) / 1000 : 0;
     f.last = now; f.frames++; f.acc += dt;
-    if (f.acc >= 0.5) { f.value = Math.round(f.frames / f.acc); f.ms = (f.acc / f.frames) * 1000; f.frames = 0; f.acc = 0; }
+    if (f.acc >= 0.5) { f.value = Math.round(f.frames / f.acc); f.ms = (f.acc / f.frames) * 1000; f.frames = 0; f.acc = 0; this.autoRes(); }
+  }
+
+  // escala usada de fato = a escolhida × o ajuste automático
+  get scaleNow() { return this.settings.scale * this.dyn; }
+  // Resolução automática (a cada 0,5 s): FPS abaixo de 28 por ~1,5 s → desenha a cena com 15% menos
+  // pixels por lado; acima de 50 por ~4 s → devolve aos poucos até a escala escolhida no menu.
+  // Nunca cai abaixo de 40% da tela nem de 55% da escala escolhida.
+  autoRes() {
+    const s = this.settings, G = this.G, v = this.fps.value;
+    if (s.autoRes === false || !G.started || G.bench || document.hidden) { this.dynLow = this.dynHigh = 0; return; }
+    this.dynLow = v < 28 ? this.dynLow + 0.5 : 0;
+    this.dynHigh = v > 50 ? this.dynHigh + 0.5 : 0;
+    const min = Math.min(1, Math.max(0.55, 0.4 / s.scale));
+    let next = this.dyn;
+    if (this.dynLow >= 1.5 && this.dyn > min) next = Math.max(min, this.dyn * 0.85);
+    else if (this.dynHigh >= 4 && this.dyn < 1) next = Math.min(1, this.dyn / 0.9);
+    if (next !== this.dyn) { this.dyn = next; this.dynLow = this.dynHigh = 0; this.resize(); if (G.gfxMenu && G.gfxMenu.open) G.gfxMenu.sync(); }
   }
 }

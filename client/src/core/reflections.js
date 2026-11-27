@@ -9,7 +9,9 @@
 import * as THREE from '../three.js';
 import { PIECES } from '../boat/pieces.js';
 
-const PROBE = { alta: { size: 128, every: 0.8 }, ultra: { size: 256, every: 0.25 } };
+// every = segundos entre fotos; gap = quadros entre um lado e o próximo (a foto se espalha no tempo:
+// com FPS baixo, antes ela redesenhava o mundo inteiro em ~3 de cada 4 quadros)
+const PROBE = { alta: { size: 128, every: 2.5, gap: 3 }, ultra: { size: 256, every: 0.5, gap: 1 } };
 const METAL = 0.35;          // metalness a partir da qual o material conta como metal
 const SKY_I = 0.32;          // intensidade padrão do céu (atmosphere.js) — madeira seca fica igual a antes
 
@@ -34,7 +36,7 @@ export class Reflections {
     if (this.probe && this.probe.size === cfg.size) return;
     if (this.probe) this.probe.rt.dispose();
     const rt = new THREE.WebGLCubeRenderTarget(cfg.size, { type: THREE.HalfFloatType, generateMipmaps: true, minFilter: THREE.LinearMipmapLinearFilter });
-    const cam = new THREE.CubeCamera(0.4, 420, rt);
+    const cam = new THREE.CubeCamera(0.4, 220, rt); // longe demais já é só neblina no reflexo
     this.probe = { rt, cam, size: cfg.size };
     this.probeT = 0;
   }
@@ -171,8 +173,10 @@ export class Reflections {
     if (s.reflect !== this.mode) { this.mode = s.reflect; this._ensureProbe(s.reflect); this._scanT = 0; }
     if (this.probe) {
       const p = this.probe;
-      if (p.face >= 0 && p.face < 6) this._renderProbe(); // continua a foto em andamento (1 lado por quadro)
-      else {
+      if (p.face >= 0 && p.face < 6) { // continua a foto em andamento (1 lado a cada `gap` quadros)
+        p.wait = (p.wait || 0) - 1;
+        if (p.wait <= 0) { p.wait = PROBE[this.mode].gap; this._renderProbe(); }
+      } else {
         this.probeT -= dt;
         if (this.probeT <= 0) { this.probeT = PROBE[this.mode].every; p.face = -1; this._renderProbe(); }
       }

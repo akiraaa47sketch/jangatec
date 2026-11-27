@@ -563,6 +563,7 @@ export function makePill(options = {}) {
   const white = new THREE.Mesh(capsuleLathe(R, L, 0, SPLIT), plastic(0xffffff, bodyTexture(baseHex, Math.round(SPLIT * pxPerM), null, 7)));
   const red = new THREE.Mesh(capsuleLathe(R, L, SPLIT, TOTAL), plastic(0xffffff, bodyTexture(capHex, Math.round((TOTAL - SPLIT) * pxPerM), null, 3)));
   body.add(white, red);
+  white.userData.lodKeep = red.userData.lodKeep = true; // de longe só a cápsula aparece (core/lod.js)
   const face = makeFaceLayer(o.face); if (face) body.add(face.mesh);
   const seam = new THREE.Mesh(new THREE.TorusGeometry(R + 0.004, 0.008, 6, 64), plastic(capHex));
   seam.rotation.x = Math.PI / 2; seam.position.y = SEAM_Y; body.add(seam);
