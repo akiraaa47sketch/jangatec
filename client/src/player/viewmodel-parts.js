@@ -186,6 +186,8 @@ function place(mesh, from, to) {
   mesh.scale.set(1, 1, len);
 }
 
+const WRIST_MAX = 0.8; // ~45°: dobra máxima do pulso antes de o cotovelo acompanhar
+const _q2 = new THREE.Quaternion(), _q3 = new THREE.Quaternion();
 export function buildArm() {
   const root = new THREE.Group();
   // bracinhos de tubo da pílula (finos e escuros); manga e punho somem dentro da luva
@@ -196,8 +198,11 @@ export function buildArm() {
   const sleeve = limb(0.001, 0.001, MAT.tube, 3); sleeve.visible = false;
   add(root, upper, fore, elbow, cuff, sleeve);
 
-  // S = ombro, W = punho (ambos no espaço do viewmodel), pole = para onde o cotovelo aponta
-  function solve(S, W, pole) {
+  // S = ombro, W = punho (ambos no espaço do viewmodel), pole = para onde o cotovelo aponta.
+  // back (opcional) = direção "para trás" da mão (do pulso para o antebraço). O pulso de verdade
+  // dobra no máximo ~45°: se o cotovelo do IK deixasse um ângulo maior (pulso "quebrado"), ele gira
+  // até o antebraço seguir a linha da mão; o braço de cima absorve a diferença (fica quase fora da tela).
+  function solve(S, W, pole, back = null) {
     _dir.subVectors(W, S);
     const dist = _dir.length();
     _dir.multiplyScalar(1 / Math.max(dist, 1e-4));
@@ -209,6 +214,16 @@ export function buildArm() {
     if (_pp.lengthSq() < 1e-6) _pp.set(0, -1, 0);
     _pp.normalize();
     _e.copy(S).addScaledVector(_dir, x).addScaledVector(_pp, h);
+    if (back) {
+      _d.subVectors(_e, W).normalize();
+      const ang = _d.angleTo(back);
+      if (ang > WRIST_MAX) {
+        _q2.setFromUnitVectors(_d, back);
+        const k = (ang - WRIST_MAX) / ang;
+        _d.applyQuaternion(_q3.identity().slerp(_q2, k));
+        _e.copy(W).addScaledVector(_d, b);
+      }
+    }
     place(upper, S, _e);
     place(fore, _e, W);
     elbow.position.copy(_e);
@@ -581,7 +596,7 @@ SPECS.escopeta = () => {
   return {
     group: g, type: 'long', reload: 'shotgun', muzzle, sightY: rdY, adsDist: 0.2, adsFov: 62, flash: 1.6,
     eject: new THREE.Vector3(0.028, 0.045, -0.06),
-    hold: { p: [0.15, -0.12, -0.46], r: [0.03, 0.09, 0] },
+    hold: { p: [0.135, -0.135, -0.3], r: [0.04, 0.07, 0] }, // coronha junto ao ombro (fora da tela), punho perto do corpo
     // coronha reta: a mão fecha em volta do pescoço inclinado (gira para acompanhar a inclinação)
     gripR: { p: [0, -0.014, 0.06], r: [-0.75, 0, -1.55], c: 0.9, idx: 0.3, th: [-0.35, -0.2, 0.2] },
     gripL: { p: [0, 0.016, -0.31], r: [0, -1.5708, 3.1416], c: 0.85, th: [0.3, -0.3, 0.2] },
@@ -618,7 +633,7 @@ SPECS.rifle = () => {
   return {
     group: g, type: 'long', reload: 'mag', muzzle, sightY: rdY, adsDist: 0.1, adsFov: 58, flash: 1.3,
     eject: new THREE.Vector3(0.03, 0.045, -0.06),
-    hold: { p: [0.15, -0.12, -0.46], r: [0.03, 0.09, 0] },
+    hold: { p: [0.14, -0.14, -0.37], r: [0.04, 0.07, 0] }, // coronha junto ao ombro
     gripR: { p: [0, -0.07, 0.075], r: [0, 0, -1.55], c: 0.9, idx: 0.3, th: [-0.35, -0.2, 0.2] },
     gripL: { p: [0, -0.002, -0.34], r: [0, -1.5708, 3.1416], c: 0.8, th: [0.3, -0.3, 0.2] },
     magPoint: [0, -0.1, -0.12],
@@ -684,7 +699,7 @@ SPECS.rifle_precisao = () => {
     group: g, type: 'long', reload: 'mag', muzzle, sightY: info.sightY || 0.163, adsDist: 0.4, adsFov: 18, scope: true, flash: 1.5,
     eject: new THREE.Vector3(0.04, 0.12, 0.0),
     boltAction: true,
-    hold: { p: [0.16, -0.19, -0.47], r: [0.03, 0.07, 0] },
+    hold: { p: [0.15, -0.18, -0.38], r: [0.04, 0.06, 0] }, // coronha junto ao ombro
     gripR: { p: [0, -0.07, 0.075], r: [0, 0, -1.55], c: 0.9, idx: 0.3, th: [-0.35, -0.2, 0.2] },
     gripL: { p: [0, -0.03, -0.34], r: [0, -1.5708, 3.1416], c: 0.8, th: [0.3, -0.3, 0.2] },
     magPoint: [0, -0.05, -0.06],
@@ -723,7 +738,7 @@ const proceduralSniper = () => {
     group: g, type: 'long', reload: 'mag', muzzle, sightY: 0.098, adsDist: 0.42, adsFov: 18, scope: true, flash: 1.5,
     eject: new THREE.Vector3(0.035, 0.04, -0.03),
     boltAction: true,
-    hold: { p: [0.15, -0.13, -0.46], r: [0.03, 0.09, 0] },
+    hold: { p: [0.14, -0.14, -0.37], r: [0.04, 0.07, 0] }, // coronha junto ao ombro
     gripR: { p: [0, -0.07, 0.075], r: [0, 0, -1.55], c: 0.9, idx: 0.3, th: [-0.35, -0.2, 0.2] },
     gripL: { p: [0, -0.002, -0.42], r: [0, -1.5708, 3.1416], c: 0.8, th: [0.3, -0.3, 0.2] },
     magPoint: [0, -0.08, -0.06],
@@ -861,10 +876,31 @@ export function buildMedkit() {
   g.add(box(0.05, 0.012, 0.05, MAT.iron, 0, 0.056, 0));
   return g;
 }
+// Cartucho de escopeta calibre 12 (~7 cm × 1,9 cm): tubo plástico com frisos, ponta fechada em
+// estrela (-Z, entra primeiro no tubo), base de latão com aro e espoleta (+Z). Materiais em cache.
+const SHELL_MATS = new Map();
+function shellMats(color) {
+  if (!SHELL_MATS.has(color)) {
+    const c = new THREE.Color(color);
+    SHELL_MATS.set(color, {
+      hull: std(color, 0.55, 0, { emissive: c.clone().multiplyScalar(0.06) }),
+      crimp: std(c.clone().multiplyScalar(0.62).getHex(), 0.7),
+      rib: std(c.clone().multiplyScalar(0.8).getHex(), 0.6),
+      head: std(0xc9a25a, 0.32, 0.85), primer: std(0x9a9da2, 0.3, 0.9),
+    });
+  }
+  return SHELL_MATS.get(color);
+}
 export function buildShell(color = 0xb03a2e) {
-  const g = new THREE.Group();
-  const body = cylZ(0.0095, 0.0095, 0.045, std(color, 0.7), 0, 0, 0, 8);
-  g.add(body, cylZ(0.0098, 0.0098, 0.014, MAT.brass, 0, 0, 0.026, 8));
+  const g = new THREE.Group(), m = shellMats(color), R = 0.0093;
+  g.add(cylZ(R, R, 0.05, m.hull, 0, 0, -0.008, 16));                       // tubo plástico
+  for (const z of [-0.026, -0.016, -0.006, 0.004]) g.add(cylZ(R + 0.0004, R + 0.0004, 0.0018, m.rib, 0, 0, z, 16)); // frisos
+  g.add(cylZ(R * 0.72, R, 0.005, m.crimp, 0, 0, -0.0355, 16));             // ponta dobrada
+  const star = new THREE.Mesh(new THREE.CircleGeometry(R * 0.72, 6), m.crimp); // fechamento em estrela (6 dobras)
+  star.rotation.y = Math.PI; star.position.z = -0.0381; g.add(star);
+  g.add(cylZ(R + 0.0003, R + 0.0003, 0.016, m.head, 0, 0, 0.025, 16));     // base de latão
+  g.add(cylZ(R + 0.0014, R + 0.0014, 0.0024, m.head, 0, 0, 0.0342, 16));   // aro
+  g.add(cylZ(0.0027, 0.0027, 0.0012, m.primer, 0, 0, 0.036, 12));          // espoleta
   return g;
 }
 export function buildCartridgeCase() {
