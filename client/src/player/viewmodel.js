@@ -124,6 +124,7 @@ function shellPhase(pl) {
   return { k: 'out', f: Math.min(1, (t - pl.intro - pl.n * pl.per) / pl.outro), pump: pl.pump };
 }
 const BELT = V(-0.13, -0.52, -0.2);
+const _m4 = new THREE.Matrix4(), _back = new THREE.Vector3(), _eul = new THREE.Euler(), _bp = new THREE.Vector3();
 // Escopeta: o cartucho fica deitado na palma, alinhado com os dedos (mão 3D: dedos -Z, palma -Y).
 const SHELL_IN_HAND = V(0.004, -0.03, -0.118); // na ponta dos dedos: metade do cartucho fica à mostra
 // Caminho do cartucho até o tubo, no espaço da ARMA (x direita, y topo, z para trás); a janela de
@@ -339,6 +340,16 @@ export class ViewModel {
     p.applyMatrix4(this.weaponRoot.matrixWorld);
     return { p, q: wq.clone().multiply(q) };
   }
+  // ponta da coronha (espaço da arma): o ponto mais para trás do modelo, na altura do meio dela
+  buttPoint(spec) {
+    if (!spec._butt) {
+      const g = spec.group; g.updateMatrixWorld(true);
+      const inv = new THREE.Matrix4().copy(g.matrixWorld).invert(), box = new THREE.Box3(), tmp = new THREE.Box3();
+      g.traverse((o) => { if (o.isMesh && o.visible && o.geometry) { if (!o.geometry.boundingBox) o.geometry.computeBoundingBox(); tmp.copy(o.geometry.boundingBox).applyMatrix4(_m4.multiplyMatrices(inv, o.matrixWorld)); box.union(tmp); } });
+      spec._butt = box.isEmpty() ? V(0, -0.02, 0.3) : V(0, (box.min.y + box.max.y) * 0.5 - 0.02, box.max.z - 0.04);
+    }
+    return spec._butt;
+  }
   weaponPoint(arr, extra) {
     const p = V(...arr);
     if (extra) p.add(extra);
@@ -467,7 +478,19 @@ export class ViewModel {
     // ---- recarga: deslocamentos da arma + posição da mão esquerda ----
     let reload = null;
     if (spec && reloadP >= 0) reload = this.reloadPose(spec, reloadP);
-    if (reload) { for (let i = 0; i < 6; i++) { const k = reload.off[i] * wt.reload; if (i < 3) P[i] += k; else R[i - 3] += k; } }
+    if (reload) {
+      const P0 = P.slice(), R0 = R.slice();
+      for (let i = 0; i < 6; i++) { const k = reload.off[i] * wt.reload; if (i < 3) P[i] += k; else R[i - 3] += k; }
+      // arma longa: gira em volta da PONTA DA CORONHA (presa no ombro, perto do cotovelo), não do
+      // punho — senão a coronha inteira vem para o meio da tela
+      if (reload.butt) {
+        const b = this.buttPoint(spec);
+        const at = (PP, RR) => b.clone().applyEuler(_eul.set(RR[0], RR[1], RR[2])).add(_bp.set(PP[0], PP[1], PP[2]));
+        const fix = at(P0, R0).sub(at(P, R));
+        P[0] += fix.x; P[1] += fix.y; P[2] += fix.z;
+        if (reload.lift) for (let i = 0; i < 3; i++) P[i] += reload.lift[i] * wt.reload; // e sobe um pouco (o ombro acompanha)
+      }
+    }
 
     // ---- golpe corpo a corpo ----
     let swingP = -1;
@@ -591,7 +614,7 @@ export class ViewModel {
       hand.root.quaternion.copy(h.q);
       const busy = Math.max(this.w.carry, this.w.swim, this.w.mantle, this.w.heal) > 0.5;
       hand.setPose(h.c, h.t, busy ? null : h.jm);
-      this.arms[i].solve(i === 0 ? SHOULDER.R : SHOULDER.L, h.p, i === 0 ? POLE.R : POLE.L);
+      this.arms[i].solve(i === 0 ? SHOULDER.R : SHOULDER.L, h.p, i === 0 ? POLE.R : POLE.L, i === 1 ? _back.set(0, 0, 1).applyQuaternion(h.q) : null); // mão esquerda: pulso não dobra além de ~45° (mão 3D: antebraço em +Z)
     }
 
     // ---- visibilidade da arma ----
@@ -681,7 +704,7 @@ export class ViewModel {
         const rk = smooth(ramp(p, T.reach[0], T.reach[1])) - smooth(ramp(p, T.back[0], T.back[1]));
         // a pistola vira com o topo para a ESQUERDA (na direção da mão que engatilha) e vem para o meio;
         // antes ficava inclinada para a direita e o braço esquerdo tinha que cruzar por cima dela
-        off[0] -= 0.05 * rk; off[1] -= 0.02 * rk; off[2] += 0.03 * rk; off[3] -= 0.2 * rk; off[4] -= 0.2 * rk; off[5] += 0.8 * rk;
+        off[0] -= 0.05 * rk; off[1] -= 0.03 * rk; off[2] -= 0.05 * rk; off[3] -= 0.2 * rk; off[4] -= 0.2 * rk; off[5] += 0.8 * rk;
         const slam = Math.sin(Math.PI * ramp(p, T.release[0], T.release[1] + 0.05));
         off[3] -= 0.07 * slam; off[1] += 0.006 * slam;
       }
@@ -695,14 +718,16 @@ export class ViewModel {
       // para a câmera e para a mão esquerda; volta a ficar de pé antes de bombear
       const st = this.shot;
       const lay = st ? (st.k === 'in' ? smooth(st.f) : st.k === 'shell' ? 1 : 1 - smooth(ramp(st.f, 0, 0.45))) : roll;
-      off[0] = -0.02 * lay; off[1] = -0.01 * lay; off[2] = -0.07 * lay;
-      off[3] = 0.0 * lay; off[4] = 0.62 * lay; off[5] = 0.55 * lay;
+      // (gira em volta da coronha: ver reload.butt) cano para a esquerda e um pouco para baixo
+      // quase só DEITA (gira no eixo do cano) e sobe um pouco: a coronha continua no ombro, fora da tela
+      off[3] = 0.03 * lay; off[4] = 0.04 * lay; off[5] = -1.0 * lay;
+      this._lift = [-0.045 * lay, 0.03 * lay, -0.04 * lay];
       if (st && st.k === 'shell') { // empurrão do cartucho entrando (a arma cede um pouco)
         const push = Math.sin(Math.PI * ramp(st.f, 0.5, 0.68));
         off[2] -= 0.008 * push; off[3] -= 0.025 * push;
       }
     }
-    return { off };
+    return { off, butt: spec.reload === 'shotgun', lift: spec.reload === 'shotgun' ? this._lift : null };
   }
   // Onde a mão esquerda deve estar durante a recarga (espaço do viewmodel).
   reloadHand(spec, p) {

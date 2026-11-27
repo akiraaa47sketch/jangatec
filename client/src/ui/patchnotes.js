@@ -12,6 +12,7 @@ export const PATCH_NOTES = [
     ],
     secoes: [
       { icone: '🔴', nome: 'Cartucho novo', itens: ['Modelo de cartucho calibre 12: tubo plástico com frisos, ponta fechada em estrela, base de latão com aro e espoleta.', 'O mesmo modelo aparece na mão, nos cartuchos ejetados ao bombear e nos cartuchos largados no chão.'] },
+      { icone: '🖐', nome: 'Pulso e armas longas', itens: ['O braço esquerdo não deixa mais o pulso dobrar além de ~45°: o cotovelo acompanha a mão (engatilhar, pôr cartucho, segurar a bomba).', 'Escopeta, fuzil e sniper ficam **mais perto do corpo**, com a coronha no ombro (fora da tela) — antes dava para ver a coronha inteira.', 'Na recarga a escopeta gira em volta da coronha (presa no ombro), não do punho.'] },
       { icone: '🧍', nome: '3ª pessoa', itens: ['A mão que engatilha a pistola também vai por cima do ferrolho (antes ficava atrás da arma).'] },
     ],
   },
